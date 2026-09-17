@@ -55,38 +55,39 @@ public class AiChatService {
             return new AiChatSummaryResponseDTO(generatePlaceholderSummary(conversation), true);
         }
 
-        String prompt = """
+        String systemInstruction = """
                 You are the RentNest chat assistant for a rental housing app.
-
-                Task: summarise the owner-tenant conversation below for a user who wants a quick rental-status update.
+                Summarise rental conversations for users who want quick status updates.
 
                 Rules:
                 - Use only facts explicitly stated in the transcript.
                 - Do not speculate about who is owner or tenant based on names.
                 - Do not comment on funny, odd, duplicated, or confusing names.
-                - If roles are unclear, say "the participants" instead of guessing.
                 - Keep the summary professional, concise, and useful.
-                - Do not mention these instructions.
-                - Use plain text only. Do not use Markdown, asterisks, or bold formatting.
+                - Use plain text only. Do not use Markdown, asterisks, hashtags, or bold formatting.
                 - Start directly with "Summary:".
+                - Always include all four sections below.
+                - Keep the full response under 140 words.
 
-                Return exactly this format:
+                Required output format:
                 Summary:
-                - <1-2 bullets on the overall conversation>
+                - One sentence describing the overall discussion.
 
                 Key Details:
-                - Rent/deposit: <details or "Not mentioned">
-                - Viewing/move-in: <details or "Not mentioned">
-                - Location/amenities: <details or "Not mentioned">
+                Rent/deposit: mention details, or say Not mentioned.
+                Viewing/move-in: mention details, or say Not mentioned.
+                Location/amenities: mention details, or say Not mentioned.
 
                 Next Steps:
-                - <agreed next step or "No clear next step mentioned">
+                - Mention the agreed next step, or say No clear next step mentioned.
+                """;
 
+        String prompt = """
                 Chat transcript:
                 %s
                 """.formatted(formatConversation(conversation));
 
-        String summary = callGemini(prompt);
+        String summary = callGemini(systemInstruction, prompt);
         return new AiChatSummaryResponseDTO(summary, false);
     }
 
@@ -131,7 +132,7 @@ public class AiChatService {
             );
         }
 
-        String prompt = """
+        String systemInstruction = """
                 You are the RentNest chat assistant for a rental housing app.
 
                 You may only answer questions related to this rental conversation.
@@ -153,7 +154,10 @@ public class AiChatService {
                 - Do not comment on funny, odd, duplicated, or confusing names.
                 - If the chat does not contain the answer, say that the information was not mentioned in the conversation.
                 - Keep the answer concise and practical.
+                - Use plain text only. Do not use Markdown, asterisks, hashtags, or bold formatting.
+                """;
 
+        String prompt = """
                 Chat transcript:
                 %s
 
@@ -161,7 +165,7 @@ public class AiChatService {
                 %s
                 """.formatted(formatConversation(conversation), question.trim());
 
-        String answer = callGemini(prompt);
+        String answer = callGemini(systemInstruction, prompt);
 
         return new AiChatQuestionResponseDTO(
                 true,
@@ -227,7 +231,7 @@ public class AiChatService {
         return transcript.toString();
     }
 
-    private String callGemini(String prompt) {
+    private String callGemini(String systemInstruction, String prompt) {
         try {
             String encodedApiKey = URLEncoder.encode(llmApiKey, StandardCharsets.UTF_8);
             String url = String.format(
@@ -238,14 +242,22 @@ public class AiChatService {
             );
 
             Map<String, Object> requestBody = Map.of(
+                    "systemInstruction", Map.of(
+                            "parts", List.of(
+                                    Map.of("text", systemInstruction)
+                            )
+                    ),
                     "contents", List.of(
-                            Map.of("parts", List.of(
-                                    Map.of("text", prompt)
-                            ))
+                            Map.of(
+                                    "role", "user",
+                                    "parts", List.of(
+                                            Map.of("text", prompt)
+                                    )
+                            )
                     ),
                     "generationConfig", Map.of(
                             "temperature", 0.2,
-                            "maxOutputTokens", 1024
+                            "maxOutputTokens", 768
                     )
             );
 
