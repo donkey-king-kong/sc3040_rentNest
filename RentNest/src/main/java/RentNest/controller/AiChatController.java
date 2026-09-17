@@ -1,8 +1,8 @@
 package RentNest.controller;
 
+import RentNest.dto.AiChatQuestionRequestDTO;
+import RentNest.dto.AiChatQuestionResponseDTO;
 import RentNest.dto.AiChatSummaryResponseDTO;
-import RentNest.dto.AiSafetyCheckRequestDTO;
-import RentNest.dto.AiSafetyCheckResponseDTO;
 import RentNest.service.AiChatService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,14 +33,18 @@ public class AiChatController {
         }
     }
 
-    @PostMapping("/safety-check")
-    public ResponseEntity<?> checkMessageSafety(@RequestBody AiSafetyCheckRequestDTO request) {
+    @PostMapping("/ask")
+    public ResponseEntity<?> askQuestion(@RequestBody AiChatQuestionRequestDTO request) {
         try {
-            AiSafetyCheckResponseDTO result = aiChatService.checkMessageSafety(request.getMessage());
+            AiChatQuestionResponseDTO result = aiChatService.askQuestion(
+                    request.getUserA(),
+                    request.getUserB(),
+                    request.getQuestion()
+            );
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("An unexpected error occurred while checking message safety: " + e.getMessage());
+                    .body("An unexpected error occurred while answering the AI chat question: " + e.getMessage());
         }
     }
 }

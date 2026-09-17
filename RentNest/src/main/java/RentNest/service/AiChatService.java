@@ -1,7 +1,7 @@
 package RentNest.service;
 
 import RentNest.dto.AiChatSummaryResponseDTO;
-import RentNest.dto.AiSafetyCheckResponseDTO;
+import RentNest.dto.AiChatQuestionResponseDTO;
 import RentNest.model.ChatHistory;
 import org.springframework.stereotype.Service;
 
@@ -43,51 +43,77 @@ public class AiChatService {
         return new AiChatSummaryResponseDTO(summary, true);
     }
 
-    public AiSafetyCheckResponseDTO checkMessageSafety(String message) {
-        if (message == null || message.trim().isEmpty()) {
-            return new AiSafetyCheckResponseDTO(
+    public AiChatQuestionResponseDTO askQuestion(Long userA, Long userB, String question) {
+        if (question == null || question.trim().isEmpty()) {
+            return new AiChatQuestionResponseDTO(
                     false,
-                    "empty_message",
-                    "[HARDCODED PLACEHOLDER] Message cannot be empty.",
+                    "empty_question",
+                    "[HARDCODED PLACEHOLDER] Please ask a question about this rental conversation.",
                     true
             );
         }
 
-        String normalizedMessage = message.toLowerCase(Locale.ROOT);
+        String normalizedQuestion = question.toLowerCase(Locale.ROOT);
 
-        if (containsAny(normalizedMessage, "deposit before viewing", "transfer deposit", "paynow me", "wire transfer", "bank transfer first")) {
-            return new AiSafetyCheckResponseDTO(
+        if (isOutOfScopeQuestion(normalizedQuestion)) {
+            return new AiChatQuestionResponseDTO(
                     false,
-                    "possible_scam",
-                    "[HARDCODED PLACEHOLDER] This message may be risky because it appears to request payment before proper verification or viewing.",
+                    "out_of_scope",
+                    "[HARDCODED PLACEHOLDER] I can only answer questions related to this rental conversation, such as the listing, rent, viewing plans, tenant/owner requests, or next steps.",
                     true
             );
         }
 
-        if (containsAny(normalizedMessage, "password", "otp", "one-time password", "credit card number", "bank account password")) {
-            return new AiSafetyCheckResponseDTO(
-                    false,
-                    "sensitive_information",
-                    "[HARDCODED PLACEHOLDER] This message may request sensitive personal or financial information.",
+        List<ChatHistory> conversation = chatHistoryService.getConversationBetweenUsers(userA, userB);
+
+        if (conversation.isEmpty()) {
+            return new AiChatQuestionResponseDTO(
+                    true,
+                    "rental_conversation",
+                    "[HARDCODED PLACEHOLDER] There are no messages in this rental conversation yet, so I cannot answer using chat context.",
                     true
             );
         }
 
-        if (containsAny(normalizedMessage, "idiot", "stupid", "shut up", "hate you")) {
-            return new AiSafetyCheckResponseDTO(
-                    false,
-                    "harassment",
-                    "[HARDCODED PLACEHOLDER] This message may contain disrespectful or harassing language.",
-                    true
-            );
-        }
+        ChatHistory latestMessage = conversation.get(conversation.size() - 1);
+        String latestSender = latestMessage.getSenderName() != null ? latestMessage.getSenderName() : "User " + latestMessage.getSenderId();
+        String latestText = latestMessage.getMessage() != null ? latestMessage.getMessage() : "";
 
-        return new AiSafetyCheckResponseDTO(
+        String answer = String.format(
+                "[HARDCODED PLACEHOLDER] This question is within the rental conversation scope. The chat has %d message(s). Latest message from %s: \"%s\". Real LLM integration will answer using full chat context later.",
+                conversation.size(),
+                latestSender,
+                latestText
+        );
+
+        return new AiChatQuestionResponseDTO(
                 true,
-                "safe",
-                "[HARDCODED PLACEHOLDER] No obvious safety issue detected by the placeholder rules.",
+                "rental_conversation",
+                answer,
                 true
         );
+    }
+
+    private boolean isOutOfScopeQuestion(String question) {
+        return containsAny(
+                question,
+                "solve",
+                "math",
+                "calculus",
+                "equation",
+                "write code",
+                "python",
+                "java program",
+                "javascript",
+                "world cup",
+                "weather",
+                "stock price",
+                "tell me a joke",
+                "recipe",
+                "movie",
+                "song",
+                "ignore previous"
+        ) && !containsAny(question, "rent", "rental", "tenant", "owner", "listing", "lease", "deposit", "viewing", "chat", "conversation");
     }
 
     private boolean containsAny(String text, String... keywords) {

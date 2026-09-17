@@ -44,10 +44,11 @@ const ChatsScreen2 = () => {
     const [isGeneratingSummary, setGeneratingSummary] = useState(false);
     const [chatSummary, setChatSummary] = useState('');
     const [summaryError, setSummaryError] = useState('');
-    const [isSafetyModalVisible, setSafetyModalVisible] = useState(false);
-    const [safetyWarning, setSafetyWarning] = useState(null);
-    const [pendingMessage, setPendingMessage] = useState('');
-    const [isCheckingSafety, setCheckingSafety] = useState(false);
+    const [isAskAiModalVisible, setAskAiModalVisible] = useState(false);
+    const [aiQuestion, setAiQuestion] = useState('');
+    const [aiAnswer, setAiAnswer] = useState('');
+    const [aiAnswerCategory, setAiAnswerCategory] = useState('');
+    const [isAskingAi, setAskingAi] = useState(false);
     const { refresh } = useLocalSearchParams();
 
     const getConversation = async () => {
@@ -269,53 +270,7 @@ const ChatsScreen2 = () => {
             return;
         }
 
-        try {
-            setCheckingSafety(true);
-            const token = await AsyncStorage.getItem('token');
-            if (!token) {
-                console.log('No token found!');
-                navigation.replace('/LoginScreen');
-                return;
-            }
-
-            const safetyResponse = await axios.post(`${API_BASE_URL}/api/ai-chat/safety-check`, {
-                message: messageToSend,
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-            });
-
-            if (safetyResponse.data?.safe === false) {
-                setPendingMessage(messageToSend);
-                setSafetyWarning(safetyResponse.data);
-                setSafetyModalVisible(true);
-                return;
-            }
-
-            await postMessage(messageToSend);
-        } catch (error) {
-            console.error('Error checking message safety:', error);
-            await postMessage(messageToSend);
-        } finally {
-            setCheckingSafety(false);
-        }
-    }
-
-    const sendPendingMessageAnyway = async () => {
-        const messageToSend = pendingMessage;
-        setSafetyModalVisible(false);
-        setSafetyWarning(null);
-        setPendingMessage('');
         await postMessage(messageToSend);
-    }
-
-    const cancelPendingMessage = () => {
-        setSafetyModalVisible(false);
-        setSafetyWarning(null);
-        setPendingMessage('');
     }
 
     const getChatSummary = async () => {
@@ -351,6 +306,47 @@ const ChatsScreen2 = () => {
             setSummaryModalVisible(true);
         } finally {
             setGeneratingSummary(false);
+        }
+    }
+
+    const askAiQuestion = async () => {
+        const questionToAsk = aiQuestion.trim();
+        if (questionToAsk === '') {
+            return;
+        }
+
+        try {
+            setAskingAi(true);
+            setAiAnswer('');
+            setAiAnswerCategory('');
+
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                console.log('No token found!');
+                navigation.replace('/LoginScreen');
+                return;
+            }
+
+            const askAiResponse = await axios.post(`${API_BASE_URL}/api/ai-chat/ask`, {
+                userA: partnerUserId,
+                userB: currentUser,
+                question: questionToAsk,
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+            });
+
+            setAiAnswer(askAiResponse.data?.answer || 'No AI answer available.');
+            setAiAnswerCategory(askAiResponse.data?.category || '');
+        } catch (error) {
+            console.error('Error asking AI question:', error);
+            setAiAnswer('Unable to ask AI right now.');
+            setAiAnswerCategory('error');
+        } finally {
+            setAskingAi(false);
         }
     }
 
@@ -738,6 +734,9 @@ const handlePaymentAndAccept = async () => {
             <View style={styles.nameHeaderContainer}>
                 <Text style={styles.header}>{partner.name}</Text>
                 <View style={styles.headerActions}>
+                    <TouchableOpacity onPress={() => setAskAiModalVisible(true)} style={styles.aiSummaryButton}>
+                        <Text style={styles.aiSummaryButtonText}>Ask AI</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={getChatSummary} style={styles.aiSummaryButton} disabled={isGeneratingSummary}>
                         <Text style={styles.aiSummaryButtonText}>{isGeneratingSummary ? 'Summarising...' : 'Summarise Chat'}</Text>
                     </TouchableOpacity>
@@ -780,7 +779,7 @@ const handlePaymentAndAccept = async () => {
                     value={newMessage}
                     onChangeText={setNewMessage}
                     />
-                <TouchableOpacity onPress={sendMessage} disabled={isCheckingSafety}>
+                <TouchableOpacity onPress={sendMessage}>
                     <Image source={sendIcon} style={styles.icon}/>
                 </TouchableOpacity>
             </View>
@@ -808,32 +807,38 @@ const handlePaymentAndAccept = async () => {
             <Modal
                 animationType="slide"
                 transparent={true}
-                visible={isSafetyModalVisible}
-                onRequestClose={cancelPendingMessage}
+                visible={isAskAiModalVisible}
+                onRequestClose={() => setAskAiModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Message Safety Warning</Text>
-                            <TouchableOpacity onPress={cancelPendingMessage}>
+                            <Text style={styles.modalTitle}>Ask AI About This Chat</Text>
+                            <TouchableOpacity onPress={() => setAskAiModalVisible(false)}>
                                 <Image source={x} style={styles.icon}/>
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder safeguards.</Text>
-                        <Text style={styles.modalDescription}>{safetyWarning?.reason}</Text>
-                        <Text style={styles.warningMessagePreview}>{pendingMessage}</Text>
-                        <View style={styles.buttonAlignment}>
-                            <View style={styles.confirmButton}>
-                                <TouchableOpacity onPress={sendPendingMessageAnyway}>
-                                    <Text style={styles.whiteButtonText}> Send Anyway </Text>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.cancelButton}>
-                                <TouchableOpacity onPress={cancelPendingMessage}>
-                                    <Text style={styles.buttonText}> Cancel </Text>
-                                </TouchableOpacity>
-                            </View>
+                        <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder LLM guardrails.</Text>
+                        <Text style={styles.modalDescription}>Ask questions related to this rental conversation only.</Text>
+                        <TextInput
+                            style={styles.aiQuestionInput}
+                            placeholder="E.g. What is the tenant asking for?"
+                            value={aiQuestion}
+                            onChangeText={setAiQuestion}
+                        />
+                        <View style={styles.longBlackButton}>
+                            <TouchableOpacity onPress={askAiQuestion} disabled={isAskingAi}>
+                                <Text style={styles.whiteButtonText}>{isAskingAi ? ' Asking AI... ' : ' Ask AI '}</Text>
+                            </TouchableOpacity>
                         </View>
+                        {aiAnswer !== '' && (
+                            <View style={styles.aiAnswerContainer}>
+                                {aiAnswerCategory !== '' && (
+                                    <Text style={styles.aiAnswerCategory}>Category: {aiAnswerCategory}</Text>
+                                )}
+                                <Text style={styles.summaryText}>{aiAnswer}</Text>
+                            </View>
+                        )}
                     </View>
                 </View>
             </Modal>
@@ -1198,14 +1203,26 @@ const styles = StyleSheet.create({
         width: '100%',
         marginBottom: 10,
     },
-    warningMessagePreview: {
+    aiQuestionInput: {
         width: '100%',
         backgroundColor: '#f1f1f1',
         borderRadius: 10,
         padding: 12,
         marginBottom: 15,
         fontSize: 14,
-        fontStyle: 'italic',
+    },
+    aiAnswerContainer: {
+        width: '100%',
+        backgroundColor: '#f9f9f9',
+        borderRadius: 10,
+        padding: 12,
+        marginTop: 15,
+    },
+    aiAnswerCategory: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginBottom: 8,
+        color: '#666',
     },
     infoContainer: {
         marginBottom: 10,
