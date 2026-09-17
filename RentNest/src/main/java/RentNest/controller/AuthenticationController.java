@@ -52,7 +52,11 @@ public class AuthenticationController {
         try {
             User authenticatedUser = authenticationService.authenticate(loginUserDto);
             String jwtToken = jwtService.generateToken(authenticatedUser);
-            LoginResponse loginResponse = new LoginResponse().setToken(jwtToken).setExpiresIn(jwtService.getExpirationTime());
+            LoginResponse loginResponse = new LoginResponse()
+                    .setToken(jwtToken)
+                    .setExpiresIn(jwtService.getExpirationTime())
+                    .setUserId(authenticatedUser.getUserID())
+                    .setRole(authenticatedUser.getRole());
             return ResponseEntity.ok(loginResponse);
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());

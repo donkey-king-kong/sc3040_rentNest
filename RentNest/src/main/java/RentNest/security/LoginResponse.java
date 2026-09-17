@@ -4,6 +4,7 @@ public class LoginResponse {
     private String token;
     private long expiresIn;
     private Long userId;  // Add this if you need the userId
+    private String role;   // USER or ADMIN, so the app can show admin screens without hardcoding emails
 
     // Getters and setters
     public String getToken() {
@@ -26,6 +27,15 @@ public class LoginResponse {
 
     public Long getUserId() {
         return userId;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public LoginResponse setRole(String role) {
+        this.role = role;
+        return this;
     }
 
     public LoginResponse setUserId(Long userId) {

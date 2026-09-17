@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import { FontAwesome } from 'react-native-vector-icons';
 
 // Sample image imports (update the paths according to your project structure)
 const processReviewsImg = require('../assets/images/processreviews.png');
@@ -51,6 +52,20 @@ const AdminScreen = () => {
           </View>
           <Image source={arrowIcon} style={styles.arrowIcon} />
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => router.push('/AdminAnalyticsScreen')}
+        >
+          <View style={[styles.buttonImage, styles.iconTile]}>
+            <FontAwesome name="bar-chart" size={40} color="#333" />
+          </View>
+          <View style={styles.buttonTextContainer}>
+            <Text style={styles.buttonTitle}>Platform Analytics</Text>
+            <Text style={styles.buttonSubtitle}>Users, payments and moderation at a glance</Text>
+          </View>
+          <Image source={arrowIcon} style={styles.arrowIcon} />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -89,6 +104,11 @@ const styles = StyleSheet.create({
     height: 90,
     marginRight: 15,
     borderRadius: 10, // Set border radius to half the width/height for a circular look
+  },
+  iconTile: {
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonTextContainer: {
     flex: 1,

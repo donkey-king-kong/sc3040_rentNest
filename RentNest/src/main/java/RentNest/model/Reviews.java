@@ -60,6 +60,11 @@ public class Reviews {
         return reviewer != null ? reviewer.getUserID() : null;
     }
 
+    /** True when the given user wrote this review (not the user being reviewed). */
+    public boolean isWrittenBy(User user) {
+        return user != null && user.getUserID() != null && user.getUserID().equals(getReviewerId());
+    }
+
     @JsonProperty("reviewerName")
     public String getReviewerName() {
         return reviewer != null ? reviewer.getName() : null;

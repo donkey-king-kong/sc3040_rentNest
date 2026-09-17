@@ -5,15 +5,18 @@ import { FontAwesome } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
+import ModerationListState, { moderationLoadError } from '../components/ModerationListState';
 
 const ProcessReviewsScreen = () => {
   const [reviewsData, setReviewsData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const router = useRouter();
   const { refresh } = useLocalSearchParams();
 
   const getFlaggedReviews = async () => {
+    setLoadError(null);
     try {
       const token = await AsyncStorage.getItem('token');
       
@@ -49,6 +52,8 @@ const ProcessReviewsScreen = () => {
       setReviewsData(flaggedReviews);
     } catch (error) {
       console.error("An error occurred:", error);
+      setReviewsData([]);
+      setLoadError(moderationLoadError(error, 'reviews'));
     }
   };
 
@@ -72,13 +77,6 @@ const ProcessReviewsScreen = () => {
     );
   };
 
-  if (!reviewsData) {
-    return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -95,7 +93,16 @@ const ProcessReviewsScreen = () => {
 
       {/* FlatList for reviews */}
       <FlatList
-        data={filterReviews(reviewsData, searchQuery)}
+        data={filterReviews(reviewsData, searchQuery) || []}
+        ListEmptyComponent={
+          <ModerationListState
+            loading={reviewsData === null && !loadError}
+            error={loadError}
+            searching={!!searchQuery}
+            emptyText="No reported reviews right now."
+            onRetry={getFlaggedReviews}
+          />
+        }
         keyExtractor={item => item.reviewid.toString()}
         refreshControl={
           <RefreshControl

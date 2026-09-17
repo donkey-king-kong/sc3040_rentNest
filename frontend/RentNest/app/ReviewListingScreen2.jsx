@@ -154,13 +154,13 @@ const ReviewListingScreen2 = () => {
           style={[styles.button, styles.ignoreButton]}
           onPress={handleIgnore} // Call handleIgnore function
         >
-          <Text style={styles.buttonText}>Ignore</Text>
+          <Text style={styles.buttonText}>Dismiss Report</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.deleteButton]}
           onPress={handleDelete} // Call handleDelete function
         >
-          <Text style={styles.buttonText}>Delete</Text>
+          <Text style={styles.buttonText}>Delete Listing</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -223,6 +223,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 5,
     width: '40%', // Adjust width as necessary
+    justifyContent: 'center', // keeps both buttons even if a label wraps
   },
   ignoreButton: {
     backgroundColor: 'green',

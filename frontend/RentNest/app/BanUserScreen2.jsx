@@ -133,13 +133,13 @@ const BanUsersScreen2 = () => {
           style={[styles.button, styles.ignoreButton]}
           onPress={handleIgnoreUser}
         >
-          <Text style={styles.buttonText}>Ignore</Text>
+          <Text style={styles.buttonText}>Dismiss Report</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.deleteButton]}
           onPress={handleBanUser}
         >
-          <Text style={styles.buttonText}>Delete</Text>
+          <Text style={styles.buttonText}>Ban User</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -192,6 +192,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 5,
     width: '40%', // Adjust width as necessary
+    justifyContent: 'center', // keeps both buttons even if a label wraps
   },
   ignoreButton: {
     backgroundColor: 'green',

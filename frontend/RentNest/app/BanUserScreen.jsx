@@ -4,15 +4,19 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
+import ModerationListState, { moderationLoadError } from '../components/ModerationListState';
 
 const BanUsersScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [flaggedUsersData, setFlaggedUsersData] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const router = useRouter();
   const { refresh } = useLocalSearchParams();
 
   const getFlaggedUsers = async () => {
+    setLoadError(null);
     try {
       const token = await AsyncStorage.getItem('token');
       
@@ -42,6 +46,10 @@ const BanUsersScreen = () => {
       setFlaggedUsersData(transformedData);
     } catch (error) {
       console.error("An error occurred:", error);
+      setFlaggedUsersData([]);
+      setLoadError(moderationLoadError(error, 'users'));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -86,7 +94,16 @@ const BanUsersScreen = () => {
       {/* FlatList for flagged users */}
       <FlatList
         data={filterUsers(flaggedUsersData, searchQuery)}
-        keyExtractor={item => item.userID}
+        keyExtractor={item => String(item.userid)}
+        ListEmptyComponent={
+          <ModerationListState
+            loading={loading}
+            error={loadError}
+            searching={!!searchQuery}
+            emptyText="No reported users right now."
+            onRetry={getFlaggedUsers}
+          />
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

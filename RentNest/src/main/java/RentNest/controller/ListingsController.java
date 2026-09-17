@@ -1,11 +1,13 @@
     package RentNest.controller;
 
     import RentNest.model.Listings;
+    import RentNest.model.User;
     import RentNest.dto.ListingsDTO;
     import RentNest.service.ListingsService;
     import org.springframework.beans.factory.annotation.Autowired;
     import org.springframework.http.HttpStatus;
     import org.springframework.http.ResponseEntity;
+    import org.springframework.security.core.annotation.AuthenticationPrincipal;
     import org.springframework.web.bind.annotation.*;
 
 
@@ -59,9 +61,21 @@
         }
 
 
-        // PUT - Update an existing listing (delegates to service)
+        // PUT - Update an existing listing (only its owner or an admin)
         @PutMapping("/{id}")
-        public ResponseEntity<Listings> updateListing(@PathVariable Long id, @RequestBody ListingsDTO listingDTO) {
+        public ResponseEntity<Listings> updateListing(@PathVariable Long id, @RequestBody ListingsDTO listingDTO, @AuthenticationPrincipal User user) {
+            Optional<Listings> existing = listingsService.getListingById(id);
+            if (existing.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            if (user == null || !(user.isAdmin() || existing.get().isOwnedBy(user))) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            // Only an admin may hand a listing to a different owner
+            Long requestedOwner = listingDTO.getOwnerUserID();
+            if (requestedOwner != null && !requestedOwner.equals(existing.get().getOwnerId()) && !user.isAdmin()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
             Optional<Listings> updatedListing = listingsService.updateListing(id, listingDTO);
             if (updatedListing.isPresent()) {
                 return ResponseEntity.ok(updatedListing.get());
@@ -71,9 +85,16 @@
         }
 
 
-        // DELETE - Delete a listing by ID
+        // DELETE - Delete a listing by ID (only its owner or an admin)
         @DeleteMapping("/{id}")
-        public ResponseEntity<Void> deleteListing(@PathVariable Long id) {
+        public ResponseEntity<Void> deleteListing(@PathVariable Long id, @AuthenticationPrincipal User user) {
+            Optional<Listings> listing = listingsService.getListingById(id);
+            if (listing.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            if (user == null || !(user.isAdmin() || listing.get().isOwnedBy(user))) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
             listingsService.deleteListing(id);
             return ResponseEntity.noContent().build();
         }

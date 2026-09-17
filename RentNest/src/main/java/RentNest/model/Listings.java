@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
+import java.util.Date;
+
 @Entity
 @Table(name = "listings")
 public class Listings {
@@ -34,6 +36,18 @@ public class Listings {
     private boolean flagged;
     private String listingpicture;
 
+    /** When the listing was published. Set by the server on first save; never accepted from requests. */
+    @Column(name = "created_at", updatable = false)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Date createdAt;
+
+    @PrePersist
+    void recordCreation() {
+        if (createdAt == null) {
+            createdAt = new Date();
+        }
+    }
+
     // Getters
     public Long getListingID() {
         return listingID;
@@ -47,6 +61,11 @@ public class Listings {
     @JsonProperty("ownerId")
     public Long getOwnerId() {
         return owner != null ? owner.getUserID() : null;
+    }
+
+    /** True when the given user owns this listing. */
+    public boolean isOwnedBy(User user) {
+        return user != null && user.getUserID() != null && user.getUserID().equals(getOwnerId());
     }
 
     @JsonProperty("ownerName")
@@ -129,6 +148,14 @@ public class Listings {
 
     public String getListingpicture() {
         return listingpicture;
+    }
+
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
     }
 
     // Setters

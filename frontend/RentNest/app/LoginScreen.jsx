@@ -50,11 +50,13 @@ const LoginScreen = () => {
         // Configure axios defaults
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
   
-        // Special case for admin
-        if (email === 'admin@gmail.com') {
+        // Admin screens are decided by the role the backend returns, not by the email
+        if (response.data.role === 'ADMIN') {
+          await AsyncStorage.setItem('role', response.data.role);
           router.push('/AdminScreen');
           return;
         }
+        await AsyncStorage.setItem('role', response.data.role || 'USER');
   
         router.push('/HomeScreen');
       } catch (storageError) {

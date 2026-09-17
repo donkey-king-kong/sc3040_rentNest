@@ -3,6 +3,7 @@ package RentNest.RentNest;
 import RentNest.controller.ListingsController;
 import RentNest.dto.ListingsDTO;
 import RentNest.model.Listings;
+import RentNest.model.User;
 import RentNest.service.ListingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.ArrayList;
@@ -114,9 +116,12 @@ public class ListingControllerTest {
     // Test for PUT /api/listings/{id} (Update a listing)
     @Test
     public void testUpdateListingSuccess() {
+        User owner = userWithId(1L, User.ROLE_USER);
+        listing.setOwner(owner);
+        when(listingsService.getListingById(1L)).thenReturn(Optional.of(listing));
         when(listingsService.updateListing(1L, listingsDTO)).thenReturn(Optional.of(listing));
 
-        ResponseEntity<Listings> response = listingsController.updateListing(1L, listingsDTO);
+        ResponseEntity<Listings> response = listingsController.updateListing(1L, listingsDTO, owner);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(listing, response.getBody());
@@ -125,23 +130,100 @@ public class ListingControllerTest {
 
     @Test
     public void testUpdateListingNotFound() {
-        when(listingsService.updateListing(1L, listingsDTO)).thenReturn(Optional.empty());
+        when(listingsService.getListingById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Listings> response = listingsController.updateListing(1L, listingsDTO);
+        ResponseEntity<Listings> response = listingsController.updateListing(1L, listingsDTO, userWithId(1L, User.ROLE_USER));
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        verify(listingsService, never()).updateListing(anyLong(), any());
+    }
+
+    @Test
+    public void testUpdateListingByAnotherUserIsForbidden() {
+        listing.setOwner(userWithId(1L, User.ROLE_USER));
+        when(listingsService.getListingById(1L)).thenReturn(Optional.of(listing));
+
+        ResponseEntity<Listings> response = listingsController.updateListing(1L, listingsDTO, userWithId(2L, User.ROLE_USER));
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(listingsService, never()).updateListing(anyLong(), any());
+    }
+
+    @Test
+    public void testOwnerCannotReassignListingToSomeoneElse() {
+        User owner = userWithId(1L, User.ROLE_USER);
+        listing.setOwner(owner);
+        listingsDTO.setOwnerUserID(2L);
+        when(listingsService.getListingById(1L)).thenReturn(Optional.of(listing));
+
+        ResponseEntity<Listings> response = listingsController.updateListing(1L, listingsDTO, owner);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(listingsService, never()).updateListing(anyLong(), any());
+    }
+
+    @Test
+    public void testAdminCanReassignListing() {
+        listing.setOwner(userWithId(1L, User.ROLE_USER));
+        listingsDTO.setOwnerUserID(2L);
+        when(listingsService.getListingById(1L)).thenReturn(Optional.of(listing));
+        when(listingsService.updateListing(1L, listingsDTO)).thenReturn(Optional.of(listing));
+
+        ResponseEntity<Listings> response = listingsController.updateListing(1L, listingsDTO, userWithId(99L, User.ROLE_ADMIN));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(listingsService, times(1)).updateListing(1L, listingsDTO);
     }
 
     // Test for DELETE /api/listings/{id} (Delete a listing)
     @Test
     public void testDeleteListing() {
-        doNothing().when(listingsService).deleteListing(1L);
+        User owner = userWithId(1L, User.ROLE_USER);
+        listing.setOwner(owner);
+        when(listingsService.getListingById(1L)).thenReturn(Optional.of(listing));
 
-        ResponseEntity<Void> response = listingsController.deleteListing(1L);
+        ResponseEntity<Void> response = listingsController.deleteListing(1L, owner);
 
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
         verify(listingsService, times(1)).deleteListing(1L);
+    }
+
+    @Test
+    public void testDeleteListingByAnotherUserIsForbidden() {
+        listing.setOwner(userWithId(1L, User.ROLE_USER));
+        when(listingsService.getListingById(1L)).thenReturn(Optional.of(listing));
+
+        ResponseEntity<Void> response = listingsController.deleteListing(1L, userWithId(2L, User.ROLE_USER));
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(listingsService, never()).deleteListing(anyLong());
+    }
+
+    @Test
+    public void testDeleteListingByAdmin() {
+        listing.setOwner(userWithId(1L, User.ROLE_USER));
+        when(listingsService.getListingById(1L)).thenReturn(Optional.of(listing));
+
+        ResponseEntity<Void> response = listingsController.deleteListing(1L, userWithId(99L, User.ROLE_ADMIN));
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(listingsService, times(1)).deleteListing(1L);
+    }
+
+    @Test
+    public void testDeleteMissingListingReturnsNotFound() {
+        when(listingsService.getListingById(1L)).thenReturn(Optional.empty());
+
+        ResponseEntity<Void> response = listingsController.deleteListing(1L, userWithId(1L, User.ROLE_USER));
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        verify(listingsService, never()).deleteListing(anyLong());
+    }
+
+    private static User userWithId(Long id, String role) {
+        User user = new User().setRole(role);
+        ReflectionTestUtils.setField(user, "userID", id);
+        return user;
     }
 
     // Test for GET /api/listings/admin/flagged (Get flagged listings)

@@ -4,12 +4,19 @@ spring.datasource.username=YOUR_DB_USERNAME
 spring.datasource.password=YOUR_DB_PASSWORD
 
 # JPA / Hibernate
-spring.jpa.hibernate.ddl-auto=update
+# validate: fail startup if the code and the shared database disagree, instead of changing the shared schema.
+# Schema changes go through docs/db/ - see that README before changing any entity.
+spring.jpa.hibernate.ddl-auto=validate
 spring.jpa.show-sql=true
 
 # JWT
 security.jwt.secret-key=GENERATE_WITH_OPENSSL_RAND_BASE64_32
 security.jwt.expiration-time=3600000
+
+# Analytics (defaults shown; all optional)
+# Admin access comes from the users.role column, not from configuration
+analytics.currency=SGD
+analytics.time-zone=Asia/Singapore
 
 # External APIs
 LTADATAMALL_ACCOUNTKEY=YOUR_API_KEY

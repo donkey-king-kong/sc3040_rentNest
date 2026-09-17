@@ -2,6 +2,7 @@ package RentNest.RentNest;
 import RentNest.controller.ReviewsController;
 import RentNest.dto.ReviewsDTO;
 import RentNest.model.Reviews;
+import RentNest.model.User;
 import RentNest.service.ReviewsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -19,6 +21,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -94,25 +97,106 @@ public class ReviewsControllerTest {
     @Test
     public void testUpdateReview() {
         Long reviewId = 1L;
+        User author = userWithId(5L, User.ROLE_USER);
+        Reviews existing = new Reviews();
+        existing.setReviewer(author);
         ReviewsDTO reviewsDTO = new ReviewsDTO();
         Reviews updatedReview = new Reviews();
+        when(reviewsService.getReviewById(reviewId)).thenReturn(Optional.of(existing));
         when(reviewsService.updateReview(anyLong(), any(ReviewsDTO.class))).thenReturn(updatedReview);
 
-        ResponseEntity<Reviews> response = reviewsController.updateReview(reviewId, reviewsDTO);
+        ResponseEntity<Reviews> response = reviewsController.updateReview(reviewId, reviewsDTO, author);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(reviewsService, times(1)).updateReview(anyLong(), any(ReviewsDTO.class));
+    }
+
+    @Test
+    public void testUpdateReviewByReviewedUserIsForbidden() {
+        User reviewedUser = userWithId(6L, User.ROLE_USER);
+        Reviews existing = new Reviews();
+        existing.setReviewer(userWithId(5L, User.ROLE_USER));
+        existing.setUser(reviewedUser);
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.of(existing));
+
+        ResponseEntity<Reviews> response = reviewsController.updateReview(1L, new ReviewsDTO(), reviewedUser);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(reviewsService, never()).updateReview(anyLong(), any(ReviewsDTO.class));
+    }
+
+    @Test
+    public void testAuthorCannotReassignReviewToSomeoneElse() {
+        User author = userWithId(5L, User.ROLE_USER);
+        Reviews existing = new Reviews();
+        existing.setReviewer(author);
+        ReviewsDTO reviewsDTO = new ReviewsDTO();
+        reviewsDTO.setReviewerID(7L);
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.of(existing));
+
+        ResponseEntity<Reviews> response = reviewsController.updateReview(1L, reviewsDTO, author);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(reviewsService, never()).updateReview(anyLong(), any(ReviewsDTO.class));
     }
 
     // Test for deleting a review
     @Test
     public void testDeleteReview() {
         Long reviewId = 1L;
+        User author = userWithId(5L, User.ROLE_USER);
+        Reviews review = new Reviews();
+        review.setReviewer(author);
+        review.setUser(userWithId(6L, User.ROLE_USER));
+        when(reviewsService.getReviewById(reviewId)).thenReturn(Optional.of(review));
 
-        ResponseEntity<Void> response = reviewsController.deleteReview(reviewId);
+        ResponseEntity<Void> response = reviewsController.deleteReview(reviewId, author);
 
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
         verify(reviewsService, times(1)).deleteReview(reviewId);
+    }
+
+    // The person being reviewed must not be able to remove reviews about themselves
+    @Test
+    public void testDeleteReviewByReviewedUserIsForbidden() {
+        User reviewedUser = userWithId(6L, User.ROLE_USER);
+        Reviews review = new Reviews();
+        review.setReviewer(userWithId(5L, User.ROLE_USER));
+        review.setUser(reviewedUser);
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.of(review));
+
+        ResponseEntity<Void> response = reviewsController.deleteReview(1L, reviewedUser);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(reviewsService, never()).deleteReview(anyLong());
+    }
+
+    @Test
+    public void testDeleteReviewByAdmin() {
+        Reviews review = new Reviews();
+        review.setReviewer(userWithId(5L, User.ROLE_USER));
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.of(review));
+
+        ResponseEntity<Void> response = reviewsController.deleteReview(1L, userWithId(99L, User.ROLE_ADMIN));
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(reviewsService, times(1)).deleteReview(1L);
+    }
+
+    @Test
+    public void testDeleteMissingReviewReturnsNotFound() {
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.empty());
+
+        ResponseEntity<Void> response = reviewsController.deleteReview(1L, userWithId(5L, User.ROLE_USER));
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        verify(reviewsService, never()).deleteReview(anyLong());
+    }
+
+    private static User userWithId(Long id, String role) {
+        User user = new User().setRole(role);
+        ReflectionTestUtils.setField(user, "userID", id);
+        return user;
     }
 
     // Test for getting flagged reviews

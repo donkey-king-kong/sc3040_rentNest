@@ -26,6 +26,26 @@ public class Rentals {
     private String paymentHistory;
     private String status;
 
+    // Lifecycle timestamps, set by the server only; never accepted from requests
+    @Column(name = "created_at", updatable = false)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Date createdAt;
+
+    @Column(name = "accepted_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Date acceptedAt;
+
+    @Column(name = "terminated_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Date terminatedAt;
+
+    @PrePersist
+    void recordCreation() {
+        if (createdAt == null) {
+            createdAt = new Date();
+        }
+    }
+
     // Getters
     public Long getRentalID() {
         return rentalID;
@@ -110,6 +130,30 @@ public class Rentals {
 
     public String getStatus() {
         return status;
+    }
+
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
+    public Date getAcceptedAt() {
+        return acceptedAt;
+    }
+
+    public Date getTerminatedAt() {
+        return terminatedAt;
+    }
+
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public void setAcceptedAt(Date acceptedAt) {
+        this.acceptedAt = acceptedAt;
+    }
+
+    public void setTerminatedAt(Date terminatedAt) {
+        this.terminatedAt = terminatedAt;
     }
 
     // Setters

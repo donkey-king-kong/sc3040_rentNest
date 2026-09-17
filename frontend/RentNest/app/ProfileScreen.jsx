@@ -91,6 +91,14 @@ const ProfileScreen = () => {
 
         <View style={styles.separator} />
 
+        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('OwnerAnalyticsScreen')}>
+          <FontAwesome name="bar-chart" size={20} color="black" style={styles.icon} />
+          <Text style={styles.buttonText}>Analytics</Text>
+          <Text style={styles.arrow}> &gt;</Text>
+        </TouchableOpacity>
+
+        <View style={styles.separator} />
+
         <TouchableOpacity style={styles.button} onPress={handleLogout}>
           <FontAwesome name="sign-out" size={20} color="black" style={styles.icon} />
           <Text style={styles.buttonText}>Logout</Text>

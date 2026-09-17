@@ -1,6 +1,6 @@
 // Previous imports remain unchanged
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Modal} from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Modal, Alert} from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import MapView, { Marker } from '../components/AppMap';
@@ -210,17 +210,21 @@ const HomeListingScreen = () => {
 
   const handleConfirm = async () => {
     try {
-      await axios.put(`${API_BASE_URL}api/listings/setFlag/${listingId}/true`, {
+      // axios.put(url, body, config): headers belong in the third argument
+      await axios.put(`${API_BASE_URL}/api/listings/setFlag/${listingId}/true`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         }
       });
+      // Only confirm once the report has actually been recorded
+      setListingReported(true);
     } catch (err) {
       console.error(`Error reporting listing: ${err.message}`);
+      setModalVisible(false);
+      Alert.alert('Report not sent', 'We could not report this listing. Please try again.');
     }
-    setListingReported(true);
   };
 
   const handleCancel = () => {

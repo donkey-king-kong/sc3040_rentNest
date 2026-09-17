@@ -1,0 +1,218 @@
+{
+  "schemaVersion": 1,
+  "scope": "listing",
+  "asOf": "2026-09-16T19:16:52.198544800Z",
+  "period": {
+    "from": "2025-12-31T16:00:00Z",
+    "to": "2026-03-31T16:00:00Z",
+    "boundary": "[from,to)",
+    "timeZone": "Asia/Singapore"
+  },
+  "listing": {
+    "listingId": 2,
+    "name": "A2",
+    "type": "HDB",
+    "location": null,
+    "price": 2000,
+    "listingPicture": null,
+    "listedAt": "2026-09-16T19:16:51.214Z"
+  },
+  "metrics": {
+    "occupancyStatus": {
+      "availability": "available",
+      "value": "vacant",
+      "unit": "status",
+      "basis": "snapshot",
+      "definition": "'occupied' when the listing has a rental record with status 'active', otherwise 'vacant'.",
+      "reason": null
+    },
+    "rentalRecordCount": {
+      "availability": "available",
+      "value": 1,
+      "unit": "count",
+      "basis": "snapshot",
+      "definition": "Rental records (offers) in any status. Rejected offers are not recorded by the app.",
+      "reason": null
+    },
+    "pendingRentalRecordCount": {
+      "availability": "available",
+      "value": 0,
+      "unit": "count",
+      "basis": "snapshot",
+      "definition": "Rental records with status 'pending' (offer sent, not yet accepted).",
+      "reason": null
+    },
+    "acceptedRentalRecordCount": {
+      "availability": "available",
+      "value": 1,
+      "unit": "count",
+      "basis": "snapshot",
+      "definition": "Rental records with status 'active' or 'terminated'.",
+      "reason": null
+    },
+    "terminatedRentalRecordCount": {
+      "availability": "available",
+      "value": 1,
+      "unit": "count",
+      "basis": "snapshot",
+      "definition": "Rental records with status 'terminated'.",
+      "reason": null
+    },
+    "acceptanceRate": {
+      "availability": "available",
+      "value": 100,
+      "unit": "percent",
+      "basis": "snapshot",
+      "definition": "Accepted rental records divided by all rental records. Pending offers count as not accepted.",
+      "reason": null
+    },
+    "tenantsHostedCount": {
+      "availability": "available",
+      "value": 1,
+      "unit": "count",
+      "basis": "snapshot",
+      "definition": "Distinct tenants on accepted (active or terminated) rentals.",
+      "reason": null
+    },
+    "averageTenancyMonths": {
+      "availability": "available",
+      "value": 3,
+      "unit": "months",
+      "basis": "snapshot",
+      "definition": "Average tenancy length of accepted rentals, from rental start to its end. Terminated rentals end at their recorded termination time (or, if terminated before that was recorded, at the lease expiry the app overwrites with the termination date), so this is the actual length; for active rentals it is the contracted length.",
+      "reason": null
+    },
+    "recordedRentPaymentCount": {
+      "availability": "available",
+      "value": 1,
+      "unit": "count",
+      "basis": "period",
+      "definition": "Rent payment records whose billing-month date falls in the period. The date is the month paid for, not the transaction time.",
+      "reason": null
+    },
+    "recordedRentPaymentTotal": {
+      "availability": "available",
+      "value": 1500,
+      "unit": "SGD",
+      "basis": "period",
+      "definition": "Sum of recorded rent payment amounts (whole SGD) with a billing-month date in the period. Excludes deposits and does not subtract termination refunds; payments have no failed or refunded state.",
+      "reason": null
+    },
+    "recordedRentPaymentTotalChange": {
+      "availability": "unavailable",
+      "value": null,
+      "unit": "percent",
+      "basis": "period",
+      "definition": "Change in rent recorded compared with the previous period of the same length, by billing month.",
+      "reason": "Nothing in the previous period, so a percentage change cannot be calculated."
+    },
+    "recordedRentPaymentCountChange": {
+      "availability": "unavailable",
+      "value": null,
+      "unit": "percent",
+      "basis": "period",
+      "definition": "Change in payments recorded compared with the previous period of the same length, by billing month.",
+      "reason": "Nothing in the previous period, so a percentage change cannot be calculated."
+    },
+    "averageOccupancyRate": {
+      "availability": "available",
+      "value": 65.6,
+      "unit": "percent",
+      "basis": "period",
+      "definition": "Share of the period the listings were occupied: time covered by accepted rentals divided by (number of listings x length of the period). Uses the listings that exist now.",
+      "reason": null
+    },
+    "averageOccupancyRateChange": {
+      "availability": "unavailable",
+      "value": null,
+      "unit": "percentage_points",
+      "basis": "period",
+      "definition": "Change in average occupancy compared with the previous period of the same length, in percentage points.",
+      "reason": "No occupancy recorded in the previous period, so a change cannot be calculated."
+    },
+    "offersSentCount": {
+      "availability": "unavailable",
+      "value": null,
+      "unit": "count",
+      "basis": "period",
+      "definition": "Offers sent during the period.",
+      "reason": "Not tracked for this period: these dates are recorded from 17 Sep 2026 onwards."
+    },
+    "offersAcceptedCount": {
+      "availability": "unavailable",
+      "value": null,
+      "unit": "count",
+      "basis": "period",
+      "definition": "Offers accepted during the period.",
+      "reason": "Not tracked for this period: these dates are recorded from 17 Sep 2026 onwards."
+    },
+    "terminationsCount": {
+      "availability": "unavailable",
+      "value": null,
+      "unit": "count",
+      "basis": "period",
+      "definition": "Tenancies terminated during the period.",
+      "reason": "Not tracked for this period: these dates are recorded from 17 Sep 2026 onwards."
+    },
+    "listingViews": {
+      "availability": "unavailable",
+      "value": null,
+      "unit": "count",
+      "basis": "period",
+      "definition": "Times the listing detail page was opened.",
+      "reason": "Not tracked yet: requires event instrumentation that has not been enabled."
+    },
+    "daysOnMarket": {
+      "availability": "unavailable",
+      "value": null,
+      "unit": "days",
+      "basis": "snapshot",
+      "definition": "Days from publishing this listing to its first accepted offer, or until now if it has not been rented.",
+      "reason": "Accepted before acceptance dates started being recorded."
+    }
+  },
+  "series": {
+    "monthlyRecordedRentPayments": {
+      "availability": "available",
+      "unit": "SGD",
+      "basis": "period",
+      "definition": "Recorded rent payment totals per calendar month in Asia/Singapore. Edge months only include dates inside the period.",
+      "reason": null,
+      "points": [
+        {
+          "bucket": "2026-01",
+          "value": 1500
+        },
+        {
+          "bucket": "2026-02",
+          "value": 0
+        },
+        {
+          "bucket": "2026-03",
+          "value": 0
+        }
+      ]
+    },
+    "monthlyOccupancy": {
+      "availability": "available",
+      "unit": "status",
+      "basis": "period",
+      "definition": "'occupied' when an accepted rental's start-to-expiry range overlaps the month (in Asia/Singapore), otherwise 'vacant'. Terminated rentals end on their termination date.",
+      "reason": null,
+      "points": [
+        {
+          "bucket": "2026-01",
+          "value": "vacant"
+        },
+        {
+          "bucket": "2026-02",
+          "value": "occupied"
+        },
+        {
+          "bucket": "2026-03",
+          "value": "occupied"
+        }
+      ]
+    }
+  }
+}
