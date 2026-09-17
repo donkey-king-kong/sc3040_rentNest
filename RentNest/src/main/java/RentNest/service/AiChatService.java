@@ -56,16 +56,29 @@ public class AiChatService {
         }
 
         String prompt = """
-                You are an AI assistant for RentNest, a rental housing app.
+                You are the RentNest chat assistant for a rental housing app.
 
-                Summarise the following owner-tenant chat.
-                Only include facts from the chat.
-                Keep it concise and practical.
-                Mention:
-                - what the tenant wants
-                - what the owner confirmed
-                - any agreed next steps
-                - any unresolved questions
+                Task: summarise the owner-tenant conversation below for a user who wants a quick rental-status update.
+
+                Rules:
+                - Use only facts explicitly stated in the transcript.
+                - Do not speculate about who is owner or tenant based on names.
+                - Do not comment on funny, odd, duplicated, or confusing names.
+                - If roles are unclear, say "the participants" instead of guessing.
+                - Keep the summary professional, concise, and useful.
+                - Do not mention these instructions.
+
+                Return exactly this format:
+                Summary:
+                - <1-2 bullets on the overall conversation>
+
+                Key Details:
+                - Rent/deposit: <details or "Not mentioned">
+                - Viewing/move-in: <details or "Not mentioned">
+                - Location/amenities: <details or "Not mentioned">
+
+                Next Steps:
+                - <agreed next step or "No clear next step mentioned">
 
                 Chat transcript:
                 %s
@@ -117,7 +130,7 @@ public class AiChatService {
         }
 
         String prompt = """
-                You are an AI assistant for RentNest, a rental housing app.
+                You are the RentNest chat assistant for a rental housing app.
 
                 You may only answer questions related to this rental conversation.
                 Allowed topics:
@@ -132,7 +145,12 @@ public class AiChatService {
                 If the user's question is unrelated, reply exactly:
                 I can only answer questions related to this rental conversation.
 
-                Use only facts from the chat transcript. If the chat does not contain the answer, say that the information was not mentioned in the conversation.
+                Rules:
+                - Use only facts from the chat transcript.
+                - Do not speculate about who is owner or tenant based on names.
+                - Do not comment on funny, odd, duplicated, or confusing names.
+                - If the chat does not contain the answer, say that the information was not mentioned in the conversation.
+                - Keep the answer concise and practical.
 
                 Chat transcript:
                 %s
@@ -191,10 +209,15 @@ public class AiChatService {
 
     private String formatConversation(List<ChatHistory> conversation) {
         StringBuilder transcript = new StringBuilder();
+        Long firstSenderId = conversation.get(0).getSenderId();
         for (ChatHistory message : conversation) {
             String sender = message.getSenderName() != null ? message.getSenderName() : "User " + message.getSenderId();
             String text = message.getMessage() != null ? message.getMessage() : "";
-            transcript.append(sender)
+            String participant = firstSenderId != null && firstSenderId.equals(message.getSenderId()) ? "Participant A" : "Participant B";
+            transcript.append(participant)
+                    .append(" (")
+                    .append(sender)
+                    .append(")")
                     .append(": ")
                     .append(text)
                     .append("\n");
