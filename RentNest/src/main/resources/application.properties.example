@@ -1,0 +1,16 @@
+# PostgreSQL
+spring.datasource.url=jdbc:YOUR_DB_CONNECTION_STRING
+spring.datasource.username=YOUR_DB_USERNAME
+spring.datasource.password=YOUR_DB_PASSWORD
+
+# JPA / Hibernate
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+
+# JWT
+security.jwt.secret-key=GENERATE_WITH_OPENSSL_RAND_BASE64_32
+security.jwt.expiration-time=3600000
+
+# External APIs
+LTADATAMALL_ACCOUNTKEY=YOUR_API_KEY
+URA_ACCESSKEY=YOUR_API_KEY
