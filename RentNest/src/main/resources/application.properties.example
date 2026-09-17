@@ -19,4 +19,4 @@ URA_ACCESSKEY=YOUR_API_KEY
 # Put the real key only in application.properties. Do not commit real API keys.
 llm.api-key=YOUR_GEMINI_API_KEY
 llm.api-url=https://generativelanguage.googleapis.com/v1beta/models
-llm.model=gemini-1.5-flash
+llm.model=gemini-3.6-flash
