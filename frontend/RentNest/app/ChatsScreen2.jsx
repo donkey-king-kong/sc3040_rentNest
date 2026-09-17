@@ -40,6 +40,14 @@ const ChatsScreen2 = () => {
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false)
     const [isPaymentSuccessfulModalVisible, setPaymentSuccessfulModalVisible] = useState(false)
     const [Loading, setLoading] = useState(true);
+    const [isSummaryModalVisible, setSummaryModalVisible] = useState(false);
+    const [isGeneratingSummary, setGeneratingSummary] = useState(false);
+    const [chatSummary, setChatSummary] = useState('');
+    const [summaryError, setSummaryError] = useState('');
+    const [isSafetyModalVisible, setSafetyModalVisible] = useState(false);
+    const [safetyWarning, setSafetyWarning] = useState(null);
+    const [pendingMessage, setPendingMessage] = useState('');
+    const [isCheckingSafety, setCheckingSafety] = useState(false);
     const { refresh } = useLocalSearchParams();
 
     const getConversation = async () => {
@@ -216,7 +224,7 @@ const ChatsScreen2 = () => {
         }
     }
 
-    const sendMessage = async() => {
+    const postMessage = async(messageToSend) => {
         try{
             const token = await AsyncStorage.getItem('token');
             if (!token) {
@@ -224,7 +232,7 @@ const ChatsScreen2 = () => {
                 navigation.replace('/LoginScreen');
                 return;
             }
-            if (newMessage.trim() !== ''){
+            if (messageToSend.trim() !== ''){
                 console.log('rentalID:', chat.rentalId || null);
                 console.log('requestID:', chat.requestId || null);
                 const body = {
@@ -232,7 +240,7 @@ const ChatsScreen2 = () => {
                     senderID: currentUser,
                     rentalID: chat.rentalId || null,
                     requestID: chat.requestId || null,
-                    message: newMessage,
+                    message: messageToSend,
                     date: new Date().toISOString(),
                 };
                 const sendChatResponse = await axios.post(`${API_BASE_URL}/api/chathistory`, body,{
@@ -252,6 +260,97 @@ const ChatsScreen2 = () => {
         }
         catch (error) {
             console.error('Error sending message:', error);
+        }
+    }
+
+    const sendMessage = async() => {
+        const messageToSend = newMessage.trim();
+        if (messageToSend === '') {
+            return;
+        }
+
+        try {
+            setCheckingSafety(true);
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                console.log('No token found!');
+                navigation.replace('/LoginScreen');
+                return;
+            }
+
+            const safetyResponse = await axios.post(`${API_BASE_URL}/api/ai-chat/safety-check`, {
+                message: messageToSend,
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+            });
+
+            if (safetyResponse.data?.safe === false) {
+                setPendingMessage(messageToSend);
+                setSafetyWarning(safetyResponse.data);
+                setSafetyModalVisible(true);
+                return;
+            }
+
+            await postMessage(messageToSend);
+        } catch (error) {
+            console.error('Error checking message safety:', error);
+            await postMessage(messageToSend);
+        } finally {
+            setCheckingSafety(false);
+        }
+    }
+
+    const sendPendingMessageAnyway = async () => {
+        const messageToSend = pendingMessage;
+        setSafetyModalVisible(false);
+        setSafetyWarning(null);
+        setPendingMessage('');
+        await postMessage(messageToSend);
+    }
+
+    const cancelPendingMessage = () => {
+        setSafetyModalVisible(false);
+        setSafetyWarning(null);
+        setPendingMessage('');
+    }
+
+    const getChatSummary = async () => {
+        try {
+            setGeneratingSummary(true);
+            setSummaryError('');
+            setChatSummary('');
+
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                console.log('No token found!');
+                navigation.replace('/LoginScreen');
+                return;
+            }
+
+            const summaryResponse = await axios.get(`${API_BASE_URL}/api/ai-chat/summary`, {
+                params: {
+                    userA: partnerUserId,
+                    userB: currentUser
+                },
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+            });
+
+            setChatSummary(summaryResponse.data?.summary || 'No summary available.');
+            setSummaryModalVisible(true);
+        } catch (error) {
+            console.error('Error generating chat summary:', error);
+            setSummaryError('Unable to generate chat summary right now.');
+            setSummaryModalVisible(true);
+        } finally {
+            setGeneratingSummary(false);
         }
     }
 
@@ -638,14 +737,19 @@ const handlePaymentAndAccept = async () => {
             {/* Header */}
             <View style={styles.nameHeaderContainer}>
                 <Text style={styles.header}>{partner.name}</Text>
-                <TouchableOpacity onPress={() => {
-                    // Navigate to UserReviewsScreen while passing userId
-                    navigation.navigate('UserReviewsScreen', {
-                        userId: partnerUserId
-                    });
-                }}>
-                    <Text style={styles.reviews}>Reviews</Text>
-                </TouchableOpacity>
+                <View style={styles.headerActions}>
+                    <TouchableOpacity onPress={getChatSummary} style={styles.aiSummaryButton} disabled={isGeneratingSummary}>
+                        <Text style={styles.aiSummaryButtonText}>{isGeneratingSummary ? 'Summarising...' : 'Summarise Chat'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => {
+                        // Navigate to UserReviewsScreen while passing userId
+                        navigation.navigate('UserReviewsScreen', {
+                            userId: partnerUserId
+                        });
+                    }}>
+                        <Text style={styles.reviews}>Reviews</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Thin divider */}
@@ -676,10 +780,63 @@ const handlePaymentAndAccept = async () => {
                     value={newMessage}
                     onChangeText={setNewMessage}
                     />
-                <TouchableOpacity onPress={sendMessage}>
+                <TouchableOpacity onPress={sendMessage} disabled={isCheckingSafety}>
                     <Image source={sendIcon} style={styles.icon}/>
                 </TouchableOpacity>
             </View>
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isSummaryModalVisible}
+                onRequestClose={() => setSummaryModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>AI Chat Summary</Text>
+                            <TouchableOpacity onPress={() => setSummaryModalVisible(false)}>
+                                <Image source={x} style={styles.icon}/>
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
+                        <Text style={styles.summaryText}>{summaryError || chatSummary}</Text>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isSafetyModalVisible}
+                onRequestClose={cancelPendingMessage}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Message Safety Warning</Text>
+                            <TouchableOpacity onPress={cancelPendingMessage}>
+                                <Image source={x} style={styles.icon}/>
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder safeguards.</Text>
+                        <Text style={styles.modalDescription}>{safetyWarning?.reason}</Text>
+                        <Text style={styles.warningMessagePreview}>{pendingMessage}</Text>
+                        <View style={styles.buttonAlignment}>
+                            <View style={styles.confirmButton}>
+                                <TouchableOpacity onPress={sendPendingMessageAnyway}>
+                                    <Text style={styles.whiteButtonText}> Send Anyway </Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.cancelButton}>
+                                <TouchableOpacity onPress={cancelPendingMessage}>
+                                    <Text style={styles.buttonText}> Cancel </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
 
             <Modal
                 animationType="slide"
@@ -889,6 +1046,23 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
     },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    aiSummaryButton: {
+        backgroundColor: '#000',
+        borderRadius: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        marginRight: 12,
+        marginBottom: 10,
+    },
+    aiSummaryButtonText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
     headerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1009,6 +1183,29 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
         marginBottom: 10,
+    },
+    placeholderNotice: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 12,
+        color: '#7A4E00',
+    },
+    summaryText: {
+        fontSize: 14,
+        lineHeight: 20,
+        textAlign: 'left',
+        width: '100%',
+        marginBottom: 10,
+    },
+    warningMessagePreview: {
+        width: '100%',
+        backgroundColor: '#f1f1f1',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 15,
+        fontSize: 14,
+        fontStyle: 'italic',
     },
     infoContainer: {
         marginBottom: 10,
