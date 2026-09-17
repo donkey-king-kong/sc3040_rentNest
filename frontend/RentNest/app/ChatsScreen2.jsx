@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput} from 'react-native';
+import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native'; // Import useRoute for accessing route parameters
 import {useLocalSearchParams, useRouter} from "expo-router";
 
@@ -808,7 +808,9 @@ const handlePaymentAndAccept = async () => {
                         <Text style={styles.placeholderNotice}>
                             {isSummaryPlaceholder ? 'Currently using hardcoded placeholder summary.' : 'Generated using Gemini LLM.'}
                         </Text>
-                        <Text style={styles.summaryText}>{summaryError || chatSummary}</Text>
+                        <ScrollView style={styles.aiResponseScroll}>
+                            <Text style={styles.summaryText}>{summaryError || chatSummary}</Text>
+                        </ScrollView>
                     </View>
                 </View>
             </Modal>
@@ -847,7 +849,9 @@ const handlePaymentAndAccept = async () => {
                                 {aiAnswerCategory !== '' && (
                                     <Text style={styles.aiAnswerCategory}>Category: {aiAnswerCategory}</Text>
                                 )}
-                                <Text style={styles.summaryText}>{aiAnswer}</Text>
+                                <ScrollView style={styles.aiResponseScroll}>
+                                    <Text style={styles.summaryText}>{aiAnswer}</Text>
+                                </ScrollView>
                             </View>
                         )}
                     </View>
@@ -1213,6 +1217,10 @@ const styles = StyleSheet.create({
         textAlign: 'left',
         width: '100%',
         marginBottom: 10,
+    },
+    aiResponseScroll: {
+        width: '100%',
+        maxHeight: 220,
     },
     aiQuestionInput: {
         width: '100%',
