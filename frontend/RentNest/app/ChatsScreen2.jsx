@@ -44,10 +44,12 @@ const ChatsScreen2 = () => {
     const [isGeneratingSummary, setGeneratingSummary] = useState(false);
     const [chatSummary, setChatSummary] = useState('');
     const [summaryError, setSummaryError] = useState('');
+    const [isSummaryPlaceholder, setSummaryPlaceholder] = useState(true);
     const [isAskAiModalVisible, setAskAiModalVisible] = useState(false);
     const [aiQuestion, setAiQuestion] = useState('');
     const [aiAnswer, setAiAnswer] = useState('');
     const [aiAnswerCategory, setAiAnswerCategory] = useState('');
+    const [isAiAnswerPlaceholder, setAiAnswerPlaceholder] = useState(true);
     const [isAskingAi, setAskingAi] = useState(false);
     const { refresh } = useLocalSearchParams();
 
@@ -299,10 +301,12 @@ const ChatsScreen2 = () => {
             });
 
             setChatSummary(summaryResponse.data?.summary || 'No summary available.');
+            setSummaryPlaceholder(summaryResponse.data?.placeholder ?? true);
             setSummaryModalVisible(true);
         } catch (error) {
             console.error('Error generating chat summary:', error);
             setSummaryError('Unable to generate chat summary right now.');
+            setSummaryPlaceholder(false);
             setSummaryModalVisible(true);
         } finally {
             setGeneratingSummary(false);
@@ -319,6 +323,7 @@ const ChatsScreen2 = () => {
             setAskingAi(true);
             setAiAnswer('');
             setAiAnswerCategory('');
+            setAiAnswerPlaceholder(true);
 
             const token = await AsyncStorage.getItem('token');
             if (!token) {
@@ -341,10 +346,12 @@ const ChatsScreen2 = () => {
 
             setAiAnswer(askAiResponse.data?.answer || 'No AI answer available.');
             setAiAnswerCategory(askAiResponse.data?.category || '');
+            setAiAnswerPlaceholder(askAiResponse.data?.placeholder ?? true);
         } catch (error) {
             console.error('Error asking AI question:', error);
             setAiAnswer('Unable to ask AI right now.');
             setAiAnswerCategory('error');
+            setAiAnswerPlaceholder(false);
         } finally {
             setAskingAi(false);
         }
@@ -798,7 +805,9 @@ const handlePaymentAndAccept = async () => {
                                 <Image source={x} style={styles.icon}/>
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
+                        <Text style={styles.placeholderNotice}>
+                            {isSummaryPlaceholder ? 'Currently using hardcoded placeholder summary.' : 'Generated using Gemini LLM.'}
+                        </Text>
                         <Text style={styles.summaryText}>{summaryError || chatSummary}</Text>
                     </View>
                 </View>
@@ -818,7 +827,9 @@ const handlePaymentAndAccept = async () => {
                                 <Image source={x} style={styles.icon}/>
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder LLM guardrails.</Text>
+                        <Text style={styles.placeholderNotice}>
+                            {isAiAnswerPlaceholder ? 'Currently using hardcoded placeholder LLM guardrails.' : 'Generated using Gemini LLM with rental-chat guardrails.'}
+                        </Text>
                         <Text style={styles.modalDescription}>Ask questions related to this rental conversation only.</Text>
                         <TextInput
                             style={styles.aiQuestionInput}
