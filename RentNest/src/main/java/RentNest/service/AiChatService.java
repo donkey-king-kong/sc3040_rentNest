@@ -32,7 +32,7 @@ public class AiChatService {
     @Value("${llm.api-url:https://generativelanguage.googleapis.com/v1beta/models}")
     private String llmApiUrl;
 
-    @Value("${llm.model:gemini-1.5-flash}")
+    @Value("${llm.model:gemini-3.6-flash}")
     private String llmModel;
 
     public AiChatService(ChatHistoryService chatHistoryService) {
