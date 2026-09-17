@@ -15,8 +15,8 @@ security.jwt.expiration-time=3600000
 LTADATAMALL_ACCOUNTKEY=YOUR_API_KEY
 URA_ACCESSKEY=YOUR_API_KEY
 
-# LLM API placeholders for future AI chat integration
-# Current AI chat summary and Ask AI guardrail features use hardcoded placeholder logic.
-llm.api-key=YOUR_LLM_API_KEY
-llm.api-url=YOUR_LLM_API_URL
-llm.model=YOUR_LLM_MODEL
+# Gemini LLM API for AI chat summary and Ask AI guardrails
+# Put the real key only in application.properties. Do not commit real API keys.
+llm.api-key=YOUR_GEMINI_API_KEY
+llm.api-url=https://generativelanguage.googleapis.com/v1beta/models
+llm.model=gemini-1.5-flash
