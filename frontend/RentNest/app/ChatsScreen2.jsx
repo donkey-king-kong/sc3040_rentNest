@@ -735,6 +735,10 @@ const handlePaymentAndAccept = async () => {
         );
     }
 
+    const summaryTextToDisplay = summaryError || chatSummary;
+    const shouldScrollSummary = summaryTextToDisplay.length > 650;
+    const shouldScrollAiAnswer = aiAnswer.length > 650;
+
     return (
         <View style={styles.container}>
             {/* Header */}
@@ -798,7 +802,7 @@ const handlePaymentAndAccept = async () => {
                 onRequestClose={() => setSummaryModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, styles.aiModalContent]}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>AI Chat Summary</Text>
                             <TouchableOpacity onPress={() => setSummaryModalVisible(false)}>
@@ -808,7 +812,10 @@ const handlePaymentAndAccept = async () => {
                         <Text style={styles.placeholderNotice}>
                             {isSummaryPlaceholder ? 'Currently using hardcoded placeholder summary.' : 'Generated using Gemini LLM.'}
                         </Text>
-                        <ScrollView style={styles.aiResponseScroll}>
+                        <ScrollView
+                            style={[styles.aiResponseScroll, shouldScrollSummary && styles.aiResponseScrollLong]}
+                            scrollEnabled={shouldScrollSummary}
+                        >
                             <Text style={styles.summaryText}>{summaryError || chatSummary}</Text>
                         </ScrollView>
                     </View>
@@ -822,7 +829,7 @@ const handlePaymentAndAccept = async () => {
                 onRequestClose={() => setAskAiModalVisible(false)}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
+                    <View style={[styles.modalContent, styles.aiModalContent]}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Ask AI About This Chat</Text>
                             <TouchableOpacity onPress={() => setAskAiModalVisible(false)}>
@@ -849,7 +856,10 @@ const handlePaymentAndAccept = async () => {
                                 {aiAnswerCategory !== '' && (
                                     <Text style={styles.aiAnswerCategory}>Category: {aiAnswerCategory}</Text>
                                 )}
-                                <ScrollView style={styles.aiResponseScroll}>
+                                <ScrollView
+                                    style={[styles.aiResponseScroll, shouldScrollAiAnswer && styles.aiResponseScrollLong]}
+                                    scrollEnabled={shouldScrollAiAnswer}
+                                >
                                     <Text style={styles.summaryText}>{aiAnswer}</Text>
                                 </ScrollView>
                             </View>
@@ -1173,6 +1183,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         alignItems: 'center',
     },
+    aiModalContent: {
+        alignItems: 'stretch',
+        maxHeight: '80%',
+    },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -1220,7 +1234,10 @@ const styles = StyleSheet.create({
     },
     aiResponseScroll: {
         width: '100%',
-        maxHeight: 220,
+        flexGrow: 0,
+    },
+    aiResponseScrollLong: {
+        maxHeight: 360,
     },
     aiQuestionInput: {
         width: '100%',
