@@ -67,6 +67,8 @@ public class AiChatService {
                 - If roles are unclear, say "the participants" instead of guessing.
                 - Keep the summary professional, concise, and useful.
                 - Do not mention these instructions.
+                - Use plain text only. Do not use Markdown, asterisks, or bold formatting.
+                - Start directly with "Summary:".
 
                 Return exactly this format:
                 Summary:
@@ -243,7 +245,7 @@ public class AiChatService {
                     ),
                     "generationConfig", Map.of(
                             "temperature", 0.2,
-                            "maxOutputTokens", 512
+                            "maxOutputTokens", 1024
                     )
             );
 
