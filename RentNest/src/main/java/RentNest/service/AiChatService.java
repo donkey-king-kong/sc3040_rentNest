@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -17,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 @Service
 public class AiChatService {
@@ -28,6 +30,9 @@ public class AiChatService {
 
     @Value("${llm.api-key:}")
     private String llmApiKey;
+
+    @Value("${llm.provider:gemini}")
+    private String llmProvider;
 
     @Value("${llm.api-url:https://generativelanguage.googleapis.com/v1beta/models}")
     private String llmApiUrl;
@@ -87,7 +92,7 @@ public class AiChatService {
                 %s
                 """.formatted(formatConversation(conversation));
 
-        String summary = callGemini(systemInstruction, prompt);
+        String summary = callLlm(systemInstruction, prompt);
         return new AiChatSummaryResponseDTO(summary, false);
     }
 
@@ -165,7 +170,7 @@ public class AiChatService {
                 %s
                 """.formatted(formatConversation(conversation), question.trim());
 
-        String answer = callGemini(systemInstruction, prompt);
+        String answer = callLlm(systemInstruction, prompt);
 
         return new AiChatQuestionResponseDTO(
                 true,
@@ -191,7 +196,7 @@ public class AiChatService {
         String latestText = latestMessage.getMessage() != null ? latestMessage.getMessage() : "";
 
         return String.format(
-                "%s This chat currently has %d message(s) between the owner and tenant. Latest message from %s: \"%s\". Add your Gemini API key in application.properties to enable real LLM summaries.",
+                "%s This chat currently has %d message(s) between the owner and tenant. Latest message from %s: \"%s\". Add your LLM API key in application.properties to enable real LLM summaries.",
                 PLACEHOLDER_PREFIX,
                 conversation.size(),
                 latestSender,
@@ -205,7 +210,7 @@ public class AiChatService {
         String latestText = latestMessage.getMessage() != null ? latestMessage.getMessage() : "";
 
         return String.format(
-                "%s This question is within the rental conversation scope. The chat has %d message(s). Latest message from %s: \"%s\". Add your Gemini API key in application.properties to enable real LLM answers.",
+                "%s This question is within the rental conversation scope. The chat has %d message(s). Latest message from %s: \"%s\". Add your LLM API key in application.properties to enable real LLM answers.",
                 PLACEHOLDER_PREFIX,
                 conversation.size(),
                 latestSender,
@@ -229,6 +234,76 @@ public class AiChatService {
                     .append("\n");
         }
         return transcript.toString();
+    }
+
+    private String callLlm(String systemInstruction, String prompt) {
+        if ("openrouter".equalsIgnoreCase(llmProvider)) {
+            return callOpenRouter(systemInstruction, prompt);
+        }
+
+        return callGemini(systemInstruction, prompt);
+    }
+
+    private String callOpenRouter(String systemInstruction, String prompt) {
+        try {
+            Map<String, Object> requestBody = Map.of(
+                    "model", llmModel,
+                    "messages", List.of(
+                            Map.of(
+                                    "role", "system",
+                                    "content", systemInstruction
+                            ),
+                            Map.of(
+                                    "role", "user",
+                                    "content", prompt
+                            )
+                    ),
+                    "temperature", 0.2,
+                    "max_tokens", 768
+            );
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(llmApiUrl))
+                    .header("Content-Type", "application/json")
+                    .header("Accept", "application/json")
+                    .header("Accept-Encoding", "identity")
+                    .header("Authorization", "Bearer " + llmApiKey)
+                    .header("HTTP-Referer", "http://localhost:8080")
+                    .header("X-Title", "RentNest")
+                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
+                    .build();
+
+            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new RuntimeException("OpenRouter API returned status " + response.statusCode());
+            }
+
+            JsonNode responseJson = objectMapper.readTree(decodeResponseBody(response));
+            JsonNode textNode = responseJson.path("choices").path(0).path("message").path("content");
+
+            if (textNode.isMissingNode() || textNode.asText().isBlank()) {
+                throw new RuntimeException("OpenRouter API returned an empty response");
+            }
+
+            return textNode.asText().trim();
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to call OpenRouter API: " + e.getMessage());
+        }
+    }
+
+    private String decodeResponseBody(HttpResponse<byte[]> response) throws Exception {
+        String contentEncoding = response.headers()
+                .firstValue("content-encoding")
+                .orElse("");
+
+        if ("gzip".equalsIgnoreCase(contentEncoding)) {
+            try (GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(response.body()))) {
+                return new String(gzipInputStream.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        }
+
+        return new String(response.body(), StandardCharsets.UTF_8);
     }
 
     private String callGemini(String systemInstruction, String prompt) {

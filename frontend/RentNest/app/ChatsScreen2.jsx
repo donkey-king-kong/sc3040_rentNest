@@ -810,7 +810,7 @@ const handlePaymentAndAccept = async () => {
                             </TouchableOpacity>
                         </View>
                         <Text style={styles.placeholderNotice}>
-                            {isSummaryPlaceholder ? 'Currently using hardcoded placeholder summary.' : 'Generated using Gemini LLM.'}
+                            {isSummaryPlaceholder ? 'Currently using hardcoded placeholder summary.' : 'Generated using configured LLM.'}
                         </Text>
                         <ScrollView
                             style={[styles.aiResponseScroll, shouldScrollSummary && styles.aiResponseScrollLong]}
@@ -837,7 +837,7 @@ const handlePaymentAndAccept = async () => {
                             </TouchableOpacity>
                         </View>
                         <Text style={styles.placeholderNotice}>
-                            {isAiAnswerPlaceholder ? 'Currently using hardcoded placeholder LLM guardrails.' : 'Generated using Gemini LLM with rental-chat guardrails.'}
+                            {isAiAnswerPlaceholder ? 'Currently using hardcoded placeholder LLM guardrails.' : 'Generated using configured LLM with rental-chat guardrails.'}
                         </Text>
                         <Text style={styles.modalDescription}>Ask questions related to this rental conversation only.</Text>
                         <TextInput
