@@ -72,7 +72,7 @@ S = snapshot, P = period, P† = period metric built on lifecycle timestamps (se
 | Key | Unit | Basis | Definition |
 |---|---|---|---|
 | `listingCount` | count | S | Listings the caller currently owns. |
-| `activeTenancyCount` | count | S | Owned listings with a rental in status `active`. |
+| `activeTenancyCount` | count | S | Owned listings with status `active` whose tenancy covers `asOf`: start inclusive, end exclusive. Expired/future tenancies and missing date bounds do not count. |
 | `occupancyRate` | percent | S | `activeTenancyCount / listingCount`, to 1 decimal place. |
 | `rentalRecordCount` | count | S | Rental records (offers) in any status. |
 | `pendingRentalRecordCount` | count | S | Status `pending`. |
@@ -87,7 +87,7 @@ S = snapshot, P = period, P† = period metric built on lifecycle timestamps (se
 | `recordedRentPaymentTotal` | SGD | P | Sum of those payment amounts. |
 | `recordedRentPaymentTotalChange` / `recordedRentPaymentCountChange` | percent | P | Change vs the previous period of the same length, by billing month. Unavailable when the previous period had nothing. Works on existing data, no tracking needed. |
 | `averageOccupancyRate` | percent | P | Share of the period the listings were occupied: time covered by accepted rentals ÷ (listings × period length). Overlapping rentals on one listing are merged. Uses the listings that exist now. |
-| `averageOccupancyRateChange` | percentage_points | P | Change in `averageOccupancyRate` vs the previous period, in **percentage points** (not %). Unavailable when the previous period had no occupancy. |
+| `averageOccupancyRateChange` | percentage_points | P | Change in `averageOccupancyRate` vs the previous period, in **percentage points** (not %). A zero baseline is valid: 0% → 50% is +50 percentage points. Unavailable only when there are no listings. |
 | `tenantsInPeriodCount` / `tenantsInPeriodChange` | count / percent | P | Distinct tenants whose accepted tenancy overlapped the period, and the change vs the previous period. |
 | `newListingCount` | count | P† | Listings the caller published in the period. |
 | `offersSentCount` / `offersAcceptedCount` / `terminationsCount` | count | P† | Offers sent, offers accepted and tenancies terminated in the period. |
@@ -108,7 +108,7 @@ Includes every rental, tenancy and payment metric above, scoped to one listing, 
 
 | Key | Unit | Basis | Definition |
 |---|---|---|---|
-| `occupancyStatus` | status | S | `occupied` if the listing has an `active` rental, else `vacant`. |
+| `occupancyStatus` | status | S | `occupied` if an `active` rental covers `asOf` (start inclusive, end exclusive), else `vacant`. Uses the recorded termination time when present, otherwise lease expiry. |
 | `listingViews` | count | P | **Unavailable.** Not tracked yet. |
 | `daysOnMarket` | days | S | Days from publishing to the first accepted offer, or until now if not yet rented. Unavailable for listings published before tracking started. |
 | `offersSentCount` / `offersAcceptedCount` / `terminationsCount` | count | P† | As in the owner summary, for this listing. |
@@ -154,7 +154,7 @@ The platform summary also returns `recordedRentPaymentTotalChange` and `recorded
 4. **`listing.tenant` is not used.** It isn't cleared on termination, so occupancy comes from rental status instead.
 5. **Each listing probably has at most one rental.** `Rentals` → `Listings` is `@OneToOne`, so per-listing offer counts are usually 0 or 1.
 6. **Reviews are about users, not listings.** There is no per-listing rating.
-7. **Admin access uses the `role` column on `users`.** Accounts are `USER` by default; `ADMIN` is granted with SQL (see `docs/db/changes/`). The moderation endpoints (`/api/*/admin/**`, banning, dismissing flags) are admin-only too, while raising a flag stays open to any signed-in user so reporting still works.
+7. **Admin access uses the `role` column on `users`.** Accounts are `USER` by default; `ADMIN` is granted with SQL (see `docs/db/changes/`). The moderation endpoints (`/api/*/admin/**`, banning, dismissing flags) are admin-only too, while raising a flag stays open to any signed-in user so reporting still works. Legacy account provisioning (`POST /api/users/add`) is admin-only; JSON cannot assign account IDs or roles, and new accounts default to `USER`. Public registration continues through `/auth/signup`; privileged role assignment remains an explicit database-administration operation.
 8. **Lifecycle metrics (marked P†) only count from when tracking started: 17 Sep 2026, 02:26 SGT.** The `created_at`, `accepted_at` and `terminated_at` columns were added then (`docs/db/changes/2026-09-17_add_lifecycle_timestamps.sql`), and older rows were not backfilled. For a period that starts before then, these metrics carry `coverage: {start, end, complete: false}` and the app shows "Tracked since ...". For a period that ends before then, they are unavailable, not zero. The start time is set by `analytics.lifecycle-tracking-start`.
 9. **The server sets these timestamps, never the client.** Creation times are recorded on insert. Acceptance is recorded the first time a rental becomes `active`, and termination the first time it becomes `terminated`; later saves never overwrite them. The API ignores these fields in requests.
 10. **Timestamps use the same column type as the existing dates** (`timestamp without time zone`, written in the backend's local time zone). All backends should run in Asia/Singapore time, as the existing rental and payment dates already assume.

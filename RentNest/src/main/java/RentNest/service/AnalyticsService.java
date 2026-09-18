@@ -10,12 +10,14 @@ import RentNest.repository.AnalyticsQueryRepository;
 import RentNest.repository.AnalyticsQueryRepository.PaymentRow;
 import RentNest.repository.AnalyticsQueryRepository.RentalRow;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DateTimeException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -72,12 +74,20 @@ public class AnalyticsService {
     private final ZoneId zone;
     // Lifecycle timestamps (created, accepted, terminated) are only recorded from this moment on
     private final Instant trackingStart;
+    private final Clock clock;
 
+    @Autowired
     public AnalyticsService(
             AnalyticsQueryRepository queries,
             @Value("${analytics.currency:SGD}") String currency,
             @Value("${analytics.time-zone:Asia/Singapore}") String timeZone,
             @Value("${analytics.lifecycle-tracking-start:2026-09-17T02:26:00+08:00}") String lifecycleTrackingStart) {
+        this(queries, currency, timeZone, lifecycleTrackingStart, Clock.systemUTC());
+    }
+
+    AnalyticsService(AnalyticsQueryRepository queries, String currency, String timeZone,
+                     String lifecycleTrackingStart, Clock clock) {
+        this.clock = clock;
         this.queries = queries;
         this.currency = currency;
         this.zone = ZoneId.of(timeZone);
@@ -112,6 +122,7 @@ public class AnalyticsService {
     // ---------- Scopes ----------
 
     public AnalyticsResponse ownerSummary(User owner, AnalyticsPeriod period) {
+        Instant asOf = clock.instant();
         Long ownerId = owner.getUserID();
         long listingCount = queries.countListingsByOwner(ownerId);
         List<RentalRow> rentals = queries.findRentalRowsByOwner(ownerId);
@@ -121,11 +132,11 @@ public class AnalyticsService {
         metrics.put("listingCount", Metric.available(listingCount, COUNT, SNAPSHOT,
                 "Listings you currently own. Not the number created during the period."));
 
-        long activeListings = countListingsWithActiveRental(rentals);
+        long activeListings = countOccupiedListings(rentals, asOf);
         metrics.put("activeTenancyCount", Metric.available(activeListings, COUNT, SNAPSHOT,
-                "Your listings that have a rental record with status 'active'."));
+                "Your listings with an active tenancy whose start is at or before asOf and whose end is after asOf."));
         metrics.put("occupancyRate", rate(activeListings, listingCount, SNAPSHOT,
-                "Listings with an active rental divided by all listings you own.",
+                "Listings occupied at asOf divided by all listings you own; tenancy start is inclusive and end is exclusive.",
                 "No listings, so occupancy cannot be calculated."));
 
         putRentalMetrics(metrics, rentals);
@@ -159,10 +170,11 @@ public class AnalyticsService {
         series.put("tenancyDurationDistribution", tenancyDistribution(rentals));
         series.put("monthlyOccupancyRate", monthlyOccupancyRateSeries(rentals, listingCount, period));
 
-        return response("owner", period, null, metrics, series);
+        return response("owner", period, null, metrics, series, asOf);
     }
 
     public AnalyticsResponse listingAnalytics(User owner, Long listingId, AnalyticsPeriod period) {
+        Instant asOf = clock.instant();
         Listings listing = queries.findListingOwnedBy(listingId, owner.getUserID())
                 .orElseThrow(AnalyticsException::listingNotFound);
         List<RentalRow> rentals = queries.findRentalRowsByListing(listingId);
@@ -178,9 +190,9 @@ public class AnalyticsService {
         listingInfo.put("listedAt", listing.getCreatedAt() == null ? null : listing.getCreatedAt().toInstant());
 
         Map<String, Metric> metrics = new LinkedHashMap<>();
-        boolean occupied = countListingsWithActiveRental(rentals) > 0;
+        boolean occupied = countOccupiedListings(rentals, asOf) > 0;
         metrics.put("occupancyStatus", Metric.available(occupied ? "occupied" : "vacant", "status", SNAPSHOT,
-                "'occupied' when the listing has a rental record with status 'active', otherwise 'vacant'."));
+                "'occupied' when an active tenancy covers asOf (start inclusive, end exclusive), otherwise 'vacant'."));
 
         putRentalMetrics(metrics, rentals);
         putTenancyMetrics(metrics, rentals);
@@ -190,16 +202,17 @@ public class AnalyticsService {
         putLifecycleCounts(metrics, rentals, period);
 
         metrics.put("listingViews", Metric.unavailable(COUNT, PERIOD, "Times the listing detail page was opened.", NOT_TRACKED));
-        metrics.put("daysOnMarket", listingDaysOnMarket(listing, rentals));
+        metrics.put("daysOnMarket", listingDaysOnMarket(listing, rentals, asOf));
 
         Map<String, Series> series = new LinkedHashMap<>();
         series.put("monthlyRecordedRentPayments", monthlyPaymentSeries(payments, period));
         series.put("monthlyOccupancy", monthlyOccupancySeries(rentals, period));
 
-        return response("listing", period, listingInfo, metrics, series);
+        return response("listing", period, listingInfo, metrics, series, asOf);
     }
 
     public AnalyticsResponse platformSummary(User actor, AnalyticsPeriod period) {
+        Instant asOf = clock.instant();
         requireAdmin(actor);
         List<RentalRow> rentals = queries.findAllRentalRows();
         List<PaymentRow> payments = queries.findAllPaymentRows(period.from(), period.to());
@@ -264,7 +277,7 @@ public class AnalyticsService {
                         new Series.Point("Both", queries.countUsersByRole(true, true, ACCEPTED_STATUSES)),
                         new Series.Point("Neither", queries.countUsersByRole(false, false, ACCEPTED_STATUSES)))));
 
-        return response("platform", period, null, metrics, series);
+        return response("platform", period, null, metrics, series, asOf);
     }
 
     public boolean isAdmin(User user) {
@@ -413,14 +426,10 @@ public class AnalyticsService {
         metrics.put("averageOccupancyRate", Metric.available(current.setScale(1, RoundingMode.HALF_UP), PERCENT, PERIOD, definition));
 
         long previousOccupied = occupiedMillis(rentals, previousFrom, period.from());
-        if (previousOccupied == 0) {
-            metrics.put("averageOccupancyRateChange", Metric.unavailable(PERCENTAGE_POINTS, PERIOD, changeDefinition,
-                    "No occupancy recorded in the previous period, so a change cannot be calculated."));
-        } else {
-            BigDecimal previous = occupancyPercent(previousOccupied, listingCount, previousFrom, period.from());
-            metrics.put("averageOccupancyRateChange", Metric.available(
-                    current.subtract(previous).setScale(1, RoundingMode.HALF_UP), PERCENTAGE_POINTS, PERIOD, changeDefinition));
-        }
+        BigDecimal previous = occupancyPercent(previousOccupied, listingCount, previousFrom, period.from());
+        // Percentage-point differences are defined even when previous occupancy is zero.
+        metrics.put("averageOccupancyRateChange", Metric.available(
+                current.subtract(previous).setScale(1, RoundingMode.HALF_UP), PERCENTAGE_POINTS, PERIOD, changeDefinition));
     }
 
     private void putTenantsInPeriod(Map<String, Metric> metrics, List<RentalRow> rentals, AnalyticsPeriod period) {
@@ -551,7 +560,7 @@ public class AnalyticsService {
                 .withCoverage(coverage(period));
     }
 
-    private Metric listingDaysOnMarket(Listings listing, List<RentalRow> rentals) {
+    private Metric listingDaysOnMarket(Listings listing, List<RentalRow> rentals, Instant asOf) {
         String definition = "Days from publishing this listing to its first accepted offer, or until now if it has not been rented.";
         if (listing.getCreatedAt() == null) {
             return Metric.unavailable("days", SNAPSHOT, definition,
@@ -566,7 +575,7 @@ public class AnalyticsService {
             return Metric.unavailable("days", SNAPSHOT, definition, "Accepted before acceptance dates started being recorded.");
         }
         Instant listed = listing.getCreatedAt().toInstant();
-        Instant end = firstAccepted.orElse(Instant.now());
+        Instant end = firstAccepted.orElse(asOf);
         if (end.isBefore(listed)) {
             return Metric.unavailable("days", SNAPSHOT, definition, "The recorded acceptance is earlier than the recorded publish date.");
         }
@@ -601,8 +610,8 @@ public class AnalyticsService {
     // ---------- Helpers ----------
 
     private AnalyticsResponse response(String scope, AnalyticsPeriod period, Map<String, Object> listing,
-                                       Map<String, Metric> metrics, Map<String, Series> series) {
-        return new AnalyticsResponse(AnalyticsResponse.SCHEMA_VERSION, scope, Instant.now(), period, listing, metrics, series);
+                                       Map<String, Metric> metrics, Map<String, Series> series, Instant asOf) {
+        return new AnalyticsResponse(AnalyticsResponse.SCHEMA_VERSION, scope, asOf, period, listing, metrics, series);
     }
 
     private static Metric rate(long numerator, long denominator, String basis, String definition, String reasonWhenEmpty) {
@@ -645,9 +654,12 @@ public class AnalyticsService {
         return months;
     }
 
-    private static long countListingsWithActiveRental(List<RentalRow> rentals) {
+    private static long countOccupiedListings(List<RentalRow> rentals, Instant asOf) {
         return rentals.stream()
                 .filter(rental -> STATUS_ACTIVE.equals(normalise(rental.status())))
+                .filter(rental -> rental.rentalDate() != null && rental.tenancyEnd() != null)
+                .filter(rental -> !rental.rentalDate().toInstant().isAfter(asOf)
+                        && rental.tenancyEnd().toInstant().isAfter(asOf))
                 .map(RentalRow::listingId)
                 .distinct()
                 .count();

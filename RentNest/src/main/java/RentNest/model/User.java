@@ -20,6 +20,7 @@ public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long userID;
 
     @Column(nullable = false)
@@ -42,6 +43,7 @@ public class User implements UserDetails {
 
     /** The authority ROLE_USER or ROLE_ADMIN is derived from this. New accounts default to USER. */
     @Column(nullable = false)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String role = ROLE_USER;
 
     /** When the account was created. Set by the server on first save; never accepted from requests. */

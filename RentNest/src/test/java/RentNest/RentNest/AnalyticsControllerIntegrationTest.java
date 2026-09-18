@@ -306,8 +306,8 @@ class AnalyticsControllerIntegrationTest {
         mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metrics.averageOccupancyRate.value").value(55.2))
-                // The previous 90 days had no occupancy, so no change can be calculated
-                .andExpect(jsonPath("$.metrics.averageOccupancyRateChange.availability").value("unavailable"))
+                // A zero baseline still permits a percentage-point difference.
+                .andExpect(jsonPath("$.metrics.averageOccupancyRateChange.value").value(55.2))
                 .andExpect(jsonPath("$.metrics.tenantsInPeriodCount.value").value(2))
                 .andExpect(jsonPath("$.metrics.tenantsInPeriodChange.availability").value("unavailable"))
                 // Jan: 31/93, Feb: 56/84, Mar: 62/93

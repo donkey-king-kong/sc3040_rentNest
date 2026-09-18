@@ -44,6 +44,8 @@ public class SecurityConfiguration {
                 .requestMatchers("/v3/api-docs/**").permitAll()
                 .requestMatchers("/swagger-ui/**").permitAll()
                 .requestMatchers("/swagger-ui.html").permitAll()
+                // Account provisioning is privileged; public registration uses /auth/signup.
+                .requestMatchers(HttpMethod.POST, "/api/users/add").hasRole("ADMIN")
                 // Raising a flag is how ordinary users report content, so it stays open to any signed-in user
                 .requestMatchers(HttpMethod.PUT, "/api/users/setFlag/*/1").authenticated()
                 .requestMatchers(HttpMethod.PUT, "/api/listings/setFlag/*/true").authenticated()
