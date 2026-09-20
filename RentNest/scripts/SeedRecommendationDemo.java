@@ -2,6 +2,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.sql.*;
 import java.util.*;
+import java.util.stream.Stream;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 
 /** Explicit, transactional demo seed. Preview is the default; --apply inserts missing demo records. */
@@ -35,7 +36,14 @@ class SeedRecommendationDemo {
             if (Integer.parseInt(row[7]) < 0 || Integer.parseInt(row[7]) >= PHOTOS.length) throw new IllegalArgumentException("Unknown photo");
         }
         Properties settings = new Properties();
-        try (var reader = Files.newBufferedReader(Path.of("application.properties"))) { settings.load(reader); }
+        // Accept the project-root copy, or the one Spring itself reads, so the database
+        // credentials only have to exist in one place.
+        Path config = Stream.of(Path.of("application.properties"),
+                        Path.of("src/main/resources/application.properties"))
+                .filter(Files::isReadable).findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "No application.properties found in RentNest/ or RentNest/src/main/resources/"));
+        try (var reader = Files.newBufferedReader(config)) { settings.load(reader); }
         try (var connection = DriverManager.getConnection(settings.getProperty("spring.datasource.url"),
                 settings.getProperty("spring.datasource.username"), settings.getProperty("spring.datasource.password"))) {
             connection.setAutoCommit(false);

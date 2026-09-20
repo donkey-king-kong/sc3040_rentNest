@@ -9,7 +9,9 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import static org.junit.jupiter.api.Assertions.*;
 
-@DataJpaTest
+// The in-memory database starts empty, so the schema has to be created here whatever
+// ddl-auto a developer has configured locally for the real database.
+@DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=create-drop")
 class RecommendationRepositoryTest {
     @Autowired TestEntityManager entityManager;
     @Autowired ListingsRepository repository;

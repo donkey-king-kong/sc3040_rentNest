@@ -30,6 +30,13 @@
 		<java.version>21</java.version>
 		<maven.compiler.source>21</maven.compiler.source>
 		<maven.compiler.target>21</maven.compiler.target>
+		<!--
+			Spring Boot 3.3.4 pins Byte Buddy 1.14.19, which refuses to instrument classes on
+			any JDK past 23. The build targets Java 21, but a developer running a newer JDK
+			cannot mock a concrete class at all, which fails every controller test. Overriding
+			the managed version keeps `mvnw test` working on both.
+		-->
+		<byte-buddy.version>1.15.11</byte-buddy.version>
 	</properties>
 	<dependencies>
 		<dependency>

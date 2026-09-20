@@ -1,19 +1,34 @@
 package RentNest.repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import RentNest.model.Listings;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface ListingsRepository extends JpaRepository<Listings, Long> {
     @Query("SELECT l FROM Listings l JOIN FETCH l.owner o WHERE l.tenant IS NULL " +
             "AND l.flagged = false AND o.flagged = 0 AND o.userID <> :userId")
     List<Listings> findRecommendationCandidates(@Param("userId") Long userId);
+
+    /**
+     * Stores a generated listing summary from the background summariser. A targeted update
+     * avoids loading and re-saving the whole entity off the request thread.
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Listings l SET l.aiSummary = :summary, l.aiSummaryKey = :key, " +
+            "l.aiSummaryUpdatedAt = :updatedAt WHERE l.listingID = :id")
+    int updateAiSummary(@Param("id") Long id, @Param("summary") String summary,
+                        @Param("key") String key, @Param("updatedAt") Instant updatedAt);
+
     List<Listings> findByFlaggedTrue();
     List<Listings> findByOwnerUserIDOrTenantUserID(Long ownerUserID, Long tenantUserID);
 

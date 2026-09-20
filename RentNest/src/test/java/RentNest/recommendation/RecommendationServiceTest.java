@@ -1,5 +1,7 @@
 package RentNest.recommendation;
 
+import RentNest.ai.AiProperties;
+import RentNest.ai.OpenRouterClient;
 import RentNest.model.Listings;
 import RentNest.repository.ListingsRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,13 +11,27 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * Covers the deterministic pipeline with AI switched off, which is also the path taken in
+ * production whenever OpenRouter is unreachable. The AI stages have their own tests.
+ */
 class RecommendationServiceTest {
     private ListingsRepository repository;
     private RecommendationService service;
+
     @BeforeEach void setup() {
         repository = mock(ListingsRepository.class);
-        service = new RecommendationService(repository);
+        AiProperties properties = new AiProperties();
+        properties.setEnabled(false);
+        OpenRouterClient client = new OpenRouterClient(properties);
+        RuleBasedQueryParser rules = new RuleBasedQueryParser();
+        service = new RecommendationService(repository,
+                new AiQueryParser(client, properties, rules),
+                new AiReranker(client, properties),
+                new ListingSummaryService(client, properties, repository,
+                        (listingId, radius) -> AmenityLookup.Counts.NONE));
     }
+
     private Listings listing(long id, int price, String type, String location, int beds) {
         Listings l = new Listings();
         l.setListingID(id); l.setPrice(price); l.setType(type); l.setLocation(location); l.setBeds(beds);
@@ -31,7 +47,7 @@ class RecommendationServiceTest {
                 listing(5, 2400, "Condo", "Tampines", 1)));
         var result = service.recommend(request("2 bedroom condo in Tampines under $3,000", List.of()), 7L);
         assertEquals(3000, result.filters().maxPrice());
-        assertEquals("tampines", result.filters().location());
+        assertEquals(List.of("tampines"), result.filters().locations());
         assertEquals(1, result.total());
         assertEquals(1L, result.recommendations().getFirst().listingID());
         assertTrue(result.recommendations().getFirst().summary().contains("S$2800/month"));
@@ -78,5 +94,24 @@ class RecommendationServiceTest {
         when(repository.findRecommendationCandidates(7L)).thenReturn(List.of(listing(1, 3000, "HDB", "Bedok", 2)));
         var result = service.recommend(request("under 1k", null), 7L);
         assertEquals(0, result.total());
+    }
+    @Test void disabledAiIsReportedAsOffAndNeverAsAi() {
+        when(repository.findRecommendationCandidates(7L)).thenReturn(List.of(listing(1, 3000, "HDB", "Bedok", 2)));
+        var result = service.recommend(request("hdb in bedok", null), 7L);
+        assertEquals("off", result.ai().filter());
+        assertEquals("off", result.ai().sorting());
+        assertEquals("off", result.ai().summaries());
+        assertEquals("template", result.recommendations().getFirst().summarySource());
+    }
+    @Test void marketNoteComparesAgainstListingsOfTheSameKind() {
+        when(repository.findRecommendationCandidates(7L)).thenReturn(List.of(
+                listing(1, 2000, "Condo", "Tampines", 2), listing(2, 3000, "Condo", "Tampines", 2),
+                listing(3, 3000, "Condo", "Tampines", 2), listing(4, 3200, "Condo", "Tampines", 2)));
+        var result = service.recommend(request("", null), 7L);
+        var cheapest = result.recommendations().getFirst();
+        assertEquals(1L, cheapest.listingID());
+        assertTrue(cheapest.marketNote().contains("below the median for 2-bedroom condos in Tampines"),
+                cheapest.marketNote());
+        assertTrue(cheapest.marketNote().contains("median S$3000"), cheapest.marketNote());
     }
 }
