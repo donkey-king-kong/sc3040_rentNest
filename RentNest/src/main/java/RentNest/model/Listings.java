@@ -34,6 +34,10 @@ public class Listings {
     private boolean flagged;
     private String listingpicture;
 
+    public boolean isDemo() {
+        return description != null && description.startsWith("FICTIONAL DEMO:");
+    }
+
     // Getters
     public Long getListingID() {
         return listingID;

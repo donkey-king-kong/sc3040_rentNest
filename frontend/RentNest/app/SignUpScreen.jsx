@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import Button from '../components/button';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
 
 const SignUpScreen = () => {
@@ -13,78 +12,36 @@ const SignUpScreen = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
 
   const router = useRouter();
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const pending = useRef(false);
 
   const handleSignUp = async () => {
-    // Validation
-    if (!fullName) {
-      Alert.alert('Validation Error', 'Full Name is required.');
-      return;
-    }
-    if (!email) {
-      Alert.alert('Validation Error', 'Email is required.');
-      return;
-    }
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      Alert.alert('Validation Error', 'Email format is invalid.');
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert('Validation Error', 'Password must be at least 6 characters long.');
-      return;
-    }
-
-    if (!phoneNumber || phoneNumber.length < 8) {
-     Alert.alert('Validation Error', 'Phone Number must be at least 8 digits long.');
-     return;
-     }
-
+    if (pending.current) return;
+    setError('');
+    const cleanEmail = email.trim();
+    if (!fullName.trim()) return setError('Full name is required.');
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) return setError('Enter a valid email address.');
+    if (password.length < 6) return setError('Password must be at least 6 characters long.');
+    if (!/^\d{8,}$/.test(phoneNumber.trim())) return setError('Phone number must contain at least 8 digits.');
+    pending.current = true;
+    setSubmitting(true);
     try {
-      console.log("Attempting signup with:", { email, fullName });
-      // First API call
-      const response = await axios.post(`${API_BASE_URL}${ENDPOINTS.SIGNUP}`, {
-        email,
-        password,
-        fullName
-      });
-
-      console.log("Response received:", response.status);
-  
-      // If we get here, the signup was successful
-      Alert.alert(
-        'Success',
-        'Account created successfully!'
-      );
-
-      router.push('/LandingScreen');
-
-    } catch (error) {
-      console.error('Detailed signup error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-  
-      if (error.response) {
-        // Server responded with an error
-        const errorMessage = error.response.data?.message || error.response.data || 'Could not create account';
-        Alert.alert('Registration Failed', errorMessage);
-      } else if (error.request) {
-        // Request was made but no response received
-        console.error('No response received:', error.request);
-        Alert.alert(
-          'Network Error',
-          'No response from server. Please check your connection.'
-        );
-      } else {
-        // Error in setting up the request
-        console.error('Request setup error:', error.message);
-        Alert.alert(
-          'Connection Error',
-          'Failed to connect to the server. Please try again.'
-        );
-      }
-  }
-};
+      await axios.post(`${API_BASE_URL}${ENDPOINTS.SIGNUP}`, {
+        email: cleanEmail, password, fullName: fullName.trim(), contact: phoneNumber.trim(),
+      }, { timeout: 15000 });
+      router.replace({ pathname: '/LoginScreen', params: { email: cleanEmail, registered: '1' } });
+    } catch (failure) {
+      const data = failure.response?.data;
+      const message = typeof data === 'string' ? data : data?.message;
+      setError(message === 'Email already exists'
+        ? 'This email is already registered. Log in with your existing password, or use a different email to create an account.'
+        : typeof message === 'string' ? message : 'Could not create your account. Check your connection and try again.');
+    } finally {
+      pending.current = false;
+      setSubmitting(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -98,6 +55,10 @@ const SignUpScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Sign Up</Text>
+        {error ? <Text accessibilityRole="alert" style={{ color: '#a42020', marginBottom: 16 }}>{error}</Text> : null}
+        <TouchableOpacity onPress={() => router.push({ pathname: '/LoginScreen', params: { email: email.trim() } })}>
+          <Text style={{ color: '#205c43', marginBottom: 20 }}>Already have an account? Log in</Text>
+        </TouchableOpacity>
 
         <TextInput
           style={styles.input}
@@ -148,7 +109,7 @@ const SignUpScreen = () => {
 
       <View style={styles.buttonContainer}>
         <Button
-          title="Sign Up"
+          title={submitting ? 'Creating account…' : 'Sign Up'}
           onPress={handleSignUp}
           backgroundColor="#222222"
           textColor="#FFFFFF"

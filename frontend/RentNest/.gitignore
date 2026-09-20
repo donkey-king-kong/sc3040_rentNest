@@ -21,3 +21,7 @@ web-build/
 
 expo-env.d.ts
 # @end expo-cli
+# Local environment settings
+.env
+.env.local
+.env.*.local

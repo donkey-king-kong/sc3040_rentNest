@@ -99,25 +99,32 @@ const HomeListingScreen = () => {
 
         // Apply default values only if the response data is empty or missing properties
         const listingData = listingResponse.data || {};
+        const isDemo = listingData.demo === true;
         const defaultListing = {
+          isDemo,
           name: listingData.name || 'No Name Available',
           location: listingData.location || 'Location not available',
           price: listingData.price || 0,
           rating: 4.0,
-          pincode: listingData.postal || 489836,
+          pincode: listingData.postal || (isDemo ? 'Not provided' : 489836),
           type: listingData.type || 'Not specified',
           rentalType: 'Room Rental',
-          description: listingData.description || 'No description available',
+          description: isDemo ? (listingData.description || '').replace('FICTIONAL DEMO:', 'SAMPLE LISTING:').replace(/\bdemo\b/gi, 'sample') : (listingData.description || 'No description available'),
           beds: listingData.beds || 0,
           baths: listingData.bathroom || 0,
           size: listingData.size || 1, // Prevent division by zero
           imageURL: listingData.listingpicture || 'https://www.sgluxurycondo.com/wp-content/uploads/2022/11/should-you-buy-a-luxury-condo-buyers-guide-to-luxury-condo-in-singapore-1536x1024.jpg',
           ownerUserID: listingData.ownerId || '',
-          ownerName: listingData.ownerName || 'Unknown',
+          ownerName: isDemo ? 'Sample Property Owner' : (listingData.ownerName || 'Unknown'),
           ownerPhotoURL: listingData.ownerPhotoURL || 'https://thumbs.dreamstime.com/b/tranquil-caucasian-handsome-brunet-man-blue-long-scarf-posing-wrinkled-face-against-background-square-image-236510369.jpg'
         };
         console.log('Processed listing data:', defaultListing);
         setListing(defaultListing);
+        if (isDemo) {
+          setNearbySchools([]); setNearbyHawkerCentres([]); setNearbyBusStops([]);
+          setPriceInsights([]); setReviews([]);
+          return; // Fictional demo addresses must not trigger government data lookups.
+        }
 
         console.log('Fetching nearby schools...');
         const schoolsResponse = await axios.get(`${API_BASE_URL}/api/gov/schools/${listingId}`, {
@@ -305,6 +312,10 @@ const HomeListingScreen = () => {
         {/* Display listing ID for future backend connection */}
         {/*<Text style={styles.listingId}>Listing ID: {listingId}</Text>*/}
 
+        {listing.isDemo && <Text style={{ color: '#805300', marginVertical: 12 }}>
+          Sample listing. Photo is illustrative; prices and property details are invented for testing. No verified address, nearby amenities or market-price comparison.
+        </Text>}
+        {!listing.isDemo && <>
         {/* Heading for the location section */}
         <Text style={styles.schoolsLabel}>About the Location</Text>
 
@@ -405,17 +416,18 @@ const HomeListingScreen = () => {
                          )}
                      />
                 </View>
+        </>}
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
                         <View style={styles.ownerInfo}>
-                          <Image source={{ uri: listing.ownerPhotoURL }} style={styles.ownerImage} />
+                          {!listing.isDemo && <Image source={{ uri: listing.ownerPhotoURL }} style={styles.ownerImage} />}
                           <Text style={styles.ownerText}>Posted by: {listing.ownerName}</Text>
                         </View>
                       </View>
 
                       {/* Buttons */}
-                        <TouchableOpacity onPress={handleChat} style={styles.messageButton}>
-                          <Text style={styles.buttonText1}>Message Owner</Text>
+                        <TouchableOpacity disabled={listing.isDemo} onPress={handleChat} style={styles.messageButton}>
+                          <Text style={styles.buttonText1}>{listing.isDemo ? 'Sample listing — enquiries unavailable' : 'Message Owner'}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.reportButton}>
                           <Text style={styles.buttonText2} onPress={handleReportListing} >Report Listing</Text>

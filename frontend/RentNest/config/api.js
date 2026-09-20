@@ -35,6 +35,7 @@ export const ENDPOINTS = {
     LOGIN: '/auth/login',
     SIGNUP: '/auth/signup',
     LISTINGS: "/api/listings",
+    RECOMMENDATIONS: '/api/listings/recommendations',
     RENTALS: '/api/rentals',
     PAYMENTS: '/api/payment',
     PAYMENTS_BY_RENTAL: (rentalId) => `/api/payment/paymentsList/${rentalId}`,

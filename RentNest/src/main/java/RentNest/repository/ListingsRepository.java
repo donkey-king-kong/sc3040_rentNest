@@ -11,6 +11,9 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ListingsRepository extends JpaRepository<Listings, Long> {
+    @Query("SELECT l FROM Listings l JOIN FETCH l.owner o WHERE l.tenant IS NULL " +
+            "AND l.flagged = false AND o.flagged = 0 AND o.userID <> :userId")
+    List<Listings> findRecommendationCandidates(@Param("userId") Long userId);
     List<Listings> findByFlaggedTrue();
     List<Listings> findByOwnerUserIDOrTenantUserID(Long ownerUserID, Long tenantUserID);
 
