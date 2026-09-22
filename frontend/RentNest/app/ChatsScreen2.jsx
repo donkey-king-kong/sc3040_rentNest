@@ -371,6 +371,18 @@ const ChatsScreen2 = () => {
         askAiQuestion();
     }
 
+    const getAiAnswerTitle = () => {
+        if (aiAnswerCategory === 'chat_summary') {
+            return 'Chat Summary';
+        }
+
+        if (aiAnswerCategory === 'out_of_scope') {
+            return 'Unable to Answer';
+        }
+
+        return 'AI Response';
+    }
+
     const sendRentalOffer = async() => {
         try{
             const token = await AsyncStorage.getItem('token');
@@ -870,9 +882,7 @@ const handlePaymentAndAccept = async () => {
                         </View>
                         {aiAnswer !== '' && (
                             <View style={styles.aiAnswerContainer}>
-                                {aiAnswerCategory !== '' && (
-                                    <Text style={styles.aiAnswerCategory}>Category: {aiAnswerCategory}</Text>
-                                )}
+                                <Text style={styles.aiAnswerTitle}>{getAiAnswerTitle()}</Text>
                                 <ScrollView
                                     style={[styles.aiResponseScroll, shouldScrollAiAnswer && styles.aiResponseScrollLong]}
                                     scrollEnabled={shouldScrollAiAnswer}
@@ -1271,7 +1281,7 @@ const styles = StyleSheet.create({
         padding: 12,
         marginTop: 15,
     },
-    aiAnswerCategory: {
+    aiAnswerTitle: {
         fontSize: 12,
         fontWeight: 'bold',
         marginBottom: 8,
