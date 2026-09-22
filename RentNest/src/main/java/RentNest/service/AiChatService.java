@@ -25,6 +25,11 @@ public class AiChatService {
     private static final String PLACEHOLDER_PREFIX = "[HARDCODED PLACEHOLDER]";
     private static final Duration LLM_CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration LLM_REQUEST_TIMEOUT = Duration.ofSeconds(20);
+    private static final List<String> PLACEHOLDER_API_KEYS = List.of(
+            "YOUR_LLM_API_KEY",
+            "YOUR_GEMINI_API_KEY",
+            "YOUR_OPENROUTER_API_KEY"
+    );
 
     private final ChatHistoryService chatHistoryService;
     private final HttpClient httpClient;
@@ -207,11 +212,16 @@ public class AiChatService {
     private boolean isLlmConfigured() {
         return llmApiKey != null
                 && !llmApiKey.isBlank()
-                && !llmApiKey.equals("YOUR_LLM_API_KEY")
+                && !PLACEHOLDER_API_KEYS.contains(llmApiKey)
+                && isSupportedProvider(llmProvider)
                 && llmApiUrl != null
                 && !llmApiUrl.isBlank()
                 && llmModel != null
                 && !llmModel.isBlank();
+    }
+
+    private boolean isSupportedProvider(String provider) {
+        return "gemini".equalsIgnoreCase(provider) || "openrouter".equalsIgnoreCase(provider);
     }
 
     private String generatePlaceholderSummary(List<ChatHistory> conversation) {
