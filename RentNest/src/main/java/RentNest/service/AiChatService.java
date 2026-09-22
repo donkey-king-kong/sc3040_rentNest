@@ -108,6 +108,15 @@ public class AiChatService {
 
         String normalizedQuestion = question.toLowerCase(Locale.ROOT);
 
+        if (isAiHelpQuestion(normalizedQuestion)) {
+            return new AiChatQuestionResponseDTO(
+                    true,
+                    "rental_conversation",
+                    generateAllowedQuestionGuide(),
+                    false
+            );
+        }
+
         if (isOutOfScopeQuestion(normalizedQuestion)) {
             return new AiChatQuestionResponseDTO(
                     false,
@@ -149,6 +158,7 @@ public class AiChatService {
                 - owner or tenant requests
                 - next steps
                 - summary of the chat
+                - what rental-chat questions this assistant can answer
 
                 If the user's question is unrelated, reply exactly:
                 I can only answer questions related to this rental conversation.
@@ -381,6 +391,31 @@ public class AiChatService {
                 "song",
                 "ignore previous"
         ) && !containsAny(question, "rent", "rental", "tenant", "owner", "listing", "lease", "deposit", "viewing", "chat", "conversation");
+    }
+
+    private boolean isAiHelpQuestion(String question) {
+        return containsAny(
+                question,
+                "what questions can i ask",
+                "what can i ask",
+                "what should i ask",
+                "what are allowed questions",
+                "what topics can i ask",
+                "how can you help",
+                "what can you help with"
+        );
+    }
+
+    private String generateAllowedQuestionGuide() {
+        return """
+                You can ask questions about this rental conversation, such as:
+                - What is the rent and deposit?
+                - When is the viewing?
+                - What move-in date was discussed?
+                - What amenities or location details were mentioned?
+                - What are the next steps?
+                - Summarise the chat.
+                """.trim();
     }
 
     private boolean containsAny(String text, String... keywords) {
