@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 @Service
@@ -455,7 +456,8 @@ public class AiChatService {
 
     private boolean containsAny(String text, String... keywords) {
         for (String keyword : keywords) {
-            if (text.contains(keyword)) {
+            String keywordPattern = "(?<![a-z0-9])" + Pattern.quote(keyword.toLowerCase(Locale.ROOT)) + "(?![a-z0-9])";
+            if (Pattern.compile(keywordPattern).matcher(text).find()) {
                 return true;
             }
         }
