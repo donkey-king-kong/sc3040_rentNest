@@ -14,6 +14,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -22,6 +23,8 @@ import java.util.zip.GZIPInputStream;
 @Service
 public class AiChatService {
     private static final String PLACEHOLDER_PREFIX = "[HARDCODED PLACEHOLDER]";
+    private static final Duration LLM_CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration LLM_REQUEST_TIMEOUT = Duration.ofSeconds(20);
 
     private final ChatHistoryService chatHistoryService;
     private final HttpClient httpClient;
@@ -41,7 +44,9 @@ public class AiChatService {
 
     public AiChatService(ChatHistoryService chatHistoryService) {
         this.chatHistoryService = chatHistoryService;
-        this.httpClient = HttpClient.newHttpClient();
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(LLM_CONNECT_TIMEOUT)
+                .build();
         this.objectMapper = new ObjectMapper();
     }
 
@@ -283,6 +288,7 @@ public class AiChatService {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(llmApiUrl))
+                    .timeout(LLM_REQUEST_TIMEOUT)
                     .header("Content-Type", "application/json")
                     .header("Accept", "application/json")
                     .header("Accept-Encoding", "identity")
@@ -355,6 +361,7 @@ public class AiChatService {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
+                    .timeout(LLM_REQUEST_TIMEOUT)
                     .header("Content-Type", "application/json")
                     .header("x-goog-api-key", llmApiKey)
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
