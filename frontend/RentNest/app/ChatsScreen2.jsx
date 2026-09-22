@@ -809,9 +809,9 @@ const handlePaymentAndAccept = async () => {
                                 <Image source={x} style={styles.icon}/>
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.placeholderNotice}>
-                            {isSummaryPlaceholder ? 'Currently using hardcoded placeholder summary.' : 'Generated using configured LLM.'}
-                        </Text>
+                        {isSummaryPlaceholder && (
+                            <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
+                        )}
                         <ScrollView
                             style={[styles.aiResponseScroll, shouldScrollSummary && styles.aiResponseScrollLong]}
                             scrollEnabled={shouldScrollSummary}
@@ -836,9 +836,9 @@ const handlePaymentAndAccept = async () => {
                                 <Image source={x} style={styles.icon}/>
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.placeholderNotice}>
-                            {isAiAnswerPlaceholder ? 'Currently using hardcoded placeholder LLM guardrails.' : 'Generated using configured LLM with rental-chat guardrails.'}
-                        </Text>
+                        {isAiAnswerPlaceholder && (
+                            <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder LLM guardrails.</Text>
+                        )}
                         <Text style={styles.modalDescription}>Ask questions related to this rental conversation only.</Text>
                         <TextInput
                             style={styles.aiQuestionInput}
