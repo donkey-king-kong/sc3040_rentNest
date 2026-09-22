@@ -357,6 +357,20 @@ const ChatsScreen2 = () => {
         }
     }
 
+    const handleAiQuestionKeyPress = (event) => {
+        const nativeEvent = event.nativeEvent || {};
+        if (nativeEvent.key !== 'Enter') {
+            return;
+        }
+
+        if (nativeEvent.shiftKey || nativeEvent.ctrlKey || nativeEvent.metaKey) {
+            return;
+        }
+
+        event.preventDefault?.();
+        askAiQuestion();
+    }
+
     const sendRentalOffer = async() => {
         try{
             const token = await AsyncStorage.getItem('token');
@@ -845,6 +859,9 @@ const handlePaymentAndAccept = async () => {
                             placeholder="E.g. What is the tenant asking for?"
                             value={aiQuestion}
                             onChangeText={setAiQuestion}
+                            onKeyPress={handleAiQuestionKeyPress}
+                            multiline={true}
+                            blurOnSubmit={false}
                         />
                         <View style={styles.longBlackButton}>
                             <TouchableOpacity onPress={askAiQuestion} disabled={isAskingAi}>
