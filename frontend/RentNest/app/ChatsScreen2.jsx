@@ -45,6 +45,7 @@ const ChatsScreen2 = () => {
     const [chatSummary, setChatSummary] = useState('');
     const [summaryError, setSummaryError] = useState('');
     const [isSummaryPlaceholder, setSummaryPlaceholder] = useState(true);
+    const [summaryCache, setSummaryCache] = useState(null);
     const [isAskAiModalVisible, setAskAiModalVisible] = useState(false);
     const [aiQuestion, setAiQuestion] = useState('');
     const [aiAnswer, setAiAnswer] = useState('');
@@ -275,7 +276,34 @@ const ChatsScreen2 = () => {
         await postMessage(messageToSend);
     }
 
+    const getChatSummaryCacheKey = () => {
+        if (!Array.isArray(chat) || chat.length === 0) {
+            return `${partnerUserId}-${currentUser}-empty`;
+        }
+
+        const latestMessage = chat[chat.length - 1];
+        return [
+            partnerUserId,
+            currentUser,
+            chat.length,
+            latestMessage?.messageID || '',
+            latestMessage?.date || '',
+            latestMessage?.senderId || '',
+            latestMessage?.message || '',
+        ].join('|');
+    }
+
     const getChatSummary = async () => {
+        const cacheKey = getChatSummaryCacheKey();
+
+        if (summaryCache?.key === cacheKey) {
+            setSummaryError('');
+            setChatSummary(summaryCache.summary);
+            setSummaryPlaceholder(summaryCache.placeholder);
+            setSummaryModalVisible(true);
+            return;
+        }
+
         try {
             setGeneratingSummary(true);
             setSummaryError('');
@@ -300,8 +328,16 @@ const ChatsScreen2 = () => {
                 },
             });
 
-            setChatSummary(summaryResponse.data?.summary || 'No summary available.');
-            setSummaryPlaceholder(summaryResponse.data?.placeholder ?? true);
+            const generatedSummary = summaryResponse.data?.summary || 'No summary available.';
+            const isPlaceholderSummary = summaryResponse.data?.placeholder ?? true;
+
+            setChatSummary(generatedSummary);
+            setSummaryPlaceholder(isPlaceholderSummary);
+            setSummaryCache({
+                key: cacheKey,
+                summary: generatedSummary,
+                placeholder: isPlaceholderSummary,
+            });
             setSummaryModalVisible(true);
         } catch (error) {
             console.error('Error generating chat summary:', error);
