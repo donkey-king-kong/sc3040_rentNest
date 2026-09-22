@@ -48,6 +48,7 @@ const ChatsScreen2 = () => {
     const [summaryCache, setSummaryCache] = useState(null);
     const [isAskAiModalVisible, setAskAiModalVisible] = useState(false);
     const [aiQuestion, setAiQuestion] = useState('');
+    const [submittedAiQuestion, setSubmittedAiQuestion] = useState('');
     const [aiAnswer, setAiAnswer] = useState('');
     const [aiAnswerCategory, setAiAnswerCategory] = useState('');
     const [isAiAnswerPlaceholder, setAiAnswerPlaceholder] = useState(false);
@@ -357,6 +358,8 @@ const ChatsScreen2 = () => {
 
         try {
             setAskingAi(true);
+            setSubmittedAiQuestion(questionToAsk);
+            setAiQuestion('');
             setAiAnswer('');
             setAiAnswerCategory('');
             setAiAnswerPlaceholder(false);
@@ -918,6 +921,12 @@ const handlePaymentAndAccept = async () => {
                         </View>
                         {aiAnswer !== '' && (
                             <View style={styles.aiAnswerContainer}>
+                                {submittedAiQuestion !== '' && (
+                                    <View style={styles.aiAskedQuestionContainer}>
+                                        <Text style={styles.aiAskedQuestionLabel}>You Asked</Text>
+                                        <Text style={styles.aiAskedQuestionText}>{submittedAiQuestion}</Text>
+                                    </View>
+                                )}
                                 <Text style={styles.aiAnswerTitle}>{getAiAnswerTitle()}</Text>
                                 <ScrollView
                                     style={[styles.aiResponseScroll, shouldScrollAiAnswer && styles.aiResponseScrollLong]}
@@ -1316,6 +1325,22 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         padding: 12,
         marginTop: 15,
+    },
+    aiAskedQuestionContainer: {
+        backgroundColor: '#efefef',
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 10,
+    },
+    aiAskedQuestionLabel: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginBottom: 4,
+        color: '#666',
+    },
+    aiAskedQuestionText: {
+        fontSize: 14,
+        lineHeight: 20,
     },
     aiAnswerTitle: {
         fontSize: 12,
