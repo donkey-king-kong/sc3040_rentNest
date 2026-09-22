@@ -49,7 +49,7 @@ const ChatsScreen2 = () => {
     const [aiQuestion, setAiQuestion] = useState('');
     const [aiAnswer, setAiAnswer] = useState('');
     const [aiAnswerCategory, setAiAnswerCategory] = useState('');
-    const [isAiAnswerPlaceholder, setAiAnswerPlaceholder] = useState(true);
+    const [isAiAnswerPlaceholder, setAiAnswerPlaceholder] = useState(false);
     const [isAskingAi, setAskingAi] = useState(false);
     const { refresh } = useLocalSearchParams();
 
@@ -323,7 +323,7 @@ const ChatsScreen2 = () => {
             setAskingAi(true);
             setAiAnswer('');
             setAiAnswerCategory('');
-            setAiAnswerPlaceholder(true);
+            setAiAnswerPlaceholder(false);
 
             const token = await AsyncStorage.getItem('token');
             if (!token) {
@@ -836,7 +836,7 @@ const handlePaymentAndAccept = async () => {
                                 <Image source={x} style={styles.icon}/>
                             </TouchableOpacity>
                         </View>
-                        {isAiAnswerPlaceholder && (
+                        {aiAnswer !== '' && isAiAnswerPlaceholder && (
                             <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder LLM guardrails.</Text>
                         )}
                         <Text style={styles.modalDescription}>Ask questions related to this rental conversation only.</Text>
