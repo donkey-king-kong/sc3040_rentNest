@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -328,12 +327,10 @@ public class AiChatService {
 
     private String callGemini(String systemInstruction, String prompt) {
         try {
-            String encodedApiKey = URLEncoder.encode(llmApiKey, StandardCharsets.UTF_8);
             String url = String.format(
-                    "%s/%s:generateContent?key=%s",
+                    "%s/%s:generateContent",
                     llmApiUrl.replaceAll("/$", ""),
-                    llmModel,
-                    encodedApiKey
+                    llmModel
             );
 
             Map<String, Object> requestBody = Map.of(
@@ -359,6 +356,7 @@ public class AiChatService {
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Content-Type", "application/json")
+                    .header("x-goog-api-key", llmApiKey)
                     .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
                     .build();
 
