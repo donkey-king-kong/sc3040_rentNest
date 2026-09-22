@@ -108,6 +108,16 @@ public class AiChatService {
 
         String normalizedQuestion = question.toLowerCase(Locale.ROOT);
 
+        if (isSummaryQuestion(normalizedQuestion)) {
+            AiChatSummaryResponseDTO summary = generateChatSummary(userA, userB);
+            return new AiChatQuestionResponseDTO(
+                    true,
+                    "chat_summary",
+                    summary.getSummary(),
+                    summary.isPlaceholder()
+            );
+        }
+
         if (isAiHelpQuestion(normalizedQuestion)) {
             return new AiChatQuestionResponseDTO(
                     true,
@@ -391,6 +401,16 @@ public class AiChatService {
                 "song",
                 "ignore previous"
         ) && !containsAny(question, "rent", "rental", "tenant", "owner", "listing", "lease", "deposit", "viewing", "chat", "conversation");
+    }
+
+    private boolean isSummaryQuestion(String question) {
+        return containsAny(
+                question,
+                "summarize",
+                "summarise",
+                "summary",
+                "recap"
+        ) && containsAny(question, "chat", "conversation");
     }
 
     private boolean isAiHelpQuestion(String question) {
