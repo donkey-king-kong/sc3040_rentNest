@@ -159,8 +159,24 @@
       "value": null,
       "unit": "count",
       "basis": "period",
-      "definition": "Times the listing detail page was opened.",
-      "reason": "Not tracked yet: requires event instrumentation that has not been enabled."
+      "definition": "Times this listing's detail page was opened during the period, counting repeat visits separately. Your own visits to your listing are not recorded.",
+      "reason": "Not tracked for this period: views are recorded from 29 Sep 2026 onwards."
+    },
+    "uniqueListingViewers": {
+      "availability": "unavailable",
+      "value": null,
+      "unit": "count",
+      "basis": "period",
+      "definition": "Different people who opened this listing during the period; repeat visits by the same person count once.",
+      "reason": "Not tracked for this period: views are recorded from 29 Sep 2026 onwards."
+    },
+    "photoGalleryViews": {
+      "availability": "unavailable",
+      "value": null,
+      "unit": "count",
+      "basis": "period",
+      "definition": "Times people browsed this listing's photographs.",
+      "reason": "A listing stores a single photograph, so there is no gallery to browse."
     },
     "daysOnMarket": {
       "availability": "unavailable",

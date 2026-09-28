@@ -324,8 +324,10 @@ describe('ListingAnalyticsScreen', () => {
     expect(text).toContain('S$1,500');
     expect(text).toContain('65.6%');
     expect(text).toContain('3.0 mo');
-    // Listing views (not tracked) and days on market must not render as numbers
-    expect(text.filter((item) => item === 'Not available')).toHaveLength(2);
+    // Listing views, unique viewers (both before view tracking) and days on market
+    // must not render as numbers
+    expect(text).toContain('Unique viewers');
+    expect(text.filter((item) => item === 'Not available')).toHaveLength(3);
     // No previous-period data in this response, so no change lines
     expect(text.some((item) => item.includes('vs previous period'))).toBe(false);
 

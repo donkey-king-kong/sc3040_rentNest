@@ -97,6 +97,19 @@ const HomeListingScreen = () => {
         });
         console.log('Listing API response:', listingResponse.data);
 
+        // Record that this listing was opened, for the owner's view analytics.
+        // Fire and forget: the page must still work if this fails, and the backend ignores
+        // an owner viewing their own listing.
+        axios.post(`${API_BASE_URL}/api/listings/${listingId}/views`, {}, {
+          headers: {
+            'Authorization': `Bearer ${tokenValue}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        }).catch((viewError) => {
+          console.log('Could not record listing view:', viewError.message);
+        });
+
         // Apply default values only if the response data is empty or missing properties
         const listingData = listingResponse.data || {};
         const defaultListing = {

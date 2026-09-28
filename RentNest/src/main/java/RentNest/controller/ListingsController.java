@@ -3,6 +3,7 @@
     import RentNest.model.Listings;
     import RentNest.model.User;
     import RentNest.dto.ListingsDTO;
+    import RentNest.service.ListingViewService;
     import RentNest.service.ListingsService;
     import org.springframework.beans.factory.annotation.Autowired;
     import org.springframework.http.HttpStatus;
@@ -19,10 +20,12 @@
     public class ListingsController {
 
         private final ListingsService listingsService;
+        private final ListingViewService listingViewService;
 
         @Autowired
-        public ListingsController(ListingsService listingsService) {
+        public ListingsController(ListingsService listingsService, ListingViewService listingViewService) {
             this.listingsService = listingsService;
+            this.listingViewService = listingViewService;
         }
 
         // GET - Retrieve all listings
@@ -40,6 +43,22 @@
             } else {
                 return ResponseEntity.notFound().build();
             }
+        }
+
+        // POST - Record that the signed-in user opened this listing.
+        // The viewer comes from the token and the time from the server clock; neither is read
+        // from the request. Returns 204 either way, so the app never has to handle a failure
+        // for something the user did not ask for. A view of your own listing is not recorded.
+        @PostMapping("/{listingId}/views")
+        public ResponseEntity<Void> recordListingView(
+                @PathVariable Long listingId,
+                @AuthenticationPrincipal User user) {
+            try {
+                listingViewService.recordListingView(listingId, user);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.noContent().build();
         }
 
         // POST - Create a new listing

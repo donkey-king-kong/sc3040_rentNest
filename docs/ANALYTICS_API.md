@@ -45,7 +45,7 @@ The 401 only applies to `/api/analytics/**`. Other routes keep their existing 40
   "listing": { "listingId": 2, "name": "A2", "type": "HDB", "location": "...", "price": 2000, "listingPicture": "..." },
   "metrics": {
     "listingCount": { "availability": "available", "value": 3, "unit": "count", "basis": "snapshot", "definition": "...", "reason": null },
-    "listingViews": { "availability": "unavailable", "value": null, "unit": "count", "basis": "period", "definition": "...", "reason": "Not tracked yet: ..." }
+    "photoGalleryViews": { "availability": "unavailable", "value": null, "unit": "count", "basis": "period", "definition": "...", "reason": "A listing stores a single photograph, ..." }
   },
   "series": {
     "monthlyRecordedRentPayments": {
@@ -65,7 +65,8 @@ The 401 only applies to `/api/analytics/**`. Other routes keep their existing 40
 
 ## Metric dictionary
 
-S = snapshot, P = period, P† = period metric built on lifecycle timestamps (see limitation 8).
+S = snapshot, P = period, P† = period metric built on lifecycle timestamps (see limitation 8),
+P‡ = period metric built on recorded listing views (see limitation 11).
 
 ### Owner summary (`scope: owner`)
 
@@ -109,7 +110,9 @@ Includes every rental, tenancy and payment metric above, scoped to one listing, 
 | Key | Unit | Basis | Definition |
 |---|---|---|---|
 | `occupancyStatus` | status | S | `occupied` if an `active` rental covers `asOf` (start inclusive, end exclusive), else `vacant`. Uses the recorded termination time when present, otherwise lease expiry. |
-| `listingViews` | count | P | **Unavailable.** Not tracked yet. |
+| `listingViews` | count | P‡ | Times the listing detail page was opened in the period, counting repeat visits separately. An owner opening their own listing is not recorded. |
+| `uniqueListingViewers` | count | P‡ | Distinct signed-in people who opened the listing in the period; repeat visits by one person count once. |
+| `photoGalleryViews` | count | P | **Unavailable.** A listing stores a single photograph, so there is no gallery to browse. |
 | `daysOnMarket` | days | S | Days from publishing to the first accepted offer, or until now if not yet rented. Unavailable for listings published before tracking started. |
 | `offersSentCount` / `offersAcceptedCount` / `terminationsCount` | count | P† | As in the owner summary, for this listing. |
 | `averageOccupancyRate` / `averageOccupancyRateChange`, payment changes | | P | As in the owner summary, for this one listing. |
@@ -158,6 +161,12 @@ The platform summary also returns `recordedRentPaymentTotalChange` and `recorded
 8. **Lifecycle metrics (marked P†) only count from when tracking started: 17 Sep 2026, 02:26 SGT.** The `created_at`, `accepted_at` and `terminated_at` columns were added then (`docs/db/changes/2026-09-17_add_lifecycle_timestamps.sql`), and older rows were not backfilled. For a period that starts before then, these metrics carry `coverage: {start, end, complete: false}` and the app shows "Tracked since ...". For a period that ends before then, they are unavailable, not zero. The start time is set by `analytics.lifecycle-tracking-start`.
 9. **The server sets these timestamps, never the client.** Creation times are recorded on insert. Acceptance is recorded the first time a rental becomes `active`, and termination the first time it becomes `terminated`; later saves never overwrite them. The API ignores these fields in requests.
 10. **Timestamps use the same column type as the existing dates** (`timestamp without time zone`, written in the backend's local time zone). All backends should run in Asia/Singapore time, as the existing rental and payment dates already assume.
+11. **Listing views (marked P‡) only count from when view tracking started: 29 Sep 2026.** Views are recorded in `public.listing_view` (`docs/db/changes/2026-09-29_add_listing_view_table.sql`), one row per view, and **cannot be backfilled** — there is no record of earlier views anywhere. A period ending before tracking started reports these as unavailable, not zero; a period starting before it carries `coverage.complete = false`. The start time is set by `analytics.view-tracking-start`.
+    - The view is recorded by the server from the token and its own clock: `POST /api/listings/{listingId}/views` reads neither a viewer nor a time from the request. It returns 204 whether or not a row was stored, and the app calls it fire-and-forget so a failure never breaks the listing page.
+    - **An owner opening their own listing is not recorded**, so owners cannot inflate their own counts. This means `listingViews` is visits by other people, not total traffic.
+    - `uniqueListingViewers` counts distinct signed-in viewers. Listings require a login to open, so in practice every view has an identity; the `userid` column is nullable only so an anonymous view could be counted later.
+    - Repeat visits count separately in `listingViews` and once in `uniqueListingViewers`. Nothing deduplicates rapid refreshes, so treat `listingViews` as "opens", not "people".
+    - `photoGalleryViews` stays unavailable: a listing stores one photograph (`listings.listingpicture`), so there is no gallery. The `listing_view.kind` column reserves `'photo'` so this needs no further migration once multi-image listings exist.
 
 ## Frontend screens
 

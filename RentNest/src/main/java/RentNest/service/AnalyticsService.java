@@ -63,7 +63,8 @@ public class AnalyticsService {
     private static final String MONTHS = "months";
     private static final String PERCENTAGE_POINTS = "percentage_points";
 
-    private static final String NOT_TRACKED = "Not tracked yet: requires event instrumentation that has not been enabled.";
+    // Used when nothing configures a view-tracking start, e.g. in unit tests
+    static final String DEFAULT_VIEW_TRACKING_START = "2026-09-29T00:00:00+08:00";
 
     // Contracted/actual tenancy length buckets, lower bound inclusive, in months
     private static final int[] TENANCY_BUCKET_BOUNDS = {3, 6, 12, 24};
@@ -74,6 +75,8 @@ public class AnalyticsService {
     private final ZoneId zone;
     // Lifecycle timestamps (created, accepted, terminated) are only recorded from this moment on
     private final Instant trackingStart;
+    // Listing views are only recorded from this moment on, and cannot be backfilled
+    private final Instant viewTrackingStart;
     private final Clock clock;
 
     @Autowired
@@ -81,17 +84,24 @@ public class AnalyticsService {
             AnalyticsQueryRepository queries,
             @Value("${analytics.currency:SGD}") String currency,
             @Value("${analytics.time-zone:Asia/Singapore}") String timeZone,
-            @Value("${analytics.lifecycle-tracking-start:2026-09-17T02:26:00+08:00}") String lifecycleTrackingStart) {
-        this(queries, currency, timeZone, lifecycleTrackingStart, Clock.systemUTC());
+            @Value("${analytics.lifecycle-tracking-start:2026-09-17T02:26:00+08:00}") String lifecycleTrackingStart,
+            @Value("${analytics.view-tracking-start:" + DEFAULT_VIEW_TRACKING_START + "}") String viewTrackingStart) {
+        this(queries, currency, timeZone, lifecycleTrackingStart, viewTrackingStart, Clock.systemUTC());
     }
 
     AnalyticsService(AnalyticsQueryRepository queries, String currency, String timeZone,
                      String lifecycleTrackingStart, Clock clock) {
+        this(queries, currency, timeZone, lifecycleTrackingStart, DEFAULT_VIEW_TRACKING_START, clock);
+    }
+
+    AnalyticsService(AnalyticsQueryRepository queries, String currency, String timeZone,
+                     String lifecycleTrackingStart, String viewTrackingStart, Clock clock) {
         this.clock = clock;
         this.queries = queries;
         this.currency = currency;
         this.zone = ZoneId.of(timeZone);
         this.trackingStart = OffsetDateTime.parse(lifecycleTrackingStart).toInstant();
+        this.viewTrackingStart = OffsetDateTime.parse(viewTrackingStart).toInstant();
     }
 
     // ---------- Period ----------
@@ -201,7 +211,16 @@ public class AnalyticsService {
         putOccupancyMetrics(metrics, rentals, 1, period);
         putLifecycleCounts(metrics, rentals, period);
 
-        metrics.put("listingViews", Metric.unavailable(COUNT, PERIOD, "Times the listing detail page was opened.", NOT_TRACKED));
+        metrics.put("listingViews", viewCount(period,
+                "Times this listing's detail page was opened during the period, counting repeat visits separately. "
+                        + "Your own visits to your listing are not recorded.",
+                (from, to) -> queries.countListingViews(listingId, from, to)));
+        metrics.put("uniqueListingViewers", viewCount(period,
+                "Different people who opened this listing during the period; repeat visits by the same person count once.",
+                (from, to) -> queries.countDistinctListingViewers(listingId, from, to)));
+        metrics.put("photoGalleryViews", Metric.unavailable(COUNT, PERIOD,
+                "Times people browsed this listing's photographs.",
+                "A listing stores a single photograph, so there is no gallery to browse."));
         metrics.put("daysOnMarket", listingDaysOnMarket(listing, rentals, asOf));
 
         Map<String, Series> series = new LinkedHashMap<>();
@@ -538,6 +557,21 @@ public class AnalyticsService {
                 (from, to) -> countInRange(rentals, RentalRow::acceptedAt, from, to)));
         metrics.put("terminationsCount", lifecycleCount(period, "Tenancies terminated during the period.",
                 (from, to) -> countInRange(rentals, RentalRow::terminatedAt, from, to)));
+    }
+
+    /**
+     * A recorded view count for the period. Views cannot be backfilled, so a period that ends
+     * before tracking started reports unavailable rather than a misleading zero, and a period
+     * that starts before it is flagged as only partly covered.
+     */
+    private Metric viewCount(AnalyticsPeriod period, String definition, BiFunction<Instant, Instant, Long> countBetween) {
+        if (!viewTrackingStart.isBefore(period.to())) {
+            return Metric.unavailable(COUNT, PERIOD, definition,
+                    "Not tracked for this period: views are recorded from " + formatDate(viewTrackingStart) + " onwards.");
+        }
+        return Metric.available(countBetween.apply(period.from(), period.to()), COUNT, PERIOD, definition)
+                .withCoverage(new Metric.Coverage(max(period.from(), viewTrackingStart), period.to(),
+                        !period.from().isBefore(viewTrackingStart)));
     }
 
     private Metric averageDaysOnMarket(List<RentalRow> rentals, AnalyticsPeriod period) {

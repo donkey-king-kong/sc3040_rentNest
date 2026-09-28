@@ -112,6 +112,7 @@ const ListingAnalyticsScreen = () => {
               <StatTile icon="calendar" tone="blue" label="Days on market" metric={m.daysOnMarket} />
               <StatTile icon="clock-o" tone="blue" label="Average tenancy" metric={m.averageTenancyMonths} />
               <StatTile icon="eye" tone="blue" label="Listing views" metric={m.listingViews} />
+              <StatTile icon="users" tone="violet" label="Unique viewers" metric={m.uniqueListingViewers} />
             </TileRow>
           </Section>
         </>

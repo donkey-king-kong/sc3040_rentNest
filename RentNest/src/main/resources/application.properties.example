@@ -17,6 +17,11 @@ security.jwt.expiration-time=3600000
 # Admin access comes from the users.role column, not from configuration
 analytics.currency=SGD
 analytics.time-zone=Asia/Singapore
+# When lifecycle timestamps and listing views started being recorded. Metrics built on them
+# report "tracked since" for earlier periods instead of a misleading zero. Do not move these
+# forward or back unless the underlying data really did start at a different time.
+analytics.lifecycle-tracking-start=2026-09-17T02:26:00+08:00
+analytics.view-tracking-start=2026-09-29T00:00:00+08:00
 
 # External APIs
 LTADATAMALL_ACCOUNTKEY=YOUR_API_KEY

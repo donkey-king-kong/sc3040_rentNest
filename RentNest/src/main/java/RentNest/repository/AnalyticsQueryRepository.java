@@ -1,5 +1,6 @@
 package RentNest.repository;
 
+import RentNest.model.ListingView;
 import RentNest.model.Listings;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -130,6 +131,30 @@ public class AnalyticsQueryRepository {
 
     private static <T> TypedQuery<T> withPeriod(TypedQuery<T> query, Instant from, Instant to) {
         return query.setParameter("from", Date.from(from)).setParameter("to", Date.from(to));
+    }
+
+    // ---------- Listing views (always period-bounded) ----------
+
+    private static final String LISTING_VIEW_WHERE =
+            "FROM ListingView v WHERE v.listing.listingID = :listingId AND v.kind = :kind " +
+            "AND v.viewedAt >= :from AND v.viewedAt < :to";
+
+    /** Recorded views of the listing in the period, counting repeat visits separately. */
+    public long countListingViews(Long listingId, Instant from, Instant to) {
+        return withPeriod(entityManager.createQuery(
+                        "SELECT COUNT(v) " + LISTING_VIEW_WHERE, Long.class), from, to)
+                .setParameter("listingId", listingId)
+                .setParameter("kind", ListingView.KIND_LISTING)
+                .getSingleResult();
+    }
+
+    /** Distinct signed-in viewers in the period. Anonymous views are not counted, since they have no identity. */
+    public long countDistinctListingViewers(Long listingId, Instant from, Instant to) {
+        return withPeriod(entityManager.createQuery(
+                        "SELECT COUNT(DISTINCT v.viewerUserId) " + LISTING_VIEW_WHERE, Long.class), from, to)
+                .setParameter("listingId", listingId)
+                .setParameter("kind", ListingView.KIND_LISTING)
+                .getSingleResult();
     }
 
     // ---------- Reviews ----------
