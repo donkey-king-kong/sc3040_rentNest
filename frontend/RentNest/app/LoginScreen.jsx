@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     alignItems: 'center',
-    width: '110%',
+    width: '100%',
   },
   signupContainer: {
     flexDirection: 'row',
