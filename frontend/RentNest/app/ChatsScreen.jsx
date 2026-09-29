@@ -9,6 +9,7 @@ import { jwtDecode } from 'jwt-decode';
 
 // Import icons
 import profilePic from '../assets/images/chatProfilePic.jpg';
+import noActiveChatsImage from '../assets/images/noActiveChats.png';
 
 const ChatsScreen = () => {
   console.log('[ChatsScreen] Component initialized');
@@ -207,6 +208,22 @@ const ChatsScreen = () => {
     );
   };
 
+  const renderEmptyState = () => (
+    <View style={styles.emptyStateContainer}>
+      <View style={styles.emptyTextContainer}>
+        <Text style={styles.emptyTitle}>No Active Chats</Text>
+        <Text style={styles.emptyDescription}>
+          There are currently no chats from any of your properties.
+        </Text>
+      </View>
+      <Image
+        source={noActiveChatsImage}
+        style={styles.emptyImage}
+        resizeMode="contain"
+      />
+    </View>
+  );
+
   if (isLoading) {
     return (
       <View style={[styles.screen, styles.content]}>
@@ -224,6 +241,8 @@ const ChatsScreen = () => {
           data={chats}
           renderItem={renderItem}
           keyExtractor={(item) => item.messageID.toString()}
+          ListEmptyComponent={renderEmptyState}
+          contentContainerStyle={chats.length === 0 ? styles.emptyListContent : null}
         />
       </View>
       <NavigationBar style={styles.navigationBar} />
@@ -284,6 +303,37 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  emptyListContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  emptyStateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
+  emptyTextContainer: {
+    flexShrink: 1,
+    maxWidth: 460,
+    marginRight: 48,
+  },
+  emptyTitle: {
+    color: '#4A4A4A',
+    fontSize: 26,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    color: '#666',
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  emptyImage: {
+    width: 380,
+    height: 280,
   },
 });
 
