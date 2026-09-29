@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import {View, Text, StyleSheet, Image, FlatList, TouchableOpacity} from 'react-native';
 import NavigationBar from '../components/NavigationBar';
 import {useRouter} from "expo-router";
@@ -6,6 +6,7 @@ import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { jwtDecode } from 'jwt-decode';
+import MorphingInfinity from '../components/MorphingInfinity';
 
 // Import icons
 import profilePic from '../assets/images/chatProfilePic.jpg';
@@ -226,8 +227,8 @@ const ChatsScreen = () => {
 
   if (isLoading) {
     return (
-      <View style={[styles.screen, styles.content]}>
-        <Text>Loading chats...</Text>
+      <View style={styles.loadingScreen}>
+        <MorphingInfinity size={86} color="#2FA84F" />
       </View>
     );
   }
@@ -299,10 +300,11 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 16,
   },
-  content: {
+  loadingScreen: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7F8FA',
   },
   emptyListContent: {
     flexGrow: 1,
