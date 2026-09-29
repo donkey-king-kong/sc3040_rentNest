@@ -94,21 +94,23 @@ public class AiChatService {
                 - Do not comment on funny, odd, duplicated, or confusing names.
                 - Keep the summary professional, concise, and useful.
                 - Use plain text only. Do not use Markdown, asterisks, hashtags, or bold formatting.
-                - Start directly with "Summary:".
-                - Always include all four sections below.
+                - Return exactly the output template below.
+                - Fill every line in the output template.
+                - Do not stop after a heading.
+                - If a detail is not available, write Not mentioned.
                 - Keep the full response under 140 words.
 
-                Required output format:
+                Output template:
                 Summary:
-                - One sentence describing the overall discussion.
+                One sentence describing the overall discussion.
 
                 Key Details:
-                Rent/deposit: mention details, or say Not mentioned.
-                Viewing/move-in: mention details, or say Not mentioned.
-                Location/amenities: mention details, or say Not mentioned.
+                Rent/deposit: ...
+                Viewing/move-in: ...
+                Location/amenities: ...
 
                 Next Steps:
-                - Mention the agreed next step, or say No clear next step mentioned.
+                Mention the agreed next step, or say No clear next step mentioned.
                 """;
 
         String prompt = """
