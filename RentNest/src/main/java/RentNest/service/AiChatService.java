@@ -434,6 +434,7 @@ public class AiChatService {
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            logger.info("Gemini raw response body: {}", response.body());
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 logger.error("Gemini API returned status {} with body: {}",
@@ -450,7 +451,9 @@ public class AiChatService {
                 throw new RuntimeException("Gemini API returned an empty response");
             }
 
-            return textNode.asText().trim();
+            String generatedText = textNode.asText().trim();
+            logger.info("Gemini extracted response text: {}", generatedText);
+            return generatedText;
         } catch (Exception e) {
             logger.error("Gemini API call failed for model={}", llmModel, e);
             throw new RuntimeException("Unable to call Gemini API: " + e.getMessage());
