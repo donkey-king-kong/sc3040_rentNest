@@ -180,9 +180,9 @@ const EditProfileScreen = () => {
   };
 
   const renderLoadingState = () => (
-    <View style={styles.innerContainer}>
+    <View style={styles.loadingStateContainer}>
       <TouchableOpacity
-        style={styles.backButton}
+        style={[styles.backButton, styles.loadingBackButton]}
         onPress={() => navigation.navigate('ProfileScreen')}
       >
         <FontAwesome name="chevron-left" size={22} color="#101820" />
@@ -304,6 +304,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 44,
   },
+  loadingStateContainer: {
+    flex: 1,
+    backgroundColor: '#F7F8FA',
+  },
   backButton: {
     width: 52,
     height: 52,
@@ -317,12 +321,18 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     elevation: 3,
   },
+  loadingBackButton: {
+    position: 'absolute',
+    top: 44,
+    left: 22,
+    zIndex: 2,
+  },
   contentContainer: {
     flex: 1,
     paddingTop: 34,
   },
   loadingContainer: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
   },
