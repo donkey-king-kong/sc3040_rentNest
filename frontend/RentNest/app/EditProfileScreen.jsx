@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,12 +14,13 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import { FontAwesome } from '@expo/vector-icons';
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const notificationBellIcon = require('../assets/images/notificationBell.png');
 
@@ -37,53 +38,78 @@ const EditProfileScreen = () => {
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showProfileUpdated, setShowProfileUpdated] = useState(false);
   const nameInputRef = useRef(null);
   const contactInputRef = useRef(null);
   const notificationTimeoutRef = useRef(null);
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const token = await AsyncStorage.getItem('token');
-        if (!token) {
-          navigation.navigate('LandingScreen');
-          return;
-        }
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
 
-        const decoded = jwtDecode(token);
-        const userEmail = decoded.sub;
+      const fetchUserData = async () => {
+        try {
+          setIsProfileLoading(true);
+          setShowProfileUpdated(false);
+          setFieldErrors({});
 
-        const response = await axios.get(`${API_BASE_URL}/api/users/${userEmail}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+          const token = await AsyncStorage.getItem('token');
+          if (!token) {
+            navigation.navigate('LandingScreen');
+            return;
           }
-        });
 
-        const userData = response.data;
-        setUser({
-          userID: userData.userID,
-          name: userData.name,
-          email: userData.email,
-          contact: userData.contact,
-          photoURL: userData.photoURL || 'https://t3.ftcdn.net/jpg/06/33/54/78/360_F_633547842_AugYzexTpMJ9z1YcpTKUBoqBF0CUCk10.jpg'
-        });
+          const decoded = jwtDecode(token);
+          const userEmail = decoded.sub;
 
-        setName(userData.name || '');
-        setContact(userData.contact || '');
+          const response = await axios.get(`${API_BASE_URL}/api/users/${userEmail}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          });
 
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-        Alert.alert('Error', 'Failed to load user data');
-        navigation.navigate('LandingScreen');
-      }
-    };
+          const userData = response.data;
+          if (!isActive) {
+            return;
+          }
 
-    fetchUserData();
-  }, []);
+          if (userData.userID) {
+            await AsyncStorage.setItem('userId', userData.userID.toString());
+          }
+
+          setUser({
+            userID: userData.userID,
+            name: userData.name,
+            email: userData.email,
+            contact: userData.contact,
+            photoURL: userData.photoURL || 'https://t3.ftcdn.net/jpg/06/33/54/78/360_F_633547842_AugYzexTpMJ9z1YcpTKUBoqBF0CUCk10.jpg'
+          });
+
+          setName(userData.name || '');
+          setContact(userData.contact || '');
+
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          Alert.alert('Error', 'Failed to load user data');
+          navigation.navigate('LandingScreen');
+        } finally {
+          if (isActive) {
+            setIsProfileLoading(false);
+          }
+        }
+      };
+
+      fetchUserData();
+
+      return () => {
+        isActive = false;
+      };
+    }, [navigation])
+  );
 
   useEffect(() => {
     return () => {
@@ -153,6 +179,21 @@ const EditProfileScreen = () => {
     }
   };
 
+  const renderLoadingState = () => (
+    <View style={styles.innerContainer}>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.navigate('ProfileScreen')}
+      >
+        <FontAwesome name="chevron-left" size={22} color="#101820" />
+      </TouchableOpacity>
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    </View>
+  );
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -160,14 +201,15 @@ const EditProfileScreen = () => {
       style={styles.container}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.innerContainer}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.navigate('ProfileScreen')}
-            disabled={isSaving}
-          >
-            <FontAwesome name="chevron-left" size={22} color="#101820" />
-          </TouchableOpacity>
+        {isProfileLoading ? renderLoadingState() : (
+          <View style={styles.innerContainer}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.navigate('ProfileScreen')}
+              disabled={isSaving}
+            >
+              <FontAwesome name="chevron-left" size={22} color="#101820" />
+            </TouchableOpacity>
 
           <View style={styles.contentContainer}>
             <View style={styles.profileBox}>
@@ -245,7 +287,8 @@ const EditProfileScreen = () => {
               </View>
             </View>
           ) : null}
-        </View>
+          </View>
+        )}
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
@@ -277,6 +320,17 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     paddingTop: 34,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   profileBox: {
     alignItems: 'center',
