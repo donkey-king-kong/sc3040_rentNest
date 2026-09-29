@@ -45,9 +45,10 @@ const LoginScreen = () => {
   
       try {
         await AsyncStorage.setItem('token', response.data.token);
-        // Only set userId if it exists in the response
         if (response.data.userId) {
           await AsyncStorage.setItem('userId', response.data.userId.toString());
+        } else {
+          await AsyncStorage.removeItem('userId');
         }
   
         // Configure axios defaults

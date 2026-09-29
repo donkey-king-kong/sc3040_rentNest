@@ -27,24 +27,20 @@ const ProfileScreen = () => {
           return;
         }
 
-        const storedUserId = await AsyncStorage.getItem('userId');
         const authHeaders = {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         };
 
-        let response;
-        if (storedUserId) {
-          response = await axios.get(`${API_BASE_URL}/api/users/id/${storedUserId}`, {
-            headers: authHeaders
-          });
-        } else {
-          const decoded = jwtDecode(token);
-          const userEmail = decoded.sub;
-          response = await axios.get(`${API_BASE_URL}/api/users/${userEmail}`, {
-            headers: authHeaders
-          });
+        const decoded = jwtDecode(token);
+        const userEmail = decoded.sub;
+        const response = await axios.get(`${API_BASE_URL}/api/users/${userEmail}`, {
+          headers: authHeaders
+        });
+
+        if (response.data.userID) {
+          await AsyncStorage.setItem('userId', response.data.userID.toString());
         }
 
         setUser({
