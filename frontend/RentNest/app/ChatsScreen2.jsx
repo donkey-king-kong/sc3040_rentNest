@@ -1,7 +1,7 @@
-import React, {useEffect, useState} from 'react';
+import {useEffect, useState} from 'react';
 import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native'; // Import useRoute for accessing route parameters
-import {useLocalSearchParams, useRouter} from "expo-router";
+import {useLocalSearchParams} from "expo-router";
 
 // Import Icons
 import sendIcon from '../assets/images/send.jpg';
@@ -17,11 +17,10 @@ import amex from "../assets/images/amex.jpg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
-import { jwtDecode } from 'jwt-decode';
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const ChatsScreen2 = () => {
     const route = useRoute();
-    const router = useRouter();
     const navigation = useNavigation();
     const { partnerUserId, currentUser} = route.params;
     const [chat, setChat] = useState([]);
@@ -68,21 +67,23 @@ const ChatsScreen2 = () => {
             const chatData = Array.isArray(chatResponse.data) ? chatResponse.data : [];
             setChat(chatData); // Store the fetched data in state
             if (chatData.length > 0) {
-                chatData.forEach((msg) => {
+                await Promise.all(chatData.map((msg) => {
                     if (msg.rentalId != null) {
-                        getRental(msg.rentalId);
+                        return getRental(msg.rentalId);
                     }
                     if (msg.requestId != null) {
                         console.log("requestid",msg.requestId);
-                        getRequest(msg.requestId);
+                        return getRequest(msg.requestId);
                     }
-                });
+                    return Promise.resolve();
+                }));
             }
-            getPartner();
+            await getPartner();
             setLoading(false);
         } catch (error) {
             console.error('Error fetching conversation:', error);
             setChat([]);
+            setLoading(false);
         }
     };
 
@@ -108,7 +109,6 @@ const ChatsScreen2 = () => {
             });
             console.log("Rental response", rentalResponse.data);
             setRental(rentalResponse.data); // Store the fetched data in state
-            setLoading(false);
         } catch (error) {
             console.error('Error fetching rentals:', error);
         }
@@ -136,7 +136,6 @@ const ChatsScreen2 = () => {
             });
             console.log("Request response", requestResponse.data);
             setRequest(requestResponse.data); // Store the fetched data in state
-            setLoading(false);
         } catch (error) {
             console.error('Error fetching requests:', error);
         }
@@ -182,7 +181,6 @@ const ChatsScreen2 = () => {
             });
             console.log("Partner response", partnerResponse.data);
             setPartner(partnerResponse.data); // Store the fetched data in state
-            setLoading(false);
         }
         catch (error) {
             console.error('Error fetching partner:', error);
@@ -480,7 +478,7 @@ const handlePaymentAndAccept = async () => {
     const isAccepted = chat.length > 0 ? isPaymentSuccessfulModalVisible : false;
     const isTerminationAccepted = chat.length>0 ? rental.status === "terminated" : false;
 
-    const renderMessage = ({ item }) => {
+    const renderMessage = () => {
         if (!Array.isArray(chat) || chat.length === 0) {
             return (
                 <View style={styles.emptyMessageContainer}>
@@ -627,8 +625,9 @@ const handlePaymentAndAccept = async () => {
 
     if (Loading) {
         return (
-            <View style={[styles.screen, styles.content]}>
-                <Text>Loading chat history...</Text>
+            <View style={styles.loadingScreen}>
+                <MorphingInfinity size={86} color="#2FA84F" />
+                <Text style={styles.loadingText}>Loading chat history...</Text>
             </View>
         );
     }
@@ -925,6 +924,18 @@ const styles = StyleSheet.create({
     },
     chatList: {
         flex: 1, // Take up all available space
+    },
+    loadingScreen: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F7F8FA',
+    },
+    loadingText: {
+        marginTop: 24,
+        color: '#101820',
+        fontSize: 18,
+        fontWeight: '700',
     },
     messageContainer:{
         padding: 20,

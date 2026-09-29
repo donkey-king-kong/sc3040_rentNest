@@ -229,6 +229,7 @@ const ChatsScreen = () => {
     return (
       <View style={styles.loadingScreen}>
         <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading chats...</Text>
       </View>
     );
   }
@@ -305,6 +306,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F7F8FA',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   emptyListContent: {
     flexGrow: 1,
