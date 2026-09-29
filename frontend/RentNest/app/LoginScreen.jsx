@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Button from '../components/button';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
+import { FontAwesome } from '@expo/vector-icons';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -87,8 +89,9 @@ const LoginScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Login</Text>
+      <Text style={styles.title}>Login to your account</Text>
 
+      <Text style={styles.label}>Email</Text>
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -99,23 +102,44 @@ const LoginScreen = () => {
         value={email}
       />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#999"
-        secureTextEntry
-        onChangeText={(text) => setPassword(text)}
-        value={password}
-      />
+      <Text style={styles.label}>Password</Text>
+      <View style={styles.passwordContainer}>
+        <TextInput
+          style={styles.passwordInput}
+          placeholder="Enter your password"
+          placeholderTextColor="#999"
+          secureTextEntry={!isPasswordVisible}
+          onChangeText={(text) => setPassword(text)}
+          value={password}
+        />
+        <TouchableOpacity
+          style={styles.passwordToggle}
+          onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+          accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+        >
+          <FontAwesome
+            name={isPasswordVisible ? 'eye-slash' : 'eye'}
+            size={22}
+            color="#777"
+          />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.buttonContainer}>
         <Button
-          title="Login"
+          title="Login now"
           onPress={handleLogin}
-          backgroundColor="#222222"
+          backgroundColor="#0A84FF"
           textColor="#FFFFFF"
           fontSize={18}
         />
+      </View>
+
+      <View style={styles.signupContainer}>
+        <Text style={styles.signupText}>Don't have an account?</Text>
+        <TouchableOpacity onPress={() => router.push('/SignUpScreen')}>
+          <Text style={styles.signupLink}>Sign up</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -125,15 +149,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
-    padding: 20,
+    paddingHorizontal: 32,
     backgroundColor: '#fff',
   },
   title: {
-    fontSize: 20,
+    fontSize: 34,
     fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 20, // Reduced margin to bring the fields closer
+    color: '#111',
+    marginBottom: 34,
+  },
+  label: {
+    color: '#555',
+    fontSize: 18,
+    marginBottom: 8,
   },
   input: {
     height: 50,
@@ -141,12 +169,50 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     paddingHorizontal: 15,
-    marginBottom: 10,
+    marginBottom: 22,
     fontSize: 16,
   },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 50,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 10,
+    marginBottom: 34,
+  },
+  passwordInput: {
+    flex: 1,
+    height: '100%',
+    paddingLeft: 15,
+    paddingRight: 50,
+    fontSize: 16,
+  },
+  passwordToggle: {
+    position: 'absolute',
+    right: 15,
+    height: '100%',
+    justifyContent: 'center',
+  },
   buttonContainer: {
-    marginTop: 'auto', // Moves the button to the bottom
-    width: '110%',
+    alignItems: 'center',
+    width: '100%',
+  },
+  signupContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  signupText: {
+    color: '#999',
+    fontSize: 16,
+    marginRight: 8,
+  },
+  signupLink: {
+    color: '#0A84FF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
