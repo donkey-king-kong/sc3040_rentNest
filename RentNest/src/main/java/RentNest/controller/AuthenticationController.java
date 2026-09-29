@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import RentNest.dto.LoginUserDto;
 import RentNest.dto.RegisterUserDto;
+import RentNest.dto.ResetPasswordDto;
 import RentNest.model.User;
 
 @RequestMapping("/auth")
@@ -61,6 +62,22 @@ public class AuthenticationController {
                 return ResponseEntity.status(403).body("This account has been banned");
             }
             return ResponseEntity.status(401).body("Authentication failed");
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordDto resetPasswordDto) {
+        try {
+            authenticationService.resetPassword(resetPasswordDto.getEmail(), resetPasswordDto.getNewPassword());
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Password reset successfully.");
+            return ResponseEntity.ok(response);
+        } catch (BadCredentialsException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (IllegalArgumentException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 }

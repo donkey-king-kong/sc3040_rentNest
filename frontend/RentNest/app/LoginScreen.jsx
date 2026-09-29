@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Button from '../components/button';
@@ -102,7 +102,12 @@ const LoginScreen = () => {
         value={email}
       />
 
-      <Text style={styles.label}>Password</Text>
+      <View style={styles.passwordLabelRow}>
+        <Text style={styles.label}>Password</Text>
+        <TouchableOpacity onPress={() => router.push('/ForgotPasswordScreen')}>
+          <Text style={styles.forgotPasswordText}>Forgot?</Text>
+        </TouchableOpacity>
+      </View>
       <View style={styles.passwordContainer}>
         <TextInput
           style={styles.passwordInput}
@@ -161,6 +166,16 @@ const styles = StyleSheet.create({
   label: {
     color: '#555',
     fontSize: 18,
+    marginBottom: 8,
+  },
+  passwordLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  forgotPasswordText: {
+    color: '#0A84FF',
+    fontSize: 16,
     marginBottom: 8,
   },
   input: {
