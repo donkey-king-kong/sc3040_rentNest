@@ -173,6 +173,13 @@ const SignUpScreen = () => {
         <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp}>
           <Text style={styles.primaryButtonText}>Sign Up</Text>
         </TouchableOpacity>
+
+        <View style={styles.signinContainer}>
+          <Text style={styles.signinText}>Already have an account?</Text>
+          <TouchableOpacity onPress={() => router.push('/LoginScreen')}>
+            <Text style={styles.signinLink}>Sign In here</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -259,6 +266,22 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 18,
+    fontWeight: '600',
+  },
+  signinContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  signinText: {
+    color: '#666',
+    fontSize: 16,
+    marginRight: 8,
+  },
+  signinLink: {
+    color: '#2DAF7D',
+    fontSize: 16,
     fontWeight: '600',
   },
 });
