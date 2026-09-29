@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import { FontAwesome } from '@expo/vector-icons';
+import errorIcon from '../assets/images/errorIcon.png';
 
 const SignUpScreen = () => {
   const [fullName, setFullName] = useState('');
@@ -221,7 +222,10 @@ const SignUpScreen = () => {
         </Pressable>
 
         {formError ? (
-          <Text style={styles.errorMessageText}>{formError}</Text>
+          <View style={styles.errorMessageContainer}>
+            <Image source={errorIcon} style={styles.errorIcon} />
+            <Text style={styles.errorMessageText}>{formError}</Text>
+          </View>
         ) : null}
 
         {/* <TextInput
@@ -305,11 +309,21 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     paddingVertical: 12,
   },
+  errorMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  errorIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 8,
+  },
   errorMessageText: {
     color: '#E94068',
     fontSize: 16,
     fontWeight: '700',
-    marginTop: 4,
+    flex: 1,
   },
   otpButton: {
     position: 'absolute', // Position the button inside the input

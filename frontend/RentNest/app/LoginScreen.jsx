@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Pressable, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import { FontAwesome } from '@expo/vector-icons';
+import errorIcon from '../assets/images/errorIcon.png';
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
@@ -157,7 +158,10 @@ const LoginScreen = () => {
         </TouchableOpacity>
 
         {formError ? (
-          <Text style={styles.errorMessageText}>{formError}</Text>
+          <View style={styles.errorMessageContainer}>
+            <Image source={errorIcon} style={styles.errorIcon} />
+            <Text style={styles.errorMessageText}>{formError}</Text>
+          </View>
         ) : null}
       </View>
 
@@ -236,11 +240,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  errorMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 18,
+  },
+  errorIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 8,
+  },
   errorMessageText: {
     color: '#E94068',
     fontSize: 16,
     fontWeight: '700',
-    marginTop: 18,
+    flex: 1,
   },
   bottomContainer: {
     marginTop: 'auto',
