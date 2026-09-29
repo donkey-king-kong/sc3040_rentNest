@@ -4,7 +4,8 @@ import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
-import errorIcon from '../assets/images/errorIcon.png';
+
+const errorIcon = require('../assets/images/errorIcon.png');
 
 const ForgotPasswordScreen = () => {
   const [email, setEmail] = useState('');
@@ -274,8 +275,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   errorIcon: {
-    width: 20,
-    height: 20,
+    width: 24,
+    height: 24,
     marginRight: 8,
   },
   errorMessageText: {
