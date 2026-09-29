@@ -1,12 +1,6 @@
 package RentNest.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
 
 import java.util.Date;
 
@@ -39,56 +33,58 @@ public class AiChatSummaryCache {
     @Column(name = "updated_at", nullable = false)
     private Date updatedAt;
 
+    // Getters
     public Long getId() {
         return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
     }
 
     public Long getUserAId() {
         return userAId;
     }
 
-    public void setUserAId(Long userAId) {
-        this.userAId = userAId;
-    }
-
     public Long getUserBId() {
         return userBId;
-    }
-
-    public void setUserBId(Long userBId) {
-        this.userBId = userBId;
     }
 
     public String getSummary() {
         return summary;
     }
 
-    public void setSummary(String summary) {
-        this.summary = summary;
-    }
-
     public Long getLastMessageId() {
         return lastMessageId;
-    }
-
-    public void setLastMessageId(Long lastMessageId) {
-        this.lastMessageId = lastMessageId;
     }
 
     public Date getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Date createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public Date getUpdatedAt() {
         return updatedAt;
+    }
+
+    // Setters
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public void setUserAId(Long userAId) {
+        this.userAId = userAId;
+    }
+
+    public void setUserBId(Long userBId) {
+        this.userBId = userBId;
+    }
+
+    public void setSummary(String summary) {
+        this.summary = summary;
+    }
+
+    public void setLastMessageId(Long lastMessageId) {
+        this.lastMessageId = lastMessageId;
+    }
+
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
     }
 
     public void setUpdatedAt(Date updatedAt) {
