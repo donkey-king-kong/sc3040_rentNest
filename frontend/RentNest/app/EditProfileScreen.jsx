@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     alignItems: 'center',
-    backgroundColor: '#2D2D2D',
+    backgroundColor: 'rgba(45, 45, 45, 0.82)',
     borderRadius: 28,
     paddingVertical: 28,
     paddingHorizontal: 24,
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3A3A3A',
+    backgroundColor: 'rgba(58, 58, 58, 0.72)',
     marginBottom: 16,
   },
   notificationIcon: {
