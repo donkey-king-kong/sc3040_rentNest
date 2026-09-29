@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Button from '../components/button';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
@@ -89,31 +88,28 @@ const LoginScreen = () => {
 
   return (
     <View style={styles.container}>
-      <View>
+      <View style={styles.formContainer}>
         <Text style={styles.title}>Login to your account</Text>
 
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#999"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          onChangeText={(text) => setEmail(text)}
-          value={email}
-        />
-
-        <View style={styles.passwordLabelRow}>
-          <Text style={styles.label}>Password</Text>
-          <TouchableOpacity onPress={() => router.push('/ForgotPasswordScreen')}>
-            <Text style={styles.forgotPasswordText}>Forgot?</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.passwordContainer}>
+        <View style={styles.inputContainer}>
+          <FontAwesome name="envelope" size={18} color="#777" style={styles.inputIcon} />
           <TextInput
-            style={styles.passwordInput}
+            style={styles.input}
+            placeholder="Email address"
+            placeholderTextColor="#666"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            onChangeText={(text) => setEmail(text)}
+            value={email}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
             placeholder="Enter your password"
-            placeholderTextColor="#999"
+            placeholderTextColor="#666"
             secureTextEntry={!isPasswordVisible}
             onChangeText={(text) => setPassword(text)}
             value={password}
@@ -130,18 +126,19 @@ const LoginScreen = () => {
             />
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity
+          style={styles.forgotPasswordContainer}
+          onPress={() => router.push('/ForgotPasswordScreen')}
+        >
+          <Text style={styles.forgotPasswordText}>Forgot?</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.bottomContainer}>
-        <View style={styles.buttonContainer}>
-          <Button
-            title="Login now"
-            onPress={handleLogin}
-            backgroundColor="#222222"
-            textColor="#FFFFFF"
-            fontSize={18}
-          />
-        </View>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleLogin}>
+          <Text style={styles.primaryButtonText}>Login now</Text>
+        </TouchableOpacity>
 
         <View style={styles.signupContainer}>
           <Text style={styles.signupText}>Don't have an account?</Text>
@@ -158,69 +155,75 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'flex-start',
-    padding: 20,
-    backgroundColor: '#fff',
+    paddingHorizontal: 22,
+    paddingTop: 44,
+    backgroundColor: '#F7F8FA',
+  },
+  formContainer: {
+    marginTop: 120,
   },
   title: {
-    fontSize: 34,
+    fontSize: 38,
     fontWeight: 'bold',
-    color: '#111',
-    marginTop: 48,
-    marginBottom: 34,
+    color: '#101820',
+    textAlign: 'center',
+    marginBottom: 58,
   },
-  label: {
-    color: '#555',
-    fontSize: 18,
-    marginBottom: 8,
-  },
-  passwordLabelRow: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    height: 72,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 36,
+    paddingHorizontal: 24,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
+  },
+  inputIcon: {
+    width: 28,
+    marginRight: 14,
+  },
+  input: {
+    flex: 1,
+    color: '#333',
+    fontSize: 16,
+  },
+  passwordToggle: {
+    paddingLeft: 12,
+    paddingVertical: 12,
+  },
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
   },
   forgotPasswordText: {
     color: '#0A84FF',
     fontSize: 16,
-    marginBottom: 8,
-  },
-  input: {
-    height: 50,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    marginBottom: 22,
-    fontSize: 16,
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 50,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  passwordInput: {
-    flex: 1,
-    height: '100%',
-    paddingLeft: 15,
-    paddingRight: 50,
-    fontSize: 16,
-  },
-  passwordToggle: {
-    position: 'absolute',
-    right: 15,
-    height: '100%',
-    justifyContent: 'center',
+    fontWeight: '600',
   },
   bottomContainer: {
     marginTop: 'auto',
-    paddingBottom: 20,
+    paddingBottom: 34,
   },
-  buttonContainer: {
+  primaryButton: {
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#222222',
     alignItems: 'center',
-    width: '100%',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
   },
   signupContainer: {
     flexDirection: 'row',
