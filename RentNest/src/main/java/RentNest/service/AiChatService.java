@@ -5,6 +5,8 @@ import RentNest.dto.AiChatQuestionResponseDTO;
 import RentNest.model.ChatHistory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -23,9 +25,12 @@ import java.util.zip.GZIPInputStream;
 
 @Service
 public class AiChatService {
+    private static final Logger logger = LoggerFactory.getLogger(AiChatService.class);
+
     private static final String PLACEHOLDER_PREFIX = "[HARDCODED PLACEHOLDER]";
     private static final Duration LLM_CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration LLM_REQUEST_TIMEOUT = Duration.ofSeconds(20);
+    private static final int LOG_BODY_PREVIEW_LIMIT = 500;
     private static final List<String> PLACEHOLDER_API_KEYS = List.of(
             "YOUR_LLM_API_KEY",
             "YOUR_GEMINI_API_KEY",
@@ -58,15 +63,24 @@ public class AiChatService {
 
     public AiChatSummaryResponseDTO generateChatSummary(Long userA, Long userB) {
         List<ChatHistory> conversation = chatHistoryService.getConversationBetweenUsers(userA, userB);
+        logger.info("Generating AI chat summary for userA={}, userB={}, messageCount={}, provider={}, model={}",
+                userA,
+                userB,
+                conversation.size(),
+                llmProvider,
+                llmModel);
 
         if (conversation.isEmpty()) {
+            logger.info("Using placeholder summary because conversation is empty for userA={}, userB={}", userA, userB);
             return new AiChatSummaryResponseDTO(
                     PLACEHOLDER_PREFIX + " No messages found between these users yet.",
                     true
             );
         }
 
-        if (!isLlmConfigured()) {
+        String configurationIssue = getLlmConfigurationIssue();
+        if (configurationIssue != null) {
+            logger.warn("Using placeholder summary because LLM is not configured: {}", configurationIssue);
             return new AiChatSummaryResponseDTO(generatePlaceholderSummary(conversation), true);
         }
 
@@ -103,11 +117,13 @@ public class AiChatService {
                 """.formatted(formatConversation(conversation));
 
         String summary = callLlm(systemInstruction, prompt);
+        logger.info("Generated AI chat summary for userA={}, userB={}", userA, userB);
         return new AiChatSummaryResponseDTO(summary, false);
     }
 
     public AiChatQuestionResponseDTO askQuestion(Long userA, Long userB, String question) {
         if (question == null || question.trim().isEmpty()) {
+            logger.info("Rejected Ask AI request because question is empty for userA={}, userB={}", userA, userB);
             return new AiChatQuestionResponseDTO(
                     false,
                     "empty_question",
@@ -119,6 +135,7 @@ public class AiChatService {
         String normalizedQuestion = question.toLowerCase(Locale.ROOT);
 
         if (isSummaryQuestion(normalizedQuestion)) {
+            logger.info("Routing Ask AI summary question to summary generator for userA={}, userB={}", userA, userB);
             AiChatSummaryResponseDTO summary = generateChatSummary(userA, userB);
             return new AiChatQuestionResponseDTO(
                     true,
@@ -129,6 +146,7 @@ public class AiChatService {
         }
 
         if (isAiHelpQuestion(normalizedQuestion)) {
+            logger.info("Answering Ask AI help question locally for userA={}, userB={}", userA, userB);
             return new AiChatQuestionResponseDTO(
                     true,
                     "rental_conversation",
@@ -138,6 +156,10 @@ public class AiChatService {
         }
 
         if (isOutOfScopeQuestion(normalizedQuestion)) {
+            logger.info("Rejected Ask AI question as out of scope for userA={}, userB={}, questionLength={}",
+                    userA,
+                    userB,
+                    question.trim().length());
             return new AiChatQuestionResponseDTO(
                     false,
                     "out_of_scope",
@@ -147,8 +169,16 @@ public class AiChatService {
         }
 
         List<ChatHistory> conversation = chatHistoryService.getConversationBetweenUsers(userA, userB);
+        logger.info("Answering Ask AI question for userA={}, userB={}, messageCount={}, provider={}, model={}, questionLength={}",
+                userA,
+                userB,
+                conversation.size(),
+                llmProvider,
+                llmModel,
+                question.trim().length());
 
         if (conversation.isEmpty()) {
+            logger.info("Ask AI response uses no-context message because conversation is empty for userA={}, userB={}", userA, userB);
             return new AiChatQuestionResponseDTO(
                     true,
                     "rental_conversation",
@@ -157,7 +187,9 @@ public class AiChatService {
             );
         }
 
-        if (!isLlmConfigured()) {
+        String configurationIssue = getLlmConfigurationIssue();
+        if (configurationIssue != null) {
+            logger.warn("Using placeholder Ask AI answer because LLM is not configured: {}", configurationIssue);
             return new AiChatQuestionResponseDTO(
                     true,
                     "rental_conversation",
@@ -201,6 +233,7 @@ public class AiChatService {
                 """.formatted(formatConversation(conversation), question.trim());
 
         String answer = callLlm(systemInstruction, prompt);
+        logger.info("Generated Ask AI answer for userA={}, userB={}", userA, userB);
 
         return new AiChatQuestionResponseDTO(
                 true,
@@ -210,15 +243,28 @@ public class AiChatService {
         );
     }
 
-    private boolean isLlmConfigured() {
-        return llmApiKey != null
-                && !llmApiKey.isBlank()
-                && !PLACEHOLDER_API_KEYS.contains(llmApiKey)
-                && isSupportedProvider(llmProvider)
-                && llmApiUrl != null
-                && !llmApiUrl.isBlank()
-                && llmModel != null
-                && !llmModel.isBlank();
+    private String getLlmConfigurationIssue() {
+        if (llmApiKey == null || llmApiKey.isBlank()) {
+            return "llm.api-key is missing";
+        }
+
+        if (PLACEHOLDER_API_KEYS.contains(llmApiKey)) {
+            return "llm.api-key still uses a placeholder value";
+        }
+
+        if (!isSupportedProvider(llmProvider)) {
+            return "llm.provider is unsupported: " + llmProvider;
+        }
+
+        if (llmApiUrl == null || llmApiUrl.isBlank()) {
+            return "llm.api-url is missing";
+        }
+
+        if (llmModel == null || llmModel.isBlank()) {
+            return "llm.model is missing";
+        }
+
+        return null;
     }
 
     private boolean isSupportedProvider(String provider) {
@@ -272,6 +318,7 @@ public class AiChatService {
     }
 
     private String callLlm(String systemInstruction, String prompt) {
+        logger.info("Calling configured LLM provider={}, model={}", llmProvider, llmModel);
         if ("openrouter".equalsIgnoreCase(llmProvider)) {
             return callOpenRouter(systemInstruction, prompt);
         }
@@ -310,20 +357,26 @@ public class AiChatService {
                     .build();
 
             HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            String responseBody = decodeResponseBody(response);
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                logger.error("OpenRouter API returned status {} with body: {}",
+                        response.statusCode(),
+                        preview(responseBody));
                 throw new RuntimeException("OpenRouter API returned status " + response.statusCode());
             }
 
-            JsonNode responseJson = objectMapper.readTree(decodeResponseBody(response));
+            JsonNode responseJson = objectMapper.readTree(responseBody);
             JsonNode textNode = responseJson.path("choices").path(0).path("message").path("content");
 
             if (textNode.isMissingNode() || textNode.asText().isBlank()) {
+                logger.error("OpenRouter API returned empty content with body: {}", preview(responseBody));
                 throw new RuntimeException("OpenRouter API returned an empty response");
             }
 
             return textNode.asText().trim();
         } catch (Exception e) {
+            logger.error("OpenRouter API call failed for model={}", llmModel, e);
             throw new RuntimeException("Unable to call OpenRouter API: " + e.getMessage());
         }
     }
@@ -381,6 +434,9 @@ public class AiChatService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                logger.error("Gemini API returned status {} with body: {}",
+                        response.statusCode(),
+                        preview(response.body()));
                 throw new RuntimeException("Gemini API returned status " + response.statusCode());
             }
 
@@ -388,13 +444,28 @@ public class AiChatService {
             JsonNode textNode = responseJson.path("candidates").path(0).path("content").path("parts").path(0).path("text");
 
             if (textNode.isMissingNode() || textNode.asText().isBlank()) {
+                logger.error("Gemini API returned empty content with body: {}", preview(response.body()));
                 throw new RuntimeException("Gemini API returned an empty response");
             }
 
             return textNode.asText().trim();
         } catch (Exception e) {
+            logger.error("Gemini API call failed for model={}", llmModel, e);
             throw new RuntimeException("Unable to call Gemini API: " + e.getMessage());
         }
+    }
+
+    private String preview(String value) {
+        if (value == null || value.isBlank()) {
+            return "[empty]";
+        }
+
+        String normalized = value.replaceAll("\\s+", " ").trim();
+        if (normalized.length() <= LOG_BODY_PREVIEW_LIMIT) {
+            return normalized;
+        }
+
+        return normalized.substring(0, LOG_BODY_PREVIEW_LIMIT) + "...";
     }
 
     private boolean isOutOfScopeQuestion(String question) {
