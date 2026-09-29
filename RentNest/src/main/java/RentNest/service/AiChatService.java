@@ -421,7 +421,10 @@ public class AiChatService {
                     ),
                     "generationConfig", Map.of(
                             "temperature", 0.2,
-                            "maxOutputTokens", 768
+                            "maxOutputTokens", 2048,
+                            "thinkingConfig", Map.of(
+                                    "thinkingBudget", 256
+                            )
                     )
             );
 
