@@ -174,10 +174,7 @@ const ForgotPasswordScreen = () => {
         </Pressable>
 
         {formError ? (
-          <View style={styles.errorMessageContainer}>
-            <FontAwesome name="exclamation-triangle" size={20} color="#E94068" />
-            <Text style={styles.errorMessageText}>{formError}</Text>
-          </View>
+          <Text style={styles.errorMessageText}>{formError}</Text>
         ) : null}
       </View>
 
@@ -267,22 +264,11 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     paddingVertical: 12,
   },
-  errorMessageContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E94068',
-    borderRadius: 18,
-    backgroundColor: '#FFECEF',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginTop: 4,
-  },
   errorMessageText: {
-    color: '#222222',
+    color: '#E94068',
     fontSize: 16,
     fontWeight: '700',
-    marginLeft: 12,
+    marginTop: 4,
   },
   bottomContainer: {
     marginTop: 'auto',
