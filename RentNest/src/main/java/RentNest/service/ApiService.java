@@ -268,10 +268,39 @@ public class ApiService {
     // Function to get latitude and longitude from postal code using OneMap API
     private double[] getCoordinatesFromPostalCode(String postalCode) {
         String geocodeUrl = "https://www.onemap.gov.sg/api/common/elastic/search?searchVal=" + postalCode + "&returnGeom=Y&getAddrDetails=N";
-        ResponseEntity<String> response = restTemplate.exchange(geocodeUrl, HttpMethod.GET, null, String.class);
+        logger.info("[OneMap] Resolving postalCode={}", postalCode);
+
+        ResponseEntity<String> response;
+        try {
+            response = restTemplate.exchange(geocodeUrl, HttpMethod.GET, null, String.class);
+        } catch (RestClientException e) {
+            logger.error("[OneMap] Postal code lookup failed for postalCode={}: {}", postalCode, e.getMessage(), e);
+            throw e;
+        }
+
+        int resultCount = countOneMapResults(response.getBody());
+        logger.info("[OneMap] Postal code lookup response postalCode={} status={} resultCount={}",
+                postalCode, response.getStatusCode(), resultCount);
+
         double latitude = parseLatitude(response.getBody());
         double longitude = parseLongitude(response.getBody());
+        if (latitude == 0.0 && longitude == 0.0) {
+            logger.warn("[OneMap] Postal code {} did not resolve to valid coordinates", postalCode);
+        }
         return new double[]{latitude, longitude};
+    }
+
+    private int countOneMapResults(String jsonResponse) {
+        try {
+            JsonNode root = objectMapper.readTree(jsonResponse);
+            JsonNode resultsNode = root.path("results");
+            if (resultsNode.isArray()) {
+                return resultsNode.size();
+            }
+        } catch (IOException e) {
+            logger.warn("[OneMap] Failed to parse postal code lookup response: {}", e.getMessage());
+        }
+        return 0;
     }
 
     // Parse latitude from OneMap API response
