@@ -35,6 +35,12 @@ const HomeListingScreen = () => {
     longitudeDelta: 0.05,
   });
 
+  const authHeaders = useCallback((tokenValue) => ({
+    'Authorization': `Bearer ${tokenValue}`,
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  }), []);
+
   // Memoize getNearbyPlaces to prevent unnecessary recalculations
   const getNearbyPlaces = useCallback(() => {
     switch (selectedCategory) {
@@ -77,11 +83,7 @@ const HomeListingScreen = () => {
         const userEmail = decoded.sub;
 
         const response = await axios.get(`${API_BASE_URL}/api/users/${userEmail}`, {
-          headers: {
-            'Authorization': `Bearer ${tokenValue}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
+          headers: authHeaders(tokenValue)
         });
 
         setCurrentUserID(response.data.userID);
@@ -89,11 +91,7 @@ const HomeListingScreen = () => {
         // Fetch listing details
         console.log('Making listing API request...');
         const listingResponse = await axios.get(`${API_BASE_URL}/api/listings/${listingId}`, {
-          headers: {
-            'Authorization': `Bearer ${tokenValue}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
+          headers: authHeaders(tokenValue)
         });
         console.log('Listing API response:', listingResponse.data);
 
@@ -119,71 +117,8 @@ const HomeListingScreen = () => {
         console.log('Processed listing data:', defaultListing);
         setListing(defaultListing);
 
-        console.log('Fetching nearby schools...');
-        const schoolsResponse = await axios.get(`${API_BASE_URL}/api/gov/schools/${listingId}`, {
-          headers: { 'Authorization': `Bearer ${tokenValue}` }
-        });
-        console.log('Schools data:', schoolsResponse.data);
-        setNearbySchools(schoolsResponse.data || []);
-
-        console.log('Fetching nearby hawker centres...');
-        const hawkerResponse = await axios.get(`${API_BASE_URL}/api/gov/hawkercentres/${listingId}`, {
-          headers: { 'Authorization': `Bearer ${tokenValue}` }
-        });
-        console.log('Hawker centres data:', hawkerResponse.data);
-        setNearbyHawkerCentres(hawkerResponse.data || []);
-
-        console.log('Fetching nearby bus stops...');
-        const busStopsResponse = await axios.get(`${API_BASE_URL}/api/gov/busstops/${listingId}`, {
-          headers: { 'Authorization': `Bearer ${tokenValue}` }
-        });
-        console.log('Bus stops data:', busStopsResponse.data);
-        setNearbyBusStops(busStopsResponse.data || []);
-
-        console.log('Fetching price insights...');
-        const pricesResponse = await axios.get(`${API_BASE_URL}/api/gov/rentalprices/${listingId}`, {
-          headers: { 'Authorization': `Bearer ${tokenValue}` }
-        });
-        console.log('Price insights data:', pricesResponse.data);
-        
-        // Filter to keep only one entry per month
-        const uniquePrices = {};
-        pricesResponse.data.forEach(item => {
-          if (!uniquePrices[item.leaseDate] || item.rentPrice > uniquePrices[item.leaseDate].rentPrice) {
-            uniquePrices[item.leaseDate] = item;
-          }
-        });
-        const filteredPrices = Object.values(uniquePrices);
-        
-        setPriceInsights(filteredPrices || [
-          { leaseDate: "May 2024", rentPrice: 2500 },
-          { leaseDate: "April 2024", rentPrice: 2400 },
-          { leaseDate: "March 2024", rentPrice: 2600 },
-          { leaseDate: "February 2024", rentPrice: 2300 },
-          { leaseDate: "January 2024", rentPrice: 2200 },]
-        );
-
-        console.log('Fetching reviews...');
-
-        const reviewsResponse = await axios.get(`${API_BASE_URL}/api/reviews/${listingId}`, {
-          headers: { 'Authorization': `Bearer ${tokenValue}` }
-        });
-        // Map the reviews data to match the expected format, with null check
-        const formattedReviews = (reviewsResponse.data || []).map(review => ({
-          reviewId: review.id,
-          rating: review.rating,
-          title: review.title || 'Review',
-          text: review.text,
-          user: {
-            userID: review.userId,
-            name: review.userName || 'Anonymous',
-            photoURL: review.userPhotoURL || 'https://via.placeholder.com/50'
-          },
-          flagged: review.flagged || false
-        }));
-
-        console.log('Reviews data:', formattedReviews);
-        setReviews(formattedReviews);
+        // Keep the loading screen visible until all listing sections have finished loading.
+        await fetchSecondaryListingData(tokenValue);
       } catch (error) {
         console.error('Error in fetchListingData:', error);
         console.error('Error details:', { //Remove when demo
@@ -197,8 +132,102 @@ const HomeListingScreen = () => {
       }
     };
 
+    const fetchSecondaryListingData = async (tokenValue) => {
+      const headers = authHeaders(tokenValue);
+      const requestConfig = { headers, timeout: 20000 };
+      const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+      const applyNearbyAmenities = (amenities) => {
+        setNearbySchools(amenities
+          .filter(item => item.amenity_type === 'school')
+          .map(item => ({
+            schoolName: item.name,
+            latitude: item.latitude,
+            longitude: item.longitude,
+            distanceMeters: item.distance_meters
+          })));
+        setNearbyHawkerCentres(amenities
+          .filter(item => item.amenity_type === 'hawker_centre')
+          .map(item => ({
+            nameOfCentre: item.name,
+            latitude: item.latitude,
+            longitude: item.longitude,
+            distanceMeters: item.distance_meters
+          })));
+        setNearbyBusStops(amenities
+          .filter(item => item.amenity_type === 'bus_stop')
+          .map(item => ({
+            description: item.name,
+            latitude: item.latitude,
+            longitude: item.longitude,
+            distanceMeters: item.distance_meters
+          })));
+      };
+
+      const fetchNearbyAmenitiesUntilReady = async () => {
+        for (let attempt = 0; attempt < 30; attempt += 1) {
+          const response = await axios.get(`${API_BASE_URL}/api/gov/nearby-amenities/${listingId}`, requestConfig);
+          const payload = response.data || {};
+          const amenities = Array.isArray(payload) ? payload : (payload.amenities || []);
+          const status = Array.isArray(payload) ? 'READY' : payload.status;
+
+          if (status === 'READY' || amenities.length > 0) {
+            applyNearbyAmenities(amenities);
+            return;
+          }
+
+          if (status !== 'LOADING') {
+            console.warn('Nearby amenities returned unexpected status:', status);
+            applyNearbyAmenities([]);
+            return;
+          }
+
+          await wait(2000);
+        }
+
+        console.warn('Nearby amenities are still loading after timeout');
+        applyNearbyAmenities([]);
+      };
+
+      await Promise.allSettled([
+        fetchNearbyAmenitiesUntilReady(),
+        axios.get(`${API_BASE_URL}/api/gov/rentalprices/${listingId}`, requestConfig)
+          .then(response => {
+            const uniquePrices = {};
+            (response.data || []).forEach(item => {
+              if (!uniquePrices[item.leaseDate] || item.rentPrice > uniquePrices[item.leaseDate].rentPrice) {
+                uniquePrices[item.leaseDate] = item;
+              }
+            });
+            setPriceInsights(Object.values(uniquePrices));
+          }),
+        axios.get(`${API_BASE_URL}/api/reviews/${listingId}`, requestConfig)
+          .then(response => {
+            const formattedReviews = (response.data || []).map(review => ({
+              reviewId: review.id,
+              rating: review.rating,
+              title: review.title || 'Review',
+              text: review.text,
+              user: {
+                userID: review.userId,
+                name: review.userName || 'Anonymous',
+                photoURL: review.userPhotoURL || 'https://via.placeholder.com/50'
+              },
+              flagged: review.flagged || false
+            }));
+            setReviews(formattedReviews);
+          })
+      ]).then(results => {
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.warn(`Secondary listing request ${index} failed:`, result.reason?.message);
+          }
+        });
+      });
+    };
+
     fetchListingData();
-  }, [listingId, router]);
+  }, [authHeaders, listingId, router]);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [listingReported, setListingReported] = useState(false);
