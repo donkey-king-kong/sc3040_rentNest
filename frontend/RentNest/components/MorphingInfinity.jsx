@@ -7,16 +7,26 @@ const MorphingInfinity = ({ size = 72, color = '#2FA84F' }) => {
   const strokeWidth = Math.max(4, size * 0.08);
 
   useEffect(() => {
-    const animation = Animated.loop(
+    let isMounted = true;
+
+    const runAnimation = () => {
+      progress.setValue(0);
       Animated.timing(progress, {
         toValue: 1,
         duration: 1400,
         useNativeDriver: true,
-      })
-    );
+      }).start(({ finished }) => {
+        if (finished && isMounted) {
+          runAnimation();
+        }
+      });
+    };
 
-    animation.start();
-    return () => animation.stop();
+    runAnimation();
+    return () => {
+      isMounted = false;
+      progress.stopAnimation();
+    };
   }, [progress]);
 
   const leftScale = progress.interpolate({
