@@ -11,6 +11,8 @@ const SignUpScreen = () => {
   const [password, setPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [formError, setFormError] = useState('');
   const fullNameInputRef = useRef(null);
   const emailInputRef = useRef(null);
   const passwordInputRef = useRef(null);
@@ -19,28 +21,56 @@ const SignUpScreen = () => {
   const router = useRouter();
 
   const handleSignUp = async () => {
+    setFormError('');
+    setFieldErrors({});
+
     // Validation
-    if (!fullName) {
-      Alert.alert('Validation Error', 'Full Name is required.');
-      return;
+    const missingFields = [];
+    const nextFieldErrors = {};
+
+    if (!fullName.trim()) {
+      missingFields.push('full name');
+      nextFieldErrors.fullName = true;
     }
-    if (!email) {
-      Alert.alert('Validation Error', 'Email is required.');
-      return;
+
+    if (!email.trim()) {
+      missingFields.push('email');
+      nextFieldErrors.email = true;
     }
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      Alert.alert('Validation Error', 'Email format is invalid.');
-      return;
+
+    if (!password) {
+      missingFields.push('password');
+      nextFieldErrors.password = true;
     }
-    if (password.length < 6) {
-      Alert.alert('Validation Error', 'Password must be at least 6 characters long.');
+
+    if (!phoneNumber.trim()) {
+      missingFields.push('phone number');
+      nextFieldErrors.phoneNumber = true;
+    }
+
+    if (missingFields.length > 0) {
+      setFieldErrors(nextFieldErrors);
+      setFormError(`ERROR: Please fill in ${missingFields.join(', ')}.`);
       return;
     }
 
-    if (!phoneNumber || phoneNumber.length < 8) {
-     Alert.alert('Validation Error', 'Phone Number must be at least 8 digits long.');
-     return;
-     }
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setFieldErrors({ email: true });
+      setFormError('ERROR: Email format is invalid.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setFieldErrors({ password: true });
+      setFormError('ERROR: Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (phoneNumber.length < 8) {
+      setFieldErrors({ phoneNumber: true });
+      setFormError('ERROR: Phone Number must be at least 8 digits long.');
+      return;
+    }
 
     try {
       console.log("Attempting signup with:", { email, fullName });
@@ -72,21 +102,15 @@ const SignUpScreen = () => {
       if (error.response) {
         // Server responded with an error
         const errorMessage = error.response.data?.message || error.response.data || 'Could not create account';
-        Alert.alert('Registration Failed', errorMessage);
+        setFormError(`ERROR: ${errorMessage}`);
       } else if (error.request) {
         // Request was made but no response received
         console.error('No response received:', error.request);
-        Alert.alert(
-          'Network Error',
-          'No response from server. Please check your connection.'
-        );
+        setFormError('ERROR: No response from server. Please check your connection.');
       } else {
         // Error in setting up the request
         console.error('Request setup error:', error.message);
-        Alert.alert(
-          'Connection Error',
-          'Failed to connect to the server. Please try again.'
-        );
+        setFormError('ERROR: Failed to connect to the server. Please try again.');
       }
   }
 };
@@ -104,19 +128,29 @@ const SignUpScreen = () => {
       >
         <Text style={styles.title}>Sign Up</Text>
 
-        <Pressable style={styles.inputContainer} onPress={() => fullNameInputRef.current?.focus()}>
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.fullName && styles.errorInputContainer]}
+          onPress={() => fullNameInputRef.current?.focus()}
+        >
           <FontAwesome name="user" size={20} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={fullNameInputRef}
             style={styles.input}
             placeholder="Full Name"
             placeholderTextColor="#666"
-            onChangeText={(text) => setFullName(text)}
+            onChangeText={(text) => {
+              setFullName(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, fullName: false }));
+              setFormError('');
+            }}
             value={fullName}
           />
         </Pressable>
 
-        <Pressable style={styles.inputContainer} onPress={() => emailInputRef.current?.focus()}>
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.email && styles.errorInputContainer]}
+          onPress={() => emailInputRef.current?.focus()}
+        >
           <FontAwesome name="envelope" size={18} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={emailInputRef}
@@ -125,12 +159,19 @@ const SignUpScreen = () => {
             placeholderTextColor="#666"
             keyboardType="email-address"
             autoCapitalize="none"
-            onChangeText={(text) => setEmail(text)}
+            onChangeText={(text) => {
+              setEmail(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, email: false }));
+              setFormError('');
+            }}
             value={email}
           />
         </Pressable>
 
-        <Pressable style={styles.inputContainer} onPress={() => passwordInputRef.current?.focus()}>
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.password && styles.errorInputContainer]}
+          onPress={() => passwordInputRef.current?.focus()}
+        >
           <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={passwordInputRef}
@@ -138,7 +179,11 @@ const SignUpScreen = () => {
             placeholder="Password"
             placeholderTextColor="#666"
             secureTextEntry={!isPasswordVisible}
-            onChangeText={(text) => setPassword(text)}
+            onChangeText={(text) => {
+              setPassword(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, password: false }));
+              setFormError('');
+            }}
             value={password}
           />
           <TouchableOpacity
@@ -155,7 +200,10 @@ const SignUpScreen = () => {
           </TouchableOpacity>
         </Pressable>
 
-        <Pressable style={styles.inputContainer} onPress={() => phoneInputRef.current?.focus()}>
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.phoneNumber && styles.errorInputContainer]}
+          onPress={() => phoneInputRef.current?.focus()}
+        >
           <FontAwesome name="phone" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={phoneInputRef}
@@ -163,10 +211,21 @@ const SignUpScreen = () => {
             placeholder="Phone Number"
             placeholderTextColor="#666"
             keyboardType="phone-pad"
-            onChangeText={(text) => setPhoneNumber(text)}
+            onChangeText={(text) => {
+              setPhoneNumber(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, phoneNumber: false }));
+              setFormError('');
+            }}
             value={phoneNumber}
           />
         </Pressable>
+
+        {formError ? (
+          <View style={styles.errorMessageContainer}>
+            <FontAwesome name="exclamation-triangle" size={20} color="#E94068" />
+            <Text style={styles.errorMessageText}>{formError}</Text>
+          </View>
+        ) : null}
 
         {/* <TextInput
           style={styles.input}
@@ -230,6 +289,11 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 2,
   },
+  errorInputContainer: {
+    borderWidth: 1,
+    borderColor: '#E94068',
+    backgroundColor: '#FFF1F4',
+  },
   inputIcon: {
     width: 28,
     marginRight: 14,
@@ -243,6 +307,23 @@ const styles = StyleSheet.create({
   passwordToggle: {
     paddingLeft: 12,
     paddingVertical: 12,
+  },
+  errorMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E94068',
+    borderRadius: 18,
+    backgroundColor: '#FFECEF',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginTop: 4,
+  },
+  errorMessageText: {
+    color: '#222222',
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 12,
   },
   otpButton: {
     position: 'absolute', // Position the button inside the input

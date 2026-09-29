@@ -11,29 +11,44 @@ const ForgotPasswordScreen = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [formError, setFormError] = useState('');
   const emailInputRef = useRef(null);
   const newPasswordInputRef = useRef(null);
   const confirmPasswordInputRef = useRef(null);
   const router = useRouter();
 
   const handleResetPassword = async () => {
+    setFormError('');
+    setFieldErrors({});
+
     if (!email) {
-      Alert.alert('Validation Error', 'Email is required.');
+      setFieldErrors({ email: true });
+      setFormError('ERROR: Email is required.');
       return;
     }
 
     if (!/\S+@\S+\.\S+/.test(email)) {
-      Alert.alert('Validation Error', 'Email format is invalid.');
+      setFieldErrors({ email: true });
+      setFormError('ERROR: Email format is invalid.');
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert('Validation Error', 'Password must be at least 6 characters long.');
+      setFieldErrors({ newPassword: true });
+      setFormError('ERROR: Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (!confirmPassword) {
+      setFieldErrors({ confirmPassword: true });
+      setFormError('ERROR: Confirm new password is required.');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Validation Error', 'Passwords do not match.');
+      setFieldErrors({ newPassword: true, confirmPassword: true });
+      setFormError('ERROR: Passwords do not match.');
       return;
     }
 
@@ -52,9 +67,9 @@ const ForgotPasswordScreen = () => {
     } catch (error) {
       if (error.response) {
         const errorMessage = error.response.data?.message || error.response.data || 'Unable to reset password.';
-        Alert.alert('Reset Failed', errorMessage);
+        setFormError(`ERROR: ${errorMessage}`);
       } else {
-        Alert.alert('Network Error', 'Could not connect to the server. Please try again.');
+        setFormError('ERROR: Could not connect to the server. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
@@ -73,7 +88,10 @@ const ForgotPasswordScreen = () => {
           Enter your email address and choose a new password to regain access to your account.
         </Text>
 
-        <Pressable style={styles.inputContainer} onPress={() => emailInputRef.current?.focus()}>
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.email && styles.errorInputContainer]}
+          onPress={() => emailInputRef.current?.focus()}
+        >
           <FontAwesome name="envelope" size={18} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={emailInputRef}
@@ -82,12 +100,19 @@ const ForgotPasswordScreen = () => {
             placeholderTextColor="#666"
             keyboardType="email-address"
             autoCapitalize="none"
-            onChangeText={(text) => setEmail(text)}
+            onChangeText={(text) => {
+              setEmail(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, email: false }));
+              setFormError('');
+            }}
             value={email}
           />
         </Pressable>
 
-        <Pressable style={styles.inputContainer} onPress={() => newPasswordInputRef.current?.focus()}>
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.newPassword && styles.errorInputContainer]}
+          onPress={() => newPasswordInputRef.current?.focus()}
+        >
           <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={newPasswordInputRef}
@@ -95,7 +120,11 @@ const ForgotPasswordScreen = () => {
             placeholder="New password"
             placeholderTextColor="#666"
             secureTextEntry={!isPasswordVisible}
-            onChangeText={(text) => setNewPassword(text)}
+            onChangeText={(text) => {
+              setNewPassword(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, newPassword: false }));
+              setFormError('');
+            }}
             value={newPassword}
           />
           <TouchableOpacity
@@ -112,7 +141,10 @@ const ForgotPasswordScreen = () => {
           </TouchableOpacity>
         </Pressable>
 
-        <Pressable style={styles.inputContainer} onPress={() => confirmPasswordInputRef.current?.focus()}>
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.confirmPassword && styles.errorInputContainer]}
+          onPress={() => confirmPasswordInputRef.current?.focus()}
+        >
           <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={confirmPasswordInputRef}
@@ -120,7 +152,11 @@ const ForgotPasswordScreen = () => {
             placeholder="Confirm new password"
             placeholderTextColor="#666"
             secureTextEntry={!isPasswordVisible}
-            onChangeText={(text) => setConfirmPassword(text)}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, confirmPassword: false }));
+              setFormError('');
+            }}
             value={confirmPassword}
           />
           <TouchableOpacity
@@ -136,6 +172,13 @@ const ForgotPasswordScreen = () => {
             />
           </TouchableOpacity>
         </Pressable>
+
+        {formError ? (
+          <View style={styles.errorMessageContainer}>
+            <FontAwesome name="exclamation-triangle" size={20} color="#E94068" />
+            <Text style={styles.errorMessageText}>{formError}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.bottomContainer}>
@@ -205,6 +248,11 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 2,
   },
+  errorInputContainer: {
+    borderWidth: 1,
+    borderColor: '#E94068',
+    backgroundColor: '#FFF1F4',
+  },
   inputIcon: {
     width: 28,
     marginRight: 14,
@@ -218,6 +266,23 @@ const styles = StyleSheet.create({
   passwordToggle: {
     paddingLeft: 12,
     paddingVertical: 12,
+  },
+  errorMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E94068',
+    borderRadius: 18,
+    backgroundColor: '#FFECEF',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginTop: 4,
+  },
+  errorMessageText: {
+    color: '#222222',
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 12,
   },
   bottomContainer: {
     marginTop: 'auto',

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
@@ -10,22 +10,30 @@ const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [formError, setFormError] = useState('');
   const emailInputRef = useRef(null);
   const passwordInputRef = useRef(null);
   const router = useRouter();
 
   const handleLogin = async () => {
+    setFormError('');
+    setFieldErrors({});
+
     // Validation
     if (!email) {
-      Alert.alert('Validation Error', 'Email is required.');
+      setFieldErrors({ email: true });
+      setFormError('ERROR: Email is required.');
       return;
     }
     if (!/\S+@\S+\.\S+/.test(email)) {
-      Alert.alert('Validation Error', 'Email format is invalid.');
+      setFieldErrors({ email: true });
+      setFormError('ERROR: Email format is invalid.');
       return;
     }
     if (!password) {
-      Alert.alert('Validation Error', 'Password is required.');
+      setFieldErrors({ password: true });
+      setFormError('ERROR: Password is required.');
       return;
     }
 
@@ -63,28 +71,22 @@ const LoginScreen = () => {
         router.push('/HomeScreen');
       } catch (storageError) {
         console.log('Storage error:', storageError);
-        Alert.alert('Error', 'Failed to save login information');
+        setFormError('ERROR: Failed to save login information.');
       }
     } catch (error) {
       console.log('Login error:', error); // Debug log
       if (error.response) {
         // The server responded with an error
-        const errorMessage = error.response.data?.message || 'Invalid credentials';
-        Alert.alert('Login Failed', errorMessage);
+        setFieldErrors({ email: true, password: true });
+        setFormError('ERROR: Invalid email or password.');
       } else if (error.request) {
         // The request was made but no response received
         console.log('No response received:', error.request);
-        Alert.alert(
-          'Network Error',
-          'Could not connect to the server. Please check your connection.'
-        );
+        setFormError('ERROR: Could not connect to the server. Please check your connection.');
       } else {
         // Something happened in setting up the request
         console.log('Request setup error:', error.message);
-        Alert.alert(
-          'Connection Error',
-          'Could not connect to the server. Please try again.'
-        );
+        setFormError('ERROR: Could not connect to the server. Please try again.');
       }
     }
   };
@@ -94,7 +96,10 @@ const LoginScreen = () => {
       <View style={styles.formContainer}>
         <Text style={styles.title}>Login to your account</Text>
 
-        <Pressable style={styles.inputContainer} onPress={() => emailInputRef.current?.focus()}>
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.email && styles.errorInputContainer]}
+          onPress={() => emailInputRef.current?.focus()}
+        >
           <FontAwesome name="envelope" size={18} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={emailInputRef}
@@ -103,12 +108,19 @@ const LoginScreen = () => {
             placeholderTextColor="#666"
             keyboardType="email-address"
             autoCapitalize="none"
-            onChangeText={(text) => setEmail(text)}
+            onChangeText={(text) => {
+              setEmail(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, email: false }));
+              setFormError('');
+            }}
             value={email}
           />
         </Pressable>
 
-        <Pressable style={styles.inputContainer} onPress={() => passwordInputRef.current?.focus()}>
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.password && styles.errorInputContainer]}
+          onPress={() => passwordInputRef.current?.focus()}
+        >
           <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={passwordInputRef}
@@ -116,7 +128,11 @@ const LoginScreen = () => {
             placeholder="Enter your password"
             placeholderTextColor="#666"
             secureTextEntry={!isPasswordVisible}
-            onChangeText={(text) => setPassword(text)}
+            onChangeText={(text) => {
+              setPassword(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, password: false }));
+              setFormError('');
+            }}
             value={password}
           />
           <TouchableOpacity
@@ -139,6 +155,13 @@ const LoginScreen = () => {
         >
           <Text style={styles.forgotPasswordText}>Forgot?</Text>
         </TouchableOpacity>
+
+        {formError ? (
+          <View style={styles.errorMessageContainer}>
+            <FontAwesome name="exclamation-triangle" size={20} color="#E94068" />
+            <Text style={styles.errorMessageText}>{formError}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.bottomContainer}>
@@ -189,6 +212,11 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 2,
   },
+  errorInputContainer: {
+    borderWidth: 1,
+    borderColor: '#E94068',
+    backgroundColor: '#FFF1F4',
+  },
   inputIcon: {
     width: 28,
     marginRight: 14,
@@ -210,6 +238,23 @@ const styles = StyleSheet.create({
     color: '#0A84FF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  errorMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E94068',
+    borderRadius: 18,
+    backgroundColor: '#FFECEF',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginTop: 18,
+  },
+  errorMessageText: {
+    color: '#222222',
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 12,
   },
   bottomContainer: {
     marginTop: 'auto',
