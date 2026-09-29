@@ -1,21 +1,21 @@
 // Previous imports remain unchanged
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Modal} from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import MapView, { Marker } from '../components/AppMap';
-import {useRouter, useNavigation} from "expo-router";
+import {useRouter} from "expo-router";
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL, ENDPOINTS } from '../config/api';
+import { API_BASE_URL } from '../config/api';
 import { jwtDecode } from 'jwt-decode';
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const HomeListingScreen = () => {
   console.log('Initializing HomeListingScreen component');
 
   const router = useRouter();
   const route = useRoute();
-  const navigation = useNavigation();
   const { listingId } = route.params;
 
   const [listing, setListing] = useState(null);
@@ -248,8 +248,9 @@ const HomeListingScreen = () => {
 
   if (loading || !listing) {
     return (
-      <View style={[styles.container, styles.loadingContainer]}>
-        <Text>Loading...</Text>
+      <View style={styles.loadingScreen}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading listing...</Text>
       </View>
     );
   }
@@ -474,6 +475,18 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     backgroundColor: '#fff',
+  },
+  loadingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7F8FA',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   image: {
     width: '100%',
