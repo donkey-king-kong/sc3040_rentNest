@@ -96,12 +96,13 @@ const ForgotPasswordScreen = () => {
           <TouchableOpacity
             style={styles.passwordToggle}
             onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            disabled={!newPassword}
             accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
           >
             <FontAwesome
-              name={isPasswordVisible ? 'eye-slash' : 'eye'}
+              name={isPasswordVisible ? 'eye' : 'eye-slash'}
               size={20}
-              color="#777"
+              color={newPassword ? '#777' : '#C4C4C4'}
             />
           </TouchableOpacity>
         </View>
@@ -119,12 +120,13 @@ const ForgotPasswordScreen = () => {
           <TouchableOpacity
             style={styles.passwordToggle}
             onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            disabled={!confirmPassword}
             accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
           >
             <FontAwesome
-              name={isPasswordVisible ? 'eye-slash' : 'eye'}
+              name={isPasswordVisible ? 'eye' : 'eye-slash'}
               size={20}
-              color="#777"
+              color={confirmPassword ? '#777' : '#C4C4C4'}
             />
           </TouchableOpacity>
         </View>

@@ -117,12 +117,13 @@ const LoginScreen = () => {
           <TouchableOpacity
             style={styles.passwordToggle}
             onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            disabled={!password}
             accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
           >
             <FontAwesome
-              name={isPasswordVisible ? 'eye-slash' : 'eye'}
+              name={isPasswordVisible ? 'eye' : 'eye-slash'}
               size={22}
-              color="#777"
+              color={password ? '#777' : '#C4C4C4'}
             />
           </TouchableOpacity>
         </View>
