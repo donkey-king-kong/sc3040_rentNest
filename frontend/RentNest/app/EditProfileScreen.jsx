@@ -161,6 +161,14 @@ const EditProfileScreen = () => {
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.innerContainer}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.navigate('ProfileScreen')}
+            disabled={isSaving}
+          >
+            <FontAwesome name="chevron-left" size={22} color="#101820" />
+          </TouchableOpacity>
+
           <View style={styles.contentContainer}>
             <View style={styles.profileBox}>
               <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
@@ -226,13 +234,6 @@ const EditProfileScreen = () => {
                 <Text style={styles.buttonText}>Update Profile</Text>
               )}
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => navigation.navigate('ProfileScreen')}
-              disabled={isSaving}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
           </View>
           {showProfileUpdated ? (
             <View style={styles.notificationOverlay} pointerEvents="none">
@@ -260,8 +261,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 44,
   },
+  backButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
+  },
   contentContainer: {
     flex: 1,
+    paddingTop: 34,
   },
   profileBox: {
     alignItems: 'center',
@@ -316,7 +331,7 @@ const styles = StyleSheet.create({
     marginLeft: 14,
   },
   buttonContainer: {
-    paddingBottom: Platform.OS === 'ios' ? 24 : 18,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 28,
   },
   button: {
     height: 68,
@@ -342,15 +357,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
-  cancelButton: {
-    alignItems: 'center',
-    paddingTop: 22,
-  },
-  cancelButtonText: {
-    color: '#555555',
-    fontSize: 18,
-    fontWeight: '700',
   },
   notificationOverlay: {
     ...StyleSheet.absoluteFillObject,
