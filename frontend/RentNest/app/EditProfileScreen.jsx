@@ -1,10 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TextInput, TouchableOpacity, Alert, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  TouchableWithoutFeedback,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { FontAwesome } from '@expo/vector-icons';
 
 const EditProfileScreen = () => {
   const navigation = useNavigation();
@@ -17,10 +31,11 @@ const EditProfileScreen = () => {
     photoURL: 'https://t3.ftcdn.net/jpg/06/33/54/78/360_F_633547842_AugYzexTpMJ9z1YcpTKUBoqBF0CUCk10.jpg',
   });
 
-  // State for the updated user details
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [contact, setContact] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const nameInputRef = useRef(null);
+  const contactInputRef = useRef(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -51,10 +66,8 @@ const EditProfileScreen = () => {
           photoURL: userData.photoURL || 'https://t3.ftcdn.net/jpg/06/33/54/78/360_F_633547842_AugYzexTpMJ9z1YcpTKUBoqBF0CUCk10.jpg'
         });
 
-        // Populate form fields
-        setName(userData.name);
-        setEmail(userData.email);
-        setContact("12345678");
+        setName(userData.name || '');
+        setContact(userData.contact || '');
 
       } catch (error) {
         console.error('Error fetching user data:', error);
@@ -66,22 +79,17 @@ const EditProfileScreen = () => {
     fetchUserData();
   }, []);
 
-  // Function to validate email
-  const isEmailValid = (email) => {
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return regex.test(email);
-  };
-
-  // Function to validate phone number
   const isPhoneNumberValid = (contact) => {
-    const regex = /^[0-9]{8,}$/; // At least 8 digits
+    const regex = /^[0-9]{8,}$/;
     return regex.test(contact);
   };
 
-  // Function to handle the update
   const handleUpdateDetails = async () => {
-    if (!isEmailValid(email)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.");
+    setFieldErrors({});
+
+    if (!name.trim()) {
+      setFieldErrors({ name: true });
+      Alert.alert("Missing Full Name", "Please enter your full name.");
       return;
     }
 
@@ -99,7 +107,7 @@ const EditProfileScreen = () => {
 
       // Send PUT request to update user data
       await axios.put(
-        `${API_BASE_URL}/api/users/id/${user.userID}?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&contact=${encodeURIComponent(contact)}`,
+        `${API_BASE_URL}/api/users/id/${user.userID}?name=${encodeURIComponent(name.trim())}&email=${encodeURIComponent(user.email)}&contact=${encodeURIComponent(contact.trim())}`,
         null,
         {
           headers: {
@@ -132,37 +140,61 @@ const EditProfileScreen = () => {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.innerContainer}>
           <View style={styles.contentContainer}>
-            <Text style={styles.title}>Edit Profile</Text>
             <View style={styles.profileBox}>
               <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
             </View>
-            <TextInput
-              style={styles.input}
-              value={name}
-              placeholder="Name"
-              placeholderTextColor="#666"
-              onChangeText={setName}
-            />
-            <TextInput
-              style={styles.input}
-              value={email}
-              placeholder="Email"
-              placeholderTextColor="#666"
-              keyboardType="email-address"
-              onChangeText={setEmail}
-            />
-            <TextInput
-              style={styles.input}
-              value={contact}
-              placeholder="Mobile Number"
-              placeholderTextColor="#666"
-              keyboardType="phone-pad"
-              onChangeText={setContact}
-            />
+
+            <Text style={styles.label}>Full Name</Text>
+            <Pressable
+              style={[styles.inputContainer, fieldErrors.name && styles.errorInputContainer]}
+              onPress={() => nameInputRef.current?.focus()}
+            >
+              <TextInput
+                ref={nameInputRef}
+                style={styles.input}
+                value={name}
+                placeholder="Your Name"
+                placeholderTextColor="#8C8C8C"
+                onChangeText={(text) => {
+                  setName(text);
+                  setFieldErrors((previousErrors) => ({ ...previousErrors, name: false }));
+                }}
+              />
+              <FontAwesome name="user" size={22} color="#777" style={styles.inputIcon} />
+            </Pressable>
+
+            <Text style={styles.label}>Email Address</Text>
+            <View style={[styles.inputContainer, styles.disabledInputContainer]}>
+              <Text style={styles.disabledInputText}>{user.email || 'Email address'}</Text>
+              <FontAwesome name="envelope" size={20} color="#777" style={styles.inputIcon} />
+            </View>
+
+            <Text style={styles.label}>Phone Number</Text>
+            <Pressable
+              style={[styles.inputContainer, fieldErrors.contact && styles.errorInputContainer]}
+              onPress={() => contactInputRef.current?.focus()}
+            >
+              <TextInput
+                ref={contactInputRef}
+                style={styles.input}
+                value={contact}
+                placeholder="Phone Number"
+                placeholderTextColor="#8C8C8C"
+                keyboardType="phone-pad"
+                onChangeText={(text) => {
+                  setContact(text);
+                  setFieldErrors((previousErrors) => ({ ...previousErrors, contact: false }));
+                }}
+              />
+              <FontAwesome name="phone" size={22} color="#777" style={styles.inputIcon} />
+            </Pressable>
           </View>
           <View style={styles.buttonContainer}>
             <TouchableOpacity style={styles.button} onPress={handleUpdateDetails}>
-              <Text style={styles.buttonText}>Update Details</Text>
+              <Text style={styles.buttonText}>Update Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.navigate('ProfileScreen')}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -174,51 +206,96 @@ const EditProfileScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F8FA',
   },
   innerContainer: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 22,
+    paddingTop: 44,
   },
   contentContainer: {
     flex: 1,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
   profileBox: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 8,
   },
   profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 156,
+    height: 156,
+    borderRadius: 78,
+    backgroundColor: '#D8D8D8',
+  },
+  label: {
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 22,
+    marginBottom: 12,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 72,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
+  },
+  errorInputContainer: {
+    borderWidth: 1,
+    borderColor: '#E94068',
+    backgroundColor: '#FFF1F4',
   },
   input: {
-    height: 50,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 15,
+    flex: 1,
+    color: '#333333',
+    fontSize: 16,
+    outlineStyle: 'none',
+  },
+  disabledInputContainer: {
+    opacity: 0.72,
+  },
+  disabledInputText: {
+    flex: 1,
+    color: '#666666',
+    fontSize: 16,
+  },
+  inputIcon: {
+    marginLeft: 14,
   },
   buttonContainer: {
-    paddingBottom: Platform.OS === 'ios' ? 20 : 0,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 18,
   },
   button: {
-    backgroundColor: '#000', // Black color
-    paddingVertical: 15,
-    borderRadius: 8,
+    height: 68,
+    borderRadius: 18,
+    backgroundColor: '#222222',
     alignItems: 'center',
-    width: '100%', // Full width
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 3,
   },
   buttonText: {
-    color: '#FFFFFF', // White text
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  cancelButton: {
+    alignItems: 'center',
+    paddingTop: 22,
+  },
+  cancelButtonText: {
+    color: '#555555',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });
 
