@@ -1,6 +1,8 @@
 package RentNest.service;
 
 import RentNest.model.api.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -8,6 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,6 +28,8 @@ import java.util.Date;
 
 @Service
 public class ApiService {
+
+    private static final Logger logger = LoggerFactory.getLogger(ApiService.class);
 
     private RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -177,6 +182,8 @@ public class ApiService {
 
     public List<BusStop> getBusStopsByListingId(Long listingId, double radiusMeters) {
         String postalCode = Integer.toString(listingsService.getPostalByListingId(listingId));
+        logger.info("[LTA DataMall] Fetching bus stops for listingId={}, postalCode={}, radiusMeters={}",
+                listingId, postalCode, radiusMeters);
         return getBusStopsNearPostalCode(postalCode,radiusMeters);
     }
 
@@ -185,19 +192,33 @@ public class ApiService {
         double[] postalCoordinates = getCoordinatesFromPostalCode(postalCode);
         double postalLatitude = postalCoordinates[0];
         double postalLongitude = postalCoordinates[1];
+        logger.info("[LTA DataMall] Postal code {} resolved to latitude={}, longitude={}",
+                postalCode, postalLatitude, postalLongitude);
 
         List<BusStop> busStops = new ArrayList<>();
         int skip = 0;
         boolean hasMoreData = true;
+        boolean hasAccountKey = LTADATAMALL_ACCOUNTKEY != null && !LTADATAMALL_ACCOUNTKEY.trim().isEmpty();
+        logger.info("[LTA DataMall] AccountKey configured={}", hasAccountKey);
 
         // Retrieve all bus stops using $skip parameter
         while (hasMoreData) {
             String url = "https://datamall2.mytransport.sg/ltaodataservice/BusStops?$skip=" + skip;
             HttpHeaders headers = new HttpHeaders();
             headers.set("AccountKey", LTADATAMALL_ACCOUNTKEY);
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+            logger.info("[LTA DataMall] Calling BusStops endpoint with skip={}", skip);
+
+            ResponseEntity<String> response;
+            try {
+                response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+            } catch (RestClientException e) {
+                logger.error("[LTA DataMall] BusStops request failed for skip={}: {}", skip, e.getMessage(), e);
+                throw e;
+            }
 
             List<BusStop> partialBusStops = parseBusStops(response.getBody());
+            logger.info("[LTA DataMall] BusStops response skip={} status={} parsedCount={}",
+                    skip, response.getStatusCode(), partialBusStops.size());
             if (partialBusStops.isEmpty()) {
                 hasMoreData = false;
             } else {
@@ -205,6 +226,7 @@ public class ApiService {
                 skip += 500;
             }
         }
+        logger.info("[LTA DataMall] Finished fetching bus stops. totalFetched={}", busStops.size());
         
         // Filter bus stops within radius
         List<BusStop> nearbyBusStops = new ArrayList<>();
@@ -214,6 +236,8 @@ public class ApiService {
                 nearbyBusStops.add(busStop);
             }
         }
+        logger.info("[LTA DataMall] Nearby bus stops found={} within radiusMeters={} for postalCode={}",
+                nearbyBusStops.size(), radiusMeters, postalCode);
         
         return nearbyBusStops;
     }
