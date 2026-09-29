@@ -48,7 +48,8 @@ const SignUpScreen = () => {
       const response = await axios.post(`${API_BASE_URL}${ENDPOINTS.SIGNUP}`, {
         email,
         password,
-        fullName
+        fullName,
+        contact: phoneNumber
       });
 
       console.log("Response received:", response.status);

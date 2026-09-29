@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { FontAwesome } from 'react-native-vector-icons'; // Import FontAwesome icons
@@ -27,22 +27,31 @@ const ProfileScreen = () => {
           return;
         }
 
-        const decoded = jwtDecode(token);
-        const userEmail = decoded.sub;
+        const storedUserId = await AsyncStorage.getItem('userId');
+        const authHeaders = {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        };
 
-        const response = await axios.get(`${API_BASE_URL}/api/users/${userEmail}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        });
+        let response;
+        if (storedUserId) {
+          response = await axios.get(`${API_BASE_URL}/api/users/id/${storedUserId}`, {
+            headers: authHeaders
+          });
+        } else {
+          const decoded = jwtDecode(token);
+          const userEmail = decoded.sub;
+          response = await axios.get(`${API_BASE_URL}/api/users/${userEmail}`, {
+            headers: authHeaders
+          });
+        }
 
         setUser({
           userID: response.data.userID,
           name: response.data.name,
           email: response.data.email,
-          contact: response.data.contact,
+          contact: response.data.contact || 'No contact provided',
           photoURL: response.data.photoURL || 'https://t3.ftcdn.net/jpg/06/33/54/78/360_F_633547842_AugYzexTpMJ9z1YcpTKUBoqBF0CUCk10.jpg'
         });
 
@@ -63,7 +72,8 @@ const ProfileScreen = () => {
   // Function to navigate to LandingScreen
   const handleLogout = async () => {
     try {
-      await AsyncStorage.removeItem('token');
+      await AsyncStorage.multiRemove(['token', 'userId']);
+      delete axios.defaults.headers.common['Authorization'];
       navigation.navigate('LandingScreen');
     } catch (error) {
       console.error('Error during logout:', error);
