@@ -63,7 +63,8 @@ const ProfileScreen = () => {
   // Function to navigate to LandingScreen
   const handleLogout = async () => {
     try {
-      await AsyncStorage.removeItem('token');
+      await AsyncStorage.multiRemove(['token', 'userId']);
+      delete axios.defaults.headers.common['Authorization'];
       navigation.navigate('LandingScreen');
     } catch (error) {
       console.error('Error during logout:', error);
