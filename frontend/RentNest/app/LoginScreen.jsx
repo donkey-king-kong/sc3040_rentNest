@@ -89,62 +89,66 @@ const LoginScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Login to your account</Text>
+      <View>
+        <Text style={styles.title}>Login to your account</Text>
 
-      <Text style={styles.label}>Email</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor="#999"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        onChangeText={(text) => setEmail(text)}
-        value={email}
-      />
-
-      <View style={styles.passwordLabelRow}>
-        <Text style={styles.label}>Password</Text>
-        <TouchableOpacity onPress={() => router.push('/ForgotPasswordScreen')}>
-          <Text style={styles.forgotPasswordText}>Forgot?</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.passwordContainer}>
+        <Text style={styles.label}>Email</Text>
         <TextInput
-          style={styles.passwordInput}
-          placeholder="Enter your password"
+          style={styles.input}
+          placeholder="Email"
           placeholderTextColor="#999"
-          secureTextEntry={!isPasswordVisible}
-          onChangeText={(text) => setPassword(text)}
-          value={password}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          onChangeText={(text) => setEmail(text)}
+          value={email}
         />
-        <TouchableOpacity
-          style={styles.passwordToggle}
-          onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-          accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
-        >
-          <FontAwesome
-            name={isPasswordVisible ? 'eye-slash' : 'eye'}
-            size={22}
-            color="#777"
+
+        <View style={styles.passwordLabelRow}>
+          <Text style={styles.label}>Password</Text>
+          <TouchableOpacity onPress={() => router.push('/ForgotPasswordScreen')}>
+            <Text style={styles.forgotPasswordText}>Forgot?</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Enter your password"
+            placeholderTextColor="#999"
+            secureTextEntry={!isPasswordVisible}
+            onChangeText={(text) => setPassword(text)}
+            value={password}
           />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.passwordToggle}
+            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+          >
+            <FontAwesome
+              name={isPasswordVisible ? 'eye-slash' : 'eye'}
+              size={22}
+              color="#777"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.buttonContainer}>
-        <Button
-          title="Login now"
-          onPress={handleLogin}
-          backgroundColor="#0A84FF"
-          textColor="#FFFFFF"
-          fontSize={18}
-        />
-      </View>
+      <View style={styles.bottomContainer}>
+        <View style={styles.buttonContainer}>
+          <Button
+            title="Login now"
+            onPress={handleLogin}
+            backgroundColor="#222222"
+            textColor="#FFFFFF"
+            fontSize={18}
+          />
+        </View>
 
-      <View style={styles.signupContainer}>
-        <Text style={styles.signupText}>Don't have an account?</Text>
-        <TouchableOpacity onPress={() => router.push('/SignUpScreen')}>
-          <Text style={styles.signupLink}>Sign up</Text>
-        </TouchableOpacity>
+        <View style={styles.signupContainer}>
+          <Text style={styles.signupText}>Don't have an account?</Text>
+          <TouchableOpacity onPress={() => router.push('/SignUpScreen')}>
+            <Text style={styles.signupLink}>Sign up</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -153,14 +157,15 @@ const LoginScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
+    justifyContent: 'flex-start',
+    padding: 20,
     backgroundColor: '#fff',
   },
   title: {
     fontSize: 34,
     fontWeight: 'bold',
     color: '#111',
+    marginTop: 48,
     marginBottom: 34,
   },
   label: {
@@ -194,7 +199,7 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderWidth: 1,
     borderRadius: 10,
-    marginBottom: 34,
+    marginBottom: 10,
   },
   passwordInput: {
     flex: 1,
@@ -209,9 +214,13 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
   },
+  bottomContainer: {
+    marginTop: 'auto',
+    paddingBottom: 20,
+  },
   buttonContainer: {
     alignItems: 'center',
-    width: '100%',
+    width: '110%',
   },
   signupContainer: {
     flexDirection: 'row',
