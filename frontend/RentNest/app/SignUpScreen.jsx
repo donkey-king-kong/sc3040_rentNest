@@ -60,7 +60,7 @@ const SignUpScreen = () => {
         'Account created successfully!'
       );
 
-      router.push('/LandingScreen');
+      router.push('/LoginScreen');
 
     } catch (error) {
       console.error('Detailed signup error:', {
