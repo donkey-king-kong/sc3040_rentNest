@@ -21,6 +21,8 @@ import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import { FontAwesome } from '@expo/vector-icons';
 
+const notificationBellIcon = require('../assets/images/notificationBell.png');
+
 const EditProfileScreen = () => {
   const navigation = useNavigation();
 
@@ -36,8 +38,10 @@ const EditProfileScreen = () => {
   const [contact, setContact] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [isSaving, setIsSaving] = useState(false);
+  const [showProfileUpdated, setShowProfileUpdated] = useState(false);
   const nameInputRef = useRef(null);
   const contactInputRef = useRef(null);
+  const notificationTimeoutRef = useRef(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -79,6 +83,14 @@ const EditProfileScreen = () => {
     };
 
     fetchUserData();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
   }, []);
 
   const isPhoneNumberValid = (contact) => {
@@ -126,10 +138,13 @@ const EditProfileScreen = () => {
         }
       );
 
-      Alert.alert(
-        "Profile Updated",
-        "Your profile changes have been saved."
-      );
+      setShowProfileUpdated(true);
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+      notificationTimeoutRef.current = setTimeout(() => {
+        setShowProfileUpdated(false);
+      }, 2000);
     } catch (error) {
       console.error('Error updating user data:', error);
       Alert.alert('Error', 'Failed to update profile');
@@ -219,6 +234,16 @@ const EditProfileScreen = () => {
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
+          {showProfileUpdated ? (
+            <View style={styles.notificationOverlay} pointerEvents="none">
+              <View style={styles.notificationCard}>
+                <View style={styles.notificationIconBox}>
+                  <Image source={notificationBellIcon} style={styles.notificationIcon} />
+                </View>
+                <Text style={styles.notificationText}>Profile Updated</Text>
+              </View>
+            </View>
+          ) : null}
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -326,6 +351,45 @@ const styles = StyleSheet.create({
     color: '#555555',
     fontSize: 18,
     fontWeight: '700',
+  },
+  notificationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+  notificationCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    backgroundColor: '#2D2D2D',
+    borderRadius: 28,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    elevation: 8,
+  },
+  notificationIconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3A3A3A',
+    marginBottom: 16,
+  },
+  notificationIcon: {
+    width: 34,
+    height: 40,
+    resizeMode: 'contain',
+  },
+  notificationText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
   },
 });
 
