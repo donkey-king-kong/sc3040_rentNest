@@ -24,6 +24,8 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Date;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 @Service
@@ -33,6 +35,7 @@ public class ApiService {
 
     private RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Map<String, double[]> postalCodeCoordinateCache = new ConcurrentHashMap<>();
 
     @Autowired
     private ListingsService listingsService;
@@ -45,6 +48,10 @@ public class ApiService {
     public List<School> getSchoolsNearPostalCode(String postalCode, double radiusMeters) {
         // Get latitude and longitude from postal code using OneMap API
         double[] postalCoordinates = getCoordinatesFromPostalCode(postalCode);
+        if (!hasValidCoordinates(postalCoordinates)) {
+            logger.warn("[OneMap] Skipping nearby schools because postalCode={} could not be resolved", postalCode);
+            return new ArrayList<>();
+        }
         double postalLatitude = postalCoordinates[0];
         double postalLongitude = postalCoordinates[1];
         
@@ -61,6 +68,9 @@ public class ApiService {
         List<School> nearbySchools = new ArrayList<>();
         for (School school : schools) {
             double[] schoolCoordinates = getCoordinatesFromPostalCode(school.getPostalCode());
+            if (!hasValidCoordinates(schoolCoordinates)) {
+                continue;
+            }
             double schoolLatitude = schoolCoordinates[0];
             school.setLatitude(schoolLatitude);
             double schoolLongitude = schoolCoordinates[1];
@@ -108,6 +118,10 @@ public class ApiService {
     public List<HawkerCentre> getHawkerCentresNearPostalCode(String postalCode, double radiusMeters) {
         // Get latitude and longitude from postal code using OneMap API
         double[] postalCoordinates = getCoordinatesFromPostalCode(postalCode);
+        if (!hasValidCoordinates(postalCoordinates)) {
+            logger.warn("[OneMap] Skipping nearby hawker centres because postalCode={} could not be resolved", postalCode);
+            return new ArrayList<>();
+        }
         double postalLatitude = postalCoordinates[0];
         double postalLongitude = postalCoordinates[1];
         
@@ -124,6 +138,9 @@ public class ApiService {
             String hawkerPostalCode = extractHawkerPostalCode(hawkerCentre.getLocationOfCentre());
             if (hawkerPostalCode != null) {
                 double[] hawkerCoordinates = getCoordinatesFromPostalCode(hawkerPostalCode);
+                if (!hasValidCoordinates(hawkerCoordinates)) {
+                    continue;
+                }
                 double hawkerLatitude = hawkerCoordinates[0];
                 hawkerCentre.setLatitude(hawkerLatitude);
                 double hawkerLongitude = hawkerCoordinates[1];
@@ -190,6 +207,10 @@ public class ApiService {
     public List<BusStop> getBusStopsNearPostalCode(String postalCode, double radiusMeters) {
         // Get latitude and longitude from postal code using OneMap API
         double[] postalCoordinates = getCoordinatesFromPostalCode(postalCode);
+        if (!hasValidCoordinates(postalCoordinates)) {
+            logger.warn("[OneMap] Skipping nearby bus stops because postalCode={} could not be resolved", postalCode);
+            return new ArrayList<>();
+        }
         double postalLatitude = postalCoordinates[0];
         double postalLongitude = postalCoordinates[1];
         logger.info("[LTA DataMall] Postal code {} resolved to latitude={}, longitude={}",
@@ -267,27 +288,44 @@ public class ApiService {
 
     // Function to get latitude and longitude from postal code using OneMap API
     private double[] getCoordinatesFromPostalCode(String postalCode) {
-        String geocodeUrl = "https://www.onemap.gov.sg/api/common/elastic/search?searchVal=" + postalCode + "&returnGeom=Y&getAddrDetails=N";
-        logger.info("[OneMap] Resolving postalCode={}", postalCode);
+        String normalizedPostalCode = postalCode == null ? "" : postalCode.trim();
+        if (normalizedPostalCode.isEmpty()) {
+            logger.warn("[OneMap] Cannot resolve blank postal code");
+            return new double[]{0.0, 0.0};
+        }
+
+        double[] cachedCoordinates = postalCodeCoordinateCache.get(normalizedPostalCode);
+        if (cachedCoordinates != null) {
+            logger.debug("[OneMap] Using cached coordinates for postalCode={}", normalizedPostalCode);
+            return copyCoordinates(cachedCoordinates);
+        }
+
+        String geocodeUrl = "https://www.onemap.gov.sg/api/common/elastic/search?searchVal=" + normalizedPostalCode + "&returnGeom=Y&getAddrDetails=N";
+        logger.info("[OneMap] Resolving postalCode={}", normalizedPostalCode);
 
         ResponseEntity<String> response;
         try {
             response = restTemplate.exchange(geocodeUrl, HttpMethod.GET, null, String.class);
         } catch (RestClientException e) {
-            logger.error("[OneMap] Postal code lookup failed for postalCode={}: {}", postalCode, e.getMessage(), e);
-            throw e;
+            logger.warn("[OneMap] Postal code lookup failed for postalCode={}: {}", normalizedPostalCode, e.getMessage());
+            return new double[]{0.0, 0.0};
         }
 
         int resultCount = countOneMapResults(response.getBody());
         logger.info("[OneMap] Postal code lookup response postalCode={} status={} resultCount={}",
-                postalCode, response.getStatusCode(), resultCount);
+                normalizedPostalCode, response.getStatusCode(), resultCount);
 
         double latitude = parseLatitude(response.getBody());
         double longitude = parseLongitude(response.getBody());
-        if (latitude == 0.0 && longitude == 0.0) {
-            logger.warn("[OneMap] Postal code {} did not resolve to valid coordinates", postalCode);
+        double[] coordinates = new double[]{latitude, longitude};
+        if (!hasValidCoordinates(coordinates)) {
+            logger.warn("[OneMap] Postal code {} did not resolve to valid coordinates", normalizedPostalCode);
+            return coordinates;
         }
-        return new double[]{latitude, longitude};
+
+        postalCodeCoordinateCache.put(normalizedPostalCode, copyCoordinates(coordinates));
+        logger.info("[OneMap] Cached coordinates for postalCode={}", normalizedPostalCode);
+        return coordinates;
     }
 
     private int countOneMapResults(String jsonResponse) {
@@ -301,6 +339,16 @@ public class ApiService {
             logger.warn("[OneMap] Failed to parse postal code lookup response: {}", e.getMessage());
         }
         return 0;
+    }
+
+    private boolean hasValidCoordinates(double[] coordinates) {
+        return coordinates != null
+                && coordinates.length == 2
+                && !(coordinates[0] == 0.0 && coordinates[1] == 0.0);
+    }
+
+    private double[] copyCoordinates(double[] coordinates) {
+        return new double[]{coordinates[0], coordinates[1]};
     }
 
     // Parse latitude from OneMap API response
