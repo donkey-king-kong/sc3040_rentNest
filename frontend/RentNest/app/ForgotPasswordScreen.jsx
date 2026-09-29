@@ -8,6 +8,7 @@ import { API_BASE_URL, ENDPOINTS } from '../config/api';
 const ForgotPasswordScreen = () => {
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
@@ -25,6 +26,11 @@ const ForgotPasswordScreen = () => {
 
     if (newPassword.length < 6) {
       Alert.alert('Validation Error', 'Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert('Validation Error', 'Passwords do not match.');
       return;
     }
 
@@ -58,7 +64,7 @@ const ForgotPasswordScreen = () => {
         <Ionicons name="chevron-back" size={28} color="#111" />
       </TouchableOpacity>
 
-      <View style={styles.content}>
+      <View style={styles.formContainer}>
         <Text style={styles.title}>Forgot Password</Text>
         <Text style={styles.subtitle}>
           Enter your email address and choose a new password to regain access to your account.
@@ -100,6 +106,31 @@ const ForgotPasswordScreen = () => {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.inputContainer}>
+          <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            placeholder="Confirm new password"
+            placeholderTextColor="#666"
+            secureTextEntry={!isPasswordVisible}
+            onChangeText={(text) => setConfirmPassword(text)}
+            value={confirmPassword}
+          />
+          <TouchableOpacity
+            style={styles.passwordToggle}
+            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+          >
+            <FontAwesome
+              name={isPasswordVisible ? 'eye-slash' : 'eye'}
+              size={20}
+              color="#777"
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={styles.bottomContainer}>
         <TouchableOpacity
           style={[styles.continueButton, isSubmitting && styles.disabledButton]}
           onPress={handleResetPassword}
@@ -134,10 +165,8 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingBottom: 70,
+  formContainer: {
+    marginTop: 120,
   },
   title: {
     color: '#101820',
@@ -151,7 +180,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     textAlign: 'center',
-    marginBottom: 58,
+    marginBottom: 48,
     paddingHorizontal: 18,
   },
   inputContainer: {
@@ -181,16 +210,19 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
     paddingVertical: 12,
   },
+  bottomContainer: {
+    marginTop: 'auto',
+    paddingBottom: 34,
+  },
   continueButton: {
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#35BF7D',
+    backgroundColor: '#222222',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 30,
-    shadowColor: '#35BF7D',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.24,
+    shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 3,
   },
