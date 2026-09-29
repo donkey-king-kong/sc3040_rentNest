@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
@@ -11,6 +11,10 @@ const SignUpScreen = () => {
   const [password, setPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const fullNameInputRef = useRef(null);
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+  const phoneInputRef = useRef(null);
 
   const router = useRouter();
 
@@ -99,20 +103,22 @@ const SignUpScreen = () => {
       >
         <Text style={styles.title}>Sign Up</Text>
 
-        <View style={styles.inputContainer}>
+        <Pressable style={styles.inputContainer} onPress={() => fullNameInputRef.current?.focus()}>
           <FontAwesome name="user" size={20} color="#777" style={styles.inputIcon} />
           <TextInput
+            ref={fullNameInputRef}
             style={styles.input}
             placeholder="Full Name"
             placeholderTextColor="#666"
             onChangeText={(text) => setFullName(text)}
             value={fullName}
           />
-        </View>
+        </Pressable>
 
-        <View style={styles.inputContainer}>
+        <Pressable style={styles.inputContainer} onPress={() => emailInputRef.current?.focus()}>
           <FontAwesome name="envelope" size={18} color="#777" style={styles.inputIcon} />
           <TextInput
+            ref={emailInputRef}
             style={styles.input}
             placeholder="Email address"
             placeholderTextColor="#666"
@@ -121,11 +127,12 @@ const SignUpScreen = () => {
             onChangeText={(text) => setEmail(text)}
             value={email}
           />
-        </View>
+        </Pressable>
 
-        <View style={styles.inputContainer}>
+        <Pressable style={styles.inputContainer} onPress={() => passwordInputRef.current?.focus()}>
           <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
+            ref={passwordInputRef}
             style={styles.input}
             placeholder="Password"
             placeholderTextColor="#666"
@@ -145,11 +152,12 @@ const SignUpScreen = () => {
               color={password ? '#777' : '#C4C4C4'}
             />
           </TouchableOpacity>
-        </View>
+        </Pressable>
 
-        <View style={styles.inputContainer}>
+        <Pressable style={styles.inputContainer} onPress={() => phoneInputRef.current?.focus()}>
           <FontAwesome name="phone" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
+            ref={phoneInputRef}
             style={styles.input}
             placeholder="Phone Number"
             placeholderTextColor="#666"
@@ -157,7 +165,7 @@ const SignUpScreen = () => {
             onChangeText={(text) => setPhoneNumber(text)}
             value={phoneNumber}
           />
-        </View>
+        </Pressable>
 
         {/* <TextInput
           style={styles.input}
@@ -229,6 +237,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#333',
     fontSize: 16,
+    outlineStyle: 'none',
   },
   passwordToggle: {
     paddingLeft: 12,

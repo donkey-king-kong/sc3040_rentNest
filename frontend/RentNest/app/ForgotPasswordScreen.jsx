@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity, Pressable } from 'react-native';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
@@ -11,6 +11,9 @@ const ForgotPasswordScreen = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const emailInputRef = useRef(null);
+  const newPasswordInputRef = useRef(null);
+  const confirmPasswordInputRef = useRef(null);
   const router = useRouter();
 
   const handleResetPassword = async () => {
@@ -70,9 +73,10 @@ const ForgotPasswordScreen = () => {
           Enter your email address and choose a new password to regain access to your account.
         </Text>
 
-        <View style={styles.inputContainer}>
+        <Pressable style={styles.inputContainer} onPress={() => emailInputRef.current?.focus()}>
           <FontAwesome name="envelope" size={18} color="#777" style={styles.inputIcon} />
           <TextInput
+            ref={emailInputRef}
             style={styles.input}
             placeholder="Email address"
             placeholderTextColor="#666"
@@ -81,11 +85,12 @@ const ForgotPasswordScreen = () => {
             onChangeText={(text) => setEmail(text)}
             value={email}
           />
-        </View>
+        </Pressable>
 
-        <View style={styles.inputContainer}>
+        <Pressable style={styles.inputContainer} onPress={() => newPasswordInputRef.current?.focus()}>
           <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
+            ref={newPasswordInputRef}
             style={styles.input}
             placeholder="New password"
             placeholderTextColor="#666"
@@ -105,11 +110,12 @@ const ForgotPasswordScreen = () => {
               color={newPassword ? '#777' : '#C4C4C4'}
             />
           </TouchableOpacity>
-        </View>
+        </Pressable>
 
-        <View style={styles.inputContainer}>
+        <Pressable style={styles.inputContainer} onPress={() => confirmPasswordInputRef.current?.focus()}>
           <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
+            ref={confirmPasswordInputRef}
             style={styles.input}
             placeholder="Confirm new password"
             placeholderTextColor="#666"
@@ -129,7 +135,7 @@ const ForgotPasswordScreen = () => {
               color={confirmPassword ? '#777' : '#C4C4C4'}
             />
           </TouchableOpacity>
-        </View>
+        </Pressable>
       </View>
 
       <View style={styles.bottomContainer}>
@@ -207,6 +213,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#333',
     fontSize: 16,
+    outlineStyle: 'none',
   },
   passwordToggle: {
     paddingLeft: 12,

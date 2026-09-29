@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
@@ -10,6 +10,8 @@ const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
   const router = useRouter();
 
   const handleLogin = async () => {
@@ -91,9 +93,10 @@ const LoginScreen = () => {
       <View style={styles.formContainer}>
         <Text style={styles.title}>Login to your account</Text>
 
-        <View style={styles.inputContainer}>
+        <Pressable style={styles.inputContainer} onPress={() => emailInputRef.current?.focus()}>
           <FontAwesome name="envelope" size={18} color="#777" style={styles.inputIcon} />
           <TextInput
+            ref={emailInputRef}
             style={styles.input}
             placeholder="Email address"
             placeholderTextColor="#666"
@@ -102,11 +105,12 @@ const LoginScreen = () => {
             onChangeText={(text) => setEmail(text)}
             value={email}
           />
-        </View>
+        </Pressable>
 
-        <View style={styles.inputContainer}>
+        <Pressable style={styles.inputContainer} onPress={() => passwordInputRef.current?.focus()}>
           <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
+            ref={passwordInputRef}
             style={styles.input}
             placeholder="Enter your password"
             placeholderTextColor="#666"
@@ -126,7 +130,7 @@ const LoginScreen = () => {
               color={password ? '#777' : '#C4C4C4'}
             />
           </TouchableOpacity>
-        </View>
+        </Pressable>
 
         <TouchableOpacity
           style={styles.forgotPasswordContainer}
@@ -192,6 +196,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#333',
     fontSize: 16,
+    outlineStyle: 'none',
   },
   passwordToggle: {
     paddingLeft: 12,
