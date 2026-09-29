@@ -127,4 +127,20 @@ public class ChatHistoryService {
             throw new RuntimeException("Error occurred while fetching the conversation between users.");
         }
     }
+
+    public List<ChatHistory> getConversationBetweenUsersAfterMessageId(Long userA, Long userB, Long lastMessageId) {
+        try {
+            return chatHistoryRepository.findConversationBetweenUsersAfterMessageId(userA, userB, lastMessageId);
+        } catch (Exception e) {
+            throw new RuntimeException("Error occurred while fetching new conversation messages between users.");
+        }
+    }
+
+    public Long getLatestMessageIdBetweenUsers(Long userA, Long userB) {
+        try {
+            return chatHistoryRepository.findLatestMessageIdBetweenUsers(userA, userB);
+        } catch (Exception e) {
+            throw new RuntimeException("Error occurred while fetching the latest conversation message.");
+        }
+    }
 }

@@ -2,7 +2,9 @@ package RentNest.service;
 
 import RentNest.dto.AiChatSummaryResponseDTO;
 import RentNest.dto.AiChatQuestionResponseDTO;
+import RentNest.model.AiChatSummaryCache;
 import RentNest.model.ChatHistory;
+import RentNest.repository.AiChatSummaryCacheRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -17,9 +19,11 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
@@ -38,6 +42,7 @@ public class AiChatService {
     );
 
     private final ChatHistoryService chatHistoryService;
+    private final AiChatSummaryCacheRepository aiChatSummaryCacheRepository;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
@@ -53,8 +58,9 @@ public class AiChatService {
     @Value("${llm.model:gemini-3.6-flash}")
     private String llmModel;
 
-    public AiChatService(ChatHistoryService chatHistoryService) {
+    public AiChatService(ChatHistoryService chatHistoryService, AiChatSummaryCacheRepository aiChatSummaryCacheRepository) {
         this.chatHistoryService = chatHistoryService;
+        this.aiChatSummaryCacheRepository = aiChatSummaryCacheRepository;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(LLM_CONNECT_TIMEOUT)
                 .build();
@@ -62,7 +68,30 @@ public class AiChatService {
     }
 
     public AiChatSummaryResponseDTO generateChatSummary(Long userA, Long userB) {
-        List<ChatHistory> conversation = chatHistoryService.getConversationBetweenUsers(userA, userB);
+        Long latestMessageId = chatHistoryService.getLatestMessageIdBetweenUsers(userA, userB);
+        Long cacheUserA = Math.min(userA, userB);
+        Long cacheUserB = Math.max(userA, userB);
+        Optional<AiChatSummaryCache> existingCache = aiChatSummaryCacheRepository.findByUserAIdAndUserBId(cacheUserA, cacheUserB);
+
+        if (latestMessageId == null) {
+            logger.info("Using placeholder summary because conversation is empty for userA={}, userB={}", userA, userB);
+            return new AiChatSummaryResponseDTO(
+                    PLACEHOLDER_PREFIX + " No messages found between these users yet.",
+                    true
+            );
+        }
+
+        if (existingCache.isPresent() && latestMessageId.equals(existingCache.get().getLastMessageId())) {
+            logger.info("Returning cached AI chat summary for userA={}, userB={}, lastMessageId={}",
+                    userA,
+                    userB,
+                    latestMessageId);
+            return new AiChatSummaryResponseDTO(existingCache.get().getSummary(), false);
+        }
+
+        List<ChatHistory> conversation = existingCache
+                .map(cache -> chatHistoryService.getConversationBetweenUsersAfterMessageId(userA, userB, cache.getLastMessageId()))
+                .orElseGet(() -> chatHistoryService.getConversationBetweenUsers(userA, userB));
         logger.info("Generating AI chat summary for userA={}, userB={}, messageCount={}, provider={}, model={}",
                 userA,
                 userB,
@@ -70,12 +99,11 @@ public class AiChatService {
                 llmProvider,
                 llmModel);
 
-        if (conversation.isEmpty()) {
-            logger.info("Using placeholder summary because conversation is empty for userA={}, userB={}", userA, userB);
-            return new AiChatSummaryResponseDTO(
-                    PLACEHOLDER_PREFIX + " No messages found between these users yet.",
-                    true
-            );
+        if (conversation.isEmpty() && existingCache.isPresent()) {
+            logger.info("Returning cached AI chat summary because no new messages were found for userA={}, userB={}",
+                    userA,
+                    userB);
+            return new AiChatSummaryResponseDTO(existingCache.get().getSummary(), false);
         }
 
         String configurationIssue = getLlmConfigurationIssue();
@@ -113,12 +141,10 @@ public class AiChatService {
                 Mention the agreed next step, or say No clear next step mentioned.
                 """;
 
-        String prompt = """
-                Chat transcript:
-                %s
-                """.formatted(formatConversation(conversation));
+        String prompt = buildSummaryPrompt(existingCache, conversation);
 
         String summary = callLlm(systemInstruction, prompt);
+        saveSummaryCache(existingCache, cacheUserA, cacheUserB, summary, latestMessageId);
         logger.info("Generated AI chat summary for userA={}, userB={}", userA, userB);
         return new AiChatSummaryResponseDTO(summary, false);
     }
@@ -299,6 +325,48 @@ public class AiChatService {
                 latestSender,
                 latestText
         );
+    }
+
+    private String buildSummaryPrompt(Optional<AiChatSummaryCache> existingCache, List<ChatHistory> conversation) {
+        if (existingCache.isPresent()) {
+            return """
+                    Previous summary:
+                    %s
+
+                    New chat messages after the previous summary:
+                    %s
+
+                    Update the previous summary using only the new chat messages above.
+                    Return the complete updated summary in the required output template.
+                    """.formatted(existingCache.get().getSummary(), formatConversation(conversation));
+        }
+
+        return """
+                Chat transcript:
+                %s
+                """.formatted(formatConversation(conversation));
+    }
+
+    private void saveSummaryCache(
+            Optional<AiChatSummaryCache> existingCache,
+            Long userA,
+            Long userB,
+            String summary,
+            Long latestMessageId
+    ) {
+        AiChatSummaryCache cache = existingCache.orElseGet(AiChatSummaryCache::new);
+        Date now = new Date();
+
+        if (cache.getId() == null) {
+            cache.setUserAId(userA);
+            cache.setUserBId(userB);
+            cache.setCreatedAt(now);
+        }
+
+        cache.setSummary(summary);
+        cache.setLastMessageId(latestMessageId);
+        cache.setUpdatedAt(now);
+        aiChatSummaryCacheRepository.save(cache);
     }
 
     private String formatConversation(List<ChatHistory> conversation) {

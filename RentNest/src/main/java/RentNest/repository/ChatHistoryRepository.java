@@ -27,5 +27,16 @@ public interface ChatHistoryRepository extends JpaRepository<ChatHistory, Long> 
             "(ch.sender.userID = :userB AND ch.receiver.userID = :userA) " +
             "ORDER BY ch.date ASC")
     List<ChatHistory> findConversationBetweenUsers(Long userA, Long userB);
-}
 
+    @Query("SELECT ch FROM ChatHistory ch WHERE " +
+            "((ch.sender.userID = :userA AND ch.receiver.userID = :userB) OR " +
+            "(ch.sender.userID = :userB AND ch.receiver.userID = :userA)) AND " +
+            "ch.messageID > :lastMessageId " +
+            "ORDER BY ch.date ASC")
+    List<ChatHistory> findConversationBetweenUsersAfterMessageId(Long userA, Long userB, Long lastMessageId);
+
+    @Query("SELECT MAX(ch.messageID) FROM ChatHistory ch WHERE " +
+            "(ch.sender.userID = :userA AND ch.receiver.userID = :userB) OR " +
+            "(ch.sender.userID = :userB AND ch.receiver.userID = :userA)")
+    Long findLatestMessageIdBetweenUsers(Long userA, Long userB);
+}
