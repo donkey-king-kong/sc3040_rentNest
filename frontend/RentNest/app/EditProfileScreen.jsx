@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -34,6 +35,7 @@ const EditProfileScreen = () => {
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
   const nameInputRef = useRef(null);
   const contactInputRef = useRef(null);
 
@@ -85,6 +87,10 @@ const EditProfileScreen = () => {
   };
 
   const handleUpdateDetails = async () => {
+    if (isSaving) {
+      return;
+    }
+
     setFieldErrors({});
 
     if (!name.trim()) {
@@ -94,11 +100,13 @@ const EditProfileScreen = () => {
     }
 
     if (!isPhoneNumberValid(contact)) {
+      setFieldErrors({ contact: true });
       Alert.alert("Invalid Phone Number", "Please enter a valid phone number with at least 8 digits.");
       return;
     }
 
     try {
+      setIsSaving(true);
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         navigation.navigate('LandingScreen');
@@ -119,15 +127,14 @@ const EditProfileScreen = () => {
       );
 
       Alert.alert(
-        "Success",
-        "Profile updated successfully",
-        [
-          { text: "OK", onPress: () => navigation.navigate('ProfileScreen') }
-        ]
+        "Profile Updated",
+        "Your profile changes have been saved."
       );
     } catch (error) {
       console.error('Error updating user data:', error);
       Alert.alert('Error', 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -190,10 +197,25 @@ const EditProfileScreen = () => {
             </Pressable>
           </View>
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.button} onPress={handleUpdateDetails}>
-              <Text style={styles.buttonText}>Update Profile</Text>
+            <TouchableOpacity
+              style={[styles.button, isSaving && styles.savingButton]}
+              onPress={handleUpdateDetails}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <View style={styles.savingContent}>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <Text style={styles.buttonText}>Saving...</Text>
+                </View>
+              ) : (
+                <Text style={styles.buttonText}>Update Profile</Text>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.navigate('ProfileScreen')}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => navigation.navigate('ProfileScreen')}
+              disabled={isSaving}
+            >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -287,6 +309,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '700',
+  },
+  savingButton: {
+    opacity: 0.82,
+  },
+  savingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   cancelButton: {
     alignItems: 'center',
