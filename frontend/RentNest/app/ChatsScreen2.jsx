@@ -1033,13 +1033,15 @@ const handlePaymentAndAccept = async () => {
                             multiline={true}
                             blurOnSubmit={false}
                         />
-                        <View style={styles.longBlackButton}>
-                            <TouchableOpacity onPress={askAiQuestion} disabled={isAskingAi}>
-                                <Text style={styles.whiteButtonText}>{isAskingAi ? ' Asking AI... ' : ' Ask AI '}</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity style={styles.aiAskButton} onPress={askAiQuestion} disabled={isAskingAi}>
+                            <Text style={styles.whiteButtonText}>{isAskingAi ? 'Asking AI...' : 'Ask AI'}</Text>
+                        </TouchableOpacity>
                         {aiAnswer !== '' && (
-                            <View style={styles.aiAnswerContainer}>
+                            <ScrollView
+                                style={styles.aiAnswerContainer}
+                                contentContainerStyle={styles.aiAnswerContentContainer}
+                                nestedScrollEnabled={true}
+                            >
                                 {submittedAiQuestion !== '' && (
                                     <View style={styles.aiAskedQuestionContainer}>
                                         <Text style={styles.aiAskedQuestionLabel}>You Asked</Text>
@@ -1047,10 +1049,8 @@ const handlePaymentAndAccept = async () => {
                                     </View>
                                 )}
                                 <Text style={styles.aiAnswerTitle}>{getAiAnswerTitle()}</Text>
-                                <ScrollView style={styles.aiResponseScroll}>
-                                    <Text style={styles.summaryText}>{aiAnswer}</Text>
-                                </ScrollView>
-                            </View>
+                                <Text style={styles.summaryText}>{aiAnswer}</Text>
+                            </ScrollView>
                         )}
                     </View>
                 </View>
@@ -1507,6 +1507,13 @@ const styles = StyleSheet.create({
         maxHeight: '80%',
         flexDirection: 'column',
     },
+    aiAskButton: {
+        backgroundColor: '#000',
+        borderRadius: 10,
+        paddingVertical: 12,
+        alignItems: 'center',
+        marginBottom: 4,
+    },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -1551,10 +1558,6 @@ const styles = StyleSheet.create({
         textAlign: 'left',
         width: '100%',
         marginBottom: 10,
-    },
-    aiResponseScroll: {
-        width: '100%',
-        flex: 1,
     },
     summarySheetBackdrop: {
         position: 'absolute',
@@ -1655,8 +1658,11 @@ const styles = StyleSheet.create({
         backgroundColor: '#f9f9f9',
         borderRadius: 10,
         padding: 12,
-        flex: 1,
-        marginTop: 15,
+        maxHeight: 260,
+        marginTop: 10,
+    },
+    aiAnswerContentContainer: {
+        paddingBottom: 4,
     },
     aiAskedQuestionContainer: {
         backgroundColor: '#efefef',
