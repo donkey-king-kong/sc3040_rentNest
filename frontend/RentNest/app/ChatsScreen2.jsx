@@ -760,8 +760,8 @@ const handlePaymentAndAccept = async () => {
             if (rentalIdExists || requestIdExists) {
                 return (
                     <View key={first.messageID} style={styles.groupContainer}>
-                        <View style={styles.bubbleRowLeft}>
-                            <AvatarCircle photoURL={isUser ? first.senderPhotoURL : partner.photoURL} name={isUser ? 'You' : partner.name} size={30} style={{ marginRight: 8 }} />
+                        <View style={isUser ? styles.bubbleRowRight : styles.bubbleRowLeft}>
+                            {!isUser && <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={30} style={{ marginRight: 8 }} />}
                             <View style={[styles.bubble, styles.bubbleOther, { maxWidth: '80%' }]}>
                                 {rentalIdExists && (
                                     <View style={styles.rentalOfferMessage}>
