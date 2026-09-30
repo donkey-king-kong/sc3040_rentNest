@@ -615,7 +615,7 @@ public class ApiService {
         return "Address not found";
     }
 
-    private String getProjectNameFromPostalCode(String postalCode) {
+    public String getProjectNameFromPostalCode(String postalCode) {
         String geocodeUrl = "https://www.onemap.gov.sg/api/common/elastic/search?searchVal=" + postalCode + "&returnGeom=N&getAddrDetails=Y";
         ResponseEntity<String> response = restTemplate.exchange(geocodeUrl, HttpMethod.GET, null, String.class);
         try {
@@ -632,11 +632,15 @@ public class ApiService {
     }
 
     public List<HDBRentalContract> getHDBRentalContracts(String postalCode, String noOfRoom) {
-        String streetName = getAddressFromPostalCode(postalCode);
-        if (streetName != null && streetName.contains("AVENUE")) {
-            streetName = streetName.replace("AVENUE", "AVE");
-        }
-        String flattype = noOfRoom + "-ROOM";
+        return getHDBRentalContractsByFlatType(postalCode, noOfRoom + "-ROOM");
+    }
+
+    /**
+     * Fetch HDB rental approvals on the same street as the postal code for a given
+     * flat type ("2-ROOM" .. "5-ROOM", "EXECUTIVE").
+     */
+    public List<HDBRentalContract> getHDBRentalContractsByFlatType(String postalCode, String flattype) {
+        String streetName = normaliseHdbStreetName(getAddressFromPostalCode(postalCode));
         String url = "https://data.gov.sg/api/action/datastore_search?resource_id=d_c9f57187485a850908655db0e8cfe651"
                      + "&filters={filter}&limit=1000";
 
@@ -649,6 +653,33 @@ public class ApiService {
         List<HDBRentalContract> rentalContracts = parseHDBRentalContracts(response.getBody());
         rentalContracts.sort((a, b) -> b.getRentApprovalDate().compareTo(a.getRentApprovalDate()));
         return rentalContracts;
+    }
+
+    private static final String[][] HDB_STREET_ABBREVIATIONS = {
+        {"AVENUE", "AVE"}, {"STREET", "ST"}, {"ROAD", "RD"}, {"DRIVE", "DR"}, {"CRESCENT", "CRES"},
+        {"CENTRAL", "CTRL"}, {"NORTH", "NTH"}, {"SOUTH", "STH"}, {"JALAN", "JLN"}, {"LORONG", "LOR"},
+        {"BUKIT", "BT"}, {"UPPER", "UPP"}, {"CLOSE", "CL"}, {"PLACE", "PL"}, {"HEIGHTS", "HTS"},
+        {"TERRACE", "TER"}, {"GARDENS", "GDNS"}, {"PARK", "PK"}, {"KAMPONG", "KG"}, {"MARKET", "MKT"},
+        {"TANJONG", "TG"}, {"COMMONWEALTH", "C'WEALTH"}, {"SAINT", "ST."}
+    };
+
+    /**
+     * OneMap returns full road names ("TAMPINES STREET 21") while the HDB rental dataset
+     * uses HDB's abbreviations ("TAMPINES ST 21"). Rewrite word by word.
+     */
+    public static String normaliseHdbStreetName(String roadName) {
+        if (roadName == null) return null;
+        String[] words = roadName.trim().toUpperCase().split("\\s+");
+        StringBuilder out = new StringBuilder();
+        for (String w : words) {
+            String r = w;
+            for (String[] pair : HDB_STREET_ABBREVIATIONS) {
+                if (w.equals(pair[0])) { r = pair[1]; break; }
+            }
+            if (out.length() > 0) out.append(' ');
+            out.append(r);
+        }
+        return out.toString();
     }
 
     // Parse rental contracts from JSON

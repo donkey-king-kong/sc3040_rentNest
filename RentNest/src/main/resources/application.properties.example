@@ -14,3 +14,11 @@ security.jwt.expiration-time=3600000
 # External APIs
 LTADATAMALL_ACCOUNTKEY=YOUR_API_KEY
 URA_ACCESSKEY=YOUR_API_KEY
+
+# AI fair-price explanations (Google Gemini). Leave the key blank to disable; can also be set as environment variables.
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.8-flash
+
+# AI fair pricing: price listings without enough real comparables from simulated
+# transactions (labelled "DEMO" on the card). On by default; set false to use real data only.
+pricing.demo-data.enabled=true

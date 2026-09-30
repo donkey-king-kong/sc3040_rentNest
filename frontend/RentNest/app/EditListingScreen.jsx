@@ -4,11 +4,14 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import FairPriceCard from '../components/FairPriceCard';
+import useFairPriceEstimate from '../hooks/useFairPriceEstimate';
 
 const EditListingScreen = () => {
     const router = useRouter();
     const { listingId } = useLocalSearchParams();
     const [modalVisible, setModalVisible] = useState(false);
+    const [token, setToken] = useState(null);
     const [listing, setListing] = useState({
         ownerUserID: 1,
         tenantUserID: 2,
@@ -34,6 +37,7 @@ const EditListingScreen = () => {
                     router.replace('/LandingScreen');
                     return;
                 }
+                setToken(token);
 
                 const response = await axios.get(`${API_BASE_URL}/api/listings/${listingId}`, {
                     headers: {
@@ -53,6 +57,16 @@ const EditListingScreen = () => {
 
         fetchListing();
     }, [listingId]);
+
+    // AI Fair-Pricing Model: suggested range updates as the owner edits the form
+    const { estimate: fairPrice, loading: fairPriceLoading } = useFairPriceEstimate({
+        token,
+        type: listing.type,
+        postal: listing.postal,
+        beds: listing.beds,
+        size: listing.size,
+        floor: listing.floor,
+    });
 
     const handleTypeSelect = (type) => {
         setListing({ ...listing, type });
@@ -179,6 +193,15 @@ const EditListingScreen = () => {
                     value={listing.price.toString()}
                     onChangeText={(value) => handleInputChange('price', value)}
                 />
+                {(fairPrice || fairPriceLoading) && (
+                    <FairPriceCard
+                        compact
+                        estimate={fairPrice}
+                        loading={fairPriceLoading}
+                        askingPrice={listing.price}
+                        onUseSuggested={(mid) => handleInputChange('price', String(mid))}
+                    />
+                )}
 
                 {/* Rooms - Bedroom & Bathroom */}
                 <Text style={styles.label}>Rooms</Text>
