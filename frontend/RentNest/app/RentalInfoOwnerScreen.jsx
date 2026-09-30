@@ -5,12 +5,14 @@ import { FontAwesome } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const RentalInfoOwner = () => {
   const router = useRouter();
   const { listingId, refresh } = useLocalSearchParams();
   const [refreshing, setRefreshing] = useState(false);
-  const [listing, setListing] = useState(null); // State to store listing data
+  const [listing, setListing] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Fetch listing details
   const getListingID = async () => {
@@ -21,7 +23,6 @@ const RentalInfoOwner = () => {
         router.replace('/LoginScreen');
         return;
       }
-      console.log("Trying endpoint : GET",`${API_BASE_URL}/api/listings/${listingId}`);
       const response = await axios.get(`${API_BASE_URL}/api/listings/${listingId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -29,20 +30,19 @@ const RentalInfoOwner = () => {
           'Content-Type': 'application/json'
         },
       });
-      console.log("Listings response", response.data);
-      
-      // Add dummy data if tenantId is null
+
       const listingData = response.data;
       if (!listingData.tenantId) {
         listingData.tenantId = 0;
         listingData.tenantName = 'No Tenant yet...';
         listingData.tenantPhotoURL = 'https://media.istockphoto.com/id/1495088043/vector/user-profile-icon-avatar-or-person-icon-profile-picture-portrait-symbol-default-portrait.jpg?s=612x612&w=0&k=20&c=dhV2p1JwmloBTOaGAtaA3AW1KSnjsdMt7-U_3EZElZ0=';
       }
-      
-      setListing(listingData); // Store the fetched data with dummy values if needed
 
+      setListing(listingData);
     } catch (error) {
       console.error('Error fetching listing:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -66,6 +66,15 @@ const RentalInfoOwner = () => {
       router.push({pathname: '/HomeListingScreen', params: { listingId: listing.listingID }});
     }
   };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading rental info...</Text>
+      </View>
+    );
+  }
 
   return (
       <ScrollView style={styles.container}>
@@ -166,7 +175,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    paddingHorizontal: 20, // Padding for entire container
+    paddingHorizontal: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   titleRow: {
     flexDirection: 'row',
