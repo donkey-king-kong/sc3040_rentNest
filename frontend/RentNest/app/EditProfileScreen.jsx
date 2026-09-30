@@ -183,12 +183,6 @@ const EditProfileScreen = () => {
 
   const renderLoadingState = () => (
     <View style={styles.loadingStateContainer}>
-      <TouchableOpacity
-        style={[styles.backButton, styles.loadingBackButton]}
-        onPress={() => router.push('/ProfileScreen')}
-      >
-        <FontAwesome name="chevron-left" size={22} color="#101820" />
-      </TouchableOpacity>
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
         <Text style={styles.loadingText}>Loading profile...</Text>
@@ -205,18 +199,11 @@ const EditProfileScreen = () => {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         {isProfileLoading ? renderLoadingState() : (
           <View style={styles.innerContainer}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.push('/ProfileScreen')}
-              disabled={isSaving}
-            >
-              <FontAwesome name="chevron-left" size={22} color="#101820" />
-            </TouchableOpacity>
-
           <View style={styles.contentContainer}>
             <View style={styles.profileBox}>
               <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
             </View>
+
 
             <Text style={styles.label}>Full Name</Text>
             <Pressable
@@ -314,25 +301,6 @@ const styles = StyleSheet.create({
   loadingStateContainer: {
     flex: 1,
     backgroundColor: '#F7F8FA',
-  },
-  backButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 3,
-  },
-  loadingBackButton: {
-    position: 'absolute',
-    top: 44,
-    left: 22,
-    zIndex: 2,
   },
   contentContainer: {
     flex: 1,
