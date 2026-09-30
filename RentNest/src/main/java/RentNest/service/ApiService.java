@@ -1,6 +1,10 @@
 package RentNest.service;
 
+import RentNest.model.Listings;
 import RentNest.model.api.*;
+import RentNest.repository.ListingsRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -8,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -21,25 +26,55 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Date;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 @Service
 public class ApiService {
 
+    private static final Logger logger = LoggerFactory.getLogger(ApiService.class);
+
     private RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Map<String, double[]> postalCodeCoordinateCache = new ConcurrentHashMap<>();
 
     @Autowired
-    private ListingsService listingsService;
+    private ListingsRepository listingsRepository;
+
+    @Autowired
+    private GeocodingService geocodingService;
+
+    private int getPostalByListingId(Long id) {
+        return listingsRepository.findById(id)
+                .map(Listings::getPostal)
+                .orElseThrow(() -> new IllegalArgumentException("Listing not found with id: " + id));
+    }
+
+    private int getBedsByListingId(Long id) {
+        return listingsRepository.findById(id)
+                .map(Listings::getBeds)
+                .orElseThrow(() -> new IllegalArgumentException("Listing not found with id: " + id));
+    }
+
+    private String getTypeByListingId(Long id) {
+        return listingsRepository.findById(id)
+                .map(Listings::getType)
+                .orElseThrow(() -> new IllegalArgumentException("Listing not found with id: " + id));
+    }
 
     public List<School> getSchoolsByListingId(Long listingId, double radiusMeters) {
-        String postalCode = Integer.toString(listingsService.getPostalByListingId(listingId));
+        String postalCode = Integer.toString(getPostalByListingId(listingId));
         return getSchoolsNearPostalCode(postalCode,radiusMeters);
     }
 
     public List<School> getSchoolsNearPostalCode(String postalCode, double radiusMeters) {
-        // Get latitude and longitude from postal code using OneMap API
+        // Get latitude and longitude from the local postal_code_coordinates table.
         double[] postalCoordinates = getCoordinatesFromPostalCode(postalCode);
+        if (!hasValidCoordinates(postalCoordinates)) {
+            logger.warn("[Coordinates] Skipping nearby schools because postalCode={} could not be resolved", postalCode);
+            return new ArrayList<>();
+        }
         double postalLatitude = postalCoordinates[0];
         double postalLongitude = postalCoordinates[1];
         
@@ -56,6 +91,9 @@ public class ApiService {
         List<School> nearbySchools = new ArrayList<>();
         for (School school : schools) {
             double[] schoolCoordinates = getCoordinatesFromPostalCode(school.getPostalCode());
+            if (!hasValidCoordinates(schoolCoordinates)) {
+                continue;
+            }
             double schoolLatitude = schoolCoordinates[0];
             school.setLatitude(schoolLatitude);
             double schoolLongitude = schoolCoordinates[1];
@@ -96,13 +134,17 @@ public class ApiService {
     }
 
     public List<HawkerCentre> getHawkerCentresByListingId(Long listingId, double radiusMeters) {
-        String postalCode = Integer.toString(listingsService.getPostalByListingId(listingId));
+        String postalCode = Integer.toString(getPostalByListingId(listingId));
         return getHawkerCentresNearPostalCode(postalCode,radiusMeters);
     }
 
     public List<HawkerCentre> getHawkerCentresNearPostalCode(String postalCode, double radiusMeters) {
-        // Get latitude and longitude from postal code using OneMap API
+        // Get latitude and longitude from the local postal_code_coordinates table.
         double[] postalCoordinates = getCoordinatesFromPostalCode(postalCode);
+        if (!hasValidCoordinates(postalCoordinates)) {
+            logger.warn("[Coordinates] Skipping nearby hawker centres because postalCode={} could not be resolved", postalCode);
+            return new ArrayList<>();
+        }
         double postalLatitude = postalCoordinates[0];
         double postalLongitude = postalCoordinates[1];
         
@@ -119,6 +161,9 @@ public class ApiService {
             String hawkerPostalCode = extractHawkerPostalCode(hawkerCentre.getLocationOfCentre());
             if (hawkerPostalCode != null) {
                 double[] hawkerCoordinates = getCoordinatesFromPostalCode(hawkerPostalCode);
+                if (!hasValidCoordinates(hawkerCoordinates)) {
+                    continue;
+                }
                 double hawkerLatitude = hawkerCoordinates[0];
                 hawkerCentre.setLatitude(hawkerLatitude);
                 double hawkerLongitude = hawkerCoordinates[1];
@@ -176,28 +221,48 @@ public class ApiService {
     private String LTADATAMALL_ACCOUNTKEY;
 
     public List<BusStop> getBusStopsByListingId(Long listingId, double radiusMeters) {
-        String postalCode = Integer.toString(listingsService.getPostalByListingId(listingId));
+        String postalCode = Integer.toString(getPostalByListingId(listingId));
+        logger.info("[LTA DataMall] Fetching bus stops for listingId={}, postalCode={}, radiusMeters={}",
+                listingId, postalCode, radiusMeters);
         return getBusStopsNearPostalCode(postalCode,radiusMeters);
     }
 
     public List<BusStop> getBusStopsNearPostalCode(String postalCode, double radiusMeters) {
-        // Get latitude and longitude from postal code using OneMap API
+        // Get latitude and longitude from the local postal_code_coordinates table.
         double[] postalCoordinates = getCoordinatesFromPostalCode(postalCode);
+        if (!hasValidCoordinates(postalCoordinates)) {
+            logger.warn("[Coordinates] Skipping nearby bus stops because postalCode={} could not be resolved", postalCode);
+            return new ArrayList<>();
+        }
         double postalLatitude = postalCoordinates[0];
         double postalLongitude = postalCoordinates[1];
+        logger.info("[LTA DataMall] Postal code {} resolved to latitude={}, longitude={}",
+                postalCode, postalLatitude, postalLongitude);
 
         List<BusStop> busStops = new ArrayList<>();
         int skip = 0;
         boolean hasMoreData = true;
+        boolean hasAccountKey = LTADATAMALL_ACCOUNTKEY != null && !LTADATAMALL_ACCOUNTKEY.trim().isEmpty();
+        logger.info("[LTA DataMall] AccountKey configured={}", hasAccountKey);
 
         // Retrieve all bus stops using $skip parameter
         while (hasMoreData) {
             String url = "https://datamall2.mytransport.sg/ltaodataservice/BusStops?$skip=" + skip;
             HttpHeaders headers = new HttpHeaders();
             headers.set("AccountKey", LTADATAMALL_ACCOUNTKEY);
-            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+            logger.info("[LTA DataMall] Calling BusStops endpoint with skip={}", skip);
+
+            ResponseEntity<String> response;
+            try {
+                response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+            } catch (RestClientException e) {
+                logger.error("[LTA DataMall] BusStops request failed for skip={}: {}", skip, e.getMessage(), e);
+                throw e;
+            }
 
             List<BusStop> partialBusStops = parseBusStops(response.getBody());
+            logger.info("[LTA DataMall] BusStops response skip={} status={} parsedCount={}",
+                    skip, response.getStatusCode(), partialBusStops.size());
             if (partialBusStops.isEmpty()) {
                 hasMoreData = false;
             } else {
@@ -205,6 +270,7 @@ public class ApiService {
                 skip += 500;
             }
         }
+        logger.info("[LTA DataMall] Finished fetching bus stops. totalFetched={}", busStops.size());
         
         // Filter bus stops within radius
         List<BusStop> nearbyBusStops = new ArrayList<>();
@@ -214,6 +280,8 @@ public class ApiService {
                 nearbyBusStops.add(busStop);
             }
         }
+        logger.info("[LTA DataMall] Nearby bus stops found={} within radiusMeters={} for postalCode={}",
+                nearbyBusStops.size(), radiusMeters, postalCode);
         
         return nearbyBusStops;
     }
@@ -241,13 +309,53 @@ public class ApiService {
         return busStops;
     }
 
-    // Function to get latitude and longitude from postal code using OneMap API
+    // Function to get latitude and longitude from the imported OneMap CSV table.
     private double[] getCoordinatesFromPostalCode(String postalCode) {
-        String geocodeUrl = "https://www.onemap.gov.sg/api/common/elastic/search?searchVal=" + postalCode + "&returnGeom=Y&getAddrDetails=N";
-        ResponseEntity<String> response = restTemplate.exchange(geocodeUrl, HttpMethod.GET, null, String.class);
-        double latitude = parseLatitude(response.getBody());
-        double longitude = parseLongitude(response.getBody());
-        return new double[]{latitude, longitude};
+        String normalizedPostalCode = postalCode == null ? "" : postalCode.trim();
+        if (normalizedPostalCode.isEmpty()) {
+            logger.warn("[Coordinates] Cannot resolve blank postal code");
+            return new double[]{0.0, 0.0};
+        }
+
+        double[] cachedCoordinates = postalCodeCoordinateCache.get(normalizedPostalCode);
+        if (cachedCoordinates != null) {
+            logger.debug("[Coordinates] Using cached coordinates for postalCode={}", normalizedPostalCode);
+            return copyCoordinates(cachedCoordinates);
+        }
+
+        return geocodingService.getStoredCoordinates(normalizedPostalCode)
+                .map(coordinates -> {
+                    double[] coordinateArray = new double[]{coordinates.latitude(), coordinates.longitude()};
+                    postalCodeCoordinateCache.put(normalizedPostalCode, copyCoordinates(coordinateArray));
+                    return coordinateArray;
+                })
+                .orElseGet(() -> {
+                    logger.warn("[Coordinates] Postal code {} not found in postal_code_coordinates", normalizedPostalCode);
+                    return new double[]{0.0, 0.0};
+                });
+    }
+
+    private int countOneMapResults(String jsonResponse) {
+        try {
+            JsonNode root = objectMapper.readTree(jsonResponse);
+            JsonNode resultsNode = root.path("results");
+            if (resultsNode.isArray()) {
+                return resultsNode.size();
+            }
+        } catch (IOException e) {
+            logger.warn("[OneMap] Failed to parse postal code lookup response: {}", e.getMessage());
+        }
+        return 0;
+    }
+
+    private boolean hasValidCoordinates(double[] coordinates) {
+        return coordinates != null
+                && coordinates.length == 2
+                && !(coordinates[0] == 0.0 && coordinates[1] == 0.0);
+    }
+
+    private double[] copyCoordinates(double[] coordinates) {
+        return new double[]{coordinates[0], coordinates[1]};
     }
 
     // Parse latitude from OneMap API response
@@ -294,11 +402,11 @@ public class ApiService {
     private String URA_ACCESSKEY;
 
     public List<RentalPrices> getPastRentalPricesByListingId(Long listingId) {
-        String noOfRoom = Integer.toString(listingsService.getBedsByListingId(listingId));
+        String noOfRoom = Integer.toString(getBedsByListingId(listingId));
         List<RentalPrices> rentalPrices;
-        String postalCode = Integer.toString(listingsService.getPostalByListingId(listingId));
+        String postalCode = Integer.toString(getPostalByListingId(listingId));
         String buildingName = getProjectNameFromPostalCode(postalCode);
-        if (listingsService.getTypeByListingId(listingId).equals("HDB")) {
+        if (getTypeByListingId(listingId).equals("HDB")) {
             rentalPrices = getHDBRentalContracts(postalCode, noOfRoom).stream()
                     .map(contract -> new RentalPrices(formatDate(contract.getRentApprovalDate()), contract.getMonthlyRent()))
                     .collect(Collectors.toList());

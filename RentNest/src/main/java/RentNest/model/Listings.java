@@ -33,6 +33,8 @@ public class Listings {
     private String description;
     private boolean flagged;
     private String listingpicture;
+    private Double latitude;
+    private Double longitude;
 
     // Getters
     public Long getListingID() {
@@ -131,6 +133,14 @@ public class Listings {
         return listingpicture;
     }
 
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
     // Setters
     public void setListingID(Long listingID) {
         this.listingID = listingID;
@@ -194,5 +204,13 @@ public class Listings {
 
     public void setListingpicture(String listingpicture) {
         this.listingpicture = listingpicture;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
     }
 }
