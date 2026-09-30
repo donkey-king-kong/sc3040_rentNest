@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     paddingTop: 34,
   },
   loadingContainer: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
