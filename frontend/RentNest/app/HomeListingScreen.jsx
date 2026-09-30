@@ -218,7 +218,10 @@ const HomeListingScreen = () => {
       ]).then(results => {
         results.forEach((result, index) => {
           if (result.status === 'rejected') {
-            console.warn(`Secondary listing request ${index} failed:`, result.reason?.message);
+            const status = result.reason?.response?.status;
+            if (status !== 404) {
+              console.warn(`Secondary listing request ${index} failed:`, result.reason?.message);
+            }
           }
         });
       });
