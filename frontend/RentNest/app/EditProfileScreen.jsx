@@ -196,102 +196,104 @@ const EditProfileScreen = () => {
   );
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}
-      style={styles.container}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        {isProfileLoading ? renderLoadingState() : (
-          <View style={styles.innerContainer}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.push('/ProfileScreen')}
-              disabled={isSaving}
-            >
-              <FontAwesome name="chevron-left" size={22} color="#101820" />
-            </TouchableOpacity>
+    <View style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}
+        style={styles.flex1}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          {isProfileLoading ? renderLoadingState() : (
+            <View style={styles.innerContainer}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => router.push('/ProfileScreen')}
+                disabled={isSaving}
+              >
+                <FontAwesome name="chevron-left" size={22} color="#101820" />
+              </TouchableOpacity>
 
-          <ScrollView style={styles.contentContainer} contentContainerStyle={styles.contentContainerInner} keyboardShouldPersistTaps="handled">
-            <View style={styles.profileBox}>
-              <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
-            </View>
-
-            <Text style={styles.label}>Full Name</Text>
-            <Pressable
-              style={[styles.inputContainer, fieldErrors.name && styles.errorInputContainer]}
-              onPress={() => nameInputRef.current?.focus()}
-            >
-              <TextInput
-                ref={nameInputRef}
-                style={styles.input}
-                value={name}
-                placeholder="Your Name"
-                placeholderTextColor="#8C8C8C"
-                onChangeText={(text) => {
-                  setName(text);
-                  setFieldErrors((previousErrors) => ({ ...previousErrors, name: false }));
-                }}
-              />
-              <FontAwesome name="user" size={22} color="#777" style={styles.inputIcon} />
-            </Pressable>
-
-            <Text style={styles.label}>Email Address</Text>
-            <View style={[styles.inputContainer, styles.disabledInputContainer]}>
-              <Text style={styles.disabledInputText}>{user.email || 'Email address'}</Text>
-              <FontAwesome name="envelope" size={20} color="#777" style={styles.inputIcon} />
-            </View>
-
-            <Text style={styles.label}>Phone Number</Text>
-            <Pressable
-              style={[styles.inputContainer, fieldErrors.contact && styles.errorInputContainer]}
-              onPress={() => contactInputRef.current?.focus()}
-            >
-              <TextInput
-                ref={contactInputRef}
-                style={styles.input}
-                value={contact}
-                placeholder="Phone Number"
-                placeholderTextColor="#8C8C8C"
-                keyboardType="phone-pad"
-                onChangeText={(text) => {
-                  setContact(text);
-                  setFieldErrors((previousErrors) => ({ ...previousErrors, contact: false }));
-                }}
-              />
-              <FontAwesome name="phone" size={22} color="#777" style={styles.inputIcon} />
-            </Pressable>
-          </ScrollView>
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.button, isSaving && styles.savingButton]}
-              onPress={handleUpdateDetails}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <View style={styles.savingContent}>
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                  <Text style={styles.buttonText}>Saving...</Text>
+              <ScrollView style={styles.contentContainer} contentContainerStyle={styles.contentContainerInner} keyboardShouldPersistTaps="handled">
+                <View style={styles.profileBox}>
+                  <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
                 </View>
-              ) : (
-                <Text style={styles.buttonText}>Update Profile</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-          {showProfileUpdated ? (
-            <View style={styles.notificationOverlay} pointerEvents="none">
-              <View style={styles.notificationCard}>
-                <View style={styles.notificationIconBox}>
-                  <Image source={notificationBellIcon} style={styles.notificationIcon} />
+
+                <Text style={styles.label}>Full Name</Text>
+                <Pressable
+                  style={[styles.inputContainer, fieldErrors.name && styles.errorInputContainer]}
+                  onPress={() => nameInputRef.current?.focus()}
+                >
+                  <TextInput
+                    ref={nameInputRef}
+                    style={styles.input}
+                    value={name}
+                    placeholder="Your Name"
+                    placeholderTextColor="#8C8C8C"
+                    onChangeText={(text) => {
+                      setName(text);
+                      setFieldErrors((previousErrors) => ({ ...previousErrors, name: false }));
+                    }}
+                  />
+                  <FontAwesome name="user" size={22} color="#777" style={styles.inputIcon} />
+                </Pressable>
+
+                <Text style={styles.label}>Email Address</Text>
+                <View style={[styles.inputContainer, styles.disabledInputContainer]}>
+                  <Text style={styles.disabledInputText}>{user.email || 'Email address'}</Text>
+                  <FontAwesome name="envelope" size={20} color="#777" style={styles.inputIcon} />
                 </View>
-                <Text style={styles.notificationText}>Profile Updated</Text>
+
+                <Text style={styles.label}>Phone Number</Text>
+                <Pressable
+                  style={[styles.inputContainer, fieldErrors.contact && styles.errorInputContainer]}
+                  onPress={() => contactInputRef.current?.focus()}
+                >
+                  <TextInput
+                    ref={contactInputRef}
+                    style={styles.input}
+                    value={contact}
+                    placeholder="Phone Number"
+                    placeholderTextColor="#8C8C8C"
+                    keyboardType="phone-pad"
+                    onChangeText={(text) => {
+                      setContact(text);
+                      setFieldErrors((previousErrors) => ({ ...previousErrors, contact: false }));
+                    }}
+                  />
+                  <FontAwesome name="phone" size={22} color="#777" style={styles.inputIcon} />
+                </Pressable>
+              </ScrollView>
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[styles.button, isSaving && styles.savingButton]}
+                  onPress={handleUpdateDetails}
+                  disabled={isSaving}
+                >
+                  {isSaving ? (
+                    <View style={styles.savingContent}>
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <Text style={styles.buttonText}>Saving...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.buttonText}>Update Profile</Text>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
-          ) : null}
+          )}
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+      {showProfileUpdated ? (
+        <View style={styles.notificationOverlay} pointerEvents="none">
+          <View style={styles.notificationCard}>
+            <View style={styles.notificationIconBox}>
+              <Image source={notificationBellIcon} style={styles.notificationIcon} />
+            </View>
+            <Text style={styles.notificationText}>Profile Updated</Text>
           </View>
-        )}
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+        </View>
+      ) : null}
+    </View>
   );
 };
 
@@ -299,6 +301,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F7F8FA',
+  },
+  flex1: {
+    flex: 1,
   },
   innerContainer: {
     flex: 1,
@@ -433,12 +438,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
   },
   notificationCard: {
-    width: '100%',
-    maxWidth: 360,
+    width: 220,
     alignItems: 'center',
-    backgroundColor: 'rgba(45, 45, 45, 0.82)',
-    borderRadius: 28,
-    paddingVertical: 28,
+    backgroundColor: 'rgba(45, 45, 45, 0.88)',
+    borderRadius: 20,
+    paddingVertical: 24,
     paddingHorizontal: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 14 },
