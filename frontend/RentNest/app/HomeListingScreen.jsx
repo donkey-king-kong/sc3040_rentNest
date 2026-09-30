@@ -292,7 +292,7 @@ const HomeListingScreen = () => {
   console.log('Rendering main component');
 
   return (
-    <ScrollView style={styles.box}>
+    <ScrollView style={styles.box} contentContainerStyle={{ paddingBottom: 50 }}>
       <Image source={{ uri: listing.imageURL }} style={styles.image} />
       <View style={styles.container}>
         {/* Display the name and address */}
@@ -360,7 +360,9 @@ const HomeListingScreen = () => {
         {/* Map to show nearby places */}
         <MapView
           style={styles.map}
-          region={mapRegion} // Update to use the mapRegion state
+          region={mapRegion}
+          scrollEnabled={false}
+          zoomEnabled={false}
         >
           {data.map((place, index) => (
             <Marker
@@ -503,6 +505,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    padding: 15,
     paddingHorizontal: 20,
     backgroundColor: '#fff',
   },
@@ -601,11 +604,11 @@ const styles = StyleSheet.create({
   },
   placeName: {
     fontSize: 14,
-    marginVertical: 5,
   },
   noPlaces: {
-    fontSize: 14,
-    color: '#7f8c8d',
+    fontSize: 16,
+    color: 'gray',
+    textAlign: 'center',
     marginVertical: 10,
   },
 placesContainer: {
@@ -625,14 +628,6 @@ placesContainer: {
       overflow: 'hidden', // Ensure overflow is hidden
   },
 
-  placeName: {
-    fontSize: 14,
-  },
-  noPlaces: {
-    fontSize: 16,
-    color: 'gray',
-    textAlign: 'center',
-  },
   reviewsContainer: {
       marginVertical: 10,
       paddingHorizontal: 0,
@@ -667,7 +662,7 @@ placesContainer: {
     reviewText: {
       fontSize: 14,
       marginVertical: 5,
-      flexGrow: 1, // Allows text to expand
+      flexGrow: 1,
     },
     userInfo: {
       flexDirection: 'row',
@@ -683,23 +678,17 @@ placesContainer: {
       fontSize: 14,
       color: '#555',
     },
-container: {
-    padding: 15,
-  },
   header: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10,
   },
   reviewContainer: {
-    marginBottom:10,
+    marginBottom: 10,
     padding: 0,
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 5,
-  },
-  reviewText: {
-    fontSize: 16,
   },
   table: {
     borderWidth: 1,
@@ -760,6 +749,7 @@ ownerBox: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 10,
+    width: '100%',
   },
   messageButton: {
       marginTop: 10,
@@ -812,11 +802,6 @@ ownerBox: {
   modalMessage: {
       alignItems: 'left',
     marginVertical: 10,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
   },
   cancelButton: {
     flex: 1,
