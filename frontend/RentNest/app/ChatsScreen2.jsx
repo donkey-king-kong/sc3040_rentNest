@@ -1655,8 +1655,8 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     aiQuestionInputDisabled: {
-        backgroundColor: '#e0e0e0',
-        color: '#aaa',
+        backgroundColor: '#e8e8e8',
+        color: '#555',
     },
     aiAnswerContainer: {
         width: '100%',
