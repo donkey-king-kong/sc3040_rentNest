@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Dimensions, Animated} from 'react-native';
+import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Dimensions} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import { FontAwesome } from '@expo/vector-icons';
 
@@ -44,9 +44,7 @@ const ChatsScreen2 = () => {
     const [Loading, setLoading] = useState(true);
     const chatScrollRef = useRef(null);
     const summaryScrollRef = useRef(null);
-    const summarySheetY = useRef(new Animated.Value(600)).current;
     const [isSummaryModalVisible, setSummaryModalVisible] = useState(false);
-    const [parsedSummary, setParsedSummary] = useState(null);
     const [isGeneratingSummary, setGeneratingSummary] = useState(false);
     const [chatSummary, setChatSummary] = useState('');
     const [summaryError, setSummaryError] = useState('');
@@ -367,10 +365,7 @@ const ChatsScreen2 = () => {
             setSummaryError('');
             setChatSummary(summaryCache.summary);
             setSummaryPlaceholder(summaryCache.placeholder);
-            try { setParsedSummary(JSON.parse(summaryCache.summary)); } catch { setParsedSummary(null); }
-            summarySheetY.setValue(600);
             setSummaryModalVisible(true);
-            Animated.spring(summarySheetY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
             return;
         }
 
@@ -408,24 +403,12 @@ const ChatsScreen2 = () => {
                 summary: generatedSummary,
                 placeholder: isPlaceholderSummary,
             });
-
-            try {
-                setParsedSummary(JSON.parse(generatedSummary));
-            } catch {
-                setParsedSummary(null);
-            }
-
-            summarySheetY.setValue(600);
             setSummaryModalVisible(true);
-            Animated.spring(summarySheetY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
         } catch (error) {
             console.error('Error generating chat summary:', error);
             setSummaryError('Unable to generate chat summary right now.');
             setSummaryPlaceholder(false);
-            setParsedSummary(null);
-            summarySheetY.setValue(600);
             setSummaryModalVisible(true);
-            Animated.spring(summarySheetY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
         } finally {
             setGeneratingSummary(false);
         }
@@ -888,6 +871,8 @@ const handlePaymentAndAccept = async () => {
         );
     }
 
+    const summaryTextToDisplay = summaryError || chatSummary;
+    const shouldScrollSummary = true;
     const shouldScrollAiAnswer = aiAnswer.length > 300;
 
     return (
@@ -951,68 +936,32 @@ const handlePaymentAndAccept = async () => {
             </View>
 
             <Modal
-                animationType="none"
+                animationType="slide"
                 transparent={true}
                 visible={isSummaryModalVisible}
                 onRequestClose={() => setSummaryModalVisible(false)}
             >
-                <TouchableOpacity
-                    style={styles.summarySheetBackdrop}
-                    activeOpacity={1}
-                    onPress={() => setSummaryModalVisible(false)}
-                />
-                <Animated.View style={[styles.summarySheet, { transform: [{ translateY: summarySheetY }] }]}>
-                    <View style={styles.summarySheetHandle} />
-                    <Text style={styles.summarySheetTitle}>AI Chat Summary</Text>
-                    {isSummaryPlaceholder && (
-                        <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
-                    )}
-                    <ScrollView
-                        ref={summaryScrollRef}
-                        style={styles.summarySheetScroll}
-                        onLayout={() => summaryScrollRef.current?.scrollTo({ y: 0, animated: false })}
-                    >
-                        {summaryError ? (
-                            <Text style={styles.summaryText}>{summaryError}</Text>
-                        ) : parsedSummary ? (
-                            <View>
-                                {/* Overview card */}
-                                <View style={styles.summaryCard}>
-                                    <Text style={styles.summaryCardLabel}>Overview</Text>
-                                    <Text style={styles.summaryCardContent}>{parsedSummary.overview}</Text>
-                                </View>
-                                {/* Section cards */}
-                                {(parsedSummary.sections || []).map((section, idx) => (
-                                    <View key={idx} style={styles.summaryCard}>
-                                        <View style={styles.summaryCardHeaderRow}>
-                                            <FontAwesome name={section.icon} size={14} color="#555" style={{ marginRight: 6 }} />
-                                            <Text style={styles.summaryCardLabel}>{section.label}</Text>
-                                        </View>
-                                        {section.rows ? (
-                                            section.rows.map((row, ri) => (
-                                                <View key={ri} style={styles.summaryCardRow}>
-                                                    <Text style={styles.summaryCardRowLabel}>{row.label}</Text>
-                                                    <Text style={styles.summaryCardRowValue}>{row.value}</Text>
-                                                </View>
-                                            ))
-                                        ) : (
-                                            <Text style={styles.summaryCardContent}>{section.content}</Text>
-                                        )}
-                                    </View>
-                                ))}
-                                {/* Next steps card */}
-                                {parsedSummary.next_steps && (
-                                    <View style={[styles.summaryCard, styles.summaryNextStepsCard]}>
-                                        <Text style={[styles.summaryCardLabel, styles.summaryNextStepsLabel]}>Next Steps</Text>
-                                        <Text style={styles.summaryCardContent}>{parsedSummary.next_steps}</Text>
-                                    </View>
-                                )}
-                            </View>
-                        ) : (
-                            <Text style={styles.summaryText}>{chatSummary}</Text>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, styles.aiModalContent]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>AI Chat Summary</Text>
+                            <TouchableOpacity onPress={() => setSummaryModalVisible(false)}>
+                                <Image source={x} style={styles.icon}/>
+                            </TouchableOpacity>
+                        </View>
+                        {isSummaryPlaceholder && (
+                            <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
                         )}
-                    </ScrollView>
-                </Animated.View>
+                        <ScrollView
+                            ref={summaryScrollRef}
+                            style={[styles.aiResponseScroll, shouldScrollSummary && styles.aiResponseScrollLong]}
+                            scrollEnabled={shouldScrollSummary}
+                            onLayout={() => summaryScrollRef.current?.scrollTo({ y: 0, animated: false })}
+                        >
+                            <Text style={styles.summaryText}>{summaryError || chatSummary}</Text>
+                        </ScrollView>
+                    </View>
+                </View>
             </Modal>
 
             <Modal
@@ -1056,7 +1005,10 @@ const handlePaymentAndAccept = async () => {
                                     </View>
                                 )}
                                 <Text style={styles.aiAnswerTitle}>{getAiAnswerTitle()}</Text>
-                                <ScrollView style={styles.aiResponseScroll}>
+                                <ScrollView
+                                    style={[styles.aiResponseScroll, shouldScrollAiAnswer && styles.aiResponseScrollLong]}
+                                    scrollEnabled={shouldScrollAiAnswer}
+                                >
                                     <Text style={styles.summaryText}>{aiAnswer}</Text>
                                 </ScrollView>
                             </View>
@@ -1514,7 +1466,6 @@ const styles = StyleSheet.create({
     aiModalContent: {
         alignItems: 'stretch',
         maxHeight: '80%',
-        flexDirection: 'column',
     },
     modalHeader: {
         flexDirection: 'row',
@@ -1563,93 +1514,10 @@ const styles = StyleSheet.create({
     },
     aiResponseScroll: {
         width: '100%',
-        flex: 1,
-    },
-    summarySheetBackdrop: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.45)',
-    },
-    summarySheet: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        paddingHorizontal: 20,
-        paddingBottom: 32,
-        paddingTop: 12,
-        maxHeight: Dimensions.get('window').height * 0.75,
-    },
-    summarySheetHandle: {
-        width: 40,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: '#ccc',
-        alignSelf: 'center',
-        marginBottom: 14,
-    },
-    summarySheetTitle: {
-        fontSize: 17,
-        fontWeight: '700',
-        marginBottom: 14,
-        color: '#101820',
-    },
-    summarySheetScroll: {
         flexGrow: 0,
     },
-    summaryCard: {
-        backgroundColor: '#f7f7f7',
-        borderRadius: 12,
-        padding: 14,
-        marginBottom: 10,
-    },
-    summaryCardHeaderRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 6,
-    },
-    summaryCardLabel: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#555',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        marginBottom: 4,
-    },
-    summaryCardContent: {
-        fontSize: 14,
-        lineHeight: 20,
-        color: '#101820',
-    },
-    summaryCardRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingVertical: 4,
-        borderBottomWidth: 1,
-        borderBottomColor: '#ececec',
-    },
-    summaryCardRowLabel: {
-        fontSize: 13,
-        color: '#666',
-    },
-    summaryCardRowValue: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#101820',
-    },
-    summaryNextStepsCard: {
-        backgroundColor: '#EFF6FF',
-        borderLeftWidth: 3,
-        borderLeftColor: '#3B82F6',
-    },
-    summaryNextStepsLabel: {
-        color: '#3B82F6',
+    aiResponseScrollLong: {
+        maxHeight: Dimensions.get('window').height * 0.45,
     },
     aiQuestionInput: {
         width: '100%',
@@ -1665,7 +1533,6 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         padding: 12,
         marginTop: 15,
-        flex: 1,
     },
     aiAskedQuestionContainer: {
         backgroundColor: '#efefef',
