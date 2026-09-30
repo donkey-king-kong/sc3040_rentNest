@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useRoute } from '@react-navigation/native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -9,8 +8,7 @@ import { API_BASE_URL } from '../config/api';
 
 const ProcessReviews2 = () => {
   const router = useRouter();
-  const route = useRoute();
-  const { reviewid } = route.params || {};
+  const { reviewid } = useLocalSearchParams();
   const [review, setReview] = useState(null);
 
   useEffect(() => {

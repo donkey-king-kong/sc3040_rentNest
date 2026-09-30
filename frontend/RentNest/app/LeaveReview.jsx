@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, Image } from 'react-native';
 import axios from "axios";
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -9,11 +9,8 @@ import confirmationImage from '../assets/images/confirmation.png';
 import errorImage from '../assets/images/error.png';
 
 const LeaveReview = () => {
-  const route = useRoute();
-  const navigation = useNavigation();
-
-  // Get tenantId, listingId, and ownerId from the route params
-  const { ownerId, listingId, tenantId } = route.params;
+  const router = useRouter();
+  const { ownerId, listingId, tenantId } = useLocalSearchParams();
 
   // Add debug logging for route params
   console.log('Route Params:', { ownerId, listingId, tenantId });
@@ -305,14 +302,9 @@ const LeaveReview = () => {
                   onPress={() => {
                     setModalVisible(false);
                     if (isError && modalMessage.includes("Authentication error")) {
-                      navigation.replace('LoginScreen');
+                      router.replace('/LoginScreen');
                     } else {
-                      // Use the correct parameters
-                      navigation.navigate('RentalInfoTenantScreen', {
-                        listingId: listingId,
-                        tenantId: tenantId,
-                        ownerId: ownerId
-                      });
+                      router.push({ pathname: '/RentalInfoTenantScreen', params: { listingId, tenantId, ownerId } });
                     }
                   }}
               >
