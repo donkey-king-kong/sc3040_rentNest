@@ -109,7 +109,7 @@ const EditProfileScreen = () => {
       return () => {
         isActive = false;
       };
-    }, [navigation])
+    }, [])
   );
 
   useEffect(() => {
