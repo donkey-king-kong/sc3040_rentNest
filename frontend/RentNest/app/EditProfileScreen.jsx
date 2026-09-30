@@ -108,7 +108,7 @@ const EditProfileScreen = () => {
       return () => {
         isActive = false;
       };
-    }, [navigation])
+    }, [router])
   );
 
   useEffect(() => {
