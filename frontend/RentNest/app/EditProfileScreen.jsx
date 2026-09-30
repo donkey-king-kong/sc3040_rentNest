@@ -7,12 +7,12 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  TouchableWithoutFeedback,
-  Keyboard,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
   Pressable,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
@@ -109,7 +109,7 @@ const EditProfileScreen = () => {
       return () => {
         isActive = false;
       };
-    }, [navigation])
+    }, [])
   );
 
   useEffect(() => {
@@ -182,12 +182,6 @@ const EditProfileScreen = () => {
 
   const renderLoadingState = () => (
     <View style={styles.loadingStateContainer}>
-      <TouchableOpacity
-        style={[styles.backButton, styles.loadingBackButton]}
-        onPress={() => router.push('/ProfileScreen')}
-      >
-        <FontAwesome name="chevron-left" size={22} color="#101820" />
-      </TouchableOpacity>
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
         <Text style={styles.loadingText}>Loading profile...</Text>
@@ -196,72 +190,73 @@ const EditProfileScreen = () => {
   );
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}
       style={styles.container}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        {isProfileLoading ? renderLoadingState() : (
-          <View style={styles.innerContainer}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.push('/ProfileScreen')}
-              disabled={isSaving}
-            >
-              <FontAwesome name="chevron-left" size={22} color="#101820" />
-            </TouchableOpacity>
+      {isProfileLoading ? renderLoadingState() : (
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            disabled={isSaving}
+          >
+            <FontAwesome name="chevron-left" size={22} color="#101820" />
+          </TouchableOpacity>
 
-          <View style={styles.contentContainer}>
-            <View style={styles.profileBox}>
-              <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
-            </View>
-
-            <Text style={styles.label}>Full Name</Text>
-            <Pressable
-              style={[styles.inputContainer, fieldErrors.name && styles.errorInputContainer]}
-              onPress={() => nameInputRef.current?.focus()}
-            >
-              <TextInput
-                ref={nameInputRef}
-                style={styles.input}
-                value={name}
-                placeholder="Your Name"
-                placeholderTextColor="#8C8C8C"
-                onChangeText={(text) => {
-                  setName(text);
-                  setFieldErrors((previousErrors) => ({ ...previousErrors, name: false }));
-                }}
-              />
-              <FontAwesome name="user" size={22} color="#777" style={styles.inputIcon} />
-            </Pressable>
-
-            <Text style={styles.label}>Email Address</Text>
-            <View style={[styles.inputContainer, styles.disabledInputContainer]}>
-              <Text style={styles.disabledInputText}>{user.email || 'Email address'}</Text>
-              <FontAwesome name="envelope" size={20} color="#777" style={styles.inputIcon} />
-            </View>
-
-            <Text style={styles.label}>Phone Number</Text>
-            <Pressable
-              style={[styles.inputContainer, fieldErrors.contact && styles.errorInputContainer]}
-              onPress={() => contactInputRef.current?.focus()}
-            >
-              <TextInput
-                ref={contactInputRef}
-                style={styles.input}
-                value={contact}
-                placeholder="Phone Number"
-                placeholderTextColor="#8C8C8C"
-                keyboardType="phone-pad"
-                onChangeText={(text) => {
-                  setContact(text);
-                  setFieldErrors((previousErrors) => ({ ...previousErrors, contact: false }));
-                }}
-              />
-              <FontAwesome name="phone" size={22} color="#777" style={styles.inputIcon} />
-            </Pressable>
+          <View style={styles.profileBox}>
+            <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
           </View>
+
+          <Text style={styles.label}>Full Name</Text>
+          <Pressable
+            style={[styles.inputContainer, fieldErrors.name && styles.errorInputContainer]}
+            onPress={() => nameInputRef.current?.focus()}
+          >
+            <TextInput
+              ref={nameInputRef}
+              style={styles.input}
+              value={name}
+              placeholder="Your Name"
+              placeholderTextColor="#8C8C8C"
+              onChangeText={(text) => {
+                setName(text);
+                setFieldErrors((previousErrors) => ({ ...previousErrors, name: false }));
+              }}
+            />
+            <FontAwesome name="user" size={22} color="#777" style={styles.inputIcon} />
+          </Pressable>
+
+          <Text style={styles.label}>Email Address</Text>
+          <View style={[styles.inputContainer, styles.disabledInputContainer]}>
+            <Text style={styles.disabledInputText}>{user.email || 'Email address'}</Text>
+            <FontAwesome name="envelope" size={20} color="#777" style={styles.inputIcon} />
+          </View>
+
+          <Text style={styles.label}>Phone Number</Text>
+          <Pressable
+            style={[styles.inputContainer, fieldErrors.contact && styles.errorInputContainer]}
+            onPress={() => contactInputRef.current?.focus()}
+          >
+            <TextInput
+              ref={contactInputRef}
+              style={styles.input}
+              value={contact}
+              placeholder="Phone Number"
+              placeholderTextColor="#8C8C8C"
+              keyboardType="phone-pad"
+              onChangeText={(text) => {
+                setContact(text);
+                setFieldErrors((previousErrors) => ({ ...previousErrors, contact: false }));
+              }}
+            />
+            <FontAwesome name="phone" size={22} color="#777" style={styles.inputIcon} />
+          </Pressable>
+
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.button, isSaving && styles.savingButton]}
@@ -278,19 +273,23 @@ const EditProfileScreen = () => {
               )}
             </TouchableOpacity>
           </View>
-          {showProfileUpdated ? (
-            <View style={styles.notificationOverlay} pointerEvents="none">
-              <View style={styles.notificationCard}>
-                <View style={styles.notificationIconBox}>
-                  <Image source={notificationBellIcon} style={styles.notificationIcon} />
-                </View>
-                <Text style={styles.notificationText}>Profile Updated</Text>
-              </View>
+        </ScrollView>
+      )}
+      <Modal
+        visible={showProfileUpdated}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+      >
+        <View style={styles.notificationOverlay} pointerEvents="none">
+          <View style={styles.notificationCard}>
+            <View style={styles.notificationIconBox}>
+              <Image source={notificationBellIcon} style={styles.notificationIcon} />
             </View>
-          ) : null}
+            <Text style={styles.notificationText}>Profile Updated</Text>
           </View>
-        )}
-      </TouchableWithoutFeedback>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -300,14 +299,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F7F8FA',
   },
-  innerContainer: {
-    flex: 1,
+  scrollContent: {
     paddingHorizontal: 22,
-    paddingTop: 44,
-  },
-  loadingStateContainer: {
-    flex: 1,
-    backgroundColor: '#F7F8FA',
+    paddingTop: 34,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 28,
   },
   backButton: {
     width: 52,
@@ -321,19 +316,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 14,
     elevation: 3,
+    marginBottom: 8,
   },
-  loadingBackButton: {
-    position: 'absolute',
-    top: 44,
-    left: 22,
-    zIndex: 2,
-  },
-  contentContainer: {
+  loadingStateContainer: {
     flex: 1,
-    paddingTop: 34,
+    backgroundColor: '#F7F8FA',
   },
   loadingContainer: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -396,7 +386,7 @@ const styles = StyleSheet.create({
     marginLeft: 14,
   },
   buttonContainer: {
-    paddingBottom: Platform.OS === 'ios' ? 34 : 28,
+    marginTop: 32,
   },
   button: {
     height: 68,
@@ -424,10 +414,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   notificationOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   notificationCard: {
     width: '100%',

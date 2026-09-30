@@ -1,6 +1,6 @@
 // Previous imports remain unchanged
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Modal} from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Modal} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import MapView, { Marker } from '../components/AppMap';
 import {useRouter, useLocalSearchParams} from "expo-router";
@@ -218,7 +218,10 @@ const HomeListingScreen = () => {
       ]).then(results => {
         results.forEach((result, index) => {
           if (result.status === 'rejected') {
-            console.warn(`Secondary listing request ${index} failed:`, result.reason?.message);
+            const status = result.reason?.response?.status;
+            if (status !== 404) {
+              console.warn(`Secondary listing request ${index} failed:`, result.reason?.message);
+            }
           }
         });
       });
@@ -286,7 +289,12 @@ const HomeListingScreen = () => {
 
   return (
     <ScrollView style={styles.box}>
-      <Image source={{ uri: listing.imageURL }} style={styles.image} />
+      <View style={styles.imageWrapper}>
+        <Image source={{ uri: listing.imageURL }} style={styles.image} />
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </TouchableOpacity>
+      </View>
       <View style={styles.container}>
         {/* Display the name and address */}
         <Text style={styles.name}>{listing.name}</Text>
@@ -422,16 +430,12 @@ const HomeListingScreen = () => {
                         <Text style={styles.cellHeader}>Lease Date</Text>
                         <Text style={styles.cellHeader}>Rent Price</Text>
                     </View>
-                    <FlatList
-                         data={priceInsights}
-                         keyExtractor={(item) => item.leaseDate}
-                         renderItem={({ item }) => (
-                             <View style={styles.row}>
-                             <Text style={styles.cell}>{item.leaseDate}</Text>
-                             <Text style={styles.cell}>${item.rentPrice}</Text>
-                           </View>
-                         )}
-                     />
+                    {priceInsights.map((item) => (
+                      <View key={item.leaseDate} style={styles.row}>
+                        <Text style={styles.cell}>{item.leaseDate}</Text>
+                        <Text style={styles.cell}>${item.rentPrice}</Text>
+                      </View>
+                    ))}
                 </View>
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
@@ -515,10 +519,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  imageWrapper: {
+    position: 'relative',
+  },
   image: {
     width: '100%',
     height: 250,
     borderRadius: 10,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.85)',
   },
   name: {
     fontSize: 24,
