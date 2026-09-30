@@ -434,7 +434,6 @@ const ChatsScreen2 = () => {
         try {
             setAskingAi(true);
             setSubmittedAiQuestion(questionToAsk);
-            setAiQuestion('');
             setAiAnswer('');
             setAiAnswerCategory('');
             setAiAnswerPlaceholder(false);
@@ -468,6 +467,7 @@ const ChatsScreen2 = () => {
             setAiAnswerPlaceholder(false);
         } finally {
             setAskingAi(false);
+            setAiQuestion('');
         }
     }
 
