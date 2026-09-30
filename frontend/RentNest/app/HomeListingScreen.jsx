@@ -1,10 +1,9 @@
 // Previous imports remain unchanged
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Modal} from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Modal} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import MapView, { Marker } from '../components/AppMap';
-import {useRouter} from "expo-router";
+import {useRouter, useLocalSearchParams} from "expo-router";
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
@@ -15,8 +14,7 @@ const HomeListingScreen = () => {
   console.log('Initializing HomeListingScreen component');
 
   const router = useRouter();
-  const route = useRoute();
-  const { listingId } = route.params;
+  const { listingId } = useLocalSearchParams();
 
   const [listing, setListing] = useState(null);
   const [nearbySchools, setNearbySchools] = useState([]);
@@ -216,6 +214,13 @@ const HomeListingScreen = () => {
               flagged: review.flagged || false
             }));
             setReviews(formattedReviews);
+          })
+          .catch(error => {
+            if (error.response?.status === 404) {
+              setReviews([]);
+            } else {
+              throw error;
+            }
           })
       ]).then(results => {
         results.forEach((result, index) => {
@@ -424,16 +429,12 @@ const HomeListingScreen = () => {
                         <Text style={styles.cellHeader}>Lease Date</Text>
                         <Text style={styles.cellHeader}>Rent Price</Text>
                     </View>
-                    <FlatList
-                         data={priceInsights}
-                         keyExtractor={(item) => item.leaseDate}
-                         renderItem={({ item }) => (
-                             <View style={styles.row}>
-                             <Text style={styles.cell}>{item.leaseDate}</Text>
-                             <Text style={styles.cell}>${item.rentPrice}</Text>
-                           </View>
-                         )}
-                     />
+                    {priceInsights.map((item) => (
+                        <View key={item.leaseDate} style={styles.row}>
+                            <Text style={styles.cell}>{item.leaseDate}</Text>
+                            <Text style={styles.cell}>${item.rentPrice}</Text>
+                        </View>
+                    ))}
                 </View>
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>

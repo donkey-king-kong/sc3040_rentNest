@@ -1,15 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, Alert} from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useLocalSearchParams } from 'expo-router';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {API_BASE_URL} from "../config/api";
 import axios from "axios";
 
 const UserReviewsScreen = () => {
-    const route = useRoute();
-
-    // Extract `userId` from the route parameters
-    const { userId } = route.params || {};
+    const { userId } = useLocalSearchParams();
 
     // Placeholder user data
     // const getRandomAvatar = () => {

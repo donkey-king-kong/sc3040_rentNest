@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, TextInput } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useLocalSearchParams } from 'expo-router';
 
 const UpdateReview = () => {
-    const route = useRoute();
-    const { reviewId, reviewData } = route.params || {};
+    const { reviewId, reviewData } = useLocalSearchParams();
 
     // Placeholder review data if no review data is passed
     const defaultReview = {

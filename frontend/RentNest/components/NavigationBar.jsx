@@ -1,35 +1,32 @@
 import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import { useNavigation, useNavigationState } from '@react-navigation/native';
+import { useRouter, usePathname } from 'expo-router';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
 
 const NavigationBar = () => {
-  const navigation = useNavigation();
-  const currentRouteName = useNavigationState(state => {
-    const route = state.routes[state.index];
-    return route.name;
-  });
+  const router = useRouter();
+  const pathname = usePathname();
 
   const getIconStyle = (route) => ({
     ...styles.icon,
-    color: currentRouteName === route ? '#000' : '#888', // Dark color if active, dimmed if not
+    color: pathname.includes(route) ? '#000' : '#888',
   });
 
   return (
     <View style={styles.navbar}>
-      <TouchableOpacity onPress={() => navigation.navigate('HomeScreen')}>
+      <TouchableOpacity onPress={() => router.push('/HomeScreen')}>
         <FontAwesome name="search" style={getIconStyle('HomeScreen')} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('InboxScreen')}>
+      <TouchableOpacity onPress={() => router.push('/InboxScreen')}>
         <FontAwesome name="inbox" style={getIconStyle('InboxScreen')} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('CreateListingScreen')}>
+      <TouchableOpacity onPress={() => router.push('/CreateListingScreen')}>
         <FontAwesome name="plus-circle" style={getIconStyle('CreateListingScreen')} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('ChatsScreen')}>
+      <TouchableOpacity onPress={() => router.push('/ChatsScreen')}>
         <FontAwesome name="comments" style={getIconStyle('ChatsScreen')} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('ProfileScreen')}>
+      <TouchableOpacity onPress={() => router.push('/ProfileScreen')}>
         <FontAwesome name="user" style={getIconStyle('ProfileScreen')} />
       </TouchableOpacity>
     </View>
