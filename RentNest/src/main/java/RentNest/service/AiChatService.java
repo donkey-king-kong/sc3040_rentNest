@@ -81,16 +81,27 @@ public class AiChatService {
                 - Use only facts explicitly stated in the transcript.
                 - Do not speculate about who is owner or tenant based on names.
                 - Do not comment on funny, odd, duplicated, or confusing names.
-                - Keep every field to one short sentence or less.
-                - Use plain text only. Do not use Markdown, asterisks, hashtags, or bold formatting.
-                - Always output all four sections in the exact format below. Never truncate.
+                - Include only sections that have actual content from the conversation.
+                - Each section value must be one short sentence or a structured list of key-value pairs, nothing longer.
+                - Output valid JSON only. No markdown, no explanation, no trailing text.
 
-                Output exactly this format and nothing else:
-                Summary: <one sentence>
-                Rent/deposit: <details, or Not mentioned>
-                Viewing/move-in: <details, or Not mentioned>
-                Location/amenities: <details, or Not mentioned>
-                Next steps: <one sentence, or No clear next step mentioned>
+                Output a JSON object with these fields:
+                - "overview": always required, one sentence summary of what was discussed
+                - "next_steps": always required, one sentence on what happens next, or "No clear next step mentioned"
+                - "sections": an array of 0-4 objects, each with "label", "icon", and "content"
+                  - Only include a section if that topic was actually discussed
+                  - For structured data (prices, dates), use "rows": [{"label": "...", "value": "..."}] instead of "content"
+                  - Choose "label" and "icon" from this list only:
+                    "Rent & deposit" -> "dollar"
+                    "Viewing & move-in" -> "calendar"
+                    "Location" -> "map-marker"
+                    "Repairs & maintenance" -> "wrench"
+                    "Lease terms" -> "file-text-o"
+                    "Utilities" -> "bolt"
+                    "Legal & disputes" -> "balance-scale"
+
+                Example output:
+                {"overview":"Discussed unit condition and agreed on a weekend viewing.","next_steps":"Tenant will confirm availability by Friday.","sections":[{"label":"Viewing & move-in","icon":"calendar","rows":[{"label":"Viewing","value":"Sat 19 Sep · 2:30 PM"},{"label":"Earliest move-in","value":"Oct 1"}]},{"label":"Location","icon":"map-marker","content":"Blk 18B, #12-04 near bus stop"}]}
                 """;
 
         String prompt = """
