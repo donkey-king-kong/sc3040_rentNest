@@ -6,9 +6,10 @@ import MapView, { Marker } from '../components/AppMap';
 import {useRouter, useLocalSearchParams} from "expo-router";
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import { jwtDecode } from 'jwt-decode';
 import MorphingInfinity from '../components/MorphingInfinity';
+import FairPriceCard from '../components/FairPriceCard';
 
 const HomeListingScreen = () => {
   console.log('Initializing HomeListingScreen component');
@@ -21,6 +22,10 @@ const HomeListingScreen = () => {
   const [nearbyHawkerCentres, setNearbyHawkerCentres] = useState([]);
   const [nearbyBusStops, setNearbyBusStops] = useState([]);
   const [priceInsights, setPriceInsights] = useState([]);
+  const [fairPrice, setFairPrice] = useState(null);
+  const [fairPriceLoading, setFairPriceLoading] = useState(true);
+  const [aiExplanation, setAiExplanation] = useState(null);
+  const [aiExplanationLoading, setAiExplanationLoading] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('Schools');
   const [loading, setLoading] = useState(true);
@@ -114,6 +119,31 @@ const HomeListingScreen = () => {
         };
         console.log('Processed listing data:', defaultListing);
         setListing(defaultListing);
+
+        // AI fair-price estimate (non-blocking: the rest of the page loads while it runs)
+        axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_FOR_LISTING(listingId)}`, {
+          headers: authHeaders(tokenValue)
+        })
+          .then(res => {
+            setFairPrice(res.data);
+            if (!res.data?.available) return;
+            // The AI explanation arrives a few seconds after the bands, so fetch it separately.
+            setAiExplanationLoading(true);
+            axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_EXPLANATION(listingId)}`, {
+              headers: authHeaders(tokenValue)
+            })
+              .then(expRes => setAiExplanation(expRes.data))
+              .catch(err => {
+                console.error('Error fetching AI price explanation:', err?.message);
+                setAiExplanation({ available: false, message: 'Could not reach the AI explanation service.' });
+              })
+              .finally(() => setAiExplanationLoading(false));
+          })
+          .catch(err => {
+            console.error('Error fetching fair price:', err?.message);
+            setFairPrice({ available: false, message: 'Could not reach the pricing service.' });
+          })
+          .finally(() => setFairPriceLoading(false));
 
         // Keep the loading screen visible until all listing sections have finished loading.
         await fetchSecondaryListingData(tokenValue);
@@ -304,6 +334,15 @@ const HomeListingScreen = () => {
 
         {/* Display the apartment type */}
         <Text style={styles.type}>Apartment Type: {listing.type}</Text>
+
+        {/* AI Fair-Pricing Model: how the asking price compares with the market */}
+        <FairPriceCard
+          estimate={fairPrice}
+          loading={fairPriceLoading}
+          askingPrice={listing.price}
+          aiExplanation={aiExplanation}
+          aiExplanationLoading={aiExplanationLoading}
+        />
 
         {/* Gray line above the icons */}
         <View style={styles.line} />
