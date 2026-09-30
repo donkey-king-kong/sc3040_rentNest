@@ -304,7 +304,7 @@ const LeaveReview = () => {
                     if (isError && modalMessage.includes("Authentication error")) {
                       router.replace('/LoginScreen');
                     } else {
-                      router.push({pathname: '/RentalInfoTenantScreen', params: { listingId, tenantId, ownerId }});
+                      router.push({ pathname: '/RentalInfoTenantScreen', params: { listingId, tenantId, ownerId } });
                     }
                   }}
               >

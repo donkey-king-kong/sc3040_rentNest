@@ -103,7 +103,7 @@ const EditListingScreen = () => {
 
     const handleReturnHome = () => {
         setModalVisible(false);
-        router.push({pathname: '/RentalInfoOwnerScreen', params: { listingId }});
+        router.push({ pathname: '/RentalInfoOwnerScreen', params: { listingId } });
     };
 
     return (
