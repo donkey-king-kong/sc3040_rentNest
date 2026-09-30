@@ -1,20 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
 import chatIcon from "../assets/images/chaticon.jpg";
 import { FontAwesome } from '@expo/vector-icons';
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 
 const RentalInfoTenant = () => {
-  const route = useRoute();
-  const navigation = useNavigation();
-  const { listingId, tenantId } = route.params;
+  const router = useRouter();
+  const { listingId, tenantId, refresh } = useLocalSearchParams();
   const [refreshing, setRefreshing] = useState(false);
-  const { refresh } = useLocalSearchParams();
   const [listing, setListing] = useState(null); // State to store listing data
   const [rentals, setRentals] = useState(null); // State to store rentals data
   const [loading, setLoading] = useState(true); // Track loading state
@@ -26,7 +23,7 @@ const RentalInfoTenant = () => {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.log('No token found!');
-        navigation.replace('/LoginScreen');
+        router.replace('/LoginScreen');
         return;
       }
       console.log(`This is the listing ID: ${listingId}`);
@@ -56,7 +53,7 @@ const RentalInfoTenant = () => {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.log('No token found!');
-        navigation.replace('/LoginScreen');
+        router.replace('/LoginScreen');
         return;
       }
       const response = await axios.get(`${API_BASE_URL}/api/payment/tenant-payments/${listingId}/${tenantId}`, {
@@ -89,7 +86,7 @@ const RentalInfoTenant = () => {
   // Function to navigate to RentPayment screen
   const handleRentPayment = () => {
     if (listing && listing.listingID) {
-      navigation.navigate('RentPayment', { listingId: listing.listingID, tenantId: tenantId });
+      router.push({ pathname: '/RentPayment', params: { listingId: listing.listingID, tenantId } });
     } else {
       console.error('Listing ID is missing, cannot navigate to RentPayment');
     }
@@ -99,11 +96,7 @@ const RentalInfoTenant = () => {
   const handleLeaveReview = () => {
     if (listing && listing.ownerId) {
       console.log('Attempting to navigate with:', { ownerId: listing.ownerId, listingId, tenantId });
-      navigation.navigate('LeaveReview', {
-        ownerId: listing.ownerId,  // Pass the correct owner ID
-        listingId: listingId,      // Pass the listing ID
-        tenantId: tenantId,        // Pass tenant ID as well
-      });
+      router.push({ pathname: '/LeaveReview', params: { ownerId: listing.ownerId, listingId, tenantId } });
     } else {
       console.error('Listing information is missing, cannot navigate to LeaveReview');
     }
@@ -117,7 +110,7 @@ const RentalInfoTenant = () => {
           <TouchableOpacity
               style={styles.transparentButton}
               onPress={() => {
-                navigation.navigate('ChatsScreen2', {partnerUserId: listing.ownerId, currentUser: listing.tenantId});
+                router.push({ pathname: '/ChatsScreen2', params: { partnerUserId: listing.ownerId, currentUser: listing.tenantId } });
               }}
           >
             <Image source={chatIcon} style={[styles.icon, styles.lighterIcon]} />

@@ -1,10 +1,9 @@
 // Previous imports remain unchanged
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Modal} from 'react-native';
-import { useRoute } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import MapView, { Marker } from '../components/AppMap';
-import {useRouter} from "expo-router";
+import {useRouter, useLocalSearchParams} from "expo-router";
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
@@ -15,8 +14,7 @@ const HomeListingScreen = () => {
   console.log('Initializing HomeListingScreen component');
 
   const router = useRouter();
-  const route = useRoute();
-  const { listingId } = route.params;
+  const { listingId } = useLocalSearchParams();
 
   const [listing, setListing] = useState(null);
   const [nearbySchools, setNearbySchools] = useState([]);

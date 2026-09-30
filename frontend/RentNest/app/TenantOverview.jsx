@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
-import FontAwesome from 'react-native-vector-icons/FontAwesome';
-import { useRouter } from "expo-router";
+import { FontAwesome } from '@expo/vector-icons';
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -35,10 +34,8 @@ const dummyPayments = [
 ];
 
 const TenantOverview = () => {
-  const route = useRoute();
   const router = useRouter();
-  const navigation = useNavigation();
-  const { tenantId, listingId } = route.params;
+  const { tenantId, listingId } = useLocalSearchParams();
   const [loading, setLoading] = useState(true);
   const [tenant, setTenant] = useState(null);
   const [rental, setRental] = useState(null);
@@ -50,7 +47,7 @@ const TenantOverview = () => {
       try {
         const token = await AsyncStorage.getItem('token');
         if (!token) {
-          navigation.navigate('LandingScreen');
+          router.replace('/LandingScreen');
           return;
         }
 
@@ -142,11 +139,11 @@ const TenantOverview = () => {
   }, [listingId, tenantId]);
 
   const handleTerminateLease = () => {
-    navigation.navigate('TerminateLease', { rentalId: rental.rentalID });
+    router.push({ pathname: '/TerminateLease', params: { rentalId: rental.rentalID } });
   };
 
   const handleLeaveReview = () => {
-    navigation.navigate('LeaveReview', { ownerId: rental.ownerUserId, listingId: listingId, tenantId: tenant.userID }); // Pass any necessary parameters here
+    router.push({ pathname: '/LeaveReview', params: { ownerId: rental.ownerUserId, listingId, tenantId: tenant.userID } });
   };
 
   if (loading) {

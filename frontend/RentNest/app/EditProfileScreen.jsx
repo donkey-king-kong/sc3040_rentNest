@@ -14,7 +14,8 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
@@ -25,7 +26,7 @@ import MorphingInfinity from '../components/MorphingInfinity';
 const notificationBellIcon = require('../assets/images/notificationBell.png');
 
 const EditProfileScreen = () => {
-  const navigation = useNavigation();
+  const router = useRouter();
 
   const [user, setUser] = useState({
     userID: null,
@@ -57,7 +58,7 @@ const EditProfileScreen = () => {
 
           const token = await AsyncStorage.getItem('token');
           if (!token) {
-            navigation.navigate('LandingScreen');
+            router.replace('/LandingScreen');
             return;
           }
 
@@ -95,7 +96,7 @@ const EditProfileScreen = () => {
         } catch (error) {
           console.error('Error fetching user data:', error);
           Alert.alert('Error', 'Failed to load user data');
-          navigation.navigate('LandingScreen');
+          router.replace('/LandingScreen');
         } finally {
           if (isActive) {
             setIsProfileLoading(false);
@@ -147,7 +148,7 @@ const EditProfileScreen = () => {
       setIsSaving(true);
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        navigation.navigate('LandingScreen');
+        router.replace('/LandingScreen');
         return;
       }
 
@@ -183,7 +184,7 @@ const EditProfileScreen = () => {
     <View style={styles.loadingStateContainer}>
       <TouchableOpacity
         style={[styles.backButton, styles.loadingBackButton]}
-        onPress={() => navigation.navigate('ProfileScreen')}
+        onPress={() => router.push('/ProfileScreen')}
       >
         <FontAwesome name="chevron-left" size={22} color="#101820" />
       </TouchableOpacity>
@@ -205,7 +206,7 @@ const EditProfileScreen = () => {
           <View style={styles.innerContainer}>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => navigation.navigate('ProfileScreen')}
+              onPress={() => router.push('/ProfileScreen')}
               disabled={isSaving}
             >
               <FontAwesome name="chevron-left" size={22} color="#101820" />
