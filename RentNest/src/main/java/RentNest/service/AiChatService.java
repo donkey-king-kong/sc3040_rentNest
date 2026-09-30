@@ -5,6 +5,8 @@ import RentNest.dto.AiChatQuestionResponseDTO;
 import RentNest.model.ChatHistory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +25,7 @@ import java.util.zip.GZIPInputStream;
 
 @Service
 public class AiChatService {
+    private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
     private static final String PLACEHOLDER_PREFIX = "[HARDCODED PLACEHOLDER]";
     private static final Duration LLM_CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration LLM_REQUEST_TIMEOUT = Duration.ofSeconds(20);
@@ -82,7 +85,7 @@ public class AiChatService {
                 - Use plain text only. Do not use Markdown, asterisks, hashtags, or bold formatting.
                 - Start directly with "Summary:".
                 - Always include all four sections below.
-                - Keep the full response under 140 words.
+                - Keep the full response under 200 words.
 
                 Required output format:
                 Summary:
@@ -294,7 +297,7 @@ public class AiChatService {
                             )
                     ),
                     "temperature", 0.2,
-                    "max_tokens", 768
+                    "max_tokens", 2000
             );
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -322,7 +325,9 @@ public class AiChatService {
                 throw new RuntimeException("OpenRouter API returned an empty response");
             }
 
-            return textNode.asText().trim();
+            String result = textNode.asText().trim();
+            log.info("[OpenRouter] LLM response:\n{}", result);
+            return result;
         } catch (Exception e) {
             throw new RuntimeException("Unable to call OpenRouter API: " + e.getMessage());
         }
@@ -352,21 +357,17 @@ public class AiChatService {
 
             Map<String, Object> requestBody = Map.of(
                     "systemInstruction", Map.of(
-                            "parts", List.of(
-                                    Map.of("text", systemInstruction)
-                            )
+                            "parts", List.of(Map.of("text", systemInstruction))
                     ),
                     "contents", List.of(
                             Map.of(
                                     "role", "user",
-                                    "parts", List.of(
-                                            Map.of("text", prompt)
-                                    )
+                                    "parts", List.of(Map.of("text", prompt))
                             )
                     ),
                     "generationConfig", Map.of(
                             "temperature", 0.2,
-                            "maxOutputTokens", 768
+                            "maxOutputTokens", 2000
                     )
             );
 
@@ -381,17 +382,21 @@ public class AiChatService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new RuntimeException("Gemini API returned status " + response.statusCode());
+                log.error("[Gemini] HTTP {} error body: {}", response.statusCode(), response.body());
+                throw new RuntimeException("Gemini API returned status " + response.statusCode() + ": " + response.body());
             }
 
             JsonNode responseJson = objectMapper.readTree(response.body());
             JsonNode textNode = responseJson.path("candidates").path(0).path("content").path("parts").path(0).path("text");
 
             if (textNode.isMissingNode() || textNode.asText().isBlank()) {
+                log.error("[Gemini] Unexpected response structure: {}", response.body());
                 throw new RuntimeException("Gemini API returned an empty response");
             }
 
-            return textNode.asText().trim();
+            String result = textNode.asText().trim();
+            log.info("[Gemini] LLM response:\n{}", result);
+            return result;
         } catch (Exception e) {
             throw new RuntimeException("Unable to call Gemini API: " + e.getMessage());
         }

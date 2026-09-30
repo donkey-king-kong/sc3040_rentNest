@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import { FontAwesome } from '@expo/vector-icons';
@@ -42,6 +42,7 @@ const ChatsScreen2 = () => {
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false)
     const [isPaymentSuccessfulModalVisible, setPaymentSuccessfulModalVisible] = useState(false)
     const [Loading, setLoading] = useState(true);
+    const summaryScrollRef = useRef(null);
     const [isSummaryModalVisible, setSummaryModalVisible] = useState(false);
     const [isGeneratingSummary, setGeneratingSummary] = useState(false);
     const [chatSummary, setChatSummary] = useState('');
@@ -946,8 +947,10 @@ const handlePaymentAndAccept = async () => {
                             <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
                         )}
                         <ScrollView
+                            ref={summaryScrollRef}
                             style={[styles.aiResponseScroll, shouldScrollSummary && styles.aiResponseScrollLong]}
                             scrollEnabled={shouldScrollSummary}
+                            onLayout={() => summaryScrollRef.current?.scrollTo({ y: 0, animated: false })}
                         >
                             <Text style={styles.summaryText}>{summaryError || chatSummary}</Text>
                         </ScrollView>
