@@ -13,6 +13,7 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -211,7 +212,7 @@ const EditProfileScreen = () => {
               <FontAwesome name="chevron-left" size={22} color="#101820" />
             </TouchableOpacity>
 
-          <View style={styles.contentContainer}>
+          <ScrollView style={styles.contentContainer} contentContainerStyle={styles.contentContainerInner} keyboardShouldPersistTaps="handled">
             <View style={styles.profileBox}>
               <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
             </View>
@@ -260,7 +261,7 @@ const EditProfileScreen = () => {
               />
               <FontAwesome name="phone" size={22} color="#777" style={styles.inputIcon} />
             </Pressable>
-          </View>
+          </ScrollView>
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.button, isSaving && styles.savingButton]}
@@ -329,7 +330,10 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
+  },
+  contentContainerInner: {
     paddingTop: 34,
+    paddingBottom: 16,
   },
   loadingContainer: {
     ...StyleSheet.absoluteFillObject,
