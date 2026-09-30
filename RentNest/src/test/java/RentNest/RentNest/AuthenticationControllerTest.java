@@ -68,7 +68,7 @@ class AuthenticationControllerTest {
         ResponseEntity<?> response = authenticationController.register(registerUserDto);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals("{message=Invalid user details}", response.getBody());
+        assertEquals(java.util.Map.of("message", "Invalid user details"), response.getBody());
         verify(authenticationService, times(1)).signup(registerUserDto);
     }
 
