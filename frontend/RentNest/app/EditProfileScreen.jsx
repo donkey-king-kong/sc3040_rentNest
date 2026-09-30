@@ -200,6 +200,14 @@ const EditProfileScreen = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            disabled={isSaving}
+          >
+            <FontAwesome name="chevron-left" size={22} color="#101820" />
+          </TouchableOpacity>
+
           <View style={styles.profileBox}>
             <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
           </View>
@@ -295,6 +303,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 34,
     paddingBottom: Platform.OS === 'ios' ? 34 : 28,
+  },
+  backButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
+    marginBottom: 8,
   },
   loadingStateContainer: {
     flex: 1,
