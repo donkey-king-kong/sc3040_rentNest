@@ -1,29 +1,76 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import Button from '../components/button';
+import { useRef, useState } from 'react';
+import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
+import { FontAwesome } from '@expo/vector-icons';
+
+const errorIcon = require('../assets/images/errorIcon.png');
 
 const SignUpScreen = () => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-
-  const router = useRouter();
-  const [error, setError] = useState('');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const pending = useRef(false);
+  const fullNameInputRef = useRef(null);
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+  const phoneInputRef = useRef(null);
+
+  const router = useRouter();
 
   const handleSignUp = async () => {
     if (pending.current) return;
-    setError('');
+    setFormError('');
+    setFieldErrors({});
+
     const cleanEmail = email.trim();
-    if (!fullName.trim()) return setError('Full name is required.');
-    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) return setError('Enter a valid email address.');
-    if (password.length < 6) return setError('Password must be at least 6 characters long.');
-    if (!/^\d{8,}$/.test(phoneNumber.trim())) return setError('Phone number must contain at least 8 digits.');
+    const missingFields = [];
+    const nextFieldErrors = {};
+
+    if (!fullName.trim()) {
+      missingFields.push('full name');
+      nextFieldErrors.fullName = true;
+    }
+    if (!cleanEmail) {
+      missingFields.push('email');
+      nextFieldErrors.email = true;
+    }
+    if (!password) {
+      missingFields.push('password');
+      nextFieldErrors.password = true;
+    }
+    if (!phoneNumber.trim()) {
+      missingFields.push('phone number');
+      nextFieldErrors.phoneNumber = true;
+    }
+    if (missingFields.length > 0) {
+      setFieldErrors(nextFieldErrors);
+      setFormError(`ERROR: Please fill in ${missingFields.join(', ')}.`);
+      return;
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+      setFieldErrors({ email: true });
+      setFormError('ERROR: Email format is invalid.');
+      return;
+    }
+    if (password.length < 6) {
+      setFieldErrors({ password: true });
+      setFormError('ERROR: Password must be at least 6 characters long.');
+      return;
+    }
+    if (!/^\d{8,}$/.test(phoneNumber.trim())) {
+      setFieldErrors({ phoneNumber: true });
+      setFormError('ERROR: Phone number must contain at least 8 digits.');
+      return;
+    }
+
     pending.current = true;
     setSubmitting(true);
     try {
@@ -34,9 +81,16 @@ const SignUpScreen = () => {
     } catch (failure) {
       const data = failure.response?.data;
       const message = typeof data === 'string' ? data : data?.message;
-      setError(message === 'Email already exists'
-        ? 'This email is already registered. Log in with your existing password, or use a different email to create an account.'
-        : typeof message === 'string' ? message : 'Could not create your account. Check your connection and try again.');
+      if (message === 'Email already exists') {
+        setFieldErrors({ email: true });
+        setFormError('ERROR: This email is already registered. Log in instead, or use a different email.');
+      } else if (failure.response) {
+        setFormError(`ERROR: ${typeof message === 'string' && message ? message : 'Could not create account.'}`);
+      } else if (failure.request) {
+        setFormError('ERROR: No response from server. Please check your connection.');
+      } else {
+        setFormError('ERROR: Failed to connect to the server. Please try again.');
+      }
     } finally {
       pending.current = false;
       setSubmitting(false);
@@ -55,66 +109,118 @@ const SignUpScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Sign Up</Text>
-        {error ? <Text accessibilityRole="alert" style={{ color: '#a42020', marginBottom: 16 }}>{error}</Text> : null}
-        <TouchableOpacity onPress={() => router.push({ pathname: '/LoginScreen', params: { email: email.trim() } })}>
-          <Text style={{ color: '#205c43', marginBottom: 20 }}>Already have an account? Log in</Text>
-        </TouchableOpacity>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Full Name"
-          placeholderTextColor="#999"
-          onChangeText={(text) => setFullName(text)}
-          value={fullName}
-        />
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.fullName && styles.errorInputContainer]}
+          onPress={() => fullNameInputRef.current?.focus()}
+        >
+          <FontAwesome name="user" size={20} color="#777" style={styles.inputIcon} />
+          <TextInput
+            ref={fullNameInputRef}
+            style={styles.input}
+            placeholder="Full Name"
+            placeholderTextColor="#666"
+            onChangeText={(text) => {
+              setFullName(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, fullName: false }));
+              setFormError('');
+            }}
+            value={fullName}
+          />
+        </Pressable>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#999"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          onChangeText={(text) => setEmail(text)}
-          value={email}
-        />
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.email && styles.errorInputContainer]}
+          onPress={() => emailInputRef.current?.focus()}
+        >
+          <FontAwesome name="envelope" size={18} color="#777" style={styles.inputIcon} />
+          <TextInput
+            ref={emailInputRef}
+            style={styles.input}
+            placeholder="Email address"
+            placeholderTextColor="#666"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            onChangeText={(text) => {
+              setEmail(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, email: false }));
+              setFormError('');
+            }}
+            value={email}
+          />
+        </Pressable>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#999"
-          secureTextEntry
-          onChangeText={(text) => setPassword(text)}
-          value={password}
-        />
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.password && styles.errorInputContainer]}
+          onPress={() => passwordInputRef.current?.focus()}
+        >
+          <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
+          <TextInput
+            ref={passwordInputRef}
+            style={styles.input}
+            placeholder="Password"
+            placeholderTextColor="#666"
+            secureTextEntry={!isPasswordVisible}
+            onChangeText={(text) => {
+              setPassword(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, password: false }));
+              setFormError('');
+            }}
+            value={password}
+          />
+          <TouchableOpacity
+            style={styles.passwordToggle}
+            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            disabled={!password}
+            accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+          >
+            <FontAwesome
+              name={isPasswordVisible ? 'eye' : 'eye-slash'}
+              size={20}
+              color={password ? '#777' : '#C4C4C4'}
+            />
+          </TouchableOpacity>
+        </Pressable>
 
-        <TextInput
-            style={styles.phoneInput}
+        <Pressable
+          style={[styles.inputContainer, fieldErrors.phoneNumber && styles.errorInputContainer]}
+          onPress={() => phoneInputRef.current?.focus()}
+        >
+          <FontAwesome name="phone" size={22} color="#777" style={styles.inputIcon} />
+          <TextInput
+            ref={phoneInputRef}
+            style={styles.input}
             placeholder="Phone Number"
-            placeholderTextColor="#999"
+            placeholderTextColor="#666"
             keyboardType="phone-pad"
-            onChangeText={(text) => setPhoneNumber(text)}
+            onChangeText={(text) => {
+              setPhoneNumber(text);
+              setFieldErrors((previousErrors) => ({ ...previousErrors, phoneNumber: false }));
+              setFormError('');
+            }}
             value={phoneNumber}
-                  />
+          />
+        </Pressable>
 
-        {/* <TextInput
-          style={styles.input}
-          placeholder="Enter OTP"
-          placeholderTextColor="#999"
-          keyboardType="phone-pad"
-          onChangeText={(text) => setOtp(text)}
-          value={otp}
-        />
-      </ScrollView> */}
+        {formError ? (
+          <View style={styles.errorMessageContainer}>
+            <Image source={errorIcon} style={styles.errorIcon} />
+            <Text style={styles.errorMessageText}>{formError}</Text>
+          </View>
+        ) : null}
       </ScrollView>
 
       <View style={styles.buttonContainer}>
-        <Button
-          title={submitting ? 'Creating account…' : 'Sign Up'}
-          onPress={handleSignUp}
-          backgroundColor="#222222"
-          textColor="#FFFFFF"
-          fontSize={18}
-        />
+        <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp} disabled={submitting}>
+          <Text style={styles.primaryButtonText}>{submitting ? 'Creating account…' : 'Sign Up'}</Text>
+        </TouchableOpacity>
+
+        <View style={styles.signinContainer}>
+          <Text style={styles.signinText}>Already have an account?</Text>
+          <TouchableOpacity onPress={() => router.push({ pathname: '/LoginScreen', params: { email: email.trim() } })}>
+            <Text style={styles.signinLink}>Sign In here</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -123,44 +229,72 @@ const SignUpScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 22,
+    paddingTop: 44,
+    backgroundColor: '#F7F8FA',
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'flex-start',
-    padding: 20,
+    paddingTop: 120,
     paddingBottom: 100, // Added extra padding for bottom space
   },
   title: {
-    fontSize: 20,
+    fontSize: 38,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#101820',
     textAlign: 'center',
-    marginBottom: 20, // Space between title and input fields
+    marginBottom: 58,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 72,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 36,
+    paddingHorizontal: 24,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.04,
+    shadowRadius: 16,
+    elevation: 2,
+  },
+  errorInputContainer: {
+    borderWidth: 1,
+    borderColor: '#E94068',
+    backgroundColor: '#FFF1F4',
+  },
+  inputIcon: {
+    width: 28,
+    marginRight: 14,
   },
   input: {
-    height: 50,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    marginBottom: 10, // Space between input fields
+    flex: 1,
+    color: '#333',
     fontSize: 16,
+    outlineStyle: 'none',
   },
-  phoneContainer: {
-    position: 'relative', // To allow absolute positioning of the button
-    marginBottom: 10,
+  passwordToggle: {
+    paddingLeft: 12,
+    paddingVertical: 12,
   },
-  phoneInput: {
-    height: 50,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 15,
+  errorMessageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  errorIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 8,
+  },
+  errorMessageText: {
+    color: '#E94068',
     fontSize: 16,
-    width: '100%', // Full width for the input
+    fontWeight: '700',
+    flex: 1,
   },
   otpButton: {
     position: 'absolute', // Position the button inside the input
@@ -177,9 +311,41 @@ const styles = StyleSheet.create({
     fontSize: 12, // Smaller font size
   },
   buttonContainer: {
-    paddingBottom: 20, // Space for the button at the bottom
-    marginHorizontal: 20, // Add left and right margin
-    width: '98%'
+    paddingBottom: 34,
+    width: '100%'
+  },
+  primaryButton: {
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#222222',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  signinContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  signinText: {
+    color: '#666',
+    fontSize: 16,
+    marginRight: 8,
+  },
+  signinLink: {
+    color: '#2DAF7D',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

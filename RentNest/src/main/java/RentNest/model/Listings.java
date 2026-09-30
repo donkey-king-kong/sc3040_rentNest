@@ -35,6 +35,8 @@ public class Listings {
     private String description;
     private boolean flagged;
     private String listingpicture;
+    private Double latitude;
+    private Double longitude;
 
     /**
      * Cached AI-generated listing summary (pillar 3). Regenerated only when
@@ -165,6 +167,14 @@ public class Listings {
         return aiSummaryUpdatedAt;
     }
 
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
     // Setters
     public void setListingID(Long listingID) {
         this.listingID = listingID;
@@ -240,5 +250,13 @@ public class Listings {
 
     public void setAiSummaryUpdatedAt(Instant aiSummaryUpdatedAt) {
         this.aiSummaryUpdatedAt = aiSummaryUpdatedAt;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
     }
 }
