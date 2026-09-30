@@ -245,17 +245,13 @@ const HomeListingScreen = () => {
             }));
             setReviews(formattedReviews);
           })
-          .catch(error => {
-            if (error.response?.status === 404) {
-              setReviews([]);
-            } else {
-              throw error;
-            }
-          })
       ]).then(results => {
         results.forEach((result, index) => {
           if (result.status === 'rejected') {
-            console.warn(`Secondary listing request ${index} failed:`, result.reason?.message);
+            const status = result.reason?.response?.status;
+            if (status !== 404) {
+              console.warn(`Secondary listing request ${index} failed:`, result.reason?.message);
+            }
           }
         });
       });
@@ -322,8 +318,13 @@ const HomeListingScreen = () => {
   console.log('Rendering main component');
 
   return (
-    <ScrollView style={styles.box} contentContainerStyle={{ paddingBottom: 50 }}>
-      <Image source={{ uri: listing.imageURL }} style={styles.image} />
+    <ScrollView style={styles.box}>
+      <View style={styles.imageWrapper}>
+        <Image source={{ uri: listing.imageURL }} style={styles.image} />
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </TouchableOpacity>
+      </View>
       <View style={styles.container}>
         {/* Display the name and address */}
         <Text style={styles.name}>{listing.name}</Text>
@@ -399,9 +400,7 @@ const HomeListingScreen = () => {
         {/* Map to show nearby places */}
         <MapView
           style={styles.map}
-          region={mapRegion}
-          scrollEnabled={false}
-          zoomEnabled={false}
+          region={mapRegion} // Update to use the mapRegion state
         >
           {data.map((place, index) => (
             <Marker
@@ -471,10 +470,10 @@ const HomeListingScreen = () => {
                         <Text style={styles.cellHeader}>Rent Price</Text>
                     </View>
                     {priceInsights.map((item) => (
-                        <View key={item.leaseDate} style={styles.row}>
-                            <Text style={styles.cell}>{item.leaseDate}</Text>
-                            <Text style={styles.cell}>${item.rentPrice}</Text>
-                        </View>
+                      <View key={item.leaseDate} style={styles.row}>
+                        <Text style={styles.cell}>{item.leaseDate}</Text>
+                        <Text style={styles.cell}>${item.rentPrice}</Text>
+                      </View>
                     ))}
                 </View>
                 {/* Owner Details Box */}
@@ -544,7 +543,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 15,
     paddingHorizontal: 20,
     backgroundColor: '#fff',
   },
@@ -560,10 +558,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  imageWrapper: {
+    position: 'relative',
+  },
   image: {
     width: '100%',
     height: 250,
     borderRadius: 10,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.85)',
   },
   name: {
     fontSize: 24,
@@ -643,11 +655,11 @@ const styles = StyleSheet.create({
   },
   placeName: {
     fontSize: 14,
+    marginVertical: 5,
   },
   noPlaces: {
-    fontSize: 16,
-    color: 'gray',
-    textAlign: 'center',
+    fontSize: 14,
+    color: '#7f8c8d',
     marginVertical: 10,
   },
 placesContainer: {
@@ -667,6 +679,14 @@ placesContainer: {
       overflow: 'hidden', // Ensure overflow is hidden
   },
 
+  placeName: {
+    fontSize: 14,
+  },
+  noPlaces: {
+    fontSize: 16,
+    color: 'gray',
+    textAlign: 'center',
+  },
   reviewsContainer: {
       marginVertical: 10,
       paddingHorizontal: 0,
@@ -701,7 +721,7 @@ placesContainer: {
     reviewText: {
       fontSize: 14,
       marginVertical: 5,
-      flexGrow: 1,
+      flexGrow: 1, // Allows text to expand
     },
     userInfo: {
       flexDirection: 'row',
@@ -717,17 +737,23 @@ placesContainer: {
       fontSize: 14,
       color: '#555',
     },
+container: {
+    padding: 15,
+  },
   header: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10,
   },
   reviewContainer: {
-    marginBottom: 10,
+    marginBottom:10,
     padding: 0,
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 5,
+  },
+  reviewText: {
+    fontSize: 16,
   },
   table: {
     borderWidth: 1,
@@ -788,7 +814,6 @@ ownerBox: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 10,
-    width: '100%',
   },
   messageButton: {
       marginTop: 10,
@@ -841,6 +866,11 @@ ownerBox: {
   modalMessage: {
       alignItems: 'left',
     marginVertical: 10,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
   },
   cancelButton: {
     flex: 1,
