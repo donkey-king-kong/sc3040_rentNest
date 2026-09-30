@@ -289,7 +289,12 @@ const HomeListingScreen = () => {
 
   return (
     <ScrollView style={styles.box}>
-      <Image source={{ uri: listing.imageURL }} style={styles.image} />
+      <View style={styles.imageWrapper}>
+        <Image source={{ uri: listing.imageURL }} style={styles.image} />
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </TouchableOpacity>
+      </View>
       <View style={styles.container}>
         {/* Display the name and address */}
         <Text style={styles.name}>{listing.name}</Text>
@@ -514,10 +519,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  imageWrapper: {
+    position: 'relative',
+  },
   image: {
     width: '100%',
     height: 250,
     borderRadius: 10,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.85)',
   },
   name: {
     fontSize: 24,
