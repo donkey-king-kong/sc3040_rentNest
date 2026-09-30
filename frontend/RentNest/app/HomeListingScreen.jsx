@@ -1,6 +1,6 @@
 // Previous imports remain unchanged
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Modal} from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Modal} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import MapView, { Marker } from '../components/AppMap';
 import {useRouter, useLocalSearchParams} from "expo-router";
@@ -425,16 +425,12 @@ const HomeListingScreen = () => {
                         <Text style={styles.cellHeader}>Lease Date</Text>
                         <Text style={styles.cellHeader}>Rent Price</Text>
                     </View>
-                    <FlatList
-                         data={priceInsights}
-                         keyExtractor={(item) => item.leaseDate}
-                         renderItem={({ item }) => (
-                             <View style={styles.row}>
-                             <Text style={styles.cell}>{item.leaseDate}</Text>
-                             <Text style={styles.cell}>${item.rentPrice}</Text>
-                           </View>
-                         )}
-                     />
+                    {priceInsights.map((item) => (
+                      <View key={item.leaseDate} style={styles.row}>
+                        <Text style={styles.cell}>{item.leaseDate}</Text>
+                        <Text style={styles.cell}>${item.rentPrice}</Text>
+                      </View>
+                    ))}
                 </View>
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
