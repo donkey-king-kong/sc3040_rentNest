@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { FontAwesome } from 'react-native-vector-icons'; // Import FontAwesome icons
+import { FontAwesome } from '@expo/vector-icons';
 import NavigationBar from '../components/NavigationBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';

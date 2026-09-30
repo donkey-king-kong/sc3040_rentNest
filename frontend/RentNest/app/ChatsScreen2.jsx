@@ -1,7 +1,7 @@
-import {useEffect, useState} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal, TextInput} from 'react-native';
-import { FontAwesome } from '@expo/vector-icons';
+import React, {useEffect, useState} from 'react';
+import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
+import { FontAwesome } from '@expo/vector-icons';
 
 // Import Icons
 import sendIcon from '../assets/images/send.jpg';
@@ -21,17 +21,7 @@ import MorphingInfinity from '../components/MorphingInfinity';
 
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
-
-const Avatar = ({ uri }) => {
-    if (uri) {
-        return <Image source={{ uri }} style={styles.avatar} />;
-    }
-    return (
-        <View style={styles.avatarFallback}>
-            <FontAwesome name="user" size={16} color="#888" />
-        </View>
-    );
-};
+const profilePic = require('../assets/images/chatProfilePic.jpg');
 
 const ChatsScreen2 = () => {
     const router = useRouter();
@@ -52,6 +42,19 @@ const ChatsScreen2 = () => {
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false)
     const [isPaymentSuccessfulModalVisible, setPaymentSuccessfulModalVisible] = useState(false)
     const [Loading, setLoading] = useState(true);
+    const [isSummaryModalVisible, setSummaryModalVisible] = useState(false);
+    const [isGeneratingSummary, setGeneratingSummary] = useState(false);
+    const [chatSummary, setChatSummary] = useState('');
+    const [summaryError, setSummaryError] = useState('');
+    const [isSummaryPlaceholder, setSummaryPlaceholder] = useState(true);
+    const [summaryCache, setSummaryCache] = useState(null);
+    const [isAskAiModalVisible, setAskAiModalVisible] = useState(false);
+    const [aiQuestion, setAiQuestion] = useState('');
+    const [submittedAiQuestion, setSubmittedAiQuestion] = useState('');
+    const [aiAnswer, setAiAnswer] = useState('');
+    const [aiAnswerCategory, setAiAnswerCategory] = useState('');
+    const [isAiAnswerPlaceholder, setAiAnswerPlaceholder] = useState(false);
+    const [isAskingAi, setAskingAi] = useState(false);
     const { refresh } = useLocalSearchParams();
 
     const getConversation = async () => {
@@ -336,6 +339,151 @@ const ChatsScreen2 = () => {
         }
     };
 
+    const getChatSummaryCacheKey = () => {
+        if (!Array.isArray(chat) || chat.length === 0) {
+            return `${partnerUserId}-${currentUser}-empty`;
+        }
+
+        const latestMessage = chat[chat.length - 1];
+        return [
+            partnerUserId,
+            currentUser,
+            chat.length,
+            latestMessage?.messageID || '',
+            latestMessage?.date || '',
+            latestMessage?.senderId || '',
+            latestMessage?.message || '',
+        ].join('|');
+    }
+
+    const getChatSummary = async () => {
+        const cacheKey = getChatSummaryCacheKey();
+
+        if (summaryCache?.key === cacheKey) {
+            setSummaryError('');
+            setChatSummary(summaryCache.summary);
+            setSummaryPlaceholder(summaryCache.placeholder);
+            setSummaryModalVisible(true);
+            return;
+        }
+
+        try {
+            setGeneratingSummary(true);
+            setSummaryError('');
+            setChatSummary('');
+
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                console.log('No token found!');
+                router.replace('/LoginScreen');
+                return;
+            }
+
+            const summaryResponse = await axios.get(`${API_BASE_URL}/api/ai-chat/summary`, {
+                params: {
+                    userA: partnerUserId,
+                    userB: currentUser
+                },
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+            });
+
+            const generatedSummary = summaryResponse.data?.summary || 'No summary available.';
+            const isPlaceholderSummary = summaryResponse.data?.placeholder ?? true;
+
+            setChatSummary(generatedSummary);
+            setSummaryPlaceholder(isPlaceholderSummary);
+            setSummaryCache({
+                key: cacheKey,
+                summary: generatedSummary,
+                placeholder: isPlaceholderSummary,
+            });
+            setSummaryModalVisible(true);
+        } catch (error) {
+            console.error('Error generating chat summary:', error);
+            setSummaryError('Unable to generate chat summary right now.');
+            setSummaryPlaceholder(false);
+            setSummaryModalVisible(true);
+        } finally {
+            setGeneratingSummary(false);
+        }
+    }
+
+    const askAiQuestion = async () => {
+        const questionToAsk = aiQuestion.trim();
+        if (questionToAsk === '') {
+            return;
+        }
+
+        try {
+            setAskingAi(true);
+            setSubmittedAiQuestion(questionToAsk);
+            setAiQuestion('');
+            setAiAnswer('');
+            setAiAnswerCategory('');
+            setAiAnswerPlaceholder(false);
+
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                console.log('No token found!');
+                router.replace('/LoginScreen');
+                return;
+            }
+
+            const askAiResponse = await axios.post(`${API_BASE_URL}/api/ai-chat/ask`, {
+                userA: partnerUserId,
+                userB: currentUser,
+                question: questionToAsk,
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+            });
+
+            setAiAnswer(askAiResponse.data?.answer || 'No AI answer available.');
+            setAiAnswerCategory(askAiResponse.data?.category || '');
+            setAiAnswerPlaceholder(askAiResponse.data?.placeholder ?? true);
+        } catch (error) {
+            console.error('Error asking AI question:', error);
+            setAiAnswer('Unable to ask AI right now.');
+            setAiAnswerCategory('error');
+            setAiAnswerPlaceholder(false);
+        } finally {
+            setAskingAi(false);
+        }
+    }
+
+    const handleAiQuestionKeyPress = (event) => {
+        const nativeEvent = event.nativeEvent || {};
+        if (nativeEvent.key !== 'Enter') {
+            return;
+        }
+
+        if (nativeEvent.shiftKey || nativeEvent.ctrlKey || nativeEvent.metaKey) {
+            return;
+        }
+
+        event.preventDefault?.();
+        askAiQuestion();
+    }
+
+    const getAiAnswerTitle = () => {
+        if (aiAnswerCategory === 'chat_summary') {
+            return 'Chat Summary';
+        }
+
+        if (aiAnswerCategory === 'out_of_scope') {
+            return 'Unable to Answer';
+        }
+
+        return 'AI Response';
+    }
+
     const sendRentalOffer = async() => {
         try{
             const token = await AsyncStorage.getItem('token');
@@ -561,6 +709,23 @@ const handlePaymentAndAccept = async () => {
     const isAccepted = chat.length > 0 ? isPaymentSuccessfulModalVisible : false;
     const isTerminationAccepted = chat.length>0 ? rental.status === "terminated" : false;
 
+    const getInitials = (name) => {
+        if (!name) return '?';
+        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    };
+
+    const AvatarCircle = ({ photoURL, name, size = 30, style }) => {
+        const dim = { width: size, height: size, borderRadius: size / 2 };
+        if (photoURL) {
+            return <Image source={{ uri: photoURL }} style={[dim, style]} />;
+        }
+        return (
+            <View style={[dim, styles.avatarCircle, style]}>
+                <Text style={[styles.avatarInitials, { fontSize: size * 0.38 }]}>{getInitials(name)}</Text>
+            </View>
+        );
+    };
+
     const renderMessage = () => {
         if (!Array.isArray(chat) || chat.length === 0) {
             return (
@@ -570,155 +735,128 @@ const handlePaymentAndAccept = async () => {
             );
         }
 
-        return chat.map((message) => {
-            const isOwner = Number(currentUser) === Number(rental.ownerUserId);
-            const isUser = Number(message.senderId) === Number(currentUser);
-            const rentalIdExists = message.rentalId != null;
-            const requestIdExists = message.requestId != null;
+        const groups = [];
+        chat.forEach((message) => {
+            const last = groups[groups.length - 1];
+            if (last && last[0].senderId === message.senderId && !message.rentalId && !message.requestId && !last[0].rentalId && !last[0].requestId) {
+                last.push(message);
+            } else {
+                groups.push([message]);
+            }
+        });
 
-            if (isOwner && rentalIdExists){
+        return groups.map((group, gi) => {
+            const first = group[0];
+            const isUser = Number(first.senderId) === Number(currentUser);
+            const isOwner = Number(currentUser) === Number(rental.ownerUserId);
+            const rentalIdExists = first.rentalId != null;
+            const requestIdExists = first.requestId != null;
+            const lastMsg = group[group.length - 1];
+            const timestamp = new Date(lastMsg.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            // Special card messages (rental offer / termination)
+            if (rentalIdExists || requestIdExists) {
                 return (
-                    <View key={message.messageID}>
-                        <View key={message.messageID} style={styles.headerContainer}>
-                            <Avatar uri={message?.senderPhotoURL} />
-                            <View style={styles.rentalOfferContainer}>
-                                <View style={styles.headerContainer}>
-                                    <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
-                                    <Text style={styles.date}> {new Date(message.date).toLocaleTimeString()}</Text>
-                                </View>
-                                <View style={styles.rentalOfferMessage}>
-                                    <Text style={styles.rentalOfferTitle}>Rental Offer</Text>
-                                    <Text style={styles.messageText}>Rent: ${rental.rentalPrice} Per Month</Text>
-                                    <Text style={styles.messageText}>Rental Deposit: ${rental.depositPrice}</Text>
-                                    <Text style={styles.messageText}>Lease until {new Date(rental.leaseExpiry).toLocaleDateString()}</Text>
-                                    <View style={styles.pendingAcceptanceBox}>
-                                        <Text style={styles.pendingAcceptanceText}>{isAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
+                    <View key={first.messageID} style={styles.groupContainer}>
+                        <View style={styles.bubbleRowLeft}>
+                            <AvatarCircle photoURL={isUser ? first.senderPhotoURL : partner.photoURL} name={isUser ? 'You' : partner.name} size={30} style={{ marginRight: 8 }} />
+                            <View style={[styles.bubble, styles.bubbleOther, { maxWidth: '80%' }]}>
+                                {rentalIdExists && (
+                                    <View style={styles.rentalOfferMessage}>
+                                        <Text style={styles.rentalOfferTitle}>Rental Offer</Text>
+                                        <Text style={styles.messageText}>Rent: ${rental.rentalPrice} Per Month</Text>
+                                        <Text style={styles.messageText}>Rental Deposit: ${rental.depositPrice}</Text>
+                                        <Text style={styles.messageText}>Lease until {new Date(rental.leaseExpiry).toLocaleDateString()}</Text>
+                                        {isOwner ? (
+                                            <View style={styles.pendingAcceptanceBox}>
+                                                <Text style={styles.pendingAcceptanceText}>{isAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
+                                            </View>
+                                        ) : rental.status === 'active' ? (
+                                            <View style={styles.pendingAcceptanceBox}>
+                                                <Text style={styles.pendingAcceptanceText}>Accepted</Text>
+                                            </View>
+                                        ) : (
+                                            <View style={styles.buttonAlignment}>
+                                                <TouchableOpacity style={styles.pendingRejectBox}>
+                                                    <Text style={styles.rejectText}>Reject</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity onPress={togglePaymentModal} style={styles.pendingAcceptBox}>
+                                                    <Text style={styles.acceptText}>Accept</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
                                     </View>
-                                </View>
+                                )}
+                                {requestIdExists && (
+                                    <View style={styles.rentalOfferMessage}>
+                                        <Text style={styles.rentalOfferTitle}>Termination of Lease Request</Text>
+                                        <Text style={styles.messageText}>Amount to be refunded: ${request.refundAmount}</Text>
+                                        {isUser ? (
+                                            <View style={styles.pendingAcceptanceBox}>
+                                                <Text style={styles.pendingAcceptanceText}>{isTerminationAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
+                                            </View>
+                                        ) : isTerminationAccepted ? (
+                                            <View style={styles.pendingAcceptanceBox}>
+                                                <Text style={styles.pendingAcceptanceText}>Accepted</Text>
+                                            </View>
+                                        ) : (
+                                            <View style={styles.buttonAlignment}>
+                                                <TouchableOpacity style={styles.pendingRejectBox}>
+                                                    <Text style={styles.rejectText}>Reject</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity onPress={acceptRequest} style={styles.pendingAcceptBox}>
+                                                    <Text style={styles.acceptText}>Accept</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
                             </View>
                         </View>
+                        <Text style={styles.groupTimestamp}>{timestamp}</Text>
                     </View>
                 );
             }
-            if (!isOwner && rentalIdExists){
-                return (
-                    <View key={message.messageID}>
-                        <View key={message.messageID} style={styles.headerContainer}>
-                            <Avatar uri={message?.senderPhotoURL} />
-                            <View style={styles.rentalOfferContainer}>
-                                <View style={styles.headerContainer}>
-                                    <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
-                                    <Text style={styles.date}> {new Date(message.date).toLocaleTimeString()}</Text>
-                                </View>
-                                <View style={styles.rentalOfferMessage}>
-                                    <Text style={styles.rentalOfferTitle}>Rental Offer</Text>
-                                    <Text style={styles.messageText}>Rent: ${rental.rentalPrice} Per Month</Text>
-                                    <Text style={styles.messageText}>Rental Deposit: ${rental.depositPrice}</Text>
-                                    <Text style={styles.messageText}>Lease until {new Date(rental.leaseExpiry).toLocaleDateString()}</Text>
-                                    {rental.status === "active" ? (
-                                        <View style={styles.pendingAcceptanceBox}>
-                                            <Text style={styles.pendingAcceptanceText}>Accepted</Text>
-                                        </View>
+
+            // Regular message group
+            return (
+                <View key={`group-${gi}`} style={styles.groupContainer}>
+                    {group.map((message, mi) => {
+                        const showAvatar = !isUser && mi === 0;
+                        const avatarPlaceholder = !isUser && mi > 0;
+                        return (
+                            <View key={message.messageID} style={isUser ? styles.bubbleRowRight : styles.bubbleRowLeft}>
+                                {!isUser && (
+                                    showAvatar ? (
+                                        <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={30} style={{ marginRight: 8 }} />
                                     ) : (
-                                        <View style={styles.buttonAlignment}>
-                                            <TouchableOpacity style={styles.pendingRejectBox}>
-                                                <Text style={styles.rejectText}>Reject</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity onPress={togglePaymentModal} style={styles.pendingAcceptBox}>
-                                                <Text style={styles.acceptText}>Accept</Text>
+                                        <View style={styles.avatarSpacer} />
+                                    )
+                                )}
+                                <View style={[styles.bubble, isUser ? styles.bubbleSelf : styles.bubbleOther]}>
+                                    <Text style={[styles.bubbleText, isUser && styles.bubbleTextSelf]}>{message.message}</Text>
+                                    {message.deliveryStatus === 'sending' && (
+                                        <Text style={styles.sendingText}>Sending...</Text>
+                                    )}
+                                    {message.deliveryStatus === 'failed' && (
+                                        <View style={styles.failedMessageContainer}>
+                                            <Image source={errorIcon} style={styles.errorIcon} />
+                                            <Text style={styles.failedMessageText}>Failed</Text>
+                                            <TouchableOpacity style={styles.retryButton} onPress={() => retryMessage(message)}>
+                                                <Image source={retryButtonIcon} style={styles.retryIcon} />
+                                                <Text style={styles.retryText}>Retry</Text>
                                             </TouchableOpacity>
                                         </View>
                                     )}
                                 </View>
                             </View>
-                        </View>
-                    </View>
-                );
-            }
-            if (isUser && requestIdExists){
-                return (
-                    <View key={message.messageID}>
-                        <View key={message.messageID} style={styles.headerContainer}>
-                            <Avatar uri={message?.senderPhotoURL} />
-                            <View style={styles.rentalOfferContainer}>
-                                <View style={styles.headerContainer}>
-                                    <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
-                                    <Text style={styles.date}> {new Date(message.date).toLocaleTimeString()}</Text>
-                                </View>
-                                <View style={styles.rentalOfferMessage}>
-                                    <Text style={styles.rentalOfferTitle}>Termination of Lease Request</Text>
-                                    <Text style={styles.messageText}>Amount to be refunded: ${request.refundAmount}</Text>
-                                    <View style={styles.pendingAcceptanceBox}>
-                                        <Text style={styles.pendingAcceptanceText}>{isTerminationAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-                );
-            }
-            if (!isUser && requestIdExists){
-                return (
-                    <View key={message.messageID}>
-                        <View key={message.messageID} style={styles.headerContainer}>
-                            <Avatar uri={message?.senderPhotoURL} />
-                            <View style={styles.rentalOfferContainer}>
-                                <View style={styles.headerContainer}>
-                                    <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
-                                    <Text style={styles.date}> {new Date(message.date).toLocaleTimeString()}</Text>
-                                </View>
-                                <View style={styles.rentalOfferMessage}>
-                                    <Text style={styles.rentalOfferTitle}>Termination of Lease Request</Text>
-                                    <Text style={styles.messageText}>Amount to be refunded: ${request.refundAmount}</Text>
-                                    {isTerminationAccepted ?
-                                        <View style={styles.pendingAcceptanceBox}>
-                                            <Text style={styles.pendingAcceptanceText}>{isTerminationAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
-                                        </View> :
-                                        <View style={styles.buttonAlignment}>
-                                        <TouchableOpacity style={styles.pendingRejectBox}>
-                                            <Text style={styles.rejectText}>Reject</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={acceptRequest} style={styles.pendingAcceptBox}>
-                                            <Text style={styles.acceptText}>Accept</Text>
-                                        </TouchableOpacity>
-                                    </View>}
-                                    <Text style={styles.messageText}>The lease termination will proceed immediately if you choose to accept. Please review the termination details stated with your rental agreement.</Text>
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-                );
-            }
-            else {
-                return (
-                    <View key={message.messageID} style={styles.headerContainer}>
-                        <Avatar uri={message?.senderPhotoURL} />
-                        <View style={styles.messageContainer}>
-                            <View style={styles.headerContainer}>
-                                <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
-                                <Text style={styles.date}> {new Date(message.date).toLocaleTimeString()}</Text>
-                            </View>
-                            <Text style={styles.messageText}>{message.message}</Text>
-                            {message.deliveryStatus === 'sending' ? (
-                                <Text style={styles.sendingText}>Sending...</Text>
-                            ) : null}
-                            {message.deliveryStatus === 'failed' ? (
-                                <View style={styles.failedMessageContainer}>
-                                    <Image source={errorIcon} style={styles.errorIcon} />
-                                    <Text style={styles.failedMessageText}>Failed to send</Text>
-                                    <TouchableOpacity
-                                        style={styles.retryButton}
-                                        onPress={() => retryMessage(message)}
-                                    >
-                                        <Image source={retryButtonIcon} style={styles.retryIcon} />
-                                        <Text style={styles.retryText}>Retry</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            ) : null}
-                        </View>
-                    </View>
-                );
-            }
+                        );
+                    })}
+                    <Text style={[styles.groupTimestamp, isUser ? styles.groupTimestampRight : styles.groupTimestampLeft]}>
+                        {timestamp}
+                    </Text>
+                </View>
+            );
         });
     };
 
@@ -731,37 +869,50 @@ const handlePaymentAndAccept = async () => {
         );
     }
 
+    const summaryTextToDisplay = summaryError || chatSummary;
+    const shouldScrollSummary = summaryTextToDisplay.length > 650;
+    const shouldScrollAiAnswer = aiAnswer.length > 650;
+
     return (
         <View style={styles.container}>
-            {/* Header */}
+            {/* Header row 1: back + avatar + name + Reviews */}
             <View style={styles.nameHeaderContainer}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <FontAwesome name="chevron-left" size={18} color="#101820" />
+                </TouchableOpacity>
+                <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={36} style={{ marginRight: 10 }} />
                 <Text style={styles.header}>{partner.name}</Text>
-                <TouchableOpacity onPress={() => {
-                    // Navigate to UserReviewsScreen while passing userId
-                    router.push({pathname: '/UserReviewsScreen', params: { userId: partnerUserId }});
-                }}>
+                <TouchableOpacity
+                    style={styles.reviewsLink}
+                    onPress={() => router.push({ pathname: '/UserReviewsScreen', params: { userId: partnerUserId } })}
+                >
                     <Text style={styles.reviews}>Reviews</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Header row 2: Ask AI + Summarise Chat */}
+            <View style={styles.headerActionsRow}>
+                <TouchableOpacity onPress={() => setAskAiModalVisible(true)} style={styles.aiSummaryButton}>
+                    <Text style={styles.aiSummaryButtonText}>Ask AI</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={getChatSummary} style={styles.aiSummaryButton} disabled={isGeneratingSummary}>
+                    <Text style={styles.aiSummaryButtonText}>{isGeneratingSummary ? 'Summarising...' : 'Summarise Chat'}</Text>
                 </TouchableOpacity>
             </View>
 
             {/* Thin divider */}
             <View style={styles.thinDivider} />
 
-
-            <ScrollView style={styles.chatList}>
+            <ScrollView style={styles.chatList} contentContainerStyle={styles.chatListContent}>
                 {renderMessage()}
             </ScrollView>
 
             <View style={styles.inputContainer}>
-                <TouchableOpacity onPress={toggleAttachmentModal}>
-                    <Image source={paperclip} style={styles.icon}/>
+                <TouchableOpacity style={styles.inputIconButton} onPress={toggleAttachmentModal}>
+                    <FontAwesome name="paperclip" size={20} color="#555" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={toggleFlagModal}>
-                    {isFlagged ? (
-                        <Image source={redFlag} style={styles.icon} />
-                    ) : (
-                        <Image source={flag} style={styles.icon} />
-                    )}
+                <TouchableOpacity style={styles.inputIconButton} onPress={toggleFlagModal}>
+                    <FontAwesome name={isFlagged ? 'flag' : 'flag-o'} size={20} color={isFlagged ? '#E94068' : '#555'} />
                 </TouchableOpacity>
                 <TextInput
                     style={styles.input}
@@ -771,11 +922,91 @@ const handlePaymentAndAccept = async () => {
                     onSubmitEditing={sendMessage}
                     blurOnSubmit={false}
                     returnKeyType="send"
-                    />
-                <TouchableOpacity onPress={sendMessage}>
-                    <Image source={sendIcon} style={styles.icon}/>
+                />
+                <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+                    <FontAwesome name="send" size={16} color="#fff" />
                 </TouchableOpacity>
             </View>
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isSummaryModalVisible}
+                onRequestClose={() => setSummaryModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, styles.aiModalContent]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>AI Chat Summary</Text>
+                            <TouchableOpacity onPress={() => setSummaryModalVisible(false)}>
+                                <Image source={x} style={styles.icon}/>
+                            </TouchableOpacity>
+                        </View>
+                        {isSummaryPlaceholder && (
+                            <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
+                        )}
+                        <ScrollView
+                            style={[styles.aiResponseScroll, shouldScrollSummary && styles.aiResponseScrollLong]}
+                            scrollEnabled={shouldScrollSummary}
+                        >
+                            <Text style={styles.summaryText}>{summaryError || chatSummary}</Text>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isAskAiModalVisible}
+                onRequestClose={() => setAskAiModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, styles.aiModalContent]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Ask AI About This Chat</Text>
+                            <TouchableOpacity onPress={() => setAskAiModalVisible(false)}>
+                                <Image source={x} style={styles.icon}/>
+                            </TouchableOpacity>
+                        </View>
+                        {aiAnswer !== '' && isAiAnswerPlaceholder && (
+                            <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder LLM guardrails.</Text>
+                        )}
+                        <Text style={styles.modalDescription}>Ask questions related to this rental conversation only.</Text>
+                        <TextInput
+                            style={styles.aiQuestionInput}
+                            placeholder="E.g. What is the tenant asking for?"
+                            value={aiQuestion}
+                            onChangeText={setAiQuestion}
+                            onKeyPress={handleAiQuestionKeyPress}
+                            multiline={true}
+                            blurOnSubmit={false}
+                        />
+                        <View style={styles.longBlackButton}>
+                            <TouchableOpacity onPress={askAiQuestion} disabled={isAskingAi}>
+                                <Text style={styles.whiteButtonText}>{isAskingAi ? ' Asking AI... ' : ' Ask AI '}</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {aiAnswer !== '' && (
+                            <View style={styles.aiAnswerContainer}>
+                                {submittedAiQuestion !== '' && (
+                                    <View style={styles.aiAskedQuestionContainer}>
+                                        <Text style={styles.aiAskedQuestionLabel}>You Asked</Text>
+                                        <Text style={styles.aiAskedQuestionText}>{submittedAiQuestion}</Text>
+                                    </View>
+                                )}
+                                <Text style={styles.aiAnswerTitle}>{getAiAnswerTitle()}</Text>
+                                <ScrollView
+                                    style={[styles.aiResponseScroll, shouldScrollAiAnswer && styles.aiResponseScrollLong]}
+                                    scrollEnabled={shouldScrollAiAnswer}
+                                >
+                                    <Text style={styles.summaryText}>{aiAnswer}</Text>
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </Modal>
 
             <Modal
                 animationType="slide"
@@ -968,60 +1199,151 @@ const handlePaymentAndAccept = async () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 20,
+        paddingHorizontal: 16,
+        paddingTop: 12,
         backgroundColor: '#fff',
     },
-    header: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        marginBottom: 10,
-        marginRight: 10,
-    },
-    headerContent:{
-        flex: 1,
-    },
+    // Header row 1
     nameHeaderContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        marginBottom: 10,
     },
-    headerContainer: {
+    backButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F0F0F0',
+        marginRight: 10,
+    },
+    headerAvatarCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#101820',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    headerAvatarInitials: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    header: {
+        flex: 1,
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#101820',
+    },
+    reviewsLink: {
+        marginLeft: 8,
+    },
+    reviews: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        textDecorationLine: 'underline',
+        color: '#101820',
+    },
+    // Header row 2
+    headerActionsRow: {
         flexDirection: 'row',
+        gap: 10,
+        marginBottom: 6,
+    },
+    aiSummaryButton: {
+        flex: 1,
+        backgroundColor: '#101820',
+        borderRadius: 10,
+        paddingVertical: 10,
         alignItems: 'center',
     },
-    roleBox: {
-        backgroundColor: 'black',
-        padding: 5,
-        borderRadius: 5,
-        marginBottom: 5,
-        marginLeft: 80,
-    },
-    roleText: {
+    aiSummaryButtonText: {
         color: '#fff',
+        fontSize: 13,
         fontWeight: 'bold',
     },
     thinDivider: {
         height: 1,
         backgroundColor: '#ddd',
         width: '100%',
-        marginVertical: 10, // Keep margin around thin dividers
+        marginBottom: 8,
     },
-    rentalName:{
-        fontWeight: 'bold',
-        fontSize:15,
-    },
-    rentalText:{
-        fontSize: 10,
-    },
-    text: {
-        fontSize: 14,
-        color: '#666',
-        marginHorizontal: 20,
-        marginBottom: 10,
-    },
+    // Chat list
     chatList: {
-        flex: 1, // Take up all available space
+        flex: 1,
     },
+    chatListContent: {
+        paddingVertical: 8,
+    },
+    // Message groups
+    groupContainer: {
+        marginBottom: 14,
+    },
+    bubbleRowLeft: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        marginBottom: 3,
+    },
+    bubbleRowRight: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginBottom: 3,
+    },
+    avatarCircle: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#555',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
+        flexShrink: 0,
+    },
+    avatarInitials: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    avatarSpacer: {
+        width: 38,
+    },
+    bubble: {
+        maxWidth: '72%',
+        borderRadius: 18,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    bubbleOther: {
+        backgroundColor: '#F0F0F0',
+        borderBottomLeftRadius: 4,
+    },
+    bubbleSelf: {
+        backgroundColor: '#2563EB',
+        borderBottomRightRadius: 4,
+    },
+    bubbleText: {
+        fontSize: 15,
+        color: '#101820',
+        lineHeight: 21,
+    },
+    bubbleTextSelf: {
+        color: '#fff',
+    },
+    groupTimestamp: {
+        fontSize: 11,
+        color: '#999',
+        marginTop: 2,
+    },
+    groupTimestampLeft: {
+        marginLeft: 38,
+    },
+    groupTimestampRight: {
+        textAlign: 'right',
+    },
+    // Loading
     loadingScreen: {
         flex: 1,
         alignItems: 'center',
@@ -1034,92 +1356,89 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '700',
     },
-    messageContainer:{
-        padding: 20,
-    },
-    messageText:{
+    // Delivery status
+    messageText: {
         marginTop: 5,
+        fontSize: 14,
+        color: '#101820',
     },
     sendingText: {
-        marginTop: 6,
-        color: '#777',
-        fontSize: 12,
-        fontWeight: '600',
+        marginTop: 4,
+        color: '#999',
+        fontSize: 11,
     },
     failedMessageContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 8,
+        marginTop: 6,
     },
     errorIcon: {
-        width: 18,
-        height: 18,
-        marginRight: 6,
+        width: 16,
+        height: 16,
+        marginRight: 4,
     },
     failedMessageText: {
         color: '#E94068',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
-        marginRight: 10,
+        marginRight: 8,
     },
     retryButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 10,
         backgroundColor: '#F1F1F1',
     },
     retryIcon: {
-        width: 14,
-        height: 14,
-        marginRight: 4,
+        width: 12,
+        height: 12,
+        marginRight: 3,
     },
     retryText: {
         color: '#101820',
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '700',
     },
-    sender:{
-        fontWeight: 'bold',
-    },
-    avatar: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-    },
-    avatarFallback: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: '#e0e0e0',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    date:{
-        fontSize: 10,
-        marginLeft: 10,
-    },
-    inputContainer:{
+    // Input bar
+    inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
         borderTopWidth: 1,
-        borderTopColor: '#ccc',
-        backgroundColor: '#f9f9f9',
+        borderTopColor: '#eee',
+        backgroundColor: '#fafafa',
+        gap: 6,
+    },
+    inputIconButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: '#F0F0F0',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     input: {
         flex: 1,
         height: 40,
         borderRadius: 20,
-        paddingHorizontal: 15,
-        backgroundColor: '#f1f1f1',
+        paddingHorizontal: 16,
+        backgroundColor: '#F0F0F0',
+        fontSize: 15,
+    },
+    sendButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: '#101820',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     icon: {
         width: 24,
         height: 24,
-        marginLeft: 10,
     },
     modalOverlay: {
         flex: 1,
@@ -1134,6 +1453,10 @@ const styles = StyleSheet.create({
         paddingVertical: 30,
         paddingHorizontal: 20,
         alignItems: 'center',
+    },
+    aiModalContent: {
+        alignItems: 'stretch',
+        maxHeight: '80%',
     },
     modalHeader: {
         flexDirection: 'row',
@@ -1165,6 +1488,64 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
         marginBottom: 10,
+    },
+    placeholderNotice: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 12,
+        color: '#7A4E00',
+    },
+    summaryText: {
+        fontSize: 14,
+        lineHeight: 20,
+        textAlign: 'left',
+        width: '100%',
+        marginBottom: 10,
+    },
+    aiResponseScroll: {
+        width: '100%',
+        flexGrow: 0,
+    },
+    aiResponseScrollLong: {
+        maxHeight: 360,
+    },
+    aiQuestionInput: {
+        width: '100%',
+        backgroundColor: '#f1f1f1',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 15,
+        fontSize: 14,
+    },
+    aiAnswerContainer: {
+        width: '100%',
+        backgroundColor: '#f9f9f9',
+        borderRadius: 10,
+        padding: 12,
+        marginTop: 15,
+    },
+    aiAskedQuestionContainer: {
+        backgroundColor: '#efefef',
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 10,
+    },
+    aiAskedQuestionLabel: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginBottom: 4,
+        color: '#666',
+    },
+    aiAskedQuestionText: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    aiAnswerTitle: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginBottom: 8,
+        color: '#666',
     },
     infoContainer: {
         marginBottom: 10,

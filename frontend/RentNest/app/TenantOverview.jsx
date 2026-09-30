@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -139,11 +139,11 @@ const TenantOverview = () => {
   }, [listingId, tenantId]);
 
   const handleTerminateLease = () => {
-    router.push({pathname: '/TerminateLease', params: { rentalId: rental.rentalID }});
+    router.push({ pathname: '/TerminateLease', params: { rentalId: rental.rentalID } });
   };
 
   const handleLeaveReview = () => {
-    router.push({pathname: '/LeaveReview', params: { ownerId: rental.ownerUserId, listingId, tenantId: tenant.userID }});
+    router.push({ pathname: '/LeaveReview', params: { ownerId: rental.ownerUserId, listingId, tenantId: tenant.userID } });
   };
 
   if (loading) {
