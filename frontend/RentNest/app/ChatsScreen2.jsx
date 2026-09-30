@@ -714,6 +714,18 @@ const handlePaymentAndAccept = async () => {
         return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
     };
 
+    const AvatarCircle = ({ photoURL, name, size = 30, style }) => {
+        const dim = { width: size, height: size, borderRadius: size / 2 };
+        if (photoURL) {
+            return <Image source={{ uri: photoURL }} style={[dim, style]} />;
+        }
+        return (
+            <View style={[dim, styles.avatarCircle, style]}>
+                <Text style={[styles.avatarInitials, { fontSize: size * 0.38 }]}>{getInitials(name)}</Text>
+            </View>
+        );
+    };
+
     const renderMessage = () => {
         if (!Array.isArray(chat) || chat.length === 0) {
             return (
@@ -747,9 +759,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={first.messageID} style={styles.groupContainer}>
                         <View style={styles.bubbleRowLeft}>
-                            <View style={styles.avatarCircle}>
-                                <Text style={styles.avatarInitials}>{getInitials(isUser ? 'You' : partner.name)}</Text>
-                            </View>
+                            <AvatarCircle photoURL={isUser ? first.senderPhotoURL : partner.photoURL} name={isUser ? 'You' : partner.name} size={30} style={{ marginRight: 8 }} />
                             <View style={[styles.bubble, styles.bubbleOther, { maxWidth: '80%' }]}>
                                 {rentalIdExists && (
                                     <View style={styles.rentalOfferMessage}>
@@ -818,9 +828,7 @@ const handlePaymentAndAccept = async () => {
                             <View key={message.messageID} style={isUser ? styles.bubbleRowRight : styles.bubbleRowLeft}>
                                 {!isUser && (
                                     showAvatar ? (
-                                        <View style={styles.avatarCircle}>
-                                            <Text style={styles.avatarInitials}>{getInitials(partner.name)}</Text>
-                                        </View>
+                                        <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={30} style={{ marginRight: 8 }} />
                                     ) : (
                                         <View style={styles.avatarSpacer} />
                                     )
@@ -872,9 +880,7 @@ const handlePaymentAndAccept = async () => {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <FontAwesome name="chevron-left" size={18} color="#101820" />
                 </TouchableOpacity>
-                <View style={styles.headerAvatarCircle}>
-                    <Text style={styles.headerAvatarInitials}>{getInitials(partner.name)}</Text>
-                </View>
+                <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={36} style={{ marginRight: 10 }} />
                 <Text style={styles.header}>{partner.name}</Text>
                 <TouchableOpacity
                     style={styles.reviewsLink}
