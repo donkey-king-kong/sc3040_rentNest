@@ -10,8 +10,7 @@ import {
   Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import {useNavigation, useRoute} from "@react-navigation/native";
-import {useLocalSearchParams} from "expo-router";
+import {useLocalSearchParams, useRouter} from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
@@ -20,11 +19,9 @@ import {ActivityIndicator} from "react-native"; // Assuming you're using Expo fo
 
 // Rent Payment Screen
 const RentPaymentScreen = () => {
-  const route = useRoute();
-  const navigation = useNavigation();
-  const { listingId , tenantId } = route.params;
+  const router = useRouter();
+  const { listingId, tenantId, refresh } = useLocalSearchParams();
   const [refreshing, setRefreshing] = useState(false);
-  const { refresh } = useLocalSearchParams();
   const [paymentHistory, setPaymentHistory] = useState(null); // State to store listing data
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isPaymentSuccessful, setIsPaymentSuccessful] = useState(false);
@@ -40,7 +37,7 @@ const RentPaymentScreen = () => {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.log('No token found!');
-        navigation.replace('/LoginScreen');
+        router.replace('/LoginScreen');
         return;
       }
       console.log(`Fetching payment history for listing ID: ${listingId}, tenant ID: ${tenantId}`);
@@ -93,7 +90,7 @@ const RentPaymentScreen = () => {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.log('No token found!');
-        navigation.replace('/LoginScreen');
+        router.replace('/LoginScreen');
         return;
       }
 

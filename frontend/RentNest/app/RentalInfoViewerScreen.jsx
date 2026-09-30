@@ -1,18 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 const RentalInfoViewer = () => {
-  const route = useRoute();
-  const navigation = useNavigation();
-  const { listingId } = route.params;
+  const router = useRouter();
+  const { listingId, refresh } = useLocalSearchParams();
   const [refreshing, setRefreshing] = useState(false);
-  const { refresh } = useLocalSearchParams();
   const [listing, setListing] = useState(null); // State to store listing data
 
   // Fetch listing details
@@ -21,7 +18,7 @@ const RentalInfoViewer = () => {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.log('No token found!');
-        navigation.replace('/LoginScreen');
+        router.replace('/LoginScreen');
         return;
       }
       const response = await axios.get(`${API_BASE_URL}/api/listings/${listingId}`, {
@@ -53,7 +50,7 @@ const RentalInfoViewer = () => {
   // Navigate to HomeListingScreen
   const handleShowRentalListing = () => {
     if (listing) {
-      navigation.navigate('HomeListingScreen', { listingId: listing.listingID });
+      router.push({pathname: '/HomeListingScreen', params: { listingId: listing.listingID }});
     }
   };
 
