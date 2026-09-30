@@ -34,6 +34,7 @@ export const API_BASE_URL = getApiBaseUrl();
 export const ENDPOINTS = {
     LOGIN: '/auth/login',
     SIGNUP: '/auth/signup',
+    RESET_PASSWORD: '/auth/reset-password',
     LISTINGS: "/api/listings",
     RENTALS: '/api/rentals',
     PAYMENTS: '/api/payment',

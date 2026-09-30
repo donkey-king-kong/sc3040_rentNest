@@ -1,7 +1,7 @@
-import React, {useEffect, useState} from 'react';
+import {useEffect, useState} from 'react';
 import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native'; // Import useRoute for accessing route parameters
-import {useLocalSearchParams, useRouter} from "expo-router";
+import {useLocalSearchParams} from "expo-router";
 
 // Import Icons
 import sendIcon from '../assets/images/send.jpg';
@@ -17,11 +17,14 @@ import amex from "../assets/images/amex.jpg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
-import { jwtDecode } from 'jwt-decode';
+import MorphingInfinity from '../components/MorphingInfinity';
+
+const errorIcon = require('../assets/images/errorIcon.png');
+const retryButtonIcon = require('../assets/images/retryButton.png');
+const profilePic = require('../assets/images/chatProfilePic.jpg');
 
 const ChatsScreen2 = () => {
     const route = useRoute();
-    const router = useRouter();
     const navigation = useNavigation();
     const { partnerUserId, currentUser} = route.params;
     const [chat, setChat] = useState([]);
@@ -68,21 +71,23 @@ const ChatsScreen2 = () => {
             const chatData = Array.isArray(chatResponse.data) ? chatResponse.data : [];
             setChat(chatData); // Store the fetched data in state
             if (chatData.length > 0) {
-                chatData.forEach((msg) => {
+                await Promise.all(chatData.map((msg) => {
                     if (msg.rentalId != null) {
-                        getRental(msg.rentalId);
+                        return getRental(msg.rentalId);
                     }
                     if (msg.requestId != null) {
                         console.log("requestid",msg.requestId);
-                        getRequest(msg.requestId);
+                        return getRequest(msg.requestId);
                     }
-                });
+                    return Promise.resolve();
+                }));
             }
-            getPartner();
+            await getPartner();
             setLoading(false);
         } catch (error) {
             console.error('Error fetching conversation:', error);
             setChat([]);
+            setLoading(false);
         }
     };
 
@@ -108,7 +113,6 @@ const ChatsScreen2 = () => {
             });
             console.log("Rental response", rentalResponse.data);
             setRental(rentalResponse.data); // Store the fetched data in state
-            setLoading(false);
         } catch (error) {
             console.error('Error fetching rentals:', error);
         }
@@ -136,7 +140,6 @@ const ChatsScreen2 = () => {
             });
             console.log("Request response", requestResponse.data);
             setRequest(requestResponse.data); // Store the fetched data in state
-            setLoading(false);
         } catch (error) {
             console.error('Error fetching requests:', error);
         }
@@ -182,7 +185,6 @@ const ChatsScreen2 = () => {
             });
             console.log("Partner response", partnerResponse.data);
             setPartner(partnerResponse.data); // Store the fetched data in state
-            setLoading(false);
         }
         catch (error) {
             console.error('Error fetching partner:', error);
@@ -216,44 +218,114 @@ const ChatsScreen2 = () => {
         }
     }
 
+    const getSenderPhotoURL = () => {
+        const existingSenderMessage = chat.find(
+            (message) => Number(message.senderId) === Number(currentUser) && message.senderPhotoURL
+        );
+
+        return existingSenderMessage?.senderPhotoURL || null;
+    };
+
+    const buildOptimisticMessage = (messageText, tempMessageId) => ({
+        messageID: tempMessageId,
+        receiverId: Number(partnerUserId),
+        receiverName: partner.name,
+        receiverPhotoURL: partner.photoURL,
+        senderId: Number(currentUser),
+        senderName: 'You',
+        senderPhotoURL: getSenderPhotoURL(),
+        rentalId: chat.rentalId || null,
+        requestId: chat.requestId || null,
+        message: messageText,
+        date: new Date().toISOString(),
+        deliveryStatus: 'sending',
+    });
+
+    const sendMessageToBackend = async(messageText, tempMessageId) => {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+            console.log('No token found!');
+            navigation.replace('/LoginScreen');
+            throw new Error('Missing authentication token');
+        }
+
+        console.log('rentalID:', chat.rentalId || null);
+        console.log('requestID:', chat.requestId || null);
+        const body = {
+            receiverID: partnerUserId,
+            senderID: currentUser,
+            rentalID: chat.rentalId || null,
+            requestID: chat.requestId || null,
+            message: messageText,
+            date: new Date().toISOString(),
+        };
+        const sendChatResponse = await axios.post(`${API_BASE_URL}/api/chathistory`, body,{
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+        });
+
+        if (sendChatResponse.status === 201){
+            setChat((previousChat) => previousChat.map((message) => (
+                message.messageID === tempMessageId
+                    ? { ...sendChatResponse.data, deliveryStatus: 'sent' }
+                    : message
+            )));
+        }else{
+            console.log('Sending Message:', sendChatResponse.data);
+            setChat((previousChat) => previousChat.map((message) => (
+                message.messageID === tempMessageId
+                    ? { ...message, deliveryStatus: 'failed' }
+                    : message
+            )));
+        }
+    };
+
     const sendMessage = async() => {
+        const messageText = newMessage.trim();
+        if (messageText === ''){
+            return;
+        }
+
+        const tempMessageId = `temp-${Date.now()}`;
+        const optimisticMessage = buildOptimisticMessage(messageText, tempMessageId);
+        setNewMessage('');
+        setChat((previousChat) => [...previousChat, optimisticMessage]);
+
         try{
-            const token = await AsyncStorage.getItem('token');
-            if (!token) {
-                console.log('No token found!');
-                navigation.replace('/LoginScreen');
-                return;
-            }
-            if (newMessage.trim() !== ''){
-                console.log('rentalID:', chat.rentalId || null);
-                console.log('requestID:', chat.requestId || null);
-                const body = {
-                    receiverID: partnerUserId,
-                    senderID: currentUser,
-                    rentalID: chat.rentalId || null,
-                    requestID: chat.requestId || null,
-                    message: newMessage,
-                    date: new Date().toISOString(),
-                };
-                const sendChatResponse = await axios.post(`${API_BASE_URL}/api/chathistory`, body,{
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    },
-                });
-                if (sendChatResponse.status === 201){
-                    await getConversation();
-                    setNewMessage('');
-                }else{
-                    console.log('Sending Message:', sendChatResponse.data);
-                }
-            }
+            await sendMessageToBackend(messageText, tempMessageId);
         }
         catch (error) {
             console.error('Error sending message:', error);
+            setChat((previousChat) => previousChat.map((message) => (
+                message.messageID === tempMessageId
+                    ? { ...message, deliveryStatus: 'failed' }
+                    : message
+            )));
         }
     }
+
+    const retryMessage = async(messageToRetry) => {
+        const retryMessageId = `temp-${Date.now()}`;
+        setChat((previousChat) => previousChat.map((message) => (
+            message.messageID === messageToRetry.messageID
+                ? { ...message, messageID: retryMessageId, deliveryStatus: 'sending' }
+                : message
+        )));
+
+        try {
+            await sendMessageToBackend(messageToRetry.message, retryMessageId);
+        } catch (error) {
+            console.error('Error retrying message:', error);
+            setChat((previousChat) => previousChat.map((message) => (
+                message.messageID === retryMessageId
+                    ? { ...message, deliveryStatus: 'failed' }
+                    : message
+            )));
+        }
+    };
 
     const sendRentalOffer = async() => {
         try{
@@ -480,7 +552,7 @@ const handlePaymentAndAccept = async () => {
     const isAccepted = chat.length > 0 ? isPaymentSuccessfulModalVisible : false;
     const isTerminationAccepted = chat.length>0 ? rental.status === "terminated" : false;
 
-    const renderMessage = ({ item }) => {
+    const renderMessage = () => {
         if (!Array.isArray(chat) || chat.length === 0) {
             return (
                 <View style={styles.emptyMessageContainer}>
@@ -611,13 +683,29 @@ const handlePaymentAndAccept = async () => {
             else {
                 return (
                     <View key={message.messageID} style={styles.headerContainer}>
-                        <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
+                        <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
                         <View style={styles.messageContainer}>
                             <View style={styles.headerContainer}>
                                 <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
                                 <Text style={styles.date}> {new Date(message.date).toLocaleTimeString()}</Text>
                             </View>
                             <Text style={styles.messageText}>{message.message}</Text>
+                            {message.deliveryStatus === 'sending' ? (
+                                <Text style={styles.sendingText}>Sending...</Text>
+                            ) : null}
+                            {message.deliveryStatus === 'failed' ? (
+                                <View style={styles.failedMessageContainer}>
+                                    <Image source={errorIcon} style={styles.errorIcon} />
+                                    <Text style={styles.failedMessageText}>Failed to send</Text>
+                                    <TouchableOpacity
+                                        style={styles.retryButton}
+                                        onPress={() => retryMessage(message)}
+                                    >
+                                        <Image source={retryButtonIcon} style={styles.retryIcon} />
+                                        <Text style={styles.retryText}>Retry</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : null}
                         </View>
                     </View>
                 );
@@ -627,8 +715,9 @@ const handlePaymentAndAccept = async () => {
 
     if (Loading) {
         return (
-            <View style={[styles.screen, styles.content]}>
-                <Text>Loading chat history...</Text>
+            <View style={styles.loadingScreen}>
+                <MorphingInfinity size={86} color="#2FA84F" />
+                <Text style={styles.loadingText}>Loading chat history...</Text>
             </View>
         );
     }
@@ -675,6 +764,9 @@ const handlePaymentAndAccept = async () => {
                     placeholder="Enter Message"
                     value={newMessage}
                     onChangeText={setNewMessage}
+                    onSubmitEditing={sendMessage}
+                    blurOnSubmit={false}
+                    returnKeyType="send"
                     />
                 <TouchableOpacity onPress={sendMessage}>
                     <Image source={sendIcon} style={styles.icon}/>
@@ -926,11 +1018,63 @@ const styles = StyleSheet.create({
     chatList: {
         flex: 1, // Take up all available space
     },
+    loadingScreen: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F7F8FA',
+    },
+    loadingText: {
+        marginTop: 24,
+        color: '#101820',
+        fontSize: 18,
+        fontWeight: '700',
+    },
     messageContainer:{
         padding: 20,
     },
     messageText:{
         marginTop: 5,
+    },
+    sendingText: {
+        marginTop: 6,
+        color: '#777',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    failedMessageContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
+    },
+    errorIcon: {
+        width: 18,
+        height: 18,
+        marginRight: 6,
+    },
+    failedMessageText: {
+        color: '#E94068',
+        fontSize: 12,
+        fontWeight: '700',
+        marginRight: 10,
+    },
+    retryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        backgroundColor: '#F1F1F1',
+    },
+    retryIcon: {
+        width: 14,
+        height: 14,
+        marginRight: 4,
+    },
+    retryText: {
+        color: '#101820',
+        fontSize: 12,
+        fontWeight: '700',
     },
     sender:{
         fontWeight: 'bold',
