@@ -42,6 +42,7 @@ const ChatsScreen2 = () => {
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false)
     const [isPaymentSuccessfulModalVisible, setPaymentSuccessfulModalVisible] = useState(false)
     const [Loading, setLoading] = useState(true);
+    const chatScrollRef = useRef(null);
     const summaryScrollRef = useRef(null);
     const [isSummaryModalVisible, setSummaryModalVisible] = useState(false);
     const [isGeneratingSummary, setGeneratingSummary] = useState(false);
@@ -904,7 +905,12 @@ const handlePaymentAndAccept = async () => {
             {/* Thin divider */}
             <View style={styles.thinDivider} />
 
-            <ScrollView style={styles.chatList} contentContainerStyle={styles.chatListContent}>
+            <ScrollView
+                ref={chatScrollRef}
+                style={styles.chatList}
+                contentContainerStyle={styles.chatListContent}
+                onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: false })}
+            >
                 {renderMessage()}
             </ScrollView>
 
