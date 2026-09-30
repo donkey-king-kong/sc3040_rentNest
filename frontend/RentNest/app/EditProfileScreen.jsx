@@ -15,7 +15,10 @@ import {
   ActivityIndicator,
   ScrollView,
   Modal,
+  Dimensions,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useFocusEffect, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
@@ -438,41 +441,40 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   notificationOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 22,
   },
   notificationCard: {
-    width: 220,
+    width: Math.round(SCREEN_WIDTH * 0.4),
     alignItems: 'center',
     backgroundColor: 'rgba(45, 45, 45, 0.88)',
-    borderRadius: 20,
-    paddingVertical: 24,
-    paddingHorizontal: 24,
+    borderRadius: 16,
+    paddingVertical: Math.round(SCREEN_WIDTH * 0.045),
+    paddingHorizontal: Math.round(SCREEN_WIDTH * 0.04),
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 14 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.24,
-    shadowRadius: 22,
+    shadowRadius: 16,
     elevation: 8,
   },
   notificationIconBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
+    width: Math.round(SCREEN_WIDTH * 0.12),
+    height: Math.round(SCREEN_WIDTH * 0.12),
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(58, 58, 58, 0.72)',
-    marginBottom: 16,
+    marginBottom: Math.round(SCREEN_WIDTH * 0.025),
   },
   notificationIcon: {
-    width: 34,
-    height: 40,
+    width: Math.round(SCREEN_WIDTH * 0.055),
+    height: Math.round(SCREEN_WIDTH * 0.065),
     resizeMode: 'contain',
   },
   notificationText: {
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: Math.round(SCREEN_WIDTH * 0.038),
     fontWeight: '800',
   },
 });
