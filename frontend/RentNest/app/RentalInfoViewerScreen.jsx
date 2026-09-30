@@ -50,7 +50,7 @@ const RentalInfoViewer = () => {
   // Navigate to HomeListingScreen
   const handleShowRentalListing = () => {
     if (listing) {
-      router.push({pathname: '/HomeListingScreen', params: { listingId: listing.listingID }});
+      router.push({ pathname: '/HomeListingScreen', params: { listingId: listing.listingID } });
     }
   };
 
