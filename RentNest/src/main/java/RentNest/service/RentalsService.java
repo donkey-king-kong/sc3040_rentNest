@@ -18,7 +18,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -85,6 +87,7 @@ public class RentalsService {
         rental.setPaymentHistory(rentalDTO.getPaymentHistory());
         rental.setStatus(rentalDTO.getStatus());
         rental.setListings(listing);
+        recordStatusChange(rental);
 
         return rentalsRepository.save(rental);
     }
@@ -133,6 +136,7 @@ public class RentalsService {
             existingRental.setLeaseExpiry(updatedRentalDTO.getLeaseExpiry());
             existingRental.setPaymentHistory(updatedRentalDTO.getPaymentHistory());
             existingRental.setStatus(updatedRentalDTO.getStatus());
+            recordStatusChange(existingRental);
 
             // Fetch the listing by listingID from the ListingsRepository
             Listings listing = listingsRepository.findById(updatedRentalDTO.getListingID())
@@ -242,6 +246,7 @@ public class RentalsService {
         // Change the status from "pending" to "active" to accept the contract
         if ("pending".equals(existingRental.getStatus())) {
             existingRental.setStatus("active");
+            recordStatusChange(existingRental);
         } else {
             throw new RuntimeException("Rental is not in pending status");
         }
@@ -276,6 +281,20 @@ public class RentalsService {
     public Optional<RentalsDTO> getRentalByListingIdAndTenantId(Long listingID, Long tenantID) {
         return rentalsRepository.findByListings_ListingIDAndTenantUserID(listingID, tenantID)
                 .map(this::toRentalsDTO);  // Map to RentalsDTO if found
+    }
+
+    /**
+     * Records, from the server clock, the first time a rental becomes active (accepted) or terminated.
+     * Existing times are never overwritten, so repeated updates keep the original moment.
+     */
+    static void recordStatusChange(Rentals rental) {
+        String status = rental.getStatus() == null ? "" : rental.getStatus().trim().toLowerCase(Locale.ROOT);
+        if (status.equals("active") && rental.getAcceptedAt() == null) {
+            rental.setAcceptedAt(new Date());
+        }
+        if (status.equals("terminated") && rental.getTerminatedAt() == null) {
+            rental.setTerminatedAt(new Date());
+        }
     }
 
     public List<Long> manageTenants(Long listingID) {

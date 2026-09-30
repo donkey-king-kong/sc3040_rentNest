@@ -4,15 +4,18 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
+import ModerationListState, { moderationLoadError } from '../components/ModerationListState';
 
 const ReviewListingsScreen = () => {
   const [listingsData, setListingsData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const router = useRouter();
   const { refresh } = useLocalSearchParams();
 
   const getFlaggedListings = async () => {
+    setLoadError(null);
     try {
       const token = await AsyncStorage.getItem('token');
       
@@ -53,6 +56,8 @@ const ReviewListingsScreen = () => {
       setListingsData(listingsWithOwners);
     } catch (error) {
       console.error("An error occurred:", error);
+      setListingsData([]);
+      setLoadError(moderationLoadError(error, 'listings'));
     }
   };
 
@@ -76,13 +81,6 @@ const ReviewListingsScreen = () => {
     );
   };
 
-  if (!listingsData) {
-    return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -99,7 +97,16 @@ const ReviewListingsScreen = () => {
 
       {/* FlatList for listings */}
       <FlatList
-        data={filterListings(listingsData, searchQuery)}
+        data={filterListings(listingsData, searchQuery) || []}
+        ListEmptyComponent={
+          <ModerationListState
+            loading={listingsData === null && !loadError}
+            error={loadError}
+            searching={!!searchQuery}
+            emptyText="No reported listings right now."
+            onRetry={getFlaggedListings}
+          />
+        }
         keyExtractor={item => item.listingID.toString()}
         refreshControl={
           <RefreshControl

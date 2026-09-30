@@ -56,7 +56,8 @@ public class AuthenticationController {
             LoginResponse loginResponse = new LoginResponse()
                     .setToken(jwtToken)
                     .setExpiresIn(jwtService.getExpirationTime())
-                    .setUserId(authenticatedUser.getUserID());
+                    .setUserId(authenticatedUser.getUserID())
+                    .setRole(authenticatedUser.getRole());
             return ResponseEntity.ok(loginResponse);
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());

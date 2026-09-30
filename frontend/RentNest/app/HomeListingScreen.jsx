@@ -1,6 +1,6 @@
 // Previous imports remain unchanged
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Modal} from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Modal, Alert} from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import MapView, { Marker } from '../components/AppMap';
@@ -94,6 +94,19 @@ const HomeListingScreen = () => {
           headers: authHeaders(tokenValue)
         });
         console.log('Listing API response:', listingResponse.data);
+
+        // Record that this listing was opened, for the owner's view analytics.
+        // Fire and forget: the page must still work if this fails, and the backend ignores
+        // an owner viewing their own listing.
+        axios.post(`${API_BASE_URL}/api/listings/${listingId}/views`, {}, {
+          headers: {
+            'Authorization': `Bearer ${tokenValue}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        }).catch((viewError) => {
+          console.log('Could not record listing view:', viewError.message);
+        });
 
         // Apply default values only if the response data is empty or missing properties
         const listingData = listingResponse.data || {};
@@ -239,17 +252,21 @@ const HomeListingScreen = () => {
 
   const handleConfirm = async () => {
     try {
-      await axios.put(`${API_BASE_URL}api/listings/setFlag/${listingId}/true`, {
+      // axios.put(url, body, config): headers belong in the third argument
+      await axios.put(`${API_BASE_URL}/api/listings/setFlag/${listingId}/true`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         }
       });
+      // Only confirm once the report has actually been recorded
+      setListingReported(true);
     } catch (err) {
       console.error(`Error reporting listing: ${err.message}`);
+      setModalVisible(false);
+      Alert.alert('Report not sent', 'We could not report this listing. Please try again.');
     }
-    setListingReported(true);
   };
 
   const handleCancel = () => {

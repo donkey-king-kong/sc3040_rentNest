@@ -84,11 +84,14 @@ http://localhost:8080/swagger-ui/index.html
 ### Database Configuration
 The app uses a shared Supabase PostgreSQL database. The real connection details are not committed to Git. Get the database URL, username, and password from the team.
 
+The backend runs with `spring.jpa.hibernate.ddl-auto=validate`, so it never changes the shared schema. Read [docs/db/README.md](docs/db/README.md) before changing any entity class.
+
 ## Pre-Configured Users
 | Role | Name | Email | Password |
 | --- | --- | --- | --- |
 | Owner | Superman | superman@gmail.com | 12345678 |
 | User Viewer | Batman | batman@gmail.com | 12345678 |
+| Admin | Admin | admin@gmail.com | 12345678 |
 
 ## Tech Stack
 - Frontend: React Native, Expo, JavaScript

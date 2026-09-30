@@ -104,7 +104,8 @@ public class ReviewsService {
         existingReview.setRating(reviewDTO.getRating());
         existingReview.setTitle(reviewDTO.getTitle());
         existingReview.setText(reviewDTO.getText());
-        existingReview.setFlagged(reviewDTO.isFlagged());
+        // The flag is not copied from the request: editing a reported review must not clear its report.
+        // Flags change only through the setFlag moderation endpoint.
 
         // If the reviewer needs to be updated, fetch the reviewer
         if (reviewDTO.getReviewerID() != null && !reviewDTO.getReviewerID().equals(existingReview.getReviewer().getUserID())) {
