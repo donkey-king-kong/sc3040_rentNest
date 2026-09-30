@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react';
 import {View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal, TextInput} from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
 import {useLocalSearchParams, useRouter} from "expo-router";
 
 // Import Icons
@@ -20,7 +21,17 @@ import MorphingInfinity from '../components/MorphingInfinity';
 
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
-const profilePic = require('../assets/images/chatProfilePic.jpg');
+
+const Avatar = ({ uri }) => {
+    if (uri) {
+        return <Image source={{ uri }} style={styles.avatar} />;
+    }
+    return (
+        <View style={styles.avatarFallback}>
+            <FontAwesome name="user" size={16} color="#888" />
+        </View>
+    );
+};
 
 const ChatsScreen2 = () => {
     const router = useRouter();
@@ -569,7 +580,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
+                            <Avatar uri={message?.senderPhotoURL} />
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -593,7 +604,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
+                            <Avatar uri={message?.senderPhotoURL} />
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -628,7 +639,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
+                            <Avatar uri={message?.senderPhotoURL} />
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -650,7 +661,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
+                            <Avatar uri={message?.senderPhotoURL} />
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -681,7 +692,7 @@ const handlePaymentAndAccept = async () => {
             else {
                 return (
                     <View key={message.messageID} style={styles.headerContainer}>
-                        <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
+                        <Avatar uri={message?.senderPhotoURL} />
                         <View style={styles.messageContainer}>
                             <View style={styles.headerContainer}>
                                 <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -1075,7 +1086,15 @@ const styles = StyleSheet.create({
     avatar: {
         width: 30,
         height: 30,
-        borderRadius: 20,
+        borderRadius: 15,
+    },
+    avatarFallback: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#e0e0e0',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     date:{
         fontSize: 10,
