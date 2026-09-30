@@ -81,23 +81,16 @@ public class AiChatService {
                 - Use only facts explicitly stated in the transcript.
                 - Do not speculate about who is owner or tenant based on names.
                 - Do not comment on funny, odd, duplicated, or confusing names.
-                - Keep the summary professional, concise, and useful.
+                - Keep every field to one short sentence or less.
                 - Use plain text only. Do not use Markdown, asterisks, hashtags, or bold formatting.
-                - Start directly with "Summary:".
-                - Always include all four sections below.
-                - Keep the full response under 200 words.
+                - Always output all four sections in the exact format below. Never truncate.
 
-                Required output format:
-                Summary:
-                - One sentence describing the overall discussion.
-
-                Key Details:
-                Rent/deposit: mention details, or say Not mentioned.
-                Viewing/move-in: mention details, or say Not mentioned.
-                Location/amenities: mention details, or say Not mentioned.
-
-                Next Steps:
-                - Mention the agreed next step, or say No clear next step mentioned.
+                Output exactly this format and nothing else:
+                Summary: <one sentence>
+                Rent/deposit: <details, or Not mentioned>
+                Viewing/move-in: <details, or Not mentioned>
+                Location/amenities: <details, or Not mentioned>
+                Next steps: <one sentence, or No clear next step mentioned>
                 """;
 
         String prompt = """
@@ -355,6 +348,10 @@ public class AiChatService {
                     llmModel
             );
 
+            log.info("[Gemini] Calling model: {}", llmModel);
+            log.info("[Gemini] System instruction ({} chars):\n{}", systemInstruction.length(), systemInstruction);
+            log.info("[Gemini] User prompt ({} chars):\n{}", prompt.length(), prompt);
+
             Map<String, Object> requestBody = Map.of(
                     "systemInstruction", Map.of(
                             "parts", List.of(Map.of("text", systemInstruction))
@@ -371,15 +368,22 @@ public class AiChatService {
                     )
             );
 
+            String requestBodyJson = objectMapper.writeValueAsString(requestBody);
+            log.info("[Gemini] Sending request to: {}", url);
+
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(LLM_REQUEST_TIMEOUT)
                     .header("Content-Type", "application/json")
                     .header("x-goog-api-key", llmApiKey)
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson))
                     .build();
 
+            long startMs = System.currentTimeMillis();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            long elapsedMs = System.currentTimeMillis() - startMs;
+
+            log.info("[Gemini] HTTP {} received in {}ms", response.statusCode(), elapsedMs);
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 log.error("[Gemini] HTTP {} error body: {}", response.statusCode(), response.body());
@@ -387,6 +391,22 @@ public class AiChatService {
             }
 
             JsonNode responseJson = objectMapper.readTree(response.body());
+
+            // Log token usage
+            JsonNode usageNode = responseJson.path("usageMetadata");
+            if (!usageNode.isMissingNode()) {
+                log.info("[Gemini] Token usage — prompt: {}, candidates: {}, total: {}",
+                        usageNode.path("promptTokenCount").asInt(),
+                        usageNode.path("candidatesTokenCount").asInt(),
+                        usageNode.path("totalTokenCount").asInt());
+            }
+
+            // Log finish reason
+            JsonNode finishReason = responseJson.path("candidates").path(0).path("finishReason");
+            if (!finishReason.isMissingNode()) {
+                log.info("[Gemini] Finish reason: {}", finishReason.asText());
+            }
+
             JsonNode textNode = responseJson.path("candidates").path(0).path("content").path("parts").path(0).path("text");
 
             if (textNode.isMissingNode() || textNode.asText().isBlank()) {
@@ -395,7 +415,7 @@ public class AiChatService {
             }
 
             String result = textNode.asText().trim();
-            log.info("[Gemini] LLM response:\n{}", result);
+            log.info("[Gemini] Response ({} chars):\n{}", result.length(), result);
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Unable to call Gemini API: " + e.getMessage());
