@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
+import { FontAwesome } from '@expo/vector-icons';
 
 // Import Icons
 import sendIcon from '../assets/images/send.jpg';
@@ -886,6 +887,9 @@ const handlePaymentAndAccept = async () => {
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.nameHeaderContainer}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <FontAwesome name="chevron-left" size={18} color="#101820" />
+                </TouchableOpacity>
                 <Text style={styles.header}>{partner.name}</Text>
                 <View style={styles.headerActions}>
                     <TouchableOpacity onPress={() => setAskAiModalVisible(true)} style={styles.aiSummaryButton}>
@@ -1226,6 +1230,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+    },
+    backButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F0F0F0',
+        marginRight: 10,
     },
     headerActions: {
         flexDirection: 'row',
