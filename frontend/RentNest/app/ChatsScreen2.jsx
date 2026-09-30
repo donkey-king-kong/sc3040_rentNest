@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput} from 'react-native';
+import {View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal, TextInput} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 
 // Import Icons
@@ -569,7 +569,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
+                            <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -593,7 +593,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
+                            <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -628,7 +628,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
+                            <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -650,7 +650,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
+                            <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -737,12 +737,9 @@ const handlePaymentAndAccept = async () => {
             <View style={styles.thinDivider} />
 
 
-            <FlatList
-                data={chat.length > 0 ? [chat[0]] : []} // Pass first message or a placeholder
-                renderItem={renderMessage}
-                keyExtractor={item => item.messageID?.toString() || 'empty'}
-                style={styles.chatList}
-            />
+            <ScrollView style={styles.chatList}>
+                {renderMessage()}
+            </ScrollView>
 
             <View style={styles.inputContainer}>
                 <TouchableOpacity onPress={toggleAttachmentModal}>
