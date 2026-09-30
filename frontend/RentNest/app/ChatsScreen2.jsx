@@ -834,7 +834,7 @@ const handlePaymentAndAccept = async () => {
                                     )
                                 )}
                                 <View style={[styles.bubble, isUser ? styles.bubbleSelf : styles.bubbleOther]}>
-                                    <Text style={styles.bubbleText}>{message.message}</Text>
+                                    <Text style={[styles.bubbleText, isUser && styles.bubbleTextSelf]}>{message.message}</Text>
                                     {message.deliveryStatus === 'sending' && (
                                         <Text style={styles.sendingText}>Sending...</Text>
                                     )}
@@ -1321,13 +1321,16 @@ const styles = StyleSheet.create({
         borderBottomLeftRadius: 4,
     },
     bubbleSelf: {
-        backgroundColor: '#E0E0E0',
+        backgroundColor: '#2563EB',
         borderBottomRightRadius: 4,
     },
     bubbleText: {
         fontSize: 15,
         color: '#101820',
         lineHeight: 21,
+    },
+    bubbleTextSelf: {
+        color: '#fff',
     },
     groupTimestamp: {
         fontSize: 11,
