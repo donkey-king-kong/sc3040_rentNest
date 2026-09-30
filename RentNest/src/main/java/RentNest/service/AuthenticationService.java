@@ -63,4 +63,23 @@ public class AuthenticationService {
 
         return user;
     }
+
+    public void resetPassword(String email, String newPassword) {
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email is required.");
+        }
+
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            throw new IllegalArgumentException("New password is required.");
+        }
+
+        if (newPassword.length() < 6) {
+            throw new IllegalArgumentException("Password must be at least 6 characters long.");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadCredentialsException("Email not registered."));
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
 }
