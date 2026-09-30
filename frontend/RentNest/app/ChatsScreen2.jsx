@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView} from 'react-native';
+import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Dimensions} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import { FontAwesome } from '@expo/vector-icons';
 
@@ -871,8 +871,8 @@ const handlePaymentAndAccept = async () => {
     }
 
     const summaryTextToDisplay = summaryError || chatSummary;
-    const shouldScrollSummary = summaryTextToDisplay.length > 650;
-    const shouldScrollAiAnswer = aiAnswer.length > 650;
+    const shouldScrollSummary = true;
+    const shouldScrollAiAnswer = aiAnswer.length > 300;
 
     return (
         <View style={styles.container}>
@@ -1501,7 +1501,7 @@ const styles = StyleSheet.create({
     },
     summaryText: {
         fontSize: 14,
-        lineHeight: 20,
+        lineHeight: 24,
         textAlign: 'left',
         width: '100%',
         marginBottom: 10,
@@ -1511,7 +1511,7 @@ const styles = StyleSheet.create({
         flexGrow: 0,
     },
     aiResponseScrollLong: {
-        maxHeight: 360,
+        maxHeight: Dimensions.get('window').height * 0.45,
     },
     aiQuestionInput: {
         width: '100%',
