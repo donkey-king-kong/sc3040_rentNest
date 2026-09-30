@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import {useLocalSearchParams, useRouter} from 'expo-router';
-import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import { FontAwesome } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
@@ -69,7 +69,12 @@ const RentalInfoOwner = () => {
 
   return (
       <ScrollView style={styles.container}>
-        <Text style={styles.title}>Rental Info</Text>
+        <View style={styles.titleRow}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <FontAwesome name="chevron-left" size={18} color="#101820" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Rental Info</Text>
+        </View>
 
         {/* Image */}
         {listing && (
@@ -163,11 +168,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingHorizontal: 20, // Padding for entire container
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0F0F0',
+    marginRight: 12,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'left',
   },
   image: {
     width: '100%',
