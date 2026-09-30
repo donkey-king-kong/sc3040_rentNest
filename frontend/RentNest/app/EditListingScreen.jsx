@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 
 const EditListingScreen = () => {
-    const route = useRoute();
-    const navigation = useNavigation();
-    const { listingId } = route.params;
+    const router = useRouter();
+    const { listingId } = useLocalSearchParams();
     const [modalVisible, setModalVisible] = useState(false);
     const [listing, setListing] = useState({
         ownerUserID: 1,
@@ -32,7 +31,7 @@ const EditListingScreen = () => {
             try {
                 const token = await AsyncStorage.getItem('token');
                 if (!token) {
-                    navigation.navigate('LandingScreen');
+                    router.replace('/LandingScreen');
                     return;
                 }
 
@@ -48,7 +47,7 @@ const EditListingScreen = () => {
             } catch (error) {
                 console.error('Error fetching listing data:', error);
                 Alert.alert('Error', 'Failed to load listing data');
-                navigation.goBack();
+                router.back();
             }
         };
 
@@ -79,7 +78,7 @@ const EditListingScreen = () => {
         try {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
-                navigation.navigate('LandingScreen');
+                router.replace('/LandingScreen');
                 return;
             }
 
@@ -104,7 +103,7 @@ const EditListingScreen = () => {
 
     const handleReturnHome = () => {
         setModalVisible(false);
-        navigation.navigate('RentalInfoOwnerScreen', { listingId });
+        router.push({pathname: '/RentalInfoOwnerScreen', params: { listingId }});
     };
 
     return (

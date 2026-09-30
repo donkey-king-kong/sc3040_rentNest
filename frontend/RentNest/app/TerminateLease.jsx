@@ -1,6 +1,5 @@
 import React, {useEffect, useState} from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
-import { useRoute } from '@react-navigation/native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {jwtDecode} from "jwt-decode";
@@ -8,10 +7,8 @@ import axios from "axios";
 import {API_BASE_URL} from "../config/api";
 
 const TerminateLease = () => {
-  const route = useRoute();
   const router = useRouter();
-  const { rentalId } = route.params;
-  const { refresh } = useLocalSearchParams();
+  const { rentalId, refresh } = useLocalSearchParams();
   const [user, setUser] = useState({
     userID: 1,
     name: 'Loading...',
@@ -28,7 +25,7 @@ const TerminateLease = () => {
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        navigation.navigate('LandingScreen');
+        router.replace('/LandingScreen');
         return;
       }
       const decoded = jwtDecode(token);
@@ -49,7 +46,7 @@ const TerminateLease = () => {
       });
     } catch (error) {
       console.error('Error fetching user data:', error);
-      navigation.navigate('LandingScreen');
+      router.replace('/LandingScreen');
     }
   };
 
@@ -63,7 +60,7 @@ const TerminateLease = () => {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.log('No token found!');
-        navigation.replace('/LoginScreen');
+        router.replace('/LoginScreen');
         return;
       }
       const rentalResponse = await axios.get(`${API_BASE_URL}/api/rentals/${rentalId}`, {
@@ -88,7 +85,7 @@ const TerminateLease = () => {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.log('No token found!');
-        navigation.replace('/LoginScreen');
+        router.replace('/LoginScreen');
         return;
       }
       console.log("amount", amount);

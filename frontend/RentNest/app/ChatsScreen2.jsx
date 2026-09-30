@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput} from 'react-native';
-import {useNavigation, useRoute} from '@react-navigation/native'; // Import useRoute for accessing route parameters
-import {useLocalSearchParams} from "expo-router";
+import {View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal, TextInput} from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
+import {useLocalSearchParams, useRouter} from "expo-router";
 
 // Import Icons
 import sendIcon from '../assets/images/send.jpg';
@@ -21,12 +21,21 @@ import MorphingInfinity from '../components/MorphingInfinity';
 
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
-const profilePic = require('../assets/images/chatProfilePic.jpg');
+
+const Avatar = ({ uri }) => {
+    if (uri) {
+        return <Image source={{ uri }} style={styles.avatar} />;
+    }
+    return (
+        <View style={styles.avatarFallback}>
+            <FontAwesome name="user" size={16} color="#888" />
+        </View>
+    );
+};
 
 const ChatsScreen2 = () => {
-    const route = useRoute();
-    const navigation = useNavigation();
-    const { partnerUserId, currentUser} = route.params;
+    const router = useRouter();
+    const { partnerUserId, currentUser} = useLocalSearchParams();
     const [chat, setChat] = useState([]);
     const [rental, setRental] = useState([]);
     const [request, setRequest] = useState([]);
@@ -53,7 +62,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const chatResponse = await axios.get(`${API_BASE_URL}/api/chathistory/conversation`, {
@@ -101,7 +110,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const rentalResponse = await axios.get(`${API_BASE_URL}/api/rentals/${rentalId}`, {
@@ -128,7 +137,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const requestResponse = await axios.get(`${API_BASE_URL}/api/requests/${requestId}`, {
@@ -150,7 +159,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const listingResponse = await axios.get(`${API_BASE_URL}/api/listings/user/${currentUser}/listingIDs`, {
@@ -173,7 +182,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const partnerResponse = await axios.get(`${API_BASE_URL}/api/users/id/${partnerUserId}`, {
@@ -196,7 +205,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const flaggedResponse = await axios.put(`${API_BASE_URL}/api/users/setFlag/${partnerUserId}/1`, {
@@ -245,7 +254,7 @@ const ChatsScreen2 = () => {
         const token = await AsyncStorage.getItem('token');
         if (!token) {
             console.log('No token found!');
-            navigation.replace('/LoginScreen');
+            router.replace('/LoginScreen');
             throw new Error('Missing authentication token');
         }
 
@@ -333,7 +342,7 @@ const ChatsScreen2 = () => {
             console.log("listingid", listing)
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             if (rentalPrice.trim() !== '' && rentalDeposit.trim() !== '' && leaseExpiry.trim() !== ''){
@@ -379,7 +388,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const updatedRentalBody = {
@@ -419,7 +428,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const terminationRequestBody ={
@@ -469,7 +478,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
 
@@ -564,14 +573,14 @@ const handlePaymentAndAccept = async () => {
         return chat.map((message) => {
             const isOwner = Number(currentUser) === Number(rental.ownerUserId);
             const isUser = Number(message.senderId) === Number(currentUser);
-            const rentalIdExists = message.rentalId !== null;
-            const requestIdExists = message.requestId !== null;
+            const rentalIdExists = message.rentalId != null;
+            const requestIdExists = message.requestId != null;
 
             if (isOwner && rentalIdExists){
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
+                            <Avatar uri={message?.senderPhotoURL} />
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -595,7 +604,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
+                            <Avatar uri={message?.senderPhotoURL} />
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -630,7 +639,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
+                            <Avatar uri={message?.senderPhotoURL} />
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -652,7 +661,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
+                            <Avatar uri={message?.senderPhotoURL} />
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -683,7 +692,7 @@ const handlePaymentAndAccept = async () => {
             else {
                 return (
                     <View key={message.messageID} style={styles.headerContainer}>
-                        <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
+                        <Avatar uri={message?.senderPhotoURL} />
                         <View style={styles.messageContainer}>
                             <View style={styles.headerContainer}>
                                 <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -729,9 +738,7 @@ const handlePaymentAndAccept = async () => {
                 <Text style={styles.header}>{partner.name}</Text>
                 <TouchableOpacity onPress={() => {
                     // Navigate to UserReviewsScreen while passing userId
-                    navigation.navigate('UserReviewsScreen', {
-                        userId: partnerUserId
-                    });
+                    router.push({pathname: '/UserReviewsScreen', params: { userId: partnerUserId }});
                 }}>
                     <Text style={styles.reviews}>Reviews</Text>
                 </TouchableOpacity>
@@ -741,12 +748,9 @@ const handlePaymentAndAccept = async () => {
             <View style={styles.thinDivider} />
 
 
-            <FlatList
-                data={chat.length > 0 ? [chat[0]] : []} // Pass first message or a placeholder
-                renderItem={renderMessage}
-                keyExtractor={item => item.messageID?.toString() || 'empty'}
-                style={styles.chatList}
-            />
+            <ScrollView style={styles.chatList}>
+                {renderMessage()}
+            </ScrollView>
 
             <View style={styles.inputContainer}>
                 <TouchableOpacity onPress={toggleAttachmentModal}>
@@ -1082,7 +1086,15 @@ const styles = StyleSheet.create({
     avatar: {
         width: 30,
         height: 30,
-        borderRadius: 20,
+        borderRadius: 15,
+    },
+    avatarFallback: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#e0e0e0',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     date:{
         fontSize: 10,
