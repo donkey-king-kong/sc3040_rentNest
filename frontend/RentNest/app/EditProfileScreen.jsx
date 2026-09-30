@@ -7,7 +7,6 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  TouchableWithoutFeedback,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -206,8 +205,7 @@ const EditProfileScreen = () => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 20}
         style={styles.flex1}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          {isProfileLoading ? renderLoadingState() : (
+        {isProfileLoading ? renderLoadingState() : (
             <View style={styles.innerContainer}>
               <TouchableOpacity
                 style={styles.backButton}
@@ -217,7 +215,12 @@ const EditProfileScreen = () => {
                 <FontAwesome name="chevron-left" size={22} color="#101820" />
               </TouchableOpacity>
 
-              <ScrollView style={styles.contentContainer} contentContainerStyle={styles.contentContainerInner} keyboardShouldPersistTaps="handled">
+              <ScrollView
+                style={styles.contentContainer}
+                contentContainerStyle={styles.contentContainerInner}
+                keyboardShouldPersistTaps="handled"
+                onScrollBeginDrag={Keyboard.dismiss}
+              >
                 <View style={styles.profileBox}>
                   <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
                 </View>
@@ -285,7 +288,6 @@ const EditProfileScreen = () => {
               </View>
             </View>
           )}
-        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
       <Modal
         visible={showProfileUpdated}
