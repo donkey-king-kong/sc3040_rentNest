@@ -562,8 +562,8 @@ const handlePaymentAndAccept = async () => {
         return chat.map((message) => {
             const isOwner = Number(currentUser) === Number(rental.ownerUserId);
             const isUser = Number(message.senderId) === Number(currentUser);
-            const rentalIdExists = message.rentalId !== null;
-            const requestIdExists = message.requestId !== null;
+            const rentalIdExists = message.rentalId != null;
+            const requestIdExists = message.requestId != null;
 
             if (isOwner && rentalIdExists){
                 return (
