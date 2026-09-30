@@ -14,6 +14,7 @@ import {
   Pressable,
   ActivityIndicator,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -283,7 +284,12 @@ const EditProfileScreen = () => {
           )}
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
-      {showProfileUpdated ? (
+      <Modal
+        visible={showProfileUpdated}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+      >
         <View style={styles.notificationOverlay} pointerEvents="none">
           <View style={styles.notificationCard}>
             <View style={styles.notificationIconBox}>
@@ -292,7 +298,7 @@ const EditProfileScreen = () => {
             <Text style={styles.notificationText}>Profile Updated</Text>
           </View>
         </View>
-      ) : null}
+      </Modal>
     </View>
   );
 };
