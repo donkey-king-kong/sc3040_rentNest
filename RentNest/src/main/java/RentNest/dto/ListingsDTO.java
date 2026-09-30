@@ -19,6 +19,8 @@ public class ListingsDTO {
     private String description;
     private boolean flagged;
     private String listingpicture;
+    private Double latitude;
+    private Double longitude;
     
 
     // Getters
@@ -92,6 +94,14 @@ public class ListingsDTO {
         return listingpicture;
     }
 
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
     // Setters
     public void setListingID(Long listingID) {
         this.listingID = listingID;
@@ -163,6 +173,14 @@ public class ListingsDTO {
 
     public void setListingpicture(String listingpictire) {
         this.listingpicture = listingpictire;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
     }
 
 }

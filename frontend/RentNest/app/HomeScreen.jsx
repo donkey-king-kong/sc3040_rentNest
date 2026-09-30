@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import NavigationBar from '../components/NavigationBar'; // Import the Navigatio
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const HomeScreen = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -219,13 +220,20 @@ const HomeScreen = () => {
             </View>
           </View>
         )}
-      <FlatList
-        data={filteredListings}
-        renderItem={renderListing}
-        keyExtractor={item => item.listingId.toString()}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={<View style={styles.listHeaderSpacing} />}
-      />
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <MorphingInfinity size={86} color="#2FA84F" />
+            <Text style={styles.loadingText}>Loading listings...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredListings}
+            renderItem={renderListing}
+            keyExtractor={item => item.listingId.toString()}
+            contentContainerStyle={styles.listContent}
+            ListHeaderComponent={<View style={styles.listHeaderSpacing} />}
+          />
+        )}
 
       <NavigationBar style={styles.navigationBar} />
       </View>
@@ -296,6 +304,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 5,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   listingContainer: {
     backgroundColor: '#fff',

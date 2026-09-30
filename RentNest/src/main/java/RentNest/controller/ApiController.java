@@ -2,6 +2,7 @@ package RentNest.controller;
 
 import RentNest.model.api.*;
 import RentNest.service.ApiService;
+import RentNest.service.NearbyAmenitiesService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,10 +13,12 @@ import java.util.List;
 public class ApiController {
 
     private final ApiService apiService;
+    private final NearbyAmenitiesService nearbyAmenitiesService;
 
     @Autowired
-    public ApiController(ApiService apiService) {
+    public ApiController(ApiService apiService, NearbyAmenitiesService nearbyAmenitiesService) {
         this.apiService = apiService;
+        this.nearbyAmenitiesService = nearbyAmenitiesService;
     }
 
     @GetMapping("/schools/{listingId}")
@@ -31,6 +34,16 @@ public class ApiController {
     @GetMapping("/busstops/{listingId}")
     public List<BusStop> getBusStopsByListingId(@PathVariable Long listingId) {
         return apiService.getBusStopsByListingId(listingId, 500);
+    }
+
+    @GetMapping("/nearby-amenities/{listingId}")
+    public NearbyAmenitiesService.NearbyAmenitiesResponse getPrecomputedNearbyAmenities(@PathVariable Long listingId) {
+        return nearbyAmenitiesService.getPrecomputedOrStart(listingId);
+    }
+
+    @PostMapping("/nearby-amenities/{listingId}/precompute")
+    public void precomputeNearbyAmenities(@PathVariable Long listingId) {
+        nearbyAmenitiesService.precomputeForListing(listingId);
     }
 
     @GetMapping("/rentalprices/{listingId}")

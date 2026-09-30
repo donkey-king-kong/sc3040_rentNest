@@ -18,6 +18,8 @@ public class ListingsService {
 
     private final ListingsRepository listingsRepository;
     private final UserRepository userRepository;
+    private final GeocodingService geocodingService;
+    private final NearbyAmenitiesService nearbyAmenitiesService;
 
     // Mapping Listings to ListingsDTO
     public ListingsDTO toListingsDTO(Listings listings) {
@@ -39,6 +41,8 @@ public class ListingsService {
         listingsDTO.setFlagged(listings.isFlagged());
         listingsDTO.setOwnerPhotoURL(listings.getOwnerPhotoURL());
         listingsDTO.setOwnerName(listings.getOwnerName());
+        listingsDTO.setLatitude(listings.getLatitude());
+        listingsDTO.setLongitude(listings.getLongitude());
         
         // Map the foreign key relationship (Owner to UserDTO)
         UserDTO userDTO = new UserDTO();
@@ -50,9 +54,14 @@ public class ListingsService {
     }
 
     @Autowired
-    public ListingsService(ListingsRepository listingsRepository, UserRepository userRepository) {
+    public ListingsService(ListingsRepository listingsRepository,
+                           UserRepository userRepository,
+                           GeocodingService geocodingService,
+                           NearbyAmenitiesService nearbyAmenitiesService) {
         this.listingsRepository = listingsRepository;
         this.userRepository = userRepository;
+        this.geocodingService = geocodingService;
+        this.nearbyAmenitiesService = nearbyAmenitiesService;
     }
 
     // Retrieve all listings
@@ -106,7 +115,18 @@ public class ListingsService {
         listing.setOwner(owner);
         listing.setListingpicture(listingDTO.getListingpicture());
 
-        return listingsRepository.save(listing);
+        if (listingDTO.getPostal() != null) {
+            geocodingService.getCoordinates(Integer.toString(listingDTO.getPostal()))
+                    .ifPresent(coordinates -> {
+                        listing.setLatitude(coordinates.latitude());
+                        listing.setLongitude(coordinates.longitude());
+                    });
+        }
+
+        Listings savedListing = listingsRepository.save(listing);
+        nearbyAmenitiesService.precomputeForListingInBackground(savedListing.getListingID());
+
+        return savedListing;
     }
 //    Example:
 //    {
