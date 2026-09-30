@@ -575,6 +575,7 @@ const handlePaymentAndAccept = async () => {
             const isUser = Number(message.senderId) === Number(currentUser);
             const rentalIdExists = message.rentalId != null;
             const requestIdExists = message.requestId != null;
+            console.log('[msg]', JSON.stringify({ id: message.messageID, senderId: message.senderId, senderPhotoURL: message.senderPhotoURL, rentalId: message.rentalId, requestId: message.requestId, isOwner, isUser, rentalIdExists, requestIdExists }));
 
             if (isOwner && rentalIdExists){
                 return (
