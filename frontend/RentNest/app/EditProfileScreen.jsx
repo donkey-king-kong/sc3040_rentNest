@@ -13,6 +13,7 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
@@ -278,7 +279,12 @@ const EditProfileScreen = () => {
               )}
             </TouchableOpacity>
           </View>
-          {showProfileUpdated ? (
+          <Modal
+            visible={showProfileUpdated}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+          >
             <View style={styles.notificationOverlay} pointerEvents="none">
               <View style={styles.notificationCard}>
                 <View style={styles.notificationIconBox}>
@@ -287,7 +293,7 @@ const EditProfileScreen = () => {
                 <Text style={styles.notificationText}>Profile Updated</Text>
               </View>
             </View>
-          ) : null}
+          </Modal>
           </View>
         )}
       </TouchableWithoutFeedback>
@@ -424,10 +430,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   notificationOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
   notificationCard: {
     width: '100%',
