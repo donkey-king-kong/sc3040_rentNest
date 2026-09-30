@@ -48,6 +48,18 @@ medium (8–14) or high (15+) comparables. Comparable sets are cached for 10
 minutes per postal code and flat type so the live form cannot exceed OneMap's
 rate limit.
 
+## Demo data
+
+Listings whose postal code has fewer than 3 real comparables (or whose market
+data call fails) are priced from 24 simulated transactions instead
+(`DemoTransactionGenerator`). Simulated rents start from typical Singapore rents
+for the property type and bedroom count, with a rough location premium by postal
+sector and deterministic noise, so a listing always gets the same numbers. These
+estimates have `dataSource: "DEMO"` and the card says "Simulated demo
+transactions (not real market data)". Real data is always used when there is
+enough of it. Demo data is on by default; set `pricing.demo-data.enabled=false`
+to use real data only. Nothing is written to the database.
+
 ## Room rentals (AI room-type detection)
 
 HDB and URA only publish whole-unit rentals, and listings have no room/unit

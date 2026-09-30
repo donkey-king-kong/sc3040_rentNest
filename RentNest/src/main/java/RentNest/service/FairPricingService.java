@@ -99,7 +99,7 @@ public class FairPricingService {
 
     @Autowired
     public FairPricingService(ApiService apiService, ListingsService listingsService,
-                              @Value("${pricing.demo-data.enabled:false}") boolean demoData,
+                              @Value("${pricing.demo-data.enabled:true}") boolean demoData,
                               RoomTypeClassifier roomTypeClassifier) {
         this.apiService = apiService;
         this.listingsService = listingsService;

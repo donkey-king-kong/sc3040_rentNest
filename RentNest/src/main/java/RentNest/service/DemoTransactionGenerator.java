@@ -12,7 +12,7 @@ import java.util.Random;
  * listings whose real comparable data is missing or too thin (for example a
  * postal code that is not a residential block).
  *
- * Only used when {@code pricing.demo-data.enabled=true}. Every estimate built
+ * Used when {@code pricing.demo-data.enabled} is true (the default). Every estimate built
  * from this data is labelled with data source "DEMO" so it is never mistaken
  * for real market data. Nothing is written to the database.
  *
