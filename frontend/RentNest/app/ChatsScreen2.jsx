@@ -1025,13 +1025,14 @@ const handlePaymentAndAccept = async () => {
                         )}
                         <Text style={styles.modalDescription}>Ask questions related to this rental conversation only.</Text>
                         <TextInput
-                            style={styles.aiQuestionInput}
+                            style={[styles.aiQuestionInput, isAskingAi && styles.aiQuestionInputDisabled]}
                             placeholder="E.g. What is the tenant asking for?"
                             value={aiQuestion}
                             onChangeText={setAiQuestion}
                             onKeyPress={handleAiQuestionKeyPress}
                             multiline={true}
                             blurOnSubmit={false}
+                            editable={!isAskingAi}
                         />
                         <TouchableOpacity style={styles.aiAskButton} onPress={askAiQuestion} disabled={isAskingAi}>
                             <Text style={styles.whiteButtonText}>{isAskingAi ? 'Asking AI...' : 'Ask AI'}</Text>
@@ -1652,6 +1653,10 @@ const styles = StyleSheet.create({
         padding: 12,
         marginBottom: 15,
         fontSize: 14,
+    },
+    aiQuestionInputDisabled: {
+        backgroundColor: '#e0e0e0',
+        color: '#aaa',
     },
     aiAnswerContainer: {
         width: '100%',
