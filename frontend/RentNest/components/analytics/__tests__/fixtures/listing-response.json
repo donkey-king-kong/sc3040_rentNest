@@ -15,7 +15,8 @@
     "location": null,
     "price": 2000,
     "listingPicture": null,
-    "listedAt": "2026-09-16T19:16:51.214Z"
+    "listedAt": "2026-09-16T19:16:51.214Z",
+    "firstAcceptedAt": null
   },
   "metrics": {
     "occupancyStatus": {
@@ -183,8 +184,8 @@
       "value": null,
       "unit": "days",
       "basis": "snapshot",
-      "definition": "Days from publishing this listing to its first accepted offer, or until now if it has not been rented.",
-      "reason": "Accepted before acceptance dates started being recorded."
+      "definition": "Elapsed days from publication to the first accepted rental offer. Stops at acceptance; never uses the lease start date or today's date.",
+      "reason": "The publication date was not recorded for this listing."
     }
   },
   "series": {

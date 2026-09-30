@@ -93,7 +93,7 @@ P‡ = period metric built on recorded listing views (see limitation 11).
 | `newListingCount` | count | P† | Listings the caller published in the period. |
 | `offersSentCount` / `offersAcceptedCount` / `terminationsCount` | count | P† | Offers sent, offers accepted and tenancies terminated in the period. |
 | `offersSentChange` | percent | P† | Offers sent vs the previous period of the same length. Unavailable unless both periods are fully tracked and the previous one had at least one offer. |
-| `averageDaysOnMarket` | days | P† | For offers accepted in the period: average days from publishing the listing to accepting. Listings published before tracking are excluded. |
+| `averageDaysOnMarket` | days | P† | Average elapsed days from publication to the first accepted offer per listing, where that first acceptance is in the selected period. Missing, reversed, future or indeterminate acceptance dates are excluded. |
 
 | Series | Basis | Points |
 |---|---|---|
@@ -113,7 +113,7 @@ Includes every rental, tenancy and payment metric above, scoped to one listing, 
 | `listingViews` | count | P‡ | Times the listing detail page was opened in the period, counting repeat visits separately. An owner opening their own listing is not recorded. |
 | `uniqueListingViewers` | count | P‡ | Distinct signed-in people who opened the listing in the period; repeat visits by one person count once. |
 | `photoGalleryViews` | count | P | **Unavailable.** A listing stores a single photograph, so there is no gallery to browse. |
-| `daysOnMarket` | days | S | Days from publishing to the first accepted offer, or until now if not yet rented. Unavailable for listings published before tracking started. |
+| `daysOnMarket` | days | S | Elapsed days from publication to the first accepted offer, independent of the selected period. Never falls back to today or the lease start. Pending, missing-date, reversed-date and future-date cases are unavailable with an explanation; an actual same-time acceptance is a measured zero. |
 | `offersSentCount` / `offersAcceptedCount` / `terminationsCount` | count | P† | As in the owner summary, for this listing. |
 | `averageOccupancyRate` / `averageOccupancyRateChange`, payment changes | | P | As in the owner summary, for this one listing. |
 
@@ -245,3 +245,17 @@ mvn test -Dtest=AnalyticsControllerIntegrationTest
 ```
 
 On JDK 22 or newer, Mockito and Byte Buddy need `"-DargLine=-Dnet.bytebuddy.experimental=true"`. The project targets Java 21.
+
+### Publication-to-acceptance dates
+
+The listing envelope exposes `listedAt` and `firstAcceptedAt` (ISO instants, nullable). The UI shows both dates beside **Days on market**. Listing creation publishes immediately in the current app, so the server-owned `listings.created_at` is the publication timestamp. Acceptance uses the server-owned `rentals.accepted_at`, not `rental_date` (lease start). New publications and acceptances already record these through the existing lifecycle flow; this fix needs no schema change.
+
+An accepted historical rental with an unknown acceptance date makes the first acceptance indeterminate, even if a later dated acceptance exists. Such a listing is excluded from the owner/platform average, as are records missing publication dates. Do not backfill from lease dates or the date of a migration; historical dates require a verified source.
+
+### Dashboard navigation
+
+- Owner: **Overview**, **Rent**, **Occupancy**, **Offers**, **Properties**.
+- Admin: **Overview**, **Rentals**, **Users**, **Safety**.
+- Property: **Overview**, **Offers**, **Payments**, **Occupancy**.
+
+Only the selected section scrolls. The tabs and period selector remain visible, switching tabs resets the section to its top, and the chosen period is retained. Wider screens use a bounded content width and up to four metric tiles per row; narrower screens wrap the tabs and use two tiles per row. Listing views and unique viewers remain in the property's Overview.

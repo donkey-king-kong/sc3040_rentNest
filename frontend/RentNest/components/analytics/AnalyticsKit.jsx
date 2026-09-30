@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, StyleSheet, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { FontAwesome } from 'react-native-vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -237,6 +237,8 @@ export const PeriodSelector = ({ value, onChange, loading }) => (
           onPress={() => onChange(option.key)}
           style={[styles.chip, selected && styles.chipSelected]}
           accessibilityRole="button"
+          accessibilityLabel={`${option.label} period`}
+          aria-pressed={selected}
           accessibilityState={{ selected }}
         >
           <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{option.label}</Text>
@@ -274,13 +276,14 @@ export const ErrorState = ({ message, onRetry, actionLabel = 'Try again' }) => (
  */
 export const StatTile = ({ label, metric, change, icon, tone }) => {
   const [showDefinition, setShowDefinition] = useState(false);
+  const { width } = useWindowDimensions();
   if (!metric) return null;
   const available = metric.availability === 'available';
   const colors = TONES[tone];
 
   return (
     <Pressable
-      style={[styles.tile, colors && { backgroundColor: colors.background, borderColor: colors.background }]}
+      style={[styles.tile, width >= 1000 && styles.wideTile, colors && { backgroundColor: colors.background, borderColor: colors.background }]}
       onPress={() => setShowDefinition((shown) => !shown)}
       accessibilityRole="button"
       accessibilityLabel={`${label}: ${available ? formatValue(metric.value, metric.unit) : 'not available'}`}
@@ -667,6 +670,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.inkSecondary,
   },
+  wideTile: {
+    flexBasis: '22%',
+  },
   tileValue: {
     fontSize: 22,
     fontWeight: 'bold',
@@ -755,8 +761,10 @@ const styles = StyleSheet.create({
   },
   periodRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 8,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 14,
   },
   periodLabel: {
     fontSize: 14,
@@ -765,11 +773,11 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingVertical: 6,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginRight: 8,
+    marginRight: 6,
     backgroundColor: COLORS.surface,
   },
   chipSelected: {

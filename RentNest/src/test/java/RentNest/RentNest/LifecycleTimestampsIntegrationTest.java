@@ -235,7 +235,8 @@ class LifecycleTimestampsIntegrationTest {
                         "2026-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metrics.daysOnMarket.value").value(10.0))
-                .andExpect(jsonPath("$.listing.listedAt").value("2026-01-31T16:00:00Z"));
+                .andExpect(jsonPath("$.listing.listedAt").value("2026-01-31T16:00:00Z"))
+                .andExpect(jsonPath("$.listing.firstAcceptedAt").value("2026-02-10T16:00:00Z"));
 
         // Published before tracking: unknown, not zero
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/listings/" + listingIdByName("L3")),
@@ -243,11 +244,13 @@ class LifecycleTimestampsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metrics.daysOnMarket.availability").value("unavailable"));
 
-        // Never rented: counts up to now
+        // Never rented: no completed publication-to-acceptance interval yet.
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/listings/" + listingIdByName("L4")),
                         "2026-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.daysOnMarket.value").value(greaterThan(200.0)));
+                .andExpect(jsonPath("$.metrics.daysOnMarket.value").value(nullValue()))
+                .andExpect(jsonPath("$.metrics.daysOnMarket.reason").value("No rental offer has been accepted yet. Days on market will be available after acceptance."))
+                .andExpect(jsonPath("$.listing.firstAcceptedAt").value(nullValue()));
     }
 
     @Test

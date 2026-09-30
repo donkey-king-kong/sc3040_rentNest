@@ -173,7 +173,7 @@ public class AnalyticsService {
         metrics.put("offersSentChange", percentChange(period,
                 "Change in offers sent compared with the previous period of the same length.",
                 (from, to) -> countInRange(rentals, RentalRow::createdAt, from, to)));
-        metrics.put("averageDaysOnMarket", averageDaysOnMarket(rentals, period));
+        metrics.put("averageDaysOnMarket", averageDaysOnMarket(rentals, period, asOf));
 
         Map<String, Series> series = new LinkedHashMap<>();
         series.put("monthlyRecordedRentPayments", monthlyPaymentSeries(payments, period));
@@ -198,6 +198,7 @@ public class AnalyticsService {
         listingInfo.put("price", listing.getPrice());
         listingInfo.put("listingPicture", listing.getListingpicture());
         listingInfo.put("listedAt", listing.getCreatedAt() == null ? null : listing.getCreatedAt().toInstant());
+        listingInfo.put("firstAcceptedAt", hasUndatedAcceptance(rentals) ? null : firstAcceptedAt(rentals).orElse(null));
 
         Map<String, Metric> metrics = new LinkedHashMap<>();
         boolean occupied = countOccupiedListings(rentals, asOf) > 0;
@@ -221,7 +222,7 @@ public class AnalyticsService {
         metrics.put("photoGalleryViews", Metric.unavailable(COUNT, PERIOD,
                 "Times people browsed this listing's photographs.",
                 "A listing stores a single photograph, so there is no gallery to browse."));
-        metrics.put("daysOnMarket", listingDaysOnMarket(listing, rentals, asOf));
+        metrics.put("daysOnMarket", listingDaysOnMarket(listing.getCreatedAt(), rentals, asOf));
 
         Map<String, Series> series = new LinkedHashMap<>();
         series.put("monthlyRecordedRentPayments", monthlyPaymentSeries(payments, period));
@@ -275,7 +276,7 @@ public class AnalyticsService {
         metrics.put("newListingCountChange", percentChange(period,
                 "Change in new listings compared with the previous period of the same length.", queries::countListingsCreated));
         putLifecycleCounts(metrics, rentals, period);
-        metrics.put("averageDaysOnMarket", averageDaysOnMarket(rentals, period));
+        metrics.put("averageDaysOnMarket", averageDaysOnMarket(rentals, period, asOf));
 
         metrics.put("reportResolutionRate", Metric.unavailable(PERCENT, PERIOD, "Resolved reports divided by submitted reports.",
                 "Not available: reports are stored as flags without a report record or resolution timestamp."));
@@ -574,46 +575,61 @@ public class AnalyticsService {
                         !period.from().isBefore(viewTrackingStart)));
     }
 
-    private Metric averageDaysOnMarket(List<RentalRow> rentals, AnalyticsPeriod period) {
-        String definition = "Average days from publishing a listing to accepting an offer on it, for offers accepted during the period. "
-                + "Only listings published after tracking started are included.";
+    private Metric averageDaysOnMarket(List<RentalRow> rentals, AnalyticsPeriod period, Instant asOf) {
+        String definition = "Average days from publication to the first accepted rental offer per listing, "
+                + "where that first acceptance falls in the selected period. Listings with missing or invalid dates are excluded.";
         if (!trackingStart.isBefore(period.to())) {
             return Metric.unavailable("days", PERIOD, definition, notTrackedReason());
         }
-        List<BigDecimal> days = rentals.stream()
-                .filter(rental -> inRange(rental.acceptedAt(), period.from(), period.to()))
-                .filter(rental -> rental.listingCreatedAt() != null && !rental.acceptedAt().before(rental.listingCreatedAt()))
-                .map(rental -> daysBetween(rental.listingCreatedAt().toInstant(), rental.acceptedAt().toInstant()))
-                .toList();
+        Map<Long, List<RentalRow>> byListing = new LinkedHashMap<>();
+        rentals.forEach(rental -> byListing.computeIfAbsent(rental.listingId(), id -> new ArrayList<>()).add(rental));
+        List<BigDecimal> days = new ArrayList<>();
+        for (List<RentalRow> history : byListing.values()) {
+            Optional<Instant> accepted = firstAcceptedAt(history);
+            if (accepted.isEmpty() || accepted.get().isBefore(period.from()) || !accepted.get().isBefore(period.to())) continue;
+            Metric duration = listingDaysOnMarket(history.getFirst().listingCreatedAt(), history, asOf);
+            if (Metric.AVAILABLE.equals(duration.availability())) days.add((BigDecimal) duration.value());
+        }
         if (days.isEmpty()) {
             return Metric.unavailable("days", PERIOD, definition,
-                    "No offers were accepted in this period on listings published since tracking started.");
+                    "No first accepted offers with valid publication and acceptance dates in this period.");
         }
         BigDecimal sum = days.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
         return Metric.available(sum.divide(BigDecimal.valueOf(days.size()), 1, RoundingMode.HALF_UP), "days", PERIOD, definition)
                 .withCoverage(coverage(period));
     }
 
-    private Metric listingDaysOnMarket(Listings listing, List<RentalRow> rentals, Instant asOf) {
-        String definition = "Days from publishing this listing to its first accepted offer, or until now if it has not been rented.";
-        if (listing.getCreatedAt() == null) {
-            return Metric.unavailable("days", SNAPSHOT, definition,
-                    "Published before " + formatDate(trackingStart) + ", when publish dates started being recorded.");
+    private Metric listingDaysOnMarket(Date publishedAt, List<RentalRow> rentals, Instant asOf) {
+        String definition = "Elapsed days from publication to the first accepted rental offer. "
+                + "Stops at acceptance; never uses the lease start date or today's date.";
+        if (publishedAt == null) {
+            return Metric.unavailable("days", SNAPSHOT, definition, "The publication date was not recorded for this listing.");
         }
-        Optional<Instant> firstAccepted = rentals.stream()
-                .map(RentalRow::acceptedAt)
-                .filter(Objects::nonNull)
-                .map(Date::toInstant)
-                .min(Comparator.naturalOrder());
-        if (firstAccepted.isEmpty() && countAccepted(rentals) > 0) {
-            return Metric.unavailable("days", SNAPSHOT, definition, "Accepted before acceptance dates started being recorded.");
+        if (hasUndatedAcceptance(rentals)) {
+            return Metric.unavailable("days", SNAPSHOT, definition, "An accepted offer has no recorded acceptance date, so the first acceptance cannot be determined.");
         }
-        Instant listed = listing.getCreatedAt().toInstant();
-        Instant end = firstAccepted.orElse(asOf);
+        Optional<Instant> firstAccepted = firstAcceptedAt(rentals);
+        if (firstAccepted.isEmpty()) {
+            return Metric.unavailable("days", SNAPSHOT, definition, "No rental offer has been accepted yet. Days on market will be available after acceptance.");
+        }
+        Instant listed = publishedAt.toInstant();
+        Instant end = firstAccepted.get();
         if (end.isBefore(listed)) {
             return Metric.unavailable("days", SNAPSHOT, definition, "The recorded acceptance is earlier than the recorded publish date.");
         }
+        if (end.isAfter(asOf)) {
+            return Metric.unavailable("days", SNAPSHOT, definition, "The recorded acceptance date is in the future.");
+        }
         return Metric.available(daysBetween(listed, end), "days", SNAPSHOT, definition);
+    }
+
+    private static Optional<Instant> firstAcceptedAt(List<RentalRow> rentals) {
+        return rentals.stream().map(RentalRow::acceptedAt).filter(Objects::nonNull)
+                .map(Date::toInstant).min(Comparator.naturalOrder());
+    }
+
+    private static boolean hasUndatedAcceptance(List<RentalRow> rentals) {
+        return rentals.stream().anyMatch(rental -> ACCEPTED_STATUSES.contains(normalise(rental.status())) && rental.acceptedAt() == null);
     }
 
     private Metric.Coverage coverage(AnalyticsPeriod period) {

@@ -323,7 +323,6 @@ describe('ListingAnalyticsScreen', () => {
     expect(text).toContain('Vacant');
     expect(text).toContain('S$1,500');
     expect(text).toContain('65.6%');
-    expect(text).toContain('3.0 mo');
     // Listing views, unique viewers (both before view tracking) and days on market
     // must not render as numbers
     expect(text).toContain('Unique viewers');
@@ -342,6 +341,7 @@ describe('ListingAnalyticsScreen', () => {
     await pressTab(tree, 'Occupancy');
     text = renderedText(tree);
     expect(text).toContain('Occupied 2 of 3 months');
+    expect(text).toContain('3.0 mo');
   });
 
   it('shows a retryable error when the request fails', async () => {

@@ -3,6 +3,7 @@ import { View, Text, Image, ScrollView, Pressable, Modal, StyleSheet } from 'rea
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { FontAwesome } from 'react-native-vector-icons';
 import { ENDPOINTS } from '../config/api';
+import AnalyticsLayout from '../components/analytics/AnalyticsLayout';
 import {
   COLORS,
   BarChart,
@@ -11,11 +12,11 @@ import {
   LoadingState,
   Meter,
   OccupancyStrip,
-  PeriodSelector,
   Section,
   StatTile,
   TileRow,
   formatValue,
+  formatDay,
   useAnalytics,
   useOwnedListings,
 } from '../components/analytics/AnalyticsKit';
@@ -54,9 +55,11 @@ const ListingAnalyticsScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <>
       {header}
-
+      <AnalyticsLayout tabs={TABS} tab={tab} onTabChange={setTab}
+        period={period} onPeriodChange={setPeriod} loading={loading} error={error}
+        header={<>
       <View style={styles.listingHeader}>
         {listing.listingPicture ? <Image source={{ uri: listing.listingPicture }} style={styles.image} /> : null}
         <View style={styles.listingText}>
@@ -82,35 +85,29 @@ const ListingAnalyticsScreen = () => {
         </Pressable>
       ) : null}
 
-      <PeriodSelector value={period} onChange={setPeriod} loading={loading} />
-
-      <View style={styles.tabBar}>
-        {TABS.map((name) => {
-          const selected = name === tab;
-          return (
-            <Pressable
-              key={name}
-              style={[styles.tab, selected && styles.tabSelected]}
-              onPress={() => setTab(name)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              accessibilityLabel={`${name} tab`}
-            >
-              <Text style={[styles.tabText, selected && styles.tabTextSelected]}>{name}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+        </>}>
 
       {tab === 'Overview' ? (
         <>
           <Section title="At a glance">
             <TileRow>
               <StatTile icon="dollar" tone="orange" label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
-              <StatTile icon="credit-card" tone="magenta" label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
               <StatTile icon="pie-chart" tone="violet" label="Occupancy in period" metric={m.averageOccupancyRate} change={m.averageOccupancyRateChange} />
+            </TileRow>
+          </Section>
+          <Section title="Time to accepted offer" note="From publication to the first accepted rental offer. This value stops at acceptance and is independent of the selected period.">
+            <TileRow>
               <StatTile icon="calendar" tone="blue" label="Days on market" metric={m.daysOnMarket} />
-              <StatTile icon="clock-o" tone="blue" label="Average tenancy" metric={m.averageTenancyMonths} />
+              <View style={styles.marketDates}>
+                <Text style={styles.dateLabel}>Published</Text>
+                <Text style={styles.dateValue}>{listing.listedAt ? formatDay(listing.listedAt) : 'Not recorded'}</Text>
+                <Text style={styles.dateLabel}>First offer accepted</Text>
+                <Text style={styles.dateValue}>{listing.firstAcceptedAt ? formatDay(listing.firstAcceptedAt) : 'Not recorded'}</Text>
+              </View>
+            </TileRow>
+          </Section>
+          <Section title="Listing interest">
+            <TileRow>
               <StatTile icon="eye" tone="blue" label="Listing views" metric={m.listingViews} />
               <StatTile icon="users" tone="violet" label="Unique viewers" metric={m.uniqueListingViewers} />
             </TileRow>
@@ -165,6 +162,7 @@ const ListingAnalyticsScreen = () => {
         </>
       ) : null}
 
+      </AnalyticsLayout>
       <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setPickerOpen(false)} accessibilityLabel="Close">
           {/* Taps inside the sheet must not reach the backdrop, which closes it */}
@@ -193,27 +191,22 @@ const ListingAnalyticsScreen = () => {
           </Pressable>
         </Pressable>
       </Modal>
-    </ScrollView>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-  },
+  marketDates: { flexGrow: 1, flexBasis: '45%', margin: 5, padding: 12, backgroundColor: COLORS.card, borderRadius: 12 },
+  dateLabel: { fontSize: 12, color: COLORS.inkSecondary },
+  dateValue: { fontSize: 15, color: COLORS.ink, fontWeight: '600', marginTop: 2, marginBottom: 10 },
   listingHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
   },
   image: {
-    width: 88,
-    height: 88,
+    width: 64,
+    height: 64,
     borderRadius: 12,
     marginRight: 14,
     backgroundColor: COLORS.card,
@@ -270,30 +263,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.ink,
     marginRight: 8,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    marginBottom: 18,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabSelected: {
-    borderBottomColor: COLORS.ink,
-  },
-  tabText: {
-    fontSize: 14,
-    color: COLORS.inkSecondary,
-  },
-  tabTextSelected: {
-    color: COLORS.ink,
-    fontWeight: '600',
   },
   modalBackdrop: {
     flex: 1,
