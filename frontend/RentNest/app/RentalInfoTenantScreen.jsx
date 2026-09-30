@@ -86,7 +86,7 @@ const RentalInfoTenant = () => {
   // Function to navigate to RentPayment screen
   const handleRentPayment = () => {
     if (listing && listing.listingID) {
-      router.push({pathname: '/RentPayment', params: { listingId: listing.listingID, tenantId }});
+      router.push({ pathname: '/RentPayment', params: { listingId: listing.listingID, tenantId } });
     } else {
       console.error('Listing ID is missing, cannot navigate to RentPayment');
     }
@@ -96,7 +96,7 @@ const RentalInfoTenant = () => {
   const handleLeaveReview = () => {
     if (listing && listing.ownerId) {
       console.log('Attempting to navigate with:', { ownerId: listing.ownerId, listingId, tenantId });
-      router.push({pathname: '/LeaveReview', params: { ownerId: listing.ownerId, listingId, tenantId }});
+      router.push({ pathname: '/LeaveReview', params: { ownerId: listing.ownerId, listingId, tenantId } });
     } else {
       console.error('Listing information is missing, cannot navigate to LeaveReview');
     }
@@ -110,7 +110,7 @@ const RentalInfoTenant = () => {
           <TouchableOpacity
               style={styles.transparentButton}
               onPress={() => {
-                router.push({pathname: '/ChatsScreen2', params: {partnerUserId: listing.ownerId, currentUser: listing.tenantId}});
+                router.push({ pathname: '/ChatsScreen2', params: { partnerUserId: listing.ownerId, currentUser: listing.tenantId } });
               }}
           >
             <Image source={chatIcon} style={[styles.icon, styles.lighterIcon]} />

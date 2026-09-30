@@ -1,6 +1,5 @@
-import {useEffect, useState} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal, TextInput} from 'react-native';
-import { FontAwesome } from '@expo/vector-icons';
+import React, {useEffect, useState} from 'react';
+import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 
 // Import Icons
@@ -21,17 +20,7 @@ import MorphingInfinity from '../components/MorphingInfinity';
 
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
-
-const Avatar = ({ uri }) => {
-    if (uri) {
-        return <Image source={{ uri }} style={styles.avatar} />;
-    }
-    return (
-        <View style={styles.avatarFallback}>
-            <FontAwesome name="user" size={16} color="#888" />
-        </View>
-    );
-};
+const profilePic = require('../assets/images/chatProfilePic.jpg');
 
 const ChatsScreen2 = () => {
     const router = useRouter();
@@ -52,6 +41,19 @@ const ChatsScreen2 = () => {
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false)
     const [isPaymentSuccessfulModalVisible, setPaymentSuccessfulModalVisible] = useState(false)
     const [Loading, setLoading] = useState(true);
+    const [isSummaryModalVisible, setSummaryModalVisible] = useState(false);
+    const [isGeneratingSummary, setGeneratingSummary] = useState(false);
+    const [chatSummary, setChatSummary] = useState('');
+    const [summaryError, setSummaryError] = useState('');
+    const [isSummaryPlaceholder, setSummaryPlaceholder] = useState(true);
+    const [summaryCache, setSummaryCache] = useState(null);
+    const [isAskAiModalVisible, setAskAiModalVisible] = useState(false);
+    const [aiQuestion, setAiQuestion] = useState('');
+    const [submittedAiQuestion, setSubmittedAiQuestion] = useState('');
+    const [aiAnswer, setAiAnswer] = useState('');
+    const [aiAnswerCategory, setAiAnswerCategory] = useState('');
+    const [isAiAnswerPlaceholder, setAiAnswerPlaceholder] = useState(false);
+    const [isAskingAi, setAskingAi] = useState(false);
     const { refresh } = useLocalSearchParams();
 
     const getConversation = async () => {
@@ -336,6 +338,151 @@ const ChatsScreen2 = () => {
         }
     };
 
+    const getChatSummaryCacheKey = () => {
+        if (!Array.isArray(chat) || chat.length === 0) {
+            return `${partnerUserId}-${currentUser}-empty`;
+        }
+
+        const latestMessage = chat[chat.length - 1];
+        return [
+            partnerUserId,
+            currentUser,
+            chat.length,
+            latestMessage?.messageID || '',
+            latestMessage?.date || '',
+            latestMessage?.senderId || '',
+            latestMessage?.message || '',
+        ].join('|');
+    }
+
+    const getChatSummary = async () => {
+        const cacheKey = getChatSummaryCacheKey();
+
+        if (summaryCache?.key === cacheKey) {
+            setSummaryError('');
+            setChatSummary(summaryCache.summary);
+            setSummaryPlaceholder(summaryCache.placeholder);
+            setSummaryModalVisible(true);
+            return;
+        }
+
+        try {
+            setGeneratingSummary(true);
+            setSummaryError('');
+            setChatSummary('');
+
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                console.log('No token found!');
+                router.replace('/LoginScreen');
+                return;
+            }
+
+            const summaryResponse = await axios.get(`${API_BASE_URL}/api/ai-chat/summary`, {
+                params: {
+                    userA: partnerUserId,
+                    userB: currentUser
+                },
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+            });
+
+            const generatedSummary = summaryResponse.data?.summary || 'No summary available.';
+            const isPlaceholderSummary = summaryResponse.data?.placeholder ?? true;
+
+            setChatSummary(generatedSummary);
+            setSummaryPlaceholder(isPlaceholderSummary);
+            setSummaryCache({
+                key: cacheKey,
+                summary: generatedSummary,
+                placeholder: isPlaceholderSummary,
+            });
+            setSummaryModalVisible(true);
+        } catch (error) {
+            console.error('Error generating chat summary:', error);
+            setSummaryError('Unable to generate chat summary right now.');
+            setSummaryPlaceholder(false);
+            setSummaryModalVisible(true);
+        } finally {
+            setGeneratingSummary(false);
+        }
+    }
+
+    const askAiQuestion = async () => {
+        const questionToAsk = aiQuestion.trim();
+        if (questionToAsk === '') {
+            return;
+        }
+
+        try {
+            setAskingAi(true);
+            setSubmittedAiQuestion(questionToAsk);
+            setAiQuestion('');
+            setAiAnswer('');
+            setAiAnswerCategory('');
+            setAiAnswerPlaceholder(false);
+
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                console.log('No token found!');
+                router.replace('/LoginScreen');
+                return;
+            }
+
+            const askAiResponse = await axios.post(`${API_BASE_URL}/api/ai-chat/ask`, {
+                userA: partnerUserId,
+                userB: currentUser,
+                question: questionToAsk,
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+            });
+
+            setAiAnswer(askAiResponse.data?.answer || 'No AI answer available.');
+            setAiAnswerCategory(askAiResponse.data?.category || '');
+            setAiAnswerPlaceholder(askAiResponse.data?.placeholder ?? true);
+        } catch (error) {
+            console.error('Error asking AI question:', error);
+            setAiAnswer('Unable to ask AI right now.');
+            setAiAnswerCategory('error');
+            setAiAnswerPlaceholder(false);
+        } finally {
+            setAskingAi(false);
+        }
+    }
+
+    const handleAiQuestionKeyPress = (event) => {
+        const nativeEvent = event.nativeEvent || {};
+        if (nativeEvent.key !== 'Enter') {
+            return;
+        }
+
+        if (nativeEvent.shiftKey || nativeEvent.ctrlKey || nativeEvent.metaKey) {
+            return;
+        }
+
+        event.preventDefault?.();
+        askAiQuestion();
+    }
+
+    const getAiAnswerTitle = () => {
+        if (aiAnswerCategory === 'chat_summary') {
+            return 'Chat Summary';
+        }
+
+        if (aiAnswerCategory === 'out_of_scope') {
+            return 'Unable to Answer';
+        }
+
+        return 'AI Response';
+    }
+
     const sendRentalOffer = async() => {
         try{
             const token = await AsyncStorage.getItem('token');
@@ -573,14 +720,14 @@ const handlePaymentAndAccept = async () => {
         return chat.map((message) => {
             const isOwner = Number(currentUser) === Number(rental.ownerUserId);
             const isUser = Number(message.senderId) === Number(currentUser);
-            const rentalIdExists = message.rentalId != null;
-            const requestIdExists = message.requestId != null;
+            const rentalIdExists = message.rentalId !== null;
+            const requestIdExists = message.requestId !== null;
 
             if (isOwner && rentalIdExists){
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Avatar uri={message?.senderPhotoURL} />
+                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -604,7 +751,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Avatar uri={message?.senderPhotoURL} />
+                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -639,7 +786,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Avatar uri={message?.senderPhotoURL} />
+                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -661,7 +808,7 @@ const handlePaymentAndAccept = async () => {
                 return (
                     <View key={message.messageID}>
                         <View key={message.messageID} style={styles.headerContainer}>
-                            <Avatar uri={message?.senderPhotoURL} />
+                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
                             <View style={styles.rentalOfferContainer}>
                                 <View style={styles.headerContainer}>
                                     <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -692,7 +839,7 @@ const handlePaymentAndAccept = async () => {
             else {
                 return (
                     <View key={message.messageID} style={styles.headerContainer}>
-                        <Avatar uri={message?.senderPhotoURL} />
+                        <Image source={message?.senderPhotoURL ? {uri: message.senderPhotoURL} : profilePic} style={styles.avatar}/>
                         <View style={styles.messageContainer}>
                             <View style={styles.headerContainer}>
                                 <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
@@ -731,26 +878,41 @@ const handlePaymentAndAccept = async () => {
         );
     }
 
+    const summaryTextToDisplay = summaryError || chatSummary;
+    const shouldScrollSummary = summaryTextToDisplay.length > 650;
+    const shouldScrollAiAnswer = aiAnswer.length > 650;
+
     return (
         <View style={styles.container}>
             {/* Header */}
             <View style={styles.nameHeaderContainer}>
                 <Text style={styles.header}>{partner.name}</Text>
-                <TouchableOpacity onPress={() => {
-                    // Navigate to UserReviewsScreen while passing userId
-                    router.push({pathname: '/UserReviewsScreen', params: { userId: partnerUserId }});
-                }}>
-                    <Text style={styles.reviews}>Reviews</Text>
-                </TouchableOpacity>
+                <View style={styles.headerActions}>
+                    <TouchableOpacity onPress={() => setAskAiModalVisible(true)} style={styles.aiSummaryButton}>
+                        <Text style={styles.aiSummaryButtonText}>Ask AI</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={getChatSummary} style={styles.aiSummaryButton} disabled={isGeneratingSummary}>
+                        <Text style={styles.aiSummaryButtonText}>{isGeneratingSummary ? 'Summarising...' : 'Summarise Chat'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => {
+                        // Navigate to UserReviewsScreen while passing userId
+                        router.push({ pathname: '/UserReviewsScreen', params: { userId: partnerUserId } });
+                    }}>
+                        <Text style={styles.reviews}>Reviews</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {/* Thin divider */}
             <View style={styles.thinDivider} />
 
 
-            <ScrollView style={styles.chatList}>
-                {renderMessage()}
-            </ScrollView>
+            <FlatList
+                data={chat.length > 0 ? [chat[0]] : []} // Pass first message or a placeholder
+                renderItem={renderMessage}
+                keyExtractor={item => item.messageID?.toString() || 'empty'}
+                style={styles.chatList}
+            />
 
             <View style={styles.inputContainer}>
                 <TouchableOpacity onPress={toggleAttachmentModal}>
@@ -776,6 +938,86 @@ const handlePaymentAndAccept = async () => {
                     <Image source={sendIcon} style={styles.icon}/>
                 </TouchableOpacity>
             </View>
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isSummaryModalVisible}
+                onRequestClose={() => setSummaryModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, styles.aiModalContent]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>AI Chat Summary</Text>
+                            <TouchableOpacity onPress={() => setSummaryModalVisible(false)}>
+                                <Image source={x} style={styles.icon}/>
+                            </TouchableOpacity>
+                        </View>
+                        {isSummaryPlaceholder && (
+                            <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
+                        )}
+                        <ScrollView
+                            style={[styles.aiResponseScroll, shouldScrollSummary && styles.aiResponseScrollLong]}
+                            scrollEnabled={shouldScrollSummary}
+                        >
+                            <Text style={styles.summaryText}>{summaryError || chatSummary}</Text>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={isAskAiModalVisible}
+                onRequestClose={() => setAskAiModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, styles.aiModalContent]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Ask AI About This Chat</Text>
+                            <TouchableOpacity onPress={() => setAskAiModalVisible(false)}>
+                                <Image source={x} style={styles.icon}/>
+                            </TouchableOpacity>
+                        </View>
+                        {aiAnswer !== '' && isAiAnswerPlaceholder && (
+                            <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder LLM guardrails.</Text>
+                        )}
+                        <Text style={styles.modalDescription}>Ask questions related to this rental conversation only.</Text>
+                        <TextInput
+                            style={styles.aiQuestionInput}
+                            placeholder="E.g. What is the tenant asking for?"
+                            value={aiQuestion}
+                            onChangeText={setAiQuestion}
+                            onKeyPress={handleAiQuestionKeyPress}
+                            multiline={true}
+                            blurOnSubmit={false}
+                        />
+                        <View style={styles.longBlackButton}>
+                            <TouchableOpacity onPress={askAiQuestion} disabled={isAskingAi}>
+                                <Text style={styles.whiteButtonText}>{isAskingAi ? ' Asking AI... ' : ' Ask AI '}</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {aiAnswer !== '' && (
+                            <View style={styles.aiAnswerContainer}>
+                                {submittedAiQuestion !== '' && (
+                                    <View style={styles.aiAskedQuestionContainer}>
+                                        <Text style={styles.aiAskedQuestionLabel}>You Asked</Text>
+                                        <Text style={styles.aiAskedQuestionText}>{submittedAiQuestion}</Text>
+                                    </View>
+                                )}
+                                <Text style={styles.aiAnswerTitle}>{getAiAnswerTitle()}</Text>
+                                <ScrollView
+                                    style={[styles.aiResponseScroll, shouldScrollAiAnswer && styles.aiResponseScrollLong]}
+                                    scrollEnabled={shouldScrollAiAnswer}
+                                >
+                                    <Text style={styles.summaryText}>{aiAnswer}</Text>
+                                </ScrollView>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </Modal>
 
             <Modal
                 animationType="slide"
@@ -985,6 +1227,23 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
     },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    aiSummaryButton: {
+        backgroundColor: '#000',
+        borderRadius: 12,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        marginRight: 12,
+        marginBottom: 10,
+    },
+    aiSummaryButtonText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
     headerContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1086,15 +1345,7 @@ const styles = StyleSheet.create({
     avatar: {
         width: 30,
         height: 30,
-        borderRadius: 15,
-    },
-    avatarFallback: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: '#e0e0e0',
-        alignItems: 'center',
-        justifyContent: 'center',
+        borderRadius: 20,
     },
     date:{
         fontSize: 10,
@@ -1135,6 +1386,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         alignItems: 'center',
     },
+    aiModalContent: {
+        alignItems: 'stretch',
+        maxHeight: '80%',
+    },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -1165,6 +1420,64 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
         marginBottom: 10,
+    },
+    placeholderNotice: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 12,
+        color: '#7A4E00',
+    },
+    summaryText: {
+        fontSize: 14,
+        lineHeight: 20,
+        textAlign: 'left',
+        width: '100%',
+        marginBottom: 10,
+    },
+    aiResponseScroll: {
+        width: '100%',
+        flexGrow: 0,
+    },
+    aiResponseScrollLong: {
+        maxHeight: 360,
+    },
+    aiQuestionInput: {
+        width: '100%',
+        backgroundColor: '#f1f1f1',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 15,
+        fontSize: 14,
+    },
+    aiAnswerContainer: {
+        width: '100%',
+        backgroundColor: '#f9f9f9',
+        borderRadius: 10,
+        padding: 12,
+        marginTop: 15,
+    },
+    aiAskedQuestionContainer: {
+        backgroundColor: '#efefef',
+        borderRadius: 8,
+        padding: 10,
+        marginBottom: 10,
+    },
+    aiAskedQuestionLabel: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginBottom: 4,
+        color: '#666',
+    },
+    aiAskedQuestionText: {
+        fontSize: 14,
+        lineHeight: 20,
+    },
+    aiAnswerTitle: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginBottom: 8,
+        color: '#666',
     },
     infoContainer: {
         marginBottom: 10,

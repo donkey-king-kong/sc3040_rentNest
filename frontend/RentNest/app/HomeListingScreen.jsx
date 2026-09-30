@@ -1,6 +1,6 @@
 // Previous imports remain unchanged
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Modal} from 'react-native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Modal} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import MapView, { Marker } from '../components/AppMap';
 import {useRouter, useLocalSearchParams} from "expo-router";
@@ -215,13 +215,6 @@ const HomeListingScreen = () => {
             }));
             setReviews(formattedReviews);
           })
-          .catch(error => {
-            if (error.response?.status === 404) {
-              setReviews([]);
-            } else {
-              throw error;
-            }
-          })
       ]).then(results => {
         results.forEach((result, index) => {
           if (result.status === 'rejected') {
@@ -292,7 +285,7 @@ const HomeListingScreen = () => {
   console.log('Rendering main component');
 
   return (
-    <ScrollView style={styles.box} contentContainerStyle={{ paddingBottom: 50 }}>
+    <ScrollView style={styles.box}>
       <Image source={{ uri: listing.imageURL }} style={styles.image} />
       <View style={styles.container}>
         {/* Display the name and address */}
@@ -360,9 +353,7 @@ const HomeListingScreen = () => {
         {/* Map to show nearby places */}
         <MapView
           style={styles.map}
-          region={mapRegion}
-          scrollEnabled={false}
-          zoomEnabled={false}
+          region={mapRegion} // Update to use the mapRegion state
         >
           {data.map((place, index) => (
             <Marker
@@ -431,12 +422,16 @@ const HomeListingScreen = () => {
                         <Text style={styles.cellHeader}>Lease Date</Text>
                         <Text style={styles.cellHeader}>Rent Price</Text>
                     </View>
-                    {priceInsights.map((item) => (
-                        <View key={item.leaseDate} style={styles.row}>
-                            <Text style={styles.cell}>{item.leaseDate}</Text>
-                            <Text style={styles.cell}>${item.rentPrice}</Text>
-                        </View>
-                    ))}
+                    <FlatList
+                         data={priceInsights}
+                         keyExtractor={(item) => item.leaseDate}
+                         renderItem={({ item }) => (
+                             <View style={styles.row}>
+                             <Text style={styles.cell}>{item.leaseDate}</Text>
+                             <Text style={styles.cell}>${item.rentPrice}</Text>
+                           </View>
+                         )}
+                     />
                 </View>
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
@@ -505,7 +500,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    padding: 15,
     paddingHorizontal: 20,
     backgroundColor: '#fff',
   },
@@ -604,11 +598,11 @@ const styles = StyleSheet.create({
   },
   placeName: {
     fontSize: 14,
+    marginVertical: 5,
   },
   noPlaces: {
-    fontSize: 16,
-    color: 'gray',
-    textAlign: 'center',
+    fontSize: 14,
+    color: '#7f8c8d',
     marginVertical: 10,
   },
 placesContainer: {
@@ -628,6 +622,14 @@ placesContainer: {
       overflow: 'hidden', // Ensure overflow is hidden
   },
 
+  placeName: {
+    fontSize: 14,
+  },
+  noPlaces: {
+    fontSize: 16,
+    color: 'gray',
+    textAlign: 'center',
+  },
   reviewsContainer: {
       marginVertical: 10,
       paddingHorizontal: 0,
@@ -662,7 +664,7 @@ placesContainer: {
     reviewText: {
       fontSize: 14,
       marginVertical: 5,
-      flexGrow: 1,
+      flexGrow: 1, // Allows text to expand
     },
     userInfo: {
       flexDirection: 'row',
@@ -678,17 +680,23 @@ placesContainer: {
       fontSize: 14,
       color: '#555',
     },
+container: {
+    padding: 15,
+  },
   header: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10,
   },
   reviewContainer: {
-    marginBottom: 10,
+    marginBottom:10,
     padding: 0,
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 5,
+  },
+  reviewText: {
+    fontSize: 16,
   },
   table: {
     borderWidth: 1,
@@ -749,7 +757,6 @@ ownerBox: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 10,
-    width: '100%',
   },
   messageButton: {
       marginTop: 10,
@@ -802,6 +809,11 @@ ownerBox: {
   modalMessage: {
       alignItems: 'left',
     marginVertical: 10,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
   },
   cancelButton: {
     flex: 1,
