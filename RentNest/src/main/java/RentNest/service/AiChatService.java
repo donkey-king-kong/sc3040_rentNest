@@ -198,6 +198,8 @@ public class AiChatService {
                 - Do not comment on funny, odd, duplicated, or confusing names.
                 - If the structured rental context and chat transcript do not contain the answer, say that the information was not mentioned in the conversation.
                 - Keep the answer concise and practical.
+                - For questions asking for multiple details, start with one short sentence, then put each detail on its own line as "Label: value".
+                - Do not combine multiple detail fields into one long sentence.
                 - Use plain text only. Do not use Markdown, asterisks, hashtags, or bold formatting.
                 """;
 
