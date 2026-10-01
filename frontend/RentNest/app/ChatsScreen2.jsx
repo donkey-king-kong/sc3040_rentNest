@@ -901,7 +901,7 @@ const handlePaymentAndAccept = async () => {
     const shouldScrollAiAnswer = aiAnswer.length > 300;
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { flex: 1 }]}>
             <StatusBar barStyle={isSummaryModalVisible ? 'light-content' : 'dark-content'} />
             {/* Header row 1: back + avatar + name + Reviews */}
             <View style={styles.nameHeaderContainer}>
@@ -940,6 +940,93 @@ const handlePaymentAndAccept = async () => {
                 {renderMessage()}
             </ScrollView>
 
+            {isSummaryModalVisible && (
+                <View style={styles.summaryOverlay} pointerEvents="box-none">
+                    <TouchableOpacity
+                        style={styles.summarySheetBackdrop}
+                        activeOpacity={1}
+                        onPress={() => setSummaryModalVisible(false)}
+                    />
+                    <Animated.View
+                        style={[
+                            styles.summarySheet,
+                            {
+                                paddingBottom: Math.max(safeAreaInsets.bottom, 16),
+                                transform: [{ translateY: summarySheetY }],
+                            },
+                        ]}
+                    >
+                        <View style={styles.summarySheetHandle} />
+                        <View style={styles.summarySheetHeader}>
+                            <View style={styles.summarySheetTitleGroup}>
+                                <View style={styles.summaryAiIconBadge}>
+                                    <FontAwesome name="magic" size={17} color="#1890FF" />
+                                </View>
+                                <Text style={styles.summarySheetTitle}>AI chat summary</Text>
+                            </View>
+                        </View>
+                        {isSummaryPlaceholder && (
+                            <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
+                        )}
+                        <ScrollView
+                            ref={summaryScrollRef}
+                            style={styles.summarySheetScroll}
+                            contentContainerStyle={[
+                                styles.summarySheetScrollContent,
+                                { paddingBottom: Math.max(safeAreaInsets.bottom + 28, 44) },
+                            ]}
+                            showsVerticalScrollIndicator={false}
+                            onLayout={() => summaryScrollRef.current?.scrollTo({ y: 0, animated: false })}
+                        >
+                            {summaryError ? (
+                                <Text style={styles.summaryText}>{summaryError}</Text>
+                            ) : parsedSummary ? (
+                                <View>
+                                    {(parsedSummary.sections || []).map((section, idx) => (
+                                        <View key={idx} style={styles.summaryCard}>
+                                            <View style={styles.summaryCardHeaderRow}>
+                                                <FontAwesome name={section.icon} size={14} color="#A4A4AD" style={styles.summaryCardIcon} />
+                                                <Text style={styles.summaryCardLabel}>{section.label}</Text>
+                                            </View>
+                                            {section.rows ? (
+                                                section.rows.map((row, ri) => (
+                                                    <View key={ri} style={styles.summaryCardRow}>
+                                                        <Text style={styles.summaryCardRowLabel}>{row.label}</Text>
+                                                        <Text
+                                                            style={[
+                                                                styles.summaryCardRowValue,
+                                                                String(row.label).toLowerCase().includes('deposit') && styles.summaryCardRowValueSmall,
+                                                            ]}
+                                                        >
+                                                            {row.value}
+                                                        </Text>
+                                                    </View>
+                                                ))
+                                            ) : (
+                                                <Text style={styles.summaryCardContent}>{section.content}</Text>
+                                            )}
+                                        </View>
+                                    ))}
+                                    {parsedSummary.next_steps && (
+                                        <View style={styles.summaryNextStepsSection}>
+                                            <View style={styles.summaryCardHeaderRow}>
+                                                <FontAwesome name="arrow-right" size={14} color="#34E65A" style={styles.summaryCardIcon} />
+                                                <Text style={[styles.summaryCardLabel, styles.summaryNextStepsLabel]}>Next Steps</Text>
+                                            </View>
+                                            <View style={styles.summaryNextStepsCard}>
+                                                <Text style={styles.summaryNextStepsContent}>{parsedSummary.next_steps}</Text>
+                                            </View>
+                                        </View>
+                                    )}
+                                </View>
+                            ) : (
+                                <Text style={styles.summaryText}>{chatSummary}</Text>
+                            )}
+                        </ScrollView>
+                    </Animated.View>
+                </View>
+            )}
+
             <View style={styles.inputContainer}>
                 <TouchableOpacity style={styles.inputIconButton} onPress={toggleAttachmentModal}>
                     <FontAwesome name="paperclip" size={20} color="#555" />
@@ -960,96 +1047,6 @@ const handlePaymentAndAccept = async () => {
                     <FontAwesome name="send" size={16} color="#fff" />
                 </TouchableOpacity>
             </View>
-
-            <Modal
-                animationType="none"
-                transparent={true}
-                visible={isSummaryModalVisible}
-                onRequestClose={() => setSummaryModalVisible(false)}
-            >
-                <TouchableOpacity
-                    style={styles.summarySheetBackdrop}
-                    activeOpacity={1}
-                    onPress={() => setSummaryModalVisible(false)}
-                />
-                <Animated.View
-                    style={[
-                        styles.summarySheet,
-                        {
-                            paddingBottom: Math.max(safeAreaInsets.bottom, 16),
-                            transform: [{ translateY: summarySheetY }],
-                        },
-                    ]}
-                >
-                    <View style={styles.summarySheetHandle} />
-                    <View style={styles.summarySheetHeader}>
-                        <View style={styles.summarySheetTitleGroup}>
-                            <View style={styles.summaryAiIconBadge}>
-                                <FontAwesome name="magic" size={17} color="#1890FF" />
-                            </View>
-                            <Text style={styles.summarySheetTitle}>AI chat summary</Text>
-                        </View>
-                    </View>
-                    {isSummaryPlaceholder && (
-                        <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
-                    )}
-                    <ScrollView
-                        ref={summaryScrollRef}
-                        style={styles.summarySheetScroll}
-                        contentContainerStyle={[
-                            styles.summarySheetScrollContent,
-                            { paddingBottom: Math.max(safeAreaInsets.bottom + 28, 44) },
-                        ]}
-                        showsVerticalScrollIndicator={false}
-                        onLayout={() => summaryScrollRef.current?.scrollTo({ y: 0, animated: false })}
-                    >
-                        {summaryError ? (
-                            <Text style={styles.summaryText}>{summaryError}</Text>
-                        ) : parsedSummary ? (
-                            <View>
-                                {(parsedSummary.sections || []).map((section, idx) => (
-                                    <View key={idx} style={styles.summaryCard}>
-                                        <View style={styles.summaryCardHeaderRow}>
-                                            <FontAwesome name={section.icon} size={14} color="#A4A4AD" style={styles.summaryCardIcon} />
-                                            <Text style={styles.summaryCardLabel}>{section.label}</Text>
-                                        </View>
-                                        {section.rows ? (
-                                            section.rows.map((row, ri) => (
-                                                <View key={ri} style={styles.summaryCardRow}>
-                                                    <Text style={styles.summaryCardRowLabel}>{row.label}</Text>
-                                                    <Text
-                                                        style={[
-                                                            styles.summaryCardRowValue,
-                                                            String(row.label).toLowerCase().includes('deposit') && styles.summaryCardRowValueSmall,
-                                                        ]}
-                                                    >
-                                                        {row.value}
-                                                    </Text>
-                                                </View>
-                                            ))
-                                        ) : (
-                                            <Text style={styles.summaryCardContent}>{section.content}</Text>
-                                        )}
-                                    </View>
-                                ))}
-                                {parsedSummary.next_steps && (
-                                    <View style={styles.summaryNextStepsSection}>
-                                        <View style={styles.summaryCardHeaderRow}>
-                                            <FontAwesome name="arrow-right" size={14} color="#34E65A" style={styles.summaryCardIcon} />
-                                            <Text style={[styles.summaryCardLabel, styles.summaryNextStepsLabel]}>Next Steps</Text>
-                                        </View>
-                                        <View style={styles.summaryNextStepsCard}>
-                                            <Text style={styles.summaryNextStepsContent}>{parsedSummary.next_steps}</Text>
-                                        </View>
-                                    </View>
-                                )}
-                            </View>
-                        ) : (
-                            <Text style={styles.summaryText}>{chatSummary}</Text>
-                        )}
-                    </ScrollView>
-                </Animated.View>
-            </Modal>
 
             <Modal
                 animationType="slide"
@@ -1606,6 +1603,15 @@ const styles = StyleSheet.create({
         marginBottom: 10,
         color: '#F1F1F4',
     },
+    summaryOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 100,
+        elevation: 100,
+    },
     summarySheetBackdrop: {
         position: 'absolute',
         top: 0,
@@ -1613,6 +1619,8 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         backgroundColor: 'rgba(0,0,0,0.52)',
+        zIndex: 100,
+        elevation: 100,
     },
     summarySheet: {
         position: 'absolute',
@@ -1632,7 +1640,8 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: -8 },
         shadowOpacity: 0.28,
         shadowRadius: 20,
-        elevation: 18,
+        zIndex: 101,
+        elevation: 101,
     },
     summarySheetHandle: {
         width: 40,
