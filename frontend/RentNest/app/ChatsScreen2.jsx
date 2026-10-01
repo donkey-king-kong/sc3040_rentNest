@@ -1011,6 +1011,10 @@ const handlePaymentAndAccept = async () => {
     }
 
     const shouldScrollAiAnswer = aiAnswer.length > 300;
+    const partnerReviewRole = rental?.ownerUserId
+        ? (Number(partnerUserId) === Number(rental.ownerUserId) ? 'Owner' : 'Tenant')
+        : undefined;
+    const partnerProfilePhotoURL = partner.photoURL || partner.profilePhotoURL || partner.profilePicture || partner.avatar;
 
     return (
         <View style={[styles.container, { flex: 1 }]}>
@@ -1020,11 +1024,20 @@ const handlePaymentAndAccept = async () => {
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                     <FontAwesome name="chevron-left" size={18} color="#101820" />
                 </TouchableOpacity>
-                <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={36} style={{ marginRight: 10 }} />
+                <AvatarCircle photoURL={partnerProfilePhotoURL} name={partner.name} size={36} style={{ marginRight: 10 }} />
                 <Text style={styles.header}>{partner.name}</Text>
                 <TouchableOpacity
                     style={styles.reviewsLink}
-                    onPress={() => router.push({ pathname: '/UserReviewsScreen', params: { userId: partnerUserId, currentUser, revieweeName: partner.name } })}
+                    onPress={() => router.push({
+                        pathname: '/UserReviewsScreen',
+                        params: {
+                            userId: partnerUserId,
+                            currentUser,
+                            revieweeName: partner.name,
+                            revieweeRole: partnerReviewRole,
+                            revieweePhotoURL: partnerProfilePhotoURL,
+                        },
+                    })}
                 >
                     <Text style={styles.reviews}>Reviews</Text>
                 </TouchableOpacity>
