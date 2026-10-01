@@ -1738,22 +1738,52 @@ const handlePaymentAndAccept = async () => {
             </Modal>
 
             <Modal
-                animationType="slide"
+                animationType="fade"
                 transparent={true}
                 visible={isPaymentSuccessfulModalVisible}
                 onRequestClose={toggleSuccessfulPaymentModal}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Payment Successful</Text>
-                            {/* Close button */}
-                            <TouchableOpacity onPress={toggleSuccessfulPaymentModal}>
-                                <Image source={x} style={styles.icon}/>
-                            </TouchableOpacity>
+                    <View style={styles.successModalContent}>
+                        {/* Green check circle */}
+                        <View style={styles.successIconCircle}>
+                            <FontAwesome name="check" size={22} color="#4ADE80" />
                         </View>
-                        <Image source={confirmation} style={styles.confirmationImage}/>
-                        <Text style={styles.modalDescription}>{new Date().toLocaleDateString()}</Text>
+
+                        <Text style={styles.successTitle}>Deposit paid</Text>
+                        <Text style={styles.successDate}>
+                            {new Date().toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </Text>
+
+                        {/* Receipt rows */}
+                        <View style={styles.successDivider} />
+                        <View style={styles.successRow}>
+                            <Text style={styles.successRowLabel}>Amount paid</Text>
+                            <Text style={styles.successRowValue}>
+                                ${rental?.depositPrice ? Number(rental.depositPrice).toLocaleString('en-SG') : '0'}
+                            </Text>
+                        </View>
+                        <View style={styles.successRow}>
+                            <Text style={styles.successRowLabel}>Rental offer</Text>
+                            <Text style={[styles.successRowValue, { color: '#4ADE80' }]}>Accepted</Text>
+                        </View>
+                        <View style={styles.successRow}>
+                            <Text style={styles.successRowLabel}>Lease starts</Text>
+                            <Text style={styles.successRowValue}>
+                                {rental?.rentalDate
+                                    ? new Date(rental.rentalDate).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' })
+                                    : '—'}
+                            </Text>
+                        </View>
+                        <View style={styles.successDivider} />
+
+                        <Text style={styles.successNote}>
+                            You can track your rental and payment history in your inbox.
+                        </Text>
+
+                        <TouchableOpacity style={styles.successDoneButton} onPress={toggleSuccessfulPaymentModal}>
+                            <Text style={styles.successDoneButtonText}>Done</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
@@ -2957,6 +2987,78 @@ const styles = StyleSheet.create({
         fontSize: 11,
         textAlign: 'center',
         marginTop: 10,
+    },
+
+    /* ── Payment success modal ── */
+    successModalContent: {
+        width: '82%',
+        backgroundColor: '#1C1C1E',
+        borderRadius: 20,
+        paddingVertical: 28,
+        paddingHorizontal: 24,
+        alignItems: 'center',
+    },
+    successIconCircle: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#14532D',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    successTitle: {
+        color: '#fff',
+        fontSize: 20,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    successDate: {
+        color: '#888',
+        fontSize: 13,
+        marginBottom: 20,
+    },
+    successDivider: {
+        width: '100%',
+        height: 1,
+        backgroundColor: '#2C2C2E',
+        marginVertical: 12,
+    },
+    successRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: '100%',
+        paddingVertical: 6,
+    },
+    successRowLabel: {
+        color: '#888',
+        fontSize: 14,
+    },
+    successRowValue: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    successNote: {
+        color: '#666',
+        fontSize: 12,
+        textAlign: 'center',
+        marginTop: 8,
+        marginBottom: 24,
+        lineHeight: 18,
+    },
+    successDoneButton: {
+        width: '100%',
+        backgroundColor: '#3B82F6',
+        borderRadius: 12,
+        height: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    successDoneButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
     },
 });
 
