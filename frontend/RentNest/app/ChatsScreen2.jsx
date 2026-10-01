@@ -45,6 +45,7 @@ const ChatsScreen2 = () => {
     const [newMessage, setNewMessage] = useState('');
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false)
     const [isPaymentSuccessfulModalVisible, setPaymentSuccessfulModalVisible] = useState(false)
+    const [isPayingDeposit, setIsPayingDeposit] = useState(false)
     const [cardNumber, setCardNumber] = useState('');
     const [cardExpiry, setCardExpiry] = useState('');
     const [cardCvv, setCardCvv] = useState('');
@@ -729,10 +730,15 @@ const ChatsScreen2 = () => {
     };
 
 const handlePaymentAndAccept = async () => {
-    await handlePaymentSubmit(); // Call the payment submit function
-    await acceptRentalOffer(); // Call the rental offer acceptance function
-    toggleSuccessfulPaymentModal();
-    await getConversation(); // Refresh the conversation data
+    setIsPayingDeposit(true);
+    try {
+        await handlePaymentSubmit();
+        await acceptRentalOffer();
+        toggleSuccessfulPaymentModal();
+        await getConversation();
+    } finally {
+        setIsPayingDeposit(false);
+    }
 };
 
     useEffect(() => {
@@ -1719,15 +1725,22 @@ const handlePaymentAndAccept = async () => {
                             }
                             const canPay = validCard && validExpiry && validCvv;
                             const depositLabel = rental?.depositPrice ? `$${Number(rental.depositPrice).toLocaleString('en-SG')}` : '';
+                            const buttonDisabled = !canPay || isPayingDeposit;
                             return (
                                 <>
                                     <TouchableOpacity
-                                        style={[styles.payButton, !canPay && styles.payButtonDisabled]}
-                                        onPress={canPay ? handlePaymentAndAccept : null}
-                                        disabled={!canPay}
+                                        style={[styles.payButton, buttonDisabled && styles.payButtonDisabled]}
+                                        onPress={buttonDisabled ? null : handlePaymentAndAccept}
+                                        disabled={buttonDisabled}
                                     >
-                                        <FontAwesome name="lock" size={13} color="#fff" style={{ marginRight: 8 }} />
-                                        <Text style={styles.payButtonText}>Pay {depositLabel} and accept offer</Text>
+                                        {isPayingDeposit ? (
+                                            <ActivityIndicator size="small" color="#fff" />
+                                        ) : (
+                                            <>
+                                                <FontAwesome name="lock" size={13} color="#fff" style={{ marginRight: 8 }} />
+                                                <Text style={styles.payButtonText}>Pay {depositLabel} and accept offer</Text>
+                                            </>
+                                        )}
                                     </TouchableOpacity>
                                     <Text style={styles.paySecureNote}>Your payment is encrypted and secure.</Text>
                                 </>
@@ -2991,11 +3004,10 @@ const styles = StyleSheet.create({
 
     /* ── Payment success modal ── */
     successModalContent: {
-        width: '82%',
+        width: '80%',
         backgroundColor: '#1C1C1E',
-        borderRadius: 20,
-        paddingVertical: 28,
-        paddingHorizontal: 24,
+        borderRadius: 16,
+        padding: 24,
         alignItems: 'center',
     },
     successIconCircle: {
@@ -3032,20 +3044,20 @@ const styles = StyleSheet.create({
     },
     successRowLabel: {
         color: '#888',
-        fontSize: 14,
+        fontSize: 16,
     },
     successRowValue: {
         color: '#fff',
-        fontSize: 14,
+        fontSize: 16,
         fontWeight: '600',
     },
     successNote: {
-        color: '#666',
-        fontSize: 12,
+        color: '#aaa',
+        fontSize: 14,
         textAlign: 'center',
         marginTop: 8,
         marginBottom: 24,
-        lineHeight: 18,
+        lineHeight: 20,
     },
     successDoneButton: {
         width: '100%',
