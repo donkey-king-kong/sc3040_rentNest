@@ -20,6 +20,18 @@ const UserReviewsScreen = () => {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [storedCurrentUserId, setStoredCurrentUserId] = useState(null);
+    const [ownReviewId, setOwnReviewId] = useState(null);
+    const currentUserId = (Array.isArray(currentUser) ? currentUser[0] : currentUser) || storedCurrentUserId;
+
+    useEffect(() => {
+        const loadCurrentUserId = async () => {
+            const userIdFromStorage = await AsyncStorage.getItem('userId');
+            setStoredCurrentUserId(userIdFromStorage);
+        };
+
+        loadCurrentUserId();
+    }, []);
 
     useEffect(() => {
         const fetchUserReviews = async () => {
@@ -35,6 +47,28 @@ const UserReviewsScreen = () => {
                 if (!token) {
                     throw new Error("No authentication token found. Please login.");
                 }
+
+                let currentUserReviewId = null;
+                if (currentUserId) {
+                    try {
+                        const ownReviewResponse = await fetch(`${API_BASE_URL}/api/reviews/byOwnerAndTenant?userId=${userId}&reviewerId=${currentUserId}`, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                            },
+                        });
+
+                        if (ownReviewResponse.ok) {
+                            const ownReview = await ownReviewResponse.json();
+                            currentUserReviewId = ownReview.reviewid || ownReview.reviewID || ownReview.id;
+                        }
+                    } catch (ownReviewError) {
+                        console.error("Error checking current user's review:", ownReviewError);
+                    }
+                }
+                setOwnReviewId(currentUserReviewId);
 
                 // Make an API call to fetch the reviews of the user
                 const response = await fetch(`${API_BASE_URL}/api/reviews/byUser/${userId}`, {
@@ -84,6 +118,8 @@ const UserReviewsScreen = () => {
 
                         return {
                             id: review.reviewID,
+                            userId: review.userID || review.userId,
+                            reviewerId: review.reviewerID || review.reviewerId,
                             reviewer: review.reviewerName,
                             // date: formattedDate, // Formatting the date to be more readable
                             avatar: review.reviewerPhotoURL || review.photoURL || review.avatar || avatars[index % avatars.length],
@@ -112,7 +148,7 @@ const UserReviewsScreen = () => {
         };
 
         fetchUserReviews();
-    }, [userId]);
+    }, [userId, currentUserId]);
 
 // Function to handle flagging/unflagging a review with user confirmation
     const handleFlagReview = (reviewId, currentlyFlagged) => {
@@ -142,42 +178,63 @@ const UserReviewsScreen = () => {
         );
     };
 
-    const renderReview = ({ item }) => (
-        <View style={styles.reviewCard}>
-            <View style={styles.reviewerInfo}>
-                <Image source={{ uri: item.avatar }} style={styles.reviewerAvatar} />
-                <View>
-                    <Text style={styles.reviewerName}>{item.reviewer}</Text>
+    const handleEditReview = (review) => {
+        router.push({
+            pathname: '/LeaveReview',
+            params: {
+                ownerId: review.userId || userId,
+                tenantId: currentUserId,
+                revieweeName,
+                revieweeRole,
+                revieweePhotoURL,
+            },
+        });
+    };
+
+    const renderReview = ({ item }) => {
+        const isOwnReview = String(item.reviewerId) === String(currentUserId)
+            || (ownReviewId && String(item.id) === String(ownReviewId));
+
+        return (
+            <View style={styles.reviewCard}>
+                <View style={styles.reviewerInfo}>
+                    <Image source={{ uri: item.avatar }} style={styles.reviewerAvatar} />
+                    <View>
+                        <Text style={styles.reviewerName}>{item.reviewer}</Text>
+                    </View>
                 </View>
-            </View>
-            <View style={styles.reviewContent}>
-                <View style={styles.ratingContainer}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                        <Text key={star} style={item.rating >= star ? styles.selectedStar : styles.star}>
-                            ★
-                        </Text>
-                    ))}
+                <View style={styles.reviewContent}>
+                    <View style={styles.ratingContainer}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                            <Text key={star} style={item.rating >= star ? styles.selectedStar : styles.star}>
+                                ★
+                            </Text>
+                        ))}
+                    </View>
+                    <Text style={styles.reviewTitle}>{item.title}</Text>
+                    <Text style={styles.reviewText}>{item.content}</Text>
                 </View>
-                <Text style={styles.reviewTitle}>{item.title}</Text>
-                <Text style={styles.reviewText}>{item.content}</Text>
+                <TouchableOpacity
+                    style={styles.cardActionButton}
+                    onPress={() => isOwnReview ? handleEditReview(item) : handleFlagReview(item.id, item.flagged)}
+                    disabled={!isOwnReview && item.flagged}
+                >
+                    <FontAwesome
+                        name={isOwnReview ? "pencil" : "flag"}
+                        size={16}
+                        color={!isOwnReview && item.flagged ? "#FF3B30" : "#8E8E93"}
+                    />
+                </TouchableOpacity>
             </View>
-            {/* Flag button for each review */}
-            <TouchableOpacity
-                style={styles.flagButton}
-                onPress={() => handleFlagReview(item.id)}
-                disabled={item.flagged}  // Disable button if already flagged
-            >
-                <Text style={[styles.flagText, item.flagged && styles.flaggedText]}>⚑</Text>
-            </TouchableOpacity>
-        </View>
-    );
+        );
+    };
 
     const handleLeaveFirstReview = () => {
         router.push({
             pathname: '/LeaveReview',
             params: {
                 ownerId: userId,
-                tenantId: currentUser,
+                tenantId: currentUserId,
                 revieweeName,
                 revieweeRole,
                 revieweePhotoURL,
@@ -333,17 +390,15 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#333',
     },
-    flagButton: {
+    cardActionButton: {
         position: 'absolute',
         top: 10,
         right: 10,
-    },
-    flagText: {
-        fontSize: 18,
-        color: '#888',
-    },
-    flaggedText: {
-        color: 'red',
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     loadingContent: {
         flex: 1,
