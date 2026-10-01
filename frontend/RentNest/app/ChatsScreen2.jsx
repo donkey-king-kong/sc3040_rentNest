@@ -615,12 +615,12 @@ const ChatsScreen2 = () => {
             }
             const updatedRentalBody = {
                 listingID: rental.listingId,
-                tenantUserID: currentUser,
+                tenantUserID: Number(currentUser),
                 rentalPrice: rental.rentalPrice,
                 depositPrice: rental.depositPrice,
-                rentalDate: new Date().toISOString(),
+                rentalDate: rental.rentalDate,
                 leaseExpiry: rental.leaseExpiry,
-                paymentHistory: "First payment made on " + new Date().toISOString(),
+                paymentHistory: rental.paymentHistory,
                 status: "active",
             };
             const acceptOfferResponse = await axios.put(`${API_BASE_URL}/api/rentals/reviewRentalOffer/${rental.rentalID}`, updatedRentalBody, {
