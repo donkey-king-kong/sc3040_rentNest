@@ -8,7 +8,7 @@ import { FontAwesome } from '@expo/vector-icons';
 
 const UserReviewsScreen = () => {
     const router = useRouter();
-    const { userId, currentUser, revieweeName } = useLocalSearchParams();
+    const { userId, currentUser, revieweeName, revieweeRole, revieweePhotoURL } = useLocalSearchParams();
 
     // Placeholder user data
     // const getRandomAvatar = () => {
@@ -179,6 +179,8 @@ const UserReviewsScreen = () => {
                 ownerId: userId,
                 tenantId: currentUser,
                 revieweeName,
+                revieweeRole,
+                revieweePhotoURL,
             },
         });
     };

@@ -14,7 +14,7 @@ import errorImage from '../assets/images/error.png';
 const LeaveReview = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { ownerId, listingId, tenantId, revieweeName, ownerName, tenantName, revieweeRole, role } = useLocalSearchParams();
+  const { ownerId, listingId, tenantId, revieweeName, ownerName, tenantName, revieweeRole, role, revieweePhotoURL } = useLocalSearchParams();
 
   // Add debug logging for route params
   console.log('Route Params:', { ownerId, listingId, tenantId });
@@ -29,6 +29,8 @@ const LeaveReview = () => {
   const [reviewId, setReviewId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isError, setIsError] = useState(false);
+  const [revieweeProfile, setRevieweeProfile] = useState(null);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   useEffect(() => {
     // Validate required parameters
@@ -68,8 +70,25 @@ const LeaveReview = () => {
     if (token && ownerId && tenantId) {
       console.log('Fetching review with token and params:', { ownerId, tenantId });
       fetchReview();
+      fetchRevieweeProfile();
     }
   }, [token, ownerId, tenantId]);
+
+  const fetchRevieweeProfile = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/users/id/${ownerId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      setRevieweeProfile(response.data);
+    } catch (error) {
+      console.error('Error fetching reviewee profile:', error);
+    }
+  };
 
   const fetchReview = async () => {
     try {
@@ -238,9 +257,19 @@ const LeaveReview = () => {
     setRating(star);
   };
 
-  const getParamValue = (value) => Array.isArray(value) ? value[0] : value;
+  const getParamValue = (value) => {
+    const paramValue = Array.isArray(value) ? value[0] : value;
+    return paramValue && paramValue !== 'undefined' ? paramValue : undefined;
+  };
   const displayedRevieweeName = getParamValue(revieweeName) || getParamValue(ownerName) || getParamValue(tenantName) || `User ${getParamValue(ownerId) || ''}`.trim();
-  const displayedRevieweeRole = getParamValue(revieweeRole) || getParamValue(role);
+  const displayedRevieweeRole = getParamValue(revieweeRole) || getParamValue(role) || 'User';
+  const displayedRevieweePhotoURL = getParamValue(revieweePhotoURL)
+      || revieweeProfile?.photoURL
+      || revieweeProfile?.profilePhotoURL
+      || revieweeProfile?.profilePicture
+      || revieweeProfile?.avatar;
+  const canShowRevieweePhoto = displayedRevieweePhotoURL && !avatarLoadFailed;
+  const isSubmitDisabled = rating === 0 || !reviewTitle.trim() || !reviewText.trim();
   const ratingLabels = {
     1: 'Poor',
     2: 'Fair',
@@ -248,6 +277,10 @@ const LeaveReview = () => {
     4: 'Good',
     5: 'Excellent',
   };
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [displayedRevieweePhotoURL]);
 
   if (loading) {
     return (
@@ -265,7 +298,7 @@ const LeaveReview = () => {
       >
         <View style={styles.navHeader}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>‹ Back</Text>
+            <FontAwesome name="chevron-left" size={18} color="#101820" />
           </TouchableOpacity>
           <Text style={styles.navTitle}>Leave a review</Text>
           <View style={styles.headerSpacer} />
@@ -279,15 +312,21 @@ const LeaveReview = () => {
         >
           <View style={styles.revieweeCard}>
             <View style={styles.avatarCircle}>
-              <Text style={styles.avatarInitial}>{displayedRevieweeName.charAt(0).toUpperCase()}</Text>
+              {canShowRevieweePhoto ? (
+                  <Image
+                      source={{ uri: displayedRevieweePhotoURL }}
+                      style={styles.avatarImage}
+                      onError={() => setAvatarLoadFailed(true)}
+                  />
+              ) : (
+                  <Text style={styles.avatarInitial}>{displayedRevieweeName.charAt(0).toUpperCase()}</Text>
+              )}
             </View>
             <View style={styles.revieweeMeta}>
               <Text style={styles.revieweeName}>{displayedRevieweeName}</Text>
-              {displayedRevieweeRole ? (
-                  <View style={styles.roleBadge}>
-                    <Text style={styles.roleBadgeText}>{displayedRevieweeRole}</Text>
-                  </View>
-              ) : null}
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleBadgeText}>{displayedRevieweeRole}</Text>
+              </View>
             </View>
           </View>
 
@@ -314,7 +353,7 @@ const LeaveReview = () => {
             />
           </View>
 
-          <View style={styles.inputGroup}>
+          <View style={styles.reviewInputGroup}>
             <Text style={styles.fieldLabel}>REVIEW</Text>
             <TextInput
                 style={styles.textArea}
@@ -337,9 +376,14 @@ const LeaveReview = () => {
         </ScrollView>
 
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 28) }]}>
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <FontAwesome name="check" size={13} color="#FFFFFF" style={styles.submitIcon} />
-            <Text style={styles.submitButtonText}>Submit review</Text>
+          <TouchableOpacity
+              style={[styles.submitButton, isSubmitDisabled && styles.submitButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={isSubmitDisabled}
+              activeOpacity={isSubmitDisabled ? 1 : 0.75}
+          >
+            <FontAwesome name="check" size={13} color={isSubmitDisabled ? "#8E8E93" : "#FFFFFF"} style={styles.submitIcon} />
+            <Text style={[styles.submitButtonText, isSubmitDisabled && styles.submitButtonTextDisabled]}>Submit review</Text>
           </TouchableOpacity>
         </View>
 
@@ -409,14 +453,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F2F2F2',
   },
   backButton: {
-    minWidth: 72,
+    minWidth: 40,
     height: 40,
     justifyContent: 'center',
-  },
-  backButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#0A84FF',
   },
   navTitle: {
     flex: 1,
@@ -426,10 +465,10 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   headerSpacer: {
-    minWidth: 72,
+    minWidth: 40,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
   },
   revieweeCard: {
     flexDirection: 'row',
@@ -448,11 +487,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
   },
   avatarInitial: {
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   revieweeMeta: {
     flex: 1,
@@ -464,33 +509,33 @@ const styles = StyleSheet.create({
   },
   roleBadge: {
     alignSelf: 'flex-start',
-    marginTop: 5,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 999,
+    marginTop: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
     backgroundColor: '#F2F2F7',
   },
   roleBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#636366',
   },
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    columnGap: 8,
-    marginTop: 12,
+    columnGap: 10,
+    marginTop: 16,
   },
   star: {
-    fontSize: 32,
+    fontSize: 40,
     color: '#E5E5EA',
   },
   selectedStar: {
-    fontSize: 32,
+    fontSize: 40,
     color: '#FF9F0A',
   },
   section: {
-    marginBottom: 18,
+    marginBottom: 22,
   },
   fieldLabel: {
     fontSize: 10,
@@ -499,13 +544,16 @@ const styles = StyleSheet.create({
     color: '#AEAEB2',
   },
   ratingHint: {
-    marginTop: 6,
-    fontSize: 11,
+    marginTop: 8,
+    fontSize: 12,
     color: '#AEAEB2',
     textAlign: 'center',
   },
   inputGroup: {
     marginBottom: 16,
+  },
+  reviewInputGroup: {
+    marginBottom: 24,
   },
   input: {
     marginTop: 8,
@@ -538,10 +586,10 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   footer: {
-    paddingTop: 12,
+    paddingTop: 14,
     paddingHorizontal: 18,
     borderTopWidth: 0.5,
-    borderTopColor: '#F2F2F2',
+    borderTopColor: '#f2f2f2',
     backgroundColor: '#FFFFFF',
   },
   submitButton: {
@@ -553,6 +601,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#0A84FF',
   },
+  submitButtonDisabled: {
+    backgroundColor: '#E5E5EA',
+  },
   submitIcon: {
     marginRight: 7,
   },
@@ -560,6 +611,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  submitButtonTextDisabled: {
+    color: '#8E8E93',
   },
   deleteButton: {
     alignSelf: 'center',
