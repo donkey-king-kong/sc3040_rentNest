@@ -36,6 +36,7 @@ const ChatsScreen2 = () => {
     const [listing, setListing] = useState([]);
     const [rentalPrice, setRentalPrice] = useState('');
     const [rentalDeposit, setRentalDeposit] = useState('');
+    const [rentalDate, setRentalDate] = useState('');
     const [leaseExpiry, setLeaseExpiry] = useState('');
     const [isAttachmentModalVisible, setAttachmentModalVisible] = useState(false)
     const [isRentalModalVisible, setRentalModalVisible] = useState(false)
@@ -554,15 +555,15 @@ const ChatsScreen2 = () => {
                 router.replace('/LoginScreen');
                 return;
             }
-            if (rentalPrice.trim() !== '' && rentalDeposit.trim() !== '' && leaseExpiry.trim() !== ''){
+            if (rentalPrice.trim() !== '' && rentalDeposit.trim() !== '' && rentalDate.trim() !== '' && leaseExpiry.trim() !== '' && new Date(leaseExpiry) > new Date(rentalDate)){
                 const rentalBody = {
                     rentalDTO: {
                         listingID: listing[0],
                         tenantUserID: partnerUserId,
                         rentalPrice: rentalPrice,
                         depositPrice: rentalDeposit,
-                        rentalDate: new Date().toISOString(),
-                        leaseExpiry: leaseExpiry,
+                        rentalDate: new Date(rentalDate).toISOString(),
+                        leaseExpiry: new Date(leaseExpiry).toISOString(),
                         paymentHistory: "First payment made on " + new Date().toISOString(),
                         status: "pending",
                     },
@@ -733,9 +734,12 @@ const handlePaymentAndAccept = async () => {
 
     // Toggle rental modal visibility
     const toggleRentalModal = async () => {
-        setAttachmentModalVisible(false);
         await getListing();
-        setRentalModalVisible(!isRentalModalVisible);
+        setRentalPrice('');
+        setRentalDeposit('');
+        setRentalDate('');
+        setLeaseExpiry('');
+        setRentalModalVisible(true);
     }
     const closeRentalModal = () => {
         setRentalModalVisible(false);
@@ -1162,7 +1166,7 @@ const handlePaymentAndAccept = async () => {
             )}
 
             <View style={styles.inputContainer}>
-                <TouchableOpacity style={styles.inputIconButton} onPress={toggleAttachmentModal}>
+                <TouchableOpacity style={styles.inputIconButton} onPress={toggleRentalModal}>
                     <FontAwesome name="paperclip" size={20} color="#555" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.inputIconButton} onPress={toggleFlagModal}>
@@ -1288,43 +1292,133 @@ const handlePaymentAndAccept = async () => {
                 onRequestClose={closeRentalModal}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.paymentModalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Send Rental Offer</Text>
-                            {/* Close button */}
+                    <View style={styles.rentalOfferModal}>
+                        {/* Header */}
+                        <View style={styles.rentalOfferModalHeader}>
+                            <View style={styles.rentalOfferTitleRow}>
+                                <FontAwesome name="file-text-o" size={16} color="#fff" style={{ marginRight: 8 }} />
+                                <Text style={styles.rentalOfferModalTitle}>Send rental offer</Text>
+                            </View>
                             <TouchableOpacity onPress={closeRentalModal}>
-                                <Image source={x} style={styles.icon}/>
+                                <FontAwesome name="times" size={18} color="#aaa" />
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.modalDescription}>
-                            This sends an offer to your potential tenant to accept or reject. Please make sure that all legal documents are in order before sending the offer. Once accepted, you can start collecting rent payments.
+
+                        {/* Disclaimer */}
+                        <Text style={styles.rentalOfferDisclaimer}>
+                            Once accepted, a rental agreement is created and you can start collecting rent.
                         </Text>
-                        {/* Rent Per Month */}
-                        <TextInput
-                            style={styles.infoContainer}
-                            placeholder="Rent Per Month"
-                            keyboardType="numeric"
-                            value={rentalPrice}
-                            onChangeText={setRentalPrice}
-                        />
-                        <TextInput
-                            style={styles.infoContainer}
-                            placeholder="Rental Deposit Required"
-                            keyboardType="numeric"
-                            value={rentalDeposit}
-                            onChangeText={setRentalDeposit}
-                        />
-                        <TextInput
-                            style={styles.infoContainer}
-                            placeholder="End of Lease Date"
-                            value={leaseExpiry}
-                            onChangeText={setLeaseExpiry}
-                        />
-                        <View style={styles.longBlackButton}>
-                            <TouchableOpacity onPress={sendRentalOffer}>
-                                <Text style={styles.whiteButtonText}> Send Offer </Text>
-                            </TouchableOpacity>
+
+                        {/* Row 1: Rent / Deposit */}
+                        <View style={styles.rentalOfferRow}>
+                            <View style={styles.rentalOfferFieldHalf}>
+                                <Text style={styles.rentalOfferFieldLabel}>Rent / month</Text>
+                                <View style={styles.rentalOfferInputRow}>
+                                    <Text style={styles.rentalOfferCurrencyPrefix}>$</Text>
+                                    <TextInput
+                                        style={styles.rentalOfferInput}
+                                        placeholder="0"
+                                        placeholderTextColor="#666"
+                                        keyboardType="numeric"
+                                        value={rentalPrice}
+                                        onChangeText={setRentalPrice}
+                                    />
+                                </View>
+                            </View>
+                            <View style={styles.rentalOfferFieldHalf}>
+                                <Text style={styles.rentalOfferFieldLabel}>Deposit</Text>
+                                <View style={styles.rentalOfferInputRow}>
+                                    <Text style={styles.rentalOfferCurrencyPrefix}>$</Text>
+                                    <TextInput
+                                        style={styles.rentalOfferInput}
+                                        placeholder="0"
+                                        placeholderTextColor="#666"
+                                        keyboardType="numeric"
+                                        value={rentalDeposit}
+                                        onChangeText={setRentalDeposit}
+                                    />
+                                </View>
+                            </View>
                         </View>
+
+                        {/* Row 2: Lease start / Lease end */}
+                        <View style={styles.rentalOfferRow}>
+                            <View style={styles.rentalOfferFieldHalf}>
+                                <Text style={styles.rentalOfferFieldLabel}>Lease start</Text>
+                                <TextInput
+                                    style={styles.rentalOfferDateInput}
+                                    placeholder="DD MMM YY"
+                                    placeholderTextColor="#666"
+                                    value={rentalDate}
+                                    onChangeText={setRentalDate}
+                                />
+                            </View>
+                            <View style={styles.rentalOfferFieldHalf}>
+                                <Text style={styles.rentalOfferFieldLabel}>Lease end</Text>
+                                <TextInput
+                                    style={styles.rentalOfferDateInput}
+                                    placeholder="DD MMM YY"
+                                    placeholderTextColor="#666"
+                                    value={leaseExpiry}
+                                    onChangeText={setLeaseExpiry}
+                                />
+                            </View>
+                        </View>
+
+                        {/* Offer Preview */}
+                        {(() => {
+                            const price = Number(rentalPrice);
+                            const deposit = Number(rentalDeposit);
+                            const start = rentalDate ? new Date(rentalDate) : null;
+                            const end = leaseExpiry ? new Date(leaseExpiry) : null;
+                            const hasPrice = rentalPrice.trim() !== '' && !isNaN(price);
+                            const hasDeposit = rentalDeposit.trim() !== '' && !isNaN(deposit);
+                            const hasValidDates = start && end && !isNaN(start) && !isNaN(end) && end > start;
+                            const months = hasValidDates ? Math.round((end - start) / (1000 * 60 * 60 * 24 * 30.44)) : 0;
+                            const durationLabel = months === 12 ? '1 year' : `${months} month${months !== 1 ? 's' : ''}`;
+                            const fmtDate = (d) => {
+                                if (!d || isNaN(d)) return '';
+                                return `${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${d.getFullYear()}`;
+                            };
+                            const fmtCurrency = (n) => n.toLocaleString('en-SG');
+                            const showPreview = hasPrice || hasDeposit || hasValidDates;
+                            if (!showPreview) return null;
+                            return (
+                                <View style={styles.rentalOfferPreview}>
+                                    <Text style={styles.rentalOfferPreviewLabel}>OFFER PREVIEW</Text>
+                                    {(hasPrice || hasDeposit) && (
+                                        <Text style={styles.rentalOfferPreviewLine}>
+                                            {hasPrice ? `$${fmtCurrency(price)}/mo` : ''}
+                                            {hasPrice && hasDeposit ? ' · ' : ''}
+                                            {hasDeposit ? `$${fmtCurrency(deposit)} deposit` : ''}
+                                        </Text>
+                                    )}
+                                    {hasValidDates && (
+                                        <Text style={styles.rentalOfferPreviewLine}>
+                                            {fmtDate(start)} – {fmtDate(end)} ({durationLabel})
+                                        </Text>
+                                    )}
+                                </View>
+                            );
+                        })()}
+
+                        {/* Send button */}
+                        {(() => {
+                            const allFilled = rentalPrice.trim() !== '' && rentalDeposit.trim() !== '' && rentalDate.trim() !== '' && leaseExpiry.trim() !== '';
+                            const start = rentalDate ? new Date(rentalDate) : null;
+                            const end = leaseExpiry ? new Date(leaseExpiry) : null;
+                            const validDates = start && end && !isNaN(start) && !isNaN(end) && end > start;
+                            const canSend = allFilled && validDates;
+                            return (
+                                <TouchableOpacity
+                                    style={[styles.rentalOfferSendButton, !canSend && styles.rentalOfferSendButtonDisabled]}
+                                    onPress={canSend ? async () => { await sendRentalOffer(); closeRentalModal(); } : null}
+                                    disabled={!canSend}
+                                >
+                                    <Text style={styles.rentalOfferSendButtonText}>Send offer</Text>
+                                </TouchableOpacity>
+                            );
+                        })()}
                     </View>
                 </View>
             </Modal>
@@ -2398,6 +2492,112 @@ const styles = StyleSheet.create({
     emptyMessageText: {
         color: '#666',
         fontStyle: 'italic',
+    },
+
+    // Rental offer modal (new design)
+    rentalOfferModal: {
+        backgroundColor: '#1C1C1E',
+        borderRadius: 16,
+        padding: 20,
+        marginHorizontal: 20,
+        marginTop: 'auto',
+        marginBottom: 40,
+    },
+    rentalOfferModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    rentalOfferTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    rentalOfferModalTitle: {
+        color: '#fff',
+        fontSize: 17,
+        fontWeight: '700',
+    },
+    rentalOfferDisclaimer: {
+        color: '#aaa',
+        fontSize: 13,
+        marginBottom: 18,
+        lineHeight: 19,
+    },
+    rentalOfferRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 14,
+    },
+    rentalOfferFieldHalf: {
+        flex: 1,
+    },
+    rentalOfferFieldLabel: {
+        color: '#ccc',
+        fontSize: 12,
+        fontWeight: '600',
+        marginBottom: 6,
+    },
+    rentalOfferInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#2C2C2E',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        height: 44,
+    },
+    rentalOfferCurrencyPrefix: {
+        color: '#fff',
+        fontSize: 15,
+        marginRight: 4,
+    },
+    rentalOfferInput: {
+        flex: 1,
+        color: '#fff',
+        fontSize: 15,
+    },
+    rentalOfferDateInput: {
+        backgroundColor: '#2C2C2E',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        height: 44,
+        color: '#fff',
+        fontSize: 14,
+    },
+    rentalOfferPreview: {
+        backgroundColor: '#2A3A5C',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 16,
+    },
+    rentalOfferPreviewLabel: {
+        color: '#6B8FD4',
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        marginBottom: 6,
+    },
+    rentalOfferPreviewLine: {
+        color: '#C5D8FF',
+        fontSize: 14,
+        fontWeight: '600',
+        lineHeight: 20,
+    },
+    rentalOfferSendButton: {
+        backgroundColor: '#3B82F6',
+        borderRadius: 12,
+        height: 48,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4,
+    },
+    rentalOfferSendButtonDisabled: {
+        backgroundColor: '#2C2C2E',
+    },
+    rentalOfferSendButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '700',
     },
 });
 
