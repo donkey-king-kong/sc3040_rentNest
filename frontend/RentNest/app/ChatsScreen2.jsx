@@ -989,13 +989,6 @@ const handlePaymentAndAccept = async () => {
                             </View>
                             <Text style={styles.summarySheetTitle}>AI chat summary</Text>
                         </View>
-                        {parsedSummary && (
-                            <View style={styles.summaryTopicBadge}>
-                                <Text style={styles.summaryTopicBadgeText}>
-                                    {(parsedSummary.sections || []).length} topics
-                                </Text>
-                            </View>
-                        )}
                     </View>
                     {isSummaryPlaceholder && (
                         <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
@@ -1677,18 +1670,6 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: '#F5F5F7',
         letterSpacing: -0.3,
-    },
-    summaryTopicBadge: {
-        backgroundColor: '#244669',
-        borderRadius: 999,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        marginLeft: 12,
-    },
-    summaryTopicBadgeText: {
-        color: '#1590FF',
-        fontSize: 16,
-        fontWeight: '800',
     },
     summarySheetScroll: {
         flex: 1,
