@@ -4,6 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {API_BASE_URL} from "../config/api";
 import MorphingInfinity from '../components/MorphingInfinity';
+import { FontAwesome } from '@expo/vector-icons';
 
 const UserReviewsScreen = () => {
     const { userId } = useLocalSearchParams();
@@ -185,8 +186,13 @@ const UserReviewsScreen = () => {
                 <Text style={{ color: 'red', marginBottom: 10 }}>{error}</Text>
             ) : reviews.length === 0 ? (
                 <View style={styles.emptyState}>
-                    <Text style={styles.header}>Reviews</Text>
-                    <Text style={styles.emptyText}>No reviews yet.</Text>
+                    <View style={styles.emptyIconContainer}>
+                        <FontAwesome name="star-o" size={28} color="#C7C7CC" />
+                    </View>
+                    <Text style={styles.emptyTitle}>No reviews yet</Text>
+                    <Text style={styles.emptySubtitle}>
+                        Reviews from owners and tenants will appear here after a rental is completed.
+                    </Text>
                 </View>
             ) : (
                 <>
@@ -315,10 +321,31 @@ const styles = StyleSheet.create({
     },
     emptyState: {
         flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 20,
     },
-    emptyText: {
-        fontSize: 15,
-        color: '#6F7075',
+    emptyIconContainer: {
+        width: 52,
+        height: 52,
+        borderRadius: 16,
+        backgroundColor: '#F2F2F7',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    emptyTitle: {
+        marginTop: 12,
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#000000',
+    },
+    emptySubtitle: {
+        marginTop: 6,
+        maxWidth: 240,
+        fontSize: 13,
+        lineHeight: 20,
+        color: '#8E8E93',
+        textAlign: 'center',
     },
 });
 
