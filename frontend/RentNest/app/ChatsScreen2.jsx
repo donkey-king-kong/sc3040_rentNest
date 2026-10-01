@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Dimensions, Animated, StatusBar, ActivityIndicator} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import { FontAwesome } from '@expo/vector-icons';
@@ -48,6 +48,9 @@ const ChatsScreen2 = () => {
     const [Loading, setLoading] = useState(true);
     const chatScrollRef = useRef(null);
     const summaryScrollRef = useRef(null);
+    const depositInputRef = useRef(null);
+    const leaseStartInputRef = useRef(null);
+    const leaseEndInputRef = useRef(null);
     const summarySheetY = useRef(new Animated.Value(600)).current;
     const [isSummaryModalVisible, setSummaryModalVisible] = useState(false);
     const [parsedSummary, setParsedSummary] = useState(null);
@@ -584,6 +587,7 @@ const ChatsScreen2 = () => {
                 });
                 if (sendRentalResponse.status === 200){
                     await getConversation();
+                    setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
                 }else{
                     console.log('Creating Rental:', sendRentalResponse.data);
                 }
@@ -826,6 +830,22 @@ const handlePaymentAndAccept = async () => {
             currency: 'USD',
             maximumFractionDigits: 0,
         }).format(amount);
+    };
+
+    const canSendOffer = useMemo(() => {
+        const allFilled = rentalPrice.trim() !== '' && rentalDeposit.trim() !== '' && rentalDate.trim() !== '' && leaseExpiry.trim() !== '';
+        const validPrice = !isNaN(Number(rentalPrice)) && Number(rentalPrice) > 0;
+        const validDeposit = !isNaN(Number(rentalDeposit)) && Number(rentalDeposit) > 0;
+        const start = parseDMY(rentalDate);
+        const end = parseDMY(leaseExpiry);
+        const validDates = !!start && !!end && end > start;
+        return allFilled && validPrice && validDeposit && validDates;
+    }, [rentalPrice, rentalDeposit, rentalDate, leaseExpiry]);
+
+    const handleSendOffer = async () => {
+        if (!canSendOffer) return;
+        await sendRentalOffer();
+        closeRentalModal();
     };
 
     const renderMessage = () => {
@@ -1334,6 +1354,9 @@ const handlePaymentAndAccept = async () => {
                                                 placeholder="0"
                                                 placeholderTextColor="#666"
                                                 keyboardType="numeric"
+                                                returnKeyType="next"
+                                                onSubmitEditing={() => depositInputRef.current?.focus()}
+                                                blurOnSubmit={false}
                                                 value={rentalPrice}
                                                 onChangeText={setRentalPrice}
                                             />
@@ -1354,10 +1377,14 @@ const handlePaymentAndAccept = async () => {
                                         <View style={[styles.rentalOfferInputRow, depositInvalid && styles.rentalOfferDateInputError]}>
                                             <Text style={styles.rentalOfferCurrencyPrefix}>$</Text>
                                             <TextInput
+                                                ref={depositInputRef}
                                                 style={styles.rentalOfferInput}
                                                 placeholder="0"
                                                 placeholderTextColor="#666"
                                                 keyboardType="numeric"
+                                                returnKeyType="next"
+                                                onSubmitEditing={() => leaseStartInputRef.current?.focus()}
+                                                blurOnSubmit={false}
                                                 value={rentalDeposit}
                                                 onChangeText={setRentalDeposit}
                                             />
@@ -1392,9 +1419,13 @@ const handlePaymentAndAccept = async () => {
                                         <Text style={styles.rentalOfferFieldLabel}>Lease start</Text>
                                         <View style={styles.rentalOfferDateWrapper}>
                                             <TextInput
+                                                ref={leaseStartInputRef}
                                                 style={[styles.rentalOfferDateInput, startInvalid && styles.rentalOfferDateInputError]}
                                                 placeholder="DD-MM-YYYY"
                                                 placeholderTextColor="#666"
+                                                returnKeyType="next"
+                                                onSubmitEditing={() => leaseEndInputRef.current?.focus()}
+                                                blurOnSubmit={false}
                                                 value={rentalDate}
                                                 onChangeText={setRentalDate}
                                             />
@@ -1414,9 +1445,12 @@ const handlePaymentAndAccept = async () => {
                                         <Text style={styles.rentalOfferFieldLabel}>Lease end</Text>
                                         <View style={styles.rentalOfferDateWrapper}>
                                             <TextInput
+                                                ref={leaseEndInputRef}
                                                 style={[styles.rentalOfferDateInput, (endInvalid || endBeforeStart) && styles.rentalOfferDateInputError]}
                                                 placeholder="DD-MM-YYYY"
                                                 placeholderTextColor="#666"
+                                                returnKeyType="send"
+                                                onSubmitEditing={handleSendOffer}
                                                 value={leaseExpiry}
                                                 onChangeText={setLeaseExpiry}
                                             />
@@ -1474,24 +1508,13 @@ const handlePaymentAndAccept = async () => {
                         })()}
 
                         {/* Send button */}
-                        {(() => {
-                            const allFilled = rentalPrice.trim() !== '' && rentalDeposit.trim() !== '' && rentalDate.trim() !== '' && leaseExpiry.trim() !== '';
-                            const validPrice = !isNaN(Number(rentalPrice)) && Number(rentalPrice) > 0;
-                            const validDeposit = !isNaN(Number(rentalDeposit)) && Number(rentalDeposit) > 0;
-                            const start = parseDMY(rentalDate);
-                            const end = parseDMY(leaseExpiry);
-                            const validDates = start && end && end > start;
-                            const canSend = allFilled && validPrice && validDeposit && validDates;
-                            return (
-                                <TouchableOpacity
-                                    style={[styles.rentalOfferSendButton, !canSend && styles.rentalOfferSendButtonDisabled]}
-                                    onPress={canSend ? async () => { await sendRentalOffer(); closeRentalModal(); } : null}
-                                    disabled={!canSend}
-                                >
-                                    <Text style={styles.rentalOfferSendButtonText}>Send offer</Text>
-                                </TouchableOpacity>
-                            );
-                        })()}
+                        <TouchableOpacity
+                            style={[styles.rentalOfferSendButton, !canSendOffer && styles.rentalOfferSendButtonDisabled]}
+                            onPress={handleSendOffer}
+                            disabled={!canSendOffer}
+                        >
+                            <Text style={styles.rentalOfferSendButtonText}>Send offer</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </Modal>
