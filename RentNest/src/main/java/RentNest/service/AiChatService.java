@@ -3,6 +3,8 @@ package RentNest.service;
 import RentNest.dto.AiChatSummaryResponseDTO;
 import RentNest.dto.AiChatQuestionResponseDTO;
 import RentNest.model.ChatHistory;
+import RentNest.model.Listings;
+import RentNest.model.Rentals;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -191,21 +193,24 @@ public class AiChatService {
                 I can only answer questions related to this rental conversation.
 
                 Rules:
-                - Use only facts from the chat transcript.
+                - Use only facts from the structured rental context and chat transcript.
                 - Do not speculate about who is owner or tenant based on names.
                 - Do not comment on funny, odd, duplicated, or confusing names.
-                - If the chat does not contain the answer, say that the information was not mentioned in the conversation.
+                - If the structured rental context and chat transcript do not contain the answer, say that the information was not mentioned in the conversation.
                 - Keep the answer concise and practical.
                 - Use plain text only. Do not use Markdown, asterisks, hashtags, or bold formatting.
                 """;
 
         String prompt = """
+                Structured rental context:
+                %s
+
                 Chat transcript:
                 %s
 
                 User question:
                 %s
-                """.formatted(formatConversation(conversation), question.trim());
+                """.formatted(formatConversationMetadata(conversation), formatConversation(conversation), question.trim());
 
         String answer = callLlm(systemInstruction, prompt);
 
@@ -276,6 +281,82 @@ public class AiChatService {
                     .append("\n");
         }
         return transcript.toString();
+    }
+
+    private String formatConversationMetadata(List<ChatHistory> conversation) {
+        Rentals rental = findConversationRental(conversation);
+
+        if (rental == null) {
+            return "No structured rental/listing metadata is attached to this conversation.";
+        }
+
+        Listings listing = rental.getListings();
+        StringBuilder metadata = new StringBuilder();
+
+        if (listing != null) {
+            appendMetadataLine(metadata, "Listing", listing.getName());
+            appendMetadataLine(metadata, "Listing location", listing.getLocation());
+        }
+
+        Long ownerId = listing != null ? listing.getOwnerId() : null;
+        String ownerName = listing != null ? listing.getOwnerName() : null;
+        Long tenantId = rental.getTenantUserID() != null ? rental.getTenantUserID() : listing != null ? listing.getTenantId() : null;
+        String tenantName = listing != null ? listing.getTenantName() : null;
+
+        appendPersonMetadata(metadata, "Owner", ownerName, ownerId);
+        appendPersonMetadata(metadata, "Tenant", tenantName, tenantId);
+
+        if (metadata.isEmpty()) {
+            return "No structured rental/listing metadata is attached to this conversation.";
+        }
+
+        return metadata.toString();
+    }
+
+    private Rentals findConversationRental(List<ChatHistory> conversation) {
+        for (ChatHistory message : conversation) {
+            if (message.getRental() != null) {
+                return message.getRental();
+            }
+
+            if (message.getRequest() != null && message.getRequest().getRentals() != null) {
+                return message.getRequest().getRentals();
+            }
+        }
+
+        return null;
+    }
+
+    private void appendMetadataLine(StringBuilder metadata, String label, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+
+        metadata.append(label)
+                .append(": ")
+                .append(value)
+                .append("\n");
+    }
+
+    private void appendPersonMetadata(StringBuilder metadata, String role, String name, Long userId) {
+        if ((name == null || name.isBlank()) && userId == null) {
+            return;
+        }
+
+        metadata.append(role)
+                .append(": ");
+
+        if (name != null && !name.isBlank()) {
+            metadata.append(name);
+        } else {
+            metadata.append("User ").append(userId);
+        }
+
+        if (userId != null) {
+            metadata.append(" (user ID ").append(userId).append(")");
+        }
+
+        metadata.append("\n");
     }
 
     private String callLlm(String systemInstruction, String prompt) {
