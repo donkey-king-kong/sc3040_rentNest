@@ -847,8 +847,8 @@ const handlePaymentAndAccept = async () => {
             if (rentalIdExists || requestIdExists) {
                 return (
                     <View key={first.messageID} style={styles.groupContainer}>
-                        <View style={rentalIdExists ? styles.bubbleRowRight : (isUser ? styles.bubbleRowRight : styles.bubbleRowLeft)}>
-                            {!isUser && !rentalIdExists && <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={30} style={{ marginRight: 8 }} />}
+                        <View style={isUser ? styles.bubbleRowRight : styles.bubbleRowLeft}>
+                            {!isUser && <AvatarCircle photoURL={partnerProfilePhotoURL} name={partner.name} size={30} style={{ marginRight: 8 }} />}
                             <View style={rentalIdExists ? styles.rentalOfferBubbleShell : [styles.bubble, styles.bubbleOther, { maxWidth: '80%' }]}>
                                 {rentalIdExists && (
                                     <View style={styles.rentalOfferMessage}>
@@ -954,7 +954,7 @@ const handlePaymentAndAccept = async () => {
                                 )}
                             </View>
                         </View>
-                        <Text style={styles.groupTimestamp}>{timestamp}</Text>
+                        <Text style={[styles.groupTimestamp, isUser ? styles.groupTimestampRight : styles.groupTimestampLeft]}>{timestamp}</Text>
                     </View>
                 );
             }
@@ -1107,6 +1107,15 @@ const handlePaymentAndAccept = async () => {
                                 <Text style={styles.summaryText}>{summaryError}</Text>
                             ) : parsedSummary ? (
                                 <View>
+                                    {parsedSummary.overview && (
+                                        <View style={styles.summaryCard}>
+                                            <View style={styles.summaryCardHeaderRow}>
+                                                <FontAwesome name="commenting-o" size={14} color="#A4A4AD" style={styles.summaryCardIcon} />
+                                                <Text style={styles.summaryCardLabel}>Overview</Text>
+                                            </View>
+                                            <Text style={styles.summaryCardContent}>{parsedSummary.overview}</Text>
+                                        </View>
+                                    )}
                                     {(parsedSummary.sections || []).map((section, idx) => (
                                         <View key={idx} style={styles.summaryCard}>
                                             <View style={styles.summaryCardHeaderRow}>
