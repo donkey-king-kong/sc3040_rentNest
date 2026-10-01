@@ -255,11 +255,15 @@ const styles = StyleSheet.create({
         color: '#101820',
     },
     headerBar: {
+        position: 'absolute',
+        top: 20,
+        left: 20,
+        right: 20,
+        zIndex: 1,
         height: 44,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 12,
     },
     backButton: {
         position: 'absolute',
@@ -271,6 +275,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     list: {
+        paddingTop: 56,
         paddingBottom: 20,
     },
     reviewCard: {
@@ -378,6 +383,7 @@ const styles = StyleSheet.create({
     },
     emptyActionButton: {
         marginTop: 20,
+        alignSelf: 'center',
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F2F2F7',
