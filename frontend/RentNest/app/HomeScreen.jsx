@@ -232,6 +232,12 @@ const HomeScreen = () => {
             keyExtractor={item => item.listingId.toString()}
             contentContainerStyle={styles.listContent}
             ListHeaderComponent={<View style={styles.listHeaderSpacing} />}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyTitle}>No listings yet</Text>
+                <Text style={styles.emptySubtitle}>Check back later for available rentals.</Text>
+              </View>
+            }
           />
         )}
 
@@ -245,6 +251,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    paddingHorizontal: 40,
   },
   content: {
     flex: 1,
