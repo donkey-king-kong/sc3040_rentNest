@@ -83,13 +83,15 @@ public class AiChatService {
                 - Use only facts explicitly stated in the transcript.
                 - Do not speculate about who is owner or tenant based on names.
                 - Do not comment on funny, odd, duplicated, or confusing names.
+                - For short conversations, still summarise the concrete request/question and the concrete reply.
+                - If a user asks for information and the reply points them to a source or action, treat that as the next step.
                 - Include only sections that have actual content from the conversation.
                 - Each section value must be one short sentence or a structured list of key-value pairs, nothing longer.
                 - Output valid JSON only. No markdown, no explanation, no trailing text.
 
                 Output a JSON object with these fields:
                 - "overview": always required, one sentence summary of what was discussed
-                - "next_steps": always required, one sentence on what happens next, or "No clear next step mentioned"
+                - "next_steps": always required, one sentence on what happens next, or "No clear next step mentioned" only if neither person requested or suggested any action
                 - "sections": an array of 0-4 objects, each with "label", "icon", and "content"
                   - Only include a section if that topic was actually discussed
                   - For structured data (prices, dates), use "rows": [{"label": "...", "value": "..."}] instead of "content"
