@@ -135,6 +135,7 @@ const InboxScreen = () => {
           data={userListings}
           renderItem={renderItem}
           keyExtractor={(item) => item.listingID.toString()}
+          contentContainerStyle={userListings.length === 0 ? { flexGrow: 1 } : null}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyTitle}>No active rentals</Text>
@@ -176,22 +177,24 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   emptyContainer: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 80,
+    paddingHorizontal: 40,
+    paddingVertical: 60,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#888',
     textAlign: 'center',
-    paddingHorizontal: 40,
+    lineHeight: 24,
   },
   listingContainer: {
     flexDirection: 'row',
