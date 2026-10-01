@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import {View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, Alert} from 'react-native';
+import {View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Alert} from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {API_BASE_URL} from "../config/api";
-import axios from "axios";
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const UserReviewsScreen = () => {
     const { userId } = useLocalSearchParams();
@@ -45,7 +45,22 @@ const UserReviewsScreen = () => {
                 });
 
                 if (response.ok) {
-                    const data = await response.json();
+                    const rawBody = await response.text();
+                    const hasJsonBody = response.headers.get('content-type')?.includes('application/json');
+                    const hasNoReviewsMessage = rawBody.trim().toLowerCase().startsWith('no reviews');
+
+                    if (response.status === 204 || rawBody.trim() === '' || hasNoReviewsMessage) {
+                        setReviews([]);
+                        setError(null);
+                        return;
+                    }
+
+                    if (!hasJsonBody) {
+                        throw new Error(rawBody || 'Unexpected response while fetching user reviews.');
+                    }
+
+                    const data = JSON.parse(rawBody);
+                    const reviewList = Array.isArray(data) ? data : [];
                     const avatars = [
                         'https://randomuser.me/api/portraits/lego/1.jpg',
                         'https://randomuser.me/api/portraits/lego/2.jpg',
@@ -55,7 +70,7 @@ const UserReviewsScreen = () => {
                     ];
 
                     // Use different avatar URLs based on review ID
-                    setReviews(data.map((review, index) => {
+                    setReviews(reviewList.map((review, index) => {
                         // Try to parse the date, fall back if it's invalid
                         // let formattedDate;
                         // try {
@@ -76,13 +91,15 @@ const UserReviewsScreen = () => {
                             flagged: review.flagged,
                         };
                     }));
+                    setError(null);
 
                 } else if (response.status === 204) {
                     // Handle case where there are no reviews for the user
                     setReviews([]);
-                    setError('No reviews found for the specified user.');
+                    setError(null);
                 } else {
-                    throw new Error("Error fetching user reviews. Status code: " + response.status);
+                    const errorBody = await response.text();
+                    throw new Error(errorBody || "Error fetching user reviews. Status code: " + response.status);
                 }
             } catch (error) {
                 console.error("Error fetching user reviews:", error);
@@ -156,7 +173,8 @@ const UserReviewsScreen = () => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#0000ff" />
+                <MorphingInfinity size={86} color="#2FA84F" />
+                <Text style={styles.loadingText}>Loading reviews...</Text>
             </View>
         );
     }
@@ -165,6 +183,11 @@ const UserReviewsScreen = () => {
         <View style={styles.container}>
             {error ? (
                 <Text style={{ color: 'red', marginBottom: 10 }}>{error}</Text>
+            ) : reviews.length === 0 ? (
+                <View style={styles.emptyState}>
+                    <Text style={styles.header}>Reviews</Text>
+                    <Text style={styles.emptyText}>No reviews yet.</Text>
+                </View>
             ) : (
                 <>
                     <Text style={styles.header}>Reviews</Text>
@@ -282,6 +305,20 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#2FA84F',
+    },
+    emptyState: {
+        flex: 1,
+    },
+    emptyText: {
+        fontSize: 15,
+        color: '#6F7075',
     },
 });
 
