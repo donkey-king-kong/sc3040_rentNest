@@ -514,6 +514,37 @@ const ChatsScreen2 = () => {
         return 'AI Response';
     }
 
+    const renderAiAnswer = () => {
+        const lines = aiAnswer
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+        if (lines.length === 0) {
+            return null;
+        }
+
+        return lines.map((line, index) => {
+            const cleanedLine = line.replace(/^[-•]\s*/, '');
+            const labelMatch = cleanedLine.match(/^([^:]{2,42}):\s*(.+)$/);
+
+            if (labelMatch) {
+                return (
+                    <View key={`${cleanedLine}-${index}`} style={styles.aiAnswerDetailRow}>
+                        <Text style={styles.aiAnswerDetailLabel}>{labelMatch[1]}</Text>
+                        <Text style={styles.aiAnswerDetailValue}>{labelMatch[2]}</Text>
+                    </View>
+                );
+            }
+
+            return (
+                <Text key={`${cleanedLine}-${index}`} style={styles.aiAnswerParagraph}>
+                    {cleanedLine}
+                </Text>
+            );
+        });
+    }
+
     const sendRentalOffer = async() => {
         try{
             const token = await AsyncStorage.getItem('token');
@@ -1170,6 +1201,8 @@ const handlePaymentAndAccept = async () => {
                                 style={styles.aiAnswerContainer}
                                 contentContainerStyle={styles.aiAnswerContentContainer}
                                 nestedScrollEnabled={true}
+                                showsVerticalScrollIndicator={true}
+                                persistentScrollbar={true}
                             >
                                 {submittedAiQuestion !== '' && (
                                     <View style={styles.aiAskedQuestionContainer}>
@@ -1192,7 +1225,7 @@ const handlePaymentAndAccept = async () => {
                                             <Text style={styles.aiLoadingText}>AI is thinking...</Text>
                                         </View>
                                     ) : (
-                                        <Text style={styles.aiAnswerText}>{aiAnswer}</Text>
+                                        <View style={styles.aiAnswerBody}>{renderAiAnswer()}</View>
                                     )}
                                 </View>
                             </ScrollView>
@@ -1954,12 +1987,12 @@ const styles = StyleSheet.create({
         width: '100%',
         backgroundColor: '#FFFFFF',
         borderRadius: 0,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
-        maxHeight: 260,
+        maxHeight: Dimensions.get('window').height * 0.48,
     },
     aiAnswerContentContainer: {
-        paddingBottom: 4,
+        paddingHorizontal: 12,
+        paddingTop: 12,
+        paddingBottom: 28,
     },
     aiAskedQuestionContainer: {
         marginBottom: 12,
@@ -2002,6 +2035,31 @@ const styles = StyleSheet.create({
         fontSize: 13,
         lineHeight: 20,
         color: '#000000',
+    },
+    aiAnswerBody: {
+        gap: 8,
+    },
+    aiAnswerParagraph: {
+        fontSize: 13,
+        lineHeight: 20,
+        color: '#000000',
+    },
+    aiAnswerDetailRow: {
+        paddingVertical: 2,
+    },
+    aiAnswerDetailLabel: {
+        fontSize: 10,
+        lineHeight: 14,
+        fontWeight: '700',
+        color: '#6F7075',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 1,
+    },
+    aiAnswerDetailValue: {
+        fontSize: 13,
+        lineHeight: 20,
+        color: '#111111',
     },
     aiLoadingRow: {
         flexDirection: 'row',
