@@ -45,6 +45,12 @@ const ChatsScreen2 = () => {
     const [newMessage, setNewMessage] = useState('');
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false)
     const [isPaymentSuccessfulModalVisible, setPaymentSuccessfulModalVisible] = useState(false)
+    const [cardNumber, setCardNumber] = useState('');
+    const [cardExpiry, setCardExpiry] = useState('');
+    const [cardCvv, setCardCvv] = useState('');
+    const [cardNumberError, setCardNumberError] = useState('');
+    const [cardExpiryError, setCardExpiryError] = useState('');
+    const [cardCvvError, setCardCvvError] = useState('');
     const [Loading, setLoading] = useState(true);
     const chatScrollRef = useRef(null);
     const summaryScrollRef = useRef(null);
@@ -767,6 +773,14 @@ const handlePaymentAndAccept = async () => {
 
     // Toggle payment modal visibility
     const togglePaymentModal = () => {
+        if (!isPaymentModalVisible) {
+            setCardNumber('');
+            setCardExpiry('');
+            setCardCvv('');
+            setCardNumberError('');
+            setCardExpiryError('');
+            setCardCvvError('');
+        }
         setPaymentModalVisible(!isPaymentModalVisible);
     }
 
@@ -1579,32 +1593,146 @@ const handlePaymentAndAccept = async () => {
                 onRequestClose={togglePaymentModal}
             >
                 <View style={styles.modalOverlay}>
-                    <View style={styles.paymentModalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Card Payment</Text>
-                            {/* Close button */}
+                    <View style={styles.payModalContent}>
+                        {/* Header */}
+                        <View style={styles.payModalHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <FontAwesome name="lock" size={14} color="#4ADE80" />
+                                <Text style={styles.payModalTitle}>Pay deposit</Text>
+                            </View>
                             <TouchableOpacity onPress={togglePaymentModal}>
-                                <Image source={x} style={styles.icon}/>
+                                <FontAwesome name="times" size={18} color="#aaa" />
                             </TouchableOpacity>
                         </View>
-                        <Text style={styles.modalDescription}>Rental Deposit</Text>
-                        <View style={styles.paymentMethodsContainer}>
-                            <Image source={visa} style={styles.icon}/>
-                            <Image source={master} style={styles.icon}/>
-                            <Image source={amex} style={styles.icon}/>
+
+                        {/* Deposit summary row */}
+                        <View style={styles.payDepositRow}>
+                            <View>
+                                <Text style={styles.payDepositLabel}>RENTAL DEPOSIT</Text>
+                                <Text style={styles.payDepositAmount}>
+                                    ${rental?.depositPrice ? Number(rental.depositPrice).toLocaleString('en-SG') : '0'}
+                                </Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Image source={visa} style={styles.payCardLogo} />
+                                <Image source={master} style={styles.payCardLogo} />
+                            </View>
                         </View>
-                        <TextInput style={styles.paymentLargeInput} placeholder="Card Number" keyboardType="numeric"/>
-                        <View style={styles.row}>
-                            <TextInput style={styles.paymentSmallInput} placeholder="Expiration (MM/YY)" keyboardType="numeric"/>
-                            <TextInput style={styles.paymentSmallInput} placeholder="CVV" keyboardType="numeric"/>
+
+                        {/* Card number */}
+                        <Text style={styles.payFieldLabel}>Card number</Text>
+                        <View style={[styles.payInputRow, cardNumberError ? styles.payInputError : null]}>
+                            <TextInput
+                                style={styles.payInput}
+                                placeholder="1234 5678 9012 3456"
+                                placeholderTextColor="#555"
+                                keyboardType="numeric"
+                                maxLength={19}
+                                value={cardNumber}
+                                onChangeText={(t) => {
+                                    const digits = t.replace(/\D/g, '').slice(0, 16);
+                                    const formatted = digits.replace(/(.{4})/g, '$1 ').trim();
+                                    setCardNumber(formatted);
+                                    setCardNumberError('');
+                                }}
+                                onBlur={() => {
+                                    const digits = cardNumber.replace(/\s/g, '');
+                                    if (digits.length > 0 && digits.length !== 16) setCardNumberError('Must be 16 digits');
+                                }}
+                            />
+                            <FontAwesome name="credit-card" size={16} color="#555" />
                         </View>
-                        <TextInput style={styles.paymentLargeInput} placeholder="Postal Code" keyboardType="numeric" />
-                        <TextInput style={styles.paymentLargeInput} placeholder="Location" />
-                        <View style={styles.longBlackButton}>
-                            <TouchableOpacity onPress={handlePaymentAndAccept}>
-                                <Text style={styles.whiteButtonText}> Pay ${rental?.depositPrice} and Accept Rental Offer </Text>
-                            </TouchableOpacity>
+                        {cardNumberError ? <Text style={styles.payFieldError}>{cardNumberError}</Text> : null}
+
+                        {/* Expiry + CVV row */}
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.payFieldLabel}>Expiry</Text>
+                                <View style={[styles.payInputRow, cardExpiryError ? styles.payInputError : null]}>
+                                    <TextInput
+                                        style={styles.payInput}
+                                        placeholder="MM / YY"
+                                        placeholderTextColor="#555"
+                                        keyboardType="numeric"
+                                        maxLength={7}
+                                        value={cardExpiry}
+                                        onChangeText={(t) => {
+                                            const digits = t.replace(/\D/g, '').slice(0, 4);
+                                            const formatted = digits.length > 2 ? `${digits.slice(0, 2)} / ${digits.slice(2)}` : digits;
+                                            setCardExpiry(formatted);
+                                            setCardExpiryError('');
+                                        }}
+                                        onBlur={() => {
+                                            const digits = cardExpiry.replace(/\D/g, '');
+                                            if (digits.length === 0) return;
+                                            if (digits.length !== 4) { setCardExpiryError('Use MM/YY format'); return; }
+                                            const mm = parseInt(digits.slice(0, 2), 10);
+                                            const yy = parseInt(digits.slice(2), 10);
+                                            if (mm < 1 || mm > 12) { setCardExpiryError('Invalid month'); return; }
+                                            const now = new Date();
+                                            const expiry = new Date(2000 + yy, mm - 1, 1);
+                                            if (expiry < new Date(now.getFullYear(), now.getMonth(), 1)) setCardExpiryError('Card has expired');
+                                        }}
+                                    />
+                                </View>
+                                {cardExpiryError ? <Text style={styles.payFieldError}>{cardExpiryError}</Text> : null}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.payFieldLabel}>CVV</Text>
+                                <View style={[styles.payInputRow, cardCvvError ? styles.payInputError : null]}>
+                                    <TextInput
+                                        style={styles.payInput}
+                                        placeholder="•••"
+                                        placeholderTextColor="#555"
+                                        keyboardType="numeric"
+                                        maxLength={3}
+                                        secureTextEntry
+                                        value={cardCvv}
+                                        onChangeText={(t) => {
+                                            setCardCvv(t.replace(/\D/g, '').slice(0, 3));
+                                            setCardCvvError('');
+                                        }}
+                                        onBlur={() => {
+                                            if (cardCvv.length > 0 && cardCvv.length !== 3) setCardCvvError('Must be 3 digits');
+                                        }}
+                                    />
+                                    <FontAwesome name="question-circle" size={16} color="#555" />
+                                </View>
+                                {cardCvvError ? <Text style={styles.payFieldError}>{cardCvvError}</Text> : null}
+                            </View>
                         </View>
+
+                        {/* Pay button */}
+                        {(() => {
+                            const digitsOnly = cardNumber.replace(/\s/g, '');
+                            const expiryDigits = cardExpiry.replace(/\D/g, '');
+                            const validCard = digitsOnly.length === 16;
+                            const validCvv = cardCvv.length === 3;
+                            let validExpiry = false;
+                            if (expiryDigits.length === 4) {
+                                const mm = parseInt(expiryDigits.slice(0, 2), 10);
+                                const yy = parseInt(expiryDigits.slice(2), 10);
+                                if (mm >= 1 && mm <= 12) {
+                                    const now = new Date();
+                                    validExpiry = new Date(2000 + yy, mm - 1, 1) >= new Date(now.getFullYear(), now.getMonth(), 1);
+                                }
+                            }
+                            const canPay = validCard && validExpiry && validCvv;
+                            const depositLabel = rental?.depositPrice ? `$${Number(rental.depositPrice).toLocaleString('en-SG')}` : '';
+                            return (
+                                <>
+                                    <TouchableOpacity
+                                        style={[styles.payButton, !canPay && styles.payButtonDisabled]}
+                                        onPress={canPay ? handlePaymentAndAccept : null}
+                                        disabled={!canPay}
+                                    >
+                                        <FontAwesome name="lock" size={13} color="#fff" style={{ marginRight: 8 }} />
+                                        <Text style={styles.payButtonText}>Pay {depositLabel} and accept offer</Text>
+                                    </TouchableOpacity>
+                                    <Text style={styles.paySecureNote}>Your payment is encrypted and secure.</Text>
+                                </>
+                            );
+                        })()}
                     </View>
                 </View>
             </Modal>
@@ -2727,6 +2855,108 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: '700',
+    },
+
+    /* ── Pay deposit modal ── */
+    payModalContent: {
+        width: '88%',
+        backgroundColor: '#1C1C1E',
+        borderRadius: 16,
+        paddingVertical: 24,
+        paddingHorizontal: 20,
+    },
+    payModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    payModalTitle: {
+        color: '#fff',
+        fontSize: 17,
+        fontWeight: '700',
+    },
+    payDepositRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#2C2C2E',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        marginBottom: 20,
+    },
+    payDepositLabel: {
+        color: '#888',
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.6,
+        marginBottom: 4,
+    },
+    payDepositAmount: {
+        color: '#fff',
+        fontSize: 24,
+        fontWeight: '800',
+    },
+    payCardLogo: {
+        width: 38,
+        height: 24,
+        resizeMode: 'contain',
+        borderRadius: 4,
+    },
+    payFieldLabel: {
+        color: '#aaa',
+        fontSize: 12,
+        fontWeight: '600',
+        marginBottom: 6,
+        marginTop: 14,
+    },
+    payInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#2C2C2E',
+        borderRadius: 10,
+        paddingHorizontal: 12,
+        height: 48,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    payInputError: {
+        borderColor: '#EF4444',
+    },
+    payInput: {
+        flex: 1,
+        color: '#fff',
+        fontSize: 15,
+    },
+    payFieldError: {
+        color: '#EF4444',
+        fontSize: 11,
+        marginTop: 4,
+    },
+    payButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#3B82F6',
+        borderRadius: 12,
+        height: 52,
+        marginTop: 24,
+    },
+    payButtonDisabled: {
+        backgroundColor: '#3B82F6',
+        opacity: 0.35,
+    },
+    payButtonText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '700',
+    },
+    paySecureNote: {
+        color: '#666',
+        fontSize: 11,
+        textAlign: 'center',
+        marginTop: 10,
     },
 });
 
