@@ -93,14 +93,7 @@ public class ReviewsController {
             // Fetch the reviews for the given userID
             List<ReviewsDTO> userReviews = reviewsService.getReviewsByUser(userId);
 
-            // If the list is empty, return 204 NO CONTENT
-            if (userReviews.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.OK)
-                        .contentType(MediaType.TEXT_PLAIN)
-                        .body("No reviews found for the specified user.");
-            }
-
-            // Return the reviews as the response
+            // Return a JSON array for both populated and empty review lists.
             return ResponseEntity.ok(userReviews);
 
         } catch (IllegalArgumentException e) {
