@@ -1129,21 +1129,16 @@ const handlePaymentAndAccept = async () => {
                 </TouchableOpacity>
             </View>
 
-            <Modal
-                animationType="slide"
-                transparent={true}
-                visible={isAskAiModalVisible}
-                onRequestClose={() => setAskAiModalVisible(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, styles.aiModalContent]}>
+            {isAskAiModalVisible && (
+                <View style={styles.aiModalOverlay}>
+                    <View style={styles.aiModalContent}>
                         <View style={styles.aiModalHeader}>
                             <View style={styles.aiModalTitleGroup}>
                                 <AvatarOrb color="blue" size="sm" shape="squircle" blinking style={styles.aiModalOrb} />
                                 <Text style={styles.aiModalTitle}>Ask AI</Text>
                             </View>
                             <TouchableOpacity style={styles.aiModalCloseButton} onPress={() => setAskAiModalVisible(false)}>
-                                <FontAwesome name="times" size={22} color="#666A70" />
+                                <FontAwesome name="times" size={14} color="#666A70" />
                             </TouchableOpacity>
                         </View>
                         {aiAnswer !== '' && isAiAnswerPlaceholder && (
@@ -1157,7 +1152,8 @@ const handlePaymentAndAccept = async () => {
                                 value={aiQuestion}
                                 onChangeText={setAiQuestion}
                                 onKeyPress={handleAiQuestionKeyPress}
-                                multiline={true}
+                                multiline={false}
+                                numberOfLines={1}
                                 blurOnSubmit={false}
                                 editable={!isAskingAi}
                             />
@@ -1166,7 +1162,7 @@ const handlePaymentAndAccept = async () => {
                                 onPress={askAiQuestion}
                                 disabled={isAskingAi}
                             >
-                                <FontAwesome name="arrow-up" size={16} color={isAskingAi ? '#C8C8CC' : '#FFFFFF'} />
+                                <FontAwesome name="arrow-up" size={14} color={isAskingAi ? '#C8C8CC' : '#FFFFFF'} />
                             </TouchableOpacity>
                         </View>
                         {aiAnswer !== '' && (
@@ -1187,7 +1183,7 @@ const handlePaymentAndAccept = async () => {
                         )}
                     </View>
                 </View>
-            </Modal>
+            )}
 
             <Modal
                 animationType="slide"
@@ -1635,12 +1631,26 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         alignItems: 'center',
     },
+    aiModalOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        zIndex: 120,
+        elevation: 120,
+    },
     aiModalContent: {
         alignItems: 'stretch',
         maxHeight: '80%',
         flexDirection: 'column',
-        width: '86%',
-        borderRadius: 18,
+        alignSelf: 'stretch',
+        marginHorizontal: 24,
+        backgroundColor: 'white',
+        borderRadius: 16,
         paddingHorizontal: 0,
         paddingVertical: 0,
         overflow: 'hidden',
@@ -1663,9 +1673,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 18,
-        paddingTop: 18,
-        paddingBottom: 18,
+        paddingHorizontal: 12,
+        paddingTop: 12,
+        paddingBottom: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#E8E8EC',
     },
@@ -1674,18 +1684,19 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     aiModalOrb: {
-        marginRight: 14,
+        width: 28,
+        height: 28,
+        marginRight: 8,
     },
     aiModalTitle: {
-        fontSize: 28,
-        fontWeight: '800',
+        fontSize: 16,
+        fontWeight: '600',
         color: '#000000',
-        letterSpacing: -0.5,
     },
     aiModalCloseButton: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
         backgroundColor: '#E1E2E8',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1718,7 +1729,9 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: 'bold',
         textAlign: 'center',
-        marginBottom: 12,
+        marginTop: 8,
+        marginBottom: 8,
+        paddingHorizontal: 12,
         color: '#F5C451',
     },
     summaryText: {
@@ -1887,14 +1900,14 @@ const styles = StyleSheet.create({
     },
     aiQuestionInput: {
         flex: 1,
-        minHeight: 54,
-        maxHeight: 96,
+        height: 40,
+        maxHeight: 40,
         backgroundColor: '#F1F1F3',
-        borderRadius: 16,
-        paddingHorizontal: 20,
-        paddingVertical: 14,
-        fontSize: 20,
-        lineHeight: 25,
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        fontSize: 13,
+        lineHeight: 18,
         color: '#101820',
     },
     aiQuestionInputDisabled: {
@@ -1904,16 +1917,16 @@ const styles = StyleSheet.create({
     aiQuestionRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 18,
-        paddingVertical: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#E8E8EC',
-        gap: 12,
+        gap: 8,
     },
     aiAskIconButton: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
+        width: 32,
+        height: 32,
+        borderRadius: 16,
         backgroundColor: '#1C1C1E',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1925,8 +1938,8 @@ const styles = StyleSheet.create({
         width: '100%',
         backgroundColor: '#FFFFFF',
         borderRadius: 0,
-        paddingHorizontal: 18,
-        paddingVertical: 24,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
         maxHeight: 260,
     },
     aiAnswerContentContainer: {
@@ -1934,37 +1947,36 @@ const styles = StyleSheet.create({
     },
     aiAskedQuestionContainer: {
         backgroundColor: '#F1F1F5',
-        borderRadius: 16,
-        paddingHorizontal: 18,
-        paddingVertical: 16,
-        marginBottom: 24,
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        marginBottom: 12,
     },
     aiAskedQuestionLabel: {
-        fontSize: 14,
-        fontWeight: '800',
-        marginBottom: 10,
+        fontSize: 12,
+        fontWeight: '600',
+        marginBottom: 6,
         color: '#8E8E95',
         textTransform: 'uppercase',
-        letterSpacing: 0.5,
+        letterSpacing: 0.3,
     },
     aiAskedQuestionText: {
-        fontSize: 21,
-        lineHeight: 28,
+        fontSize: 13,
+        lineHeight: 18,
         color: '#000000',
     },
     aiAnswerTitle: {
-        fontSize: 17,
-        fontWeight: '800',
-        marginBottom: 14,
+        fontSize: 12,
+        fontWeight: '600',
+        marginBottom: 6,
         color: '#8E8E95',
         textTransform: 'uppercase',
-        letterSpacing: 0.4,
+        letterSpacing: 0.3,
     },
     aiAnswerText: {
-        fontSize: 22,
-        lineHeight: 36,
+        fontSize: 13,
+        lineHeight: 19,
         color: '#000000',
-        fontWeight: '500',
     },
     infoContainer: {
         marginBottom: 10,
