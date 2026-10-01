@@ -4,6 +4,7 @@ import axios from "axios";
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import MorphingInfinity from '../components/MorphingInfinity';
 
 import confirmationImage from '../assets/images/confirmation.png';
 import errorImage from '../assets/images/error.png';
@@ -236,8 +237,9 @@ const LeaveReview = () => {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading review...</Text>
       </View>
     );
   }
@@ -322,6 +324,18 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2FA84F',
   },
   scrollContainer: {
     flexGrow: 1,
