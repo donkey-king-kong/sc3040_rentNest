@@ -187,11 +187,11 @@ const UserReviewsScreen = () => {
             ) : reviews.length === 0 ? (
                 <View style={styles.emptyState}>
                     <View style={styles.emptyIconContainer}>
-                        <FontAwesome name="star-o" size={28} color="#C7C7CC" />
+                        <FontAwesome name="star-o" size={36} color="#C7C7CC" />
                     </View>
                     <Text style={styles.emptyTitle}>No reviews yet</Text>
                     <Text style={styles.emptySubtitle}>
-                        Reviews from owners and tenants will appear here after a rental is completed.
+                        This user hasn't received any reviews yet.
                     </Text>
                 </View>
             ) : (
@@ -326,22 +326,22 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     emptyIconContainer: {
-        width: 52,
-        height: 52,
-        borderRadius: 16,
+        width: 72,
+        height: 72,
+        borderRadius: 20,
         backgroundColor: '#F2F2F7',
         justifyContent: 'center',
         alignItems: 'center',
     },
     emptyTitle: {
         marginTop: 12,
-        fontSize: 16,
+        fontSize: 17,
         fontWeight: '700',
         color: '#000000',
     },
     emptySubtitle: {
         marginTop: 6,
-        maxWidth: 240,
+        maxWidth: 220,
         fontSize: 13,
         lineHeight: 20,
         color: '#8E8E93',
