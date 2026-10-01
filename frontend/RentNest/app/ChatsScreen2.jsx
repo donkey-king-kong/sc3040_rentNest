@@ -957,7 +957,21 @@ const handlePaymentAndAccept = async () => {
                 />
                 <Animated.View style={[styles.summarySheet, { transform: [{ translateY: summarySheetY }] }]}>
                     <View style={styles.summarySheetHandle} />
-                    <Text style={styles.summarySheetTitle}>AI Chat Summary</Text>
+                    <View style={styles.summarySheetHeader}>
+                        <View style={styles.summarySheetTitleGroup}>
+                            <View style={styles.summaryAiIconBadge}>
+                                <FontAwesome name="magic" size={17} color="#1890FF" />
+                            </View>
+                            <Text style={styles.summarySheetTitle}>AI chat summary</Text>
+                        </View>
+                        {parsedSummary && (
+                            <View style={styles.summaryTopicBadge}>
+                                <Text style={styles.summaryTopicBadgeText}>
+                                    {(parsedSummary.sections || []).length} topics
+                                </Text>
+                            </View>
+                        )}
+                    </View>
                     {isSummaryPlaceholder && (
                         <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
                     )}
@@ -970,21 +984,24 @@ const handlePaymentAndAccept = async () => {
                             <Text style={styles.summaryText}>{summaryError}</Text>
                         ) : parsedSummary ? (
                             <View>
-                                <View style={styles.summaryCard}>
-                                    <Text style={styles.summaryCardLabel}>Overview</Text>
-                                    <Text style={styles.summaryCardContent}>{parsedSummary.overview}</Text>
-                                </View>
                                 {(parsedSummary.sections || []).map((section, idx) => (
                                     <View key={idx} style={styles.summaryCard}>
                                         <View style={styles.summaryCardHeaderRow}>
-                                            <FontAwesome name={section.icon} size={14} color="#555" style={{ marginRight: 6 }} />
+                                            <FontAwesome name={section.icon} size={14} color="#A4A4AD" style={styles.summaryCardIcon} />
                                             <Text style={styles.summaryCardLabel}>{section.label}</Text>
                                         </View>
                                         {section.rows ? (
                                             section.rows.map((row, ri) => (
                                                 <View key={ri} style={styles.summaryCardRow}>
                                                     <Text style={styles.summaryCardRowLabel}>{row.label}</Text>
-                                                    <Text style={styles.summaryCardRowValue}>{row.value}</Text>
+                                                    <Text
+                                                        style={[
+                                                            styles.summaryCardRowValue,
+                                                            String(row.label).toLowerCase().includes('deposit') && styles.summaryCardRowValueSmall,
+                                                        ]}
+                                                    >
+                                                        {row.value}
+                                                    </Text>
                                                 </View>
                                             ))
                                         ) : (
@@ -993,9 +1010,14 @@ const handlePaymentAndAccept = async () => {
                                     </View>
                                 ))}
                                 {parsedSummary.next_steps && (
-                                    <View style={[styles.summaryCard, styles.summaryNextStepsCard]}>
-                                        <Text style={[styles.summaryCardLabel, styles.summaryNextStepsLabel]}>Next Steps</Text>
-                                        <Text style={styles.summaryCardContent}>{parsedSummary.next_steps}</Text>
+                                    <View style={styles.summaryNextStepsSection}>
+                                        <View style={styles.summaryCardHeaderRow}>
+                                            <FontAwesome name="arrow-right" size={14} color="#34E65A" style={styles.summaryCardIcon} />
+                                            <Text style={[styles.summaryCardLabel, styles.summaryNextStepsLabel]}>Next Steps</Text>
+                                        </View>
+                                        <View style={styles.summaryNextStepsCard}>
+                                            <Text style={styles.summaryNextStepsContent}>{parsedSummary.next_steps}</Text>
+                                        </View>
                                     </View>
                                 )}
                             </View>
@@ -1551,14 +1573,15 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         textAlign: 'center',
         marginBottom: 12,
-        color: '#7A4E00',
+        color: '#F5C451',
     },
     summaryText: {
-        fontSize: 14,
+        fontSize: 15,
         lineHeight: 24,
         textAlign: 'left',
         width: '100%',
         marginBottom: 10,
+        color: '#F1F1F4',
     },
     summarySheetBackdrop: {
         position: 'absolute',
@@ -1566,85 +1589,149 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.45)',
+        backgroundColor: 'rgba(0,0,0,0.52)',
     },
     summarySheet: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        paddingHorizontal: 20,
+        backgroundColor: '#2B2B2E',
+        borderTopLeftRadius: 30,
+        borderTopRightRadius: 30,
+        paddingHorizontal: 24,
         paddingBottom: 32,
-        paddingTop: 12,
+        paddingTop: 18,
         maxHeight: Dimensions.get('window').height * 0.75,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -8 },
+        shadowOpacity: 0.28,
+        shadowRadius: 20,
+        elevation: 18,
     },
     summarySheetHandle: {
         width: 40,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: '#ccc',
+        height: 5,
+        borderRadius: 999,
+        backgroundColor: '#8D8D92',
         alignSelf: 'center',
-        marginBottom: 14,
+        marginBottom: 18,
+    },
+    summarySheetHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingBottom: 22,
+        borderBottomWidth: 1,
+        borderBottomColor: '#3B3B3F',
+        marginBottom: 8,
+    },
+    summarySheetTitleGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexShrink: 1,
+    },
+    summaryAiIconBadge: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        backgroundColor: '#203A61',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 16,
     },
     summarySheetTitle: {
-        fontSize: 17,
-        fontWeight: '700',
-        marginBottom: 14,
-        color: '#101820',
+        fontSize: 22,
+        fontWeight: '800',
+        color: '#F5F5F7',
+        letterSpacing: -0.3,
+    },
+    summaryTopicBadge: {
+        backgroundColor: '#244669',
+        borderRadius: 999,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        marginLeft: 12,
+    },
+    summaryTopicBadgeText: {
+        color: '#1590FF',
+        fontSize: 16,
+        fontWeight: '800',
     },
     summarySheetScroll: {
         flexGrow: 0,
     },
     summaryCard: {
-        backgroundColor: '#f7f7f7',
-        borderRadius: 12,
-        padding: 14,
-        marginBottom: 10,
+        paddingVertical: 18,
+        borderBottomWidth: 1,
+        borderBottomColor: '#39393D',
     },
     summaryCardHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 6,
+        marginBottom: 12,
+    },
+    summaryCardIcon: {
+        marginRight: 10,
     },
     summaryCardLabel: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#555',
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#A4A4AD',
         textTransform: 'uppercase',
-        letterSpacing: 0.5,
-        marginBottom: 4,
+        letterSpacing: 0.7,
     },
     summaryCardContent: {
-        fontSize: 14,
-        lineHeight: 20,
-        color: '#101820',
+        fontSize: 18,
+        lineHeight: 26,
+        fontWeight: '700',
+        color: '#F0F0F3',
     },
     summaryCardRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        paddingVertical: 4,
-        borderBottomWidth: 1,
-        borderBottomColor: '#ececec',
+        alignItems: 'flex-start',
+        paddingVertical: 6,
+        gap: 12,
     },
     summaryCardRowLabel: {
-        fontSize: 13,
-        color: '#666',
+        fontSize: 18,
+        lineHeight: 24,
+        color: '#AAAAB0',
+        flex: 1,
     },
     summaryCardRowValue: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#101820',
+        fontSize: 18,
+        lineHeight: 24,
+        fontWeight: '800',
+        color: '#F4F4F6',
+        flex: 1.2,
+        textAlign: 'right',
     },
-    summaryNextStepsCard: {
-        backgroundColor: '#EFF6FF',
-        borderLeftWidth: 3,
-        borderLeftColor: '#3B82F6',
+    summaryCardRowValueSmall: {
+        fontSize: 15,
+        lineHeight: 21,
+        color: '#C8C8CE',
+    },
+    summaryNextStepsSection: {
+        paddingTop: 18,
     },
     summaryNextStepsLabel: {
-        color: '#3B82F6',
+        color: '#34E65A',
+    },
+    summaryNextStepsCard: {
+        backgroundColor: '#26382A',
+        borderWidth: 1,
+        borderColor: '#3B7943',
+        borderRadius: 16,
+        paddingHorizontal: 18,
+        paddingVertical: 18,
+    },
+    summaryNextStepsContent: {
+        fontSize: 18,
+        lineHeight: 27,
+        fontWeight: '800',
+        color: '#ECECEF',
     },
     aiQuestionInput: {
         width: '100%',
