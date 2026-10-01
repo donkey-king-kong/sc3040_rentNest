@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, Image, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import axios from "axios";
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
@@ -8,8 +8,8 @@ import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MorphingInfinity from '../components/MorphingInfinity';
 
-import confirmationImage from '../assets/images/confirmation.png';
 import errorImage from '../assets/images/error.png';
+const notificationBellIcon = require('../assets/images/notificationBell.png');
 
 const LeaveReview = () => {
   const router = useRouter();
@@ -31,6 +31,9 @@ const LeaveReview = () => {
   const [isError, setIsError] = useState(false);
   const [revieweeProfile, setRevieweeProfile] = useState(null);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [initialReview, setInitialReview] = useState(null);
+  const notificationTimeoutRef = useRef(null);
 
   useEffect(() => {
     // Validate required parameters
@@ -113,15 +116,22 @@ const LeaveReview = () => {
         setReviewText(userReview.text);
         setIsEditing(true);
         setReviewId(userReview.reviewid);
+        setInitialReview({
+          rating: userReview.rating,
+          title: userReview.title || '',
+          text: userReview.text || '',
+        });
       } else {
         console.log('No existing review found for this user-owner pair.');
         setIsEditing(false);
+        setInitialReview(null);
       }
     } catch (error) {
       if (error.response && error.response.status === 404) {
         // No review found
         console.log('No review found for this user-owner pair. Navigating to create mode.');
         setIsEditing(false);
+        setInitialReview(null);
       } else {
         let errorMessage = "Error fetching review.";
         if (error.response) {
@@ -143,6 +153,10 @@ const LeaveReview = () => {
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
     if (!ownerId || !tenantId) {
       setModalMessage("Missing required parameters. Please try again.");
       setIsError(true);
@@ -158,6 +172,7 @@ const LeaveReview = () => {
     }
 
     try {
+      setIsSubmitting(true);
       const reviewData = {
         userID: ownerId,
         rating,
@@ -195,7 +210,7 @@ const LeaveReview = () => {
       }
 
       if (response.status === 200 || response.status === 201) {
-        setModalMessage(isEditing ? "Review Updated Successfully!" : "Review Submitted Successfully!");
+        setModalMessage(isEditing ? "Review Updated" : "Review Submitted");
         setIsError(false);
         setModalVisible(true);
         setRating(0);
@@ -221,6 +236,8 @@ const LeaveReview = () => {
       setModalMessage(errorMessage);
       setIsError(true);
       setModalVisible(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -241,7 +258,7 @@ const LeaveReview = () => {
           'Content-Type': 'application/json'
         }
       });
-      setModalMessage("Review Deleted!");
+      setModalMessage("Review Deleted");
       console.log(`Response Status: ${response.status}. Review Deleted successfully!`); // Added log
       setIsError(false);
       setModalVisible(true);
@@ -269,7 +286,13 @@ const LeaveReview = () => {
       || revieweeProfile?.profilePicture
       || revieweeProfile?.avatar;
   const canShowRevieweePhoto = displayedRevieweePhotoURL && !avatarLoadFailed;
-  const isSubmitDisabled = rating === 0 || !reviewTitle.trim() || !reviewText.trim();
+  const hasRequiredFields = rating > 0 && Boolean(reviewTitle.trim()) && Boolean(reviewText.trim());
+  const hasReviewChanged = !isEditing || !initialReview
+      || rating !== initialReview.rating
+      || reviewTitle.trim() !== initialReview.title.trim()
+      || reviewText.trim() !== initialReview.text.trim();
+  const isFormSubmitDisabled = !hasRequiredFields || !hasReviewChanged;
+  const isSubmitDisabled = isSubmitting || isFormSubmitDisabled;
   const ratingLabels = {
     1: 'Poor',
     2: 'Fair',
@@ -281,6 +304,36 @@ const LeaveReview = () => {
   useEffect(() => {
     setAvatarLoadFailed(false);
   }, [displayedRevieweePhotoURL]);
+
+  useEffect(() => {
+    if (!modalVisible || isError) {
+      return undefined;
+    }
+
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
+
+    notificationTimeoutRef.current = setTimeout(() => {
+      setModalVisible(false);
+      router.replace({
+        pathname: '/UserReviewsScreen',
+        params: {
+          userId: ownerId,
+          currentUser: tenantId,
+          revieweeName: displayedRevieweeName,
+          revieweeRole: displayedRevieweeRole,
+          revieweePhotoURL: displayedRevieweePhotoURL,
+        },
+      });
+    }, 2000);
+
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
+  }, [modalVisible, isError, router, ownerId, tenantId, displayedRevieweeName, displayedRevieweeRole, displayedRevieweePhotoURL]);
 
   if (loading) {
     return (
@@ -377,46 +430,68 @@ const LeaveReview = () => {
 
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 28) }]}>
           <TouchableOpacity
-              style={[styles.submitButton, isSubmitDisabled && styles.submitButtonDisabled]}
+              style={[
+                styles.submitButton,
+                isFormSubmitDisabled && !isSubmitting && styles.submitButtonDisabled,
+                isSubmitting && styles.submitButtonSubmitting,
+              ]}
               onPress={handleSubmit}
               disabled={isSubmitDisabled}
               activeOpacity={isSubmitDisabled ? 1 : 0.75}
           >
-            <FontAwesome name="check" size={13} color={isSubmitDisabled ? "#8E8E93" : "#FFFFFF"} style={styles.submitIcon} />
-            <Text style={[styles.submitButtonText, isSubmitDisabled && styles.submitButtonTextDisabled]}>Submit review</Text>
+            {isSubmitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" style={styles.submitLoadingIcon} />
+            ) : (
+                <FontAwesome name="check" size={13} color={isFormSubmitDisabled ? "#8E8E93" : "#FFFFFF"} style={styles.submitIcon} />
+            )}
+            <Text style={[styles.submitButtonText, isFormSubmitDisabled && !isSubmitting && styles.submitButtonTextDisabled]}>
+              {isSubmitting ? (isEditing ? 'Updating review...' : 'Submitting review...') : 'Submit review'}
+            </Text>
           </TouchableOpacity>
         </View>
 
         <Modal
-            animationType="slide"
+            animationType={isError ? "slide" : "fade"}
             transparent={true}
             visible={modalVisible}
+            statusBarTranslucent={!isError}
             onRequestClose={() => setModalVisible(false)}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Image
-                  source={isError ? errorImage : confirmationImage}
-                  style={styles.confirmationImage}
-                  resizeMode="contain"
-              />
-              <Text style={styles.modalText}>{modalMessage}</Text>
+          {isError ? (
+              <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                  <Image
+                      source={errorImage}
+                      style={styles.confirmationImage}
+                      resizeMode="contain"
+                  />
+                  <Text style={styles.modalText}>{modalMessage}</Text>
 
-              <TouchableOpacity
-                  style={styles.returnButton}
-                  onPress={() => {
-                    setModalVisible(false);
-                    if (isError && modalMessage.includes("Authentication error")) {
-                      router.replace('/LoginScreen');
-                    } else {
-                      router.push({ pathname: '/RentalInfoTenantScreen', params: { listingId, tenantId, ownerId } });
-                    }
-                  }}
-              >
-                <Text style={styles.returnButtonText}>Return</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+                  <TouchableOpacity
+                      style={styles.returnButton}
+                      onPress={() => {
+                        setModalVisible(false);
+                        if (modalMessage.includes("Authentication error")) {
+                          router.replace('/LoginScreen');
+                        } else {
+                          router.push({ pathname: '/RentalInfoTenantScreen', params: { listingId, tenantId, ownerId } });
+                        }
+                      }}
+                  >
+                    <Text style={styles.returnButtonText}>Return</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+          ) : (
+              <View style={styles.notificationOverlay} pointerEvents="none">
+                <View style={styles.notificationCard}>
+                  <View style={styles.notificationIconBox}>
+                    <Image source={notificationBellIcon} style={styles.notificationIcon} />
+                  </View>
+                  <Text style={styles.notificationText}>{modalMessage}</Text>
+                </View>
+              </View>
+          )}
         </Modal>
       </KeyboardAvoidingView>
   );
@@ -604,8 +679,16 @@ const styles = StyleSheet.create({
   submitButtonDisabled: {
     backgroundColor: '#E5E5EA',
   },
+  submitButtonSubmitting: {
+    backgroundColor: '#007AFF',
+    opacity: 1,
+  },
   submitIcon: {
     marginRight: 7,
+  },
+  submitLoadingIcon: {
+    marginRight: 8,
+    transform: [{ scale: 1.15 }],
   },
   submitButtonText: {
     color: '#FFFFFF',
@@ -661,6 +744,46 @@ const styles = StyleSheet.create({
   returnButtonText: {
     color: '#fff',
     fontSize: 16,
+  },
+  notificationOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
+  notificationCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    backgroundColor: 'rgba(45, 45, 45, 0.82)',
+    borderRadius: 28,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    elevation: 8,
+  },
+  notificationIconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(58, 58, 58, 0.72)',
+    marginBottom: 16,
+  },
+  notificationIcon: {
+    width: 34,
+    height: 40,
+    resizeMode: 'contain',
+  },
+  notificationText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
   },
 });
 
