@@ -1024,7 +1024,7 @@ const handlePaymentAndAccept = async () => {
                 <Text style={styles.header}>{partner.name}</Text>
                 <TouchableOpacity
                     style={styles.reviewsLink}
-                    onPress={() => router.push({ pathname: '/UserReviewsScreen', params: { userId: partnerUserId, currentUser } })}
+                    onPress={() => router.push({ pathname: '/UserReviewsScreen', params: { userId: partnerUserId, currentUser, revieweeName: partner.name } })}
                 >
                     <Text style={styles.reviews}>Reviews</Text>
                 </TouchableOpacity>
