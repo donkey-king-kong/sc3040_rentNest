@@ -755,6 +755,33 @@ const handlePaymentAndAccept = async () => {
         );
     };
 
+    const formatOfferDate = (dateValue) => {
+        if (!dateValue) {
+            return 'N/A';
+        }
+
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) {
+            return String(dateValue);
+        }
+
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+    };
+
+    const formatOfferCurrency = (value) => {
+        const amount = Number(value);
+        if (Number.isNaN(amount)) {
+            return `$${value}`;
+        }
+
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            maximumFractionDigits: 0,
+        }).format(amount);
+    };
+
     const renderMessage = () => {
         if (!Array.isArray(chat) || chat.length === 0) {
             return (
@@ -780,6 +807,7 @@ const handlePaymentAndAccept = async () => {
             const isOwner = Number(currentUser) === Number(rental.ownerUserId);
             const rentalIdExists = first.rentalId != null;
             const requestIdExists = first.requestId != null;
+            const isRentalOfferSender = rentalIdExists && Number(first.senderId) === Number(currentUser);
             const lastMsg = group[group.length - 1];
             const timestamp = new Date(lastMsg.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -787,30 +815,82 @@ const handlePaymentAndAccept = async () => {
             if (rentalIdExists || requestIdExists) {
                 return (
                     <View key={first.messageID} style={styles.groupContainer}>
-                        <View style={isUser ? styles.bubbleRowRight : styles.bubbleRowLeft}>
-                            {!isUser && <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={30} style={{ marginRight: 8 }} />}
-                            <View style={[styles.bubble, styles.bubbleOther, { maxWidth: '80%' }]}>
+                        <View style={rentalIdExists ? styles.bubbleRowRight : (isUser ? styles.bubbleRowRight : styles.bubbleRowLeft)}>
+                            {!isUser && !rentalIdExists && <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={30} style={{ marginRight: 8 }} />}
+                            <View style={rentalIdExists ? styles.rentalOfferBubbleShell : [styles.bubble, styles.bubbleOther, { maxWidth: '80%' }]}>
                                 {rentalIdExists && (
                                     <View style={styles.rentalOfferMessage}>
-                                        <Text style={styles.rentalOfferTitle}>Rental Offer</Text>
-                                        <Text style={styles.messageText}>Rent: ${rental.rentalPrice} Per Month</Text>
-                                        <Text style={styles.messageText}>Rental Deposit: ${rental.depositPrice}</Text>
-                                        <Text style={styles.messageText}>Lease until {new Date(rental.leaseExpiry).toLocaleDateString()}</Text>
-                                        {isOwner ? (
+                                        <View style={styles.rentalOfferHeader}>
+                                            <View style={styles.rentalOfferHeaderLeft}>
+                                                <View style={styles.rentalOfferIconBadge}>
+                                                    <FontAwesome name="home" size={14} color="#FFFFFF" />
+                                                </View>
+                                                <Text style={styles.rentalOfferHeaderTitle}>
+                                                    {isRentalOfferSender ? 'Rental offer sent' : 'Rental offer'}
+                                                </Text>
+                                            </View>
+                                            <View
+                                                style={[
+                                                    styles.rentalOfferStatusPill,
+                                                    isRentalOfferSender ? styles.rentalOfferStatusPillPending : styles.rentalOfferStatusPillNew,
+                                                    rental.status === 'active' && styles.rentalOfferStatusPillAccepted,
+                                                ]}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.rentalOfferStatusText,
+                                                        isRentalOfferSender ? styles.rentalOfferStatusTextPending : styles.rentalOfferStatusTextNew,
+                                                        rental.status === 'active' && styles.rentalOfferStatusTextAccepted,
+                                                    ]}
+                                                >
+                                                    {rental.status === 'active' ? 'Accepted' : (isRentalOfferSender ? 'Pending' : 'New')}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <View style={styles.rentalOfferBody}>
+                                            <View style={styles.rentalOfferDetailRow}>
+                                                <View style={styles.rentalOfferDetailLabelGroup}>
+                                                    <FontAwesome name="dollar" size={16} color="#8F8F96" style={styles.rentalOfferDetailIcon} />
+                                                    <Text style={styles.rentalOfferDetailLabel}>Monthly rent</Text>
+                                                </View>
+                                                <Text style={[styles.rentalOfferDetailValue, styles.rentalOfferRentValue]}>
+                                                    {formatOfferCurrency(rental.rentalPrice)}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.rentalOfferDetailRow}>
+                                                <View style={styles.rentalOfferDetailLabelGroup}>
+                                                    <FontAwesome name="shield" size={16} color="#8F8F96" style={styles.rentalOfferDetailIcon} />
+                                                    <Text style={styles.rentalOfferDetailLabel}>Deposit</Text>
+                                                </View>
+                                                <Text style={styles.rentalOfferDetailValue}>{formatOfferCurrency(rental.depositPrice)}</Text>
+                                            </View>
+                                            <View style={[styles.rentalOfferDetailRow, styles.rentalOfferDetailRowLast]}>
+                                                <View style={styles.rentalOfferDetailLabelGroup}>
+                                                    <FontAwesome name="calendar" size={15} color="#8F8F96" style={styles.rentalOfferDetailIcon} />
+                                                    <Text style={styles.rentalOfferDetailLabel}>Lease until</Text>
+                                                </View>
+                                                <Text style={styles.rentalOfferDetailValue}>{formatOfferDate(rental.leaseExpiry)}</Text>
+                                            </View>
+                                        </View>
+                                        {isRentalOfferSender ? (
                                             <View style={styles.pendingAcceptanceBox}>
-                                                <Text style={styles.pendingAcceptanceText}>{isAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
+                                                <View style={[styles.pendingStatusDot, rental.status === 'active' && styles.acceptedStatusDot]} />
+                                                <Text style={styles.pendingAcceptanceText}>
+                                                    {rental.status === 'active' ? 'Accepted' : 'Awaiting tenant response'}
+                                                </Text>
                                             </View>
                                         ) : rental.status === 'active' ? (
                                             <View style={styles.pendingAcceptanceBox}>
+                                                <View style={[styles.pendingStatusDot, styles.acceptedStatusDot]} />
                                                 <Text style={styles.pendingAcceptanceText}>Accepted</Text>
                                             </View>
                                         ) : (
-                                            <View style={styles.buttonAlignment}>
+                                            <View style={styles.rentalOfferActionRow}>
                                                 <TouchableOpacity style={styles.pendingRejectBox}>
-                                                    <Text style={styles.rejectText}>Reject</Text>
+                                                    <Text style={styles.rejectText}>Decline</Text>
                                                 </TouchableOpacity>
                                                 <TouchableOpacity onPress={togglePaymentModal} style={styles.pendingAcceptBox}>
-                                                    <Text style={styles.acceptText}>Accept</Text>
+                                                    <Text style={styles.acceptText}>Accept offer</Text>
                                                 </TouchableOpacity>
                                             </View>
                                         )}
@@ -1870,52 +1950,182 @@ const styles = StyleSheet.create({
         padding: 20,
         flexDirection: 'column'
     },
+    rentalOfferBubbleShell: {
+        width: '88%',
+        maxWidth: 420,
+    },
     rentalOfferMessage: {
-        width: 300,
+        width: '100%',
         flexDirection: 'column',
-        padding: 10,
-        borderColor: '#DDDDDD',
-        borderWidth: 1,
-        borderRadius: 5,
+        backgroundColor: '#FFFFFF',
+        borderColor: 'rgba(60, 60, 67, 0.18)',
+        borderWidth: 0.5,
+        borderRadius: 16,
         marginTop: 5,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    rentalOfferHeader: {
+        backgroundColor: '#1c1c1e',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    rentalOfferHeaderLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexShrink: 1,
+    },
+    rentalOfferIconBadge: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        backgroundColor: '#444447',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    rentalOfferHeaderTitle: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '800',
+        flexShrink: 1,
+    },
+    rentalOfferStatusPill: {
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    rentalOfferStatusPillNew: {
+        backgroundColor: 'rgba(10, 132, 255, 0.18)',
+    },
+    rentalOfferStatusPillPending: {
+        backgroundColor: 'rgba(255, 159, 10, 0.18)',
+    },
+    rentalOfferStatusPillAccepted: {
+        backgroundColor: '#DDF8E5',
+    },
+    rentalOfferStatusText: {
+        fontSize: 13,
+        fontWeight: '800',
+    },
+    rentalOfferStatusTextNew: {
+        color: '#0a84ff',
+    },
+    rentalOfferStatusTextPending: {
+        color: '#FF9F0A',
+    },
+    rentalOfferStatusTextAccepted: {
+        color: '#1C8E3A',
+    },
+    rentalOfferBody: {
+        paddingHorizontal: 16,
+        paddingTop: 16,
+    },
+    rentalOfferDetailRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ECECEF',
+        gap: 12,
+    },
+    rentalOfferDetailRowLast: {
+        borderBottomWidth: 0,
+    },
+    rentalOfferDetailLabelGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    rentalOfferDetailIcon: {
+        width: 18,
+        textAlign: 'center',
+        marginRight: 10,
+    },
+    rentalOfferDetailLabel: {
+        color: '#85858C',
+        fontSize: 16,
+        fontWeight: '700',
+    },
+    rentalOfferDetailValue: {
+        color: '#1C1C20',
+        fontSize: 16,
+        fontWeight: '800',
+        textAlign: 'right',
+        flexShrink: 1,
+    },
+    rentalOfferRentValue: {
+        color: '#0a84ff',
+        fontSize: 19,
     },
     rentalOfferTitle: {
         fontWeight: 'bold',
     },
     pendingAcceptanceBox: {
-        backgroundColor: '#e0e0e0',
-        borderRadius: 10,
-        padding: 10,
-        marginTop: 10,
+        backgroundColor: '#F1F1F5',
+        borderRadius: 14,
+        padding: 14,
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 16,
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
     },
     pendingAcceptanceText: {
-        fontSize: 14,
-        fontWeight: 'bold',
+        color: '#85858C',
+        fontSize: 16,
+        fontWeight: '800',
+    },
+    pendingStatusDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#FF9F0A',
+        marginRight: 10,
+    },
+    acceptedStatusDot: {
+        backgroundColor: '#32D74B',
+    },
+    rentalOfferActionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+        paddingBottom: 16,
     },
     pendingRejectBox: {
-        width: 120,
-        backgroundColor: '#e0e0e0',
-        borderRadius: 10,
-        padding: 10,
-        marginTop: 10,
+        flex: 1,
+        backgroundColor: '#F1F1F5',
+        borderRadius: 14,
+        padding: 12,
         alignItems: 'center',
     },
     pendingAcceptBox: {
-        width: 120,
-        backgroundColor: '#000',
-        borderRadius: 10,
-        padding: 10,
-        marginTop: 10,
+        flex: 2,
+        backgroundColor: '#0a84ff',
+        borderRadius: 14,
+        padding: 12,
         alignItems: 'center',
     },
     rejectText: {
+        color: '#1C1C20',
         fontSize: 14,
-        fontWeight: 'bold',
+        fontWeight: '800',
     },
     acceptText: {
         fontSize: 14,
-        fontWeight: 'bold',
+        fontWeight: '800',
         color: 'white'
     },
     paymentMethodsContainer:{
