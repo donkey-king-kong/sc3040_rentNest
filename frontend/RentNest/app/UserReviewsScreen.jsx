@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Alert} from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {API_BASE_URL} from "../config/api";
 import MorphingInfinity from '../components/MorphingInfinity';
 import { FontAwesome } from '@expo/vector-icons';
 
 const UserReviewsScreen = () => {
-    const { userId } = useLocalSearchParams();
+    const router = useRouter();
+    const { userId, currentUser } = useLocalSearchParams();
 
     // Placeholder user data
     // const getRandomAvatar = () => {
@@ -171,6 +172,16 @@ const UserReviewsScreen = () => {
         </View>
     );
 
+    const handleLeaveFirstReview = () => {
+        router.push({
+            pathname: '/LeaveReview',
+            params: {
+                ownerId: userId,
+                tenantId: currentUser,
+            },
+        });
+    };
+
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
@@ -193,6 +204,10 @@ const UserReviewsScreen = () => {
                     <Text style={styles.emptySubtitle}>
                         This user hasn't received any reviews yet.
                     </Text>
+                    <TouchableOpacity style={styles.emptyActionButton} onPress={handleLeaveFirstReview}>
+                        <FontAwesome name="star-o" size={14} color="#8E8E93" />
+                        <Text style={styles.emptyActionText}>Leave the first review</Text>
+                    </TouchableOpacity>
                 </View>
             ) : (
                 <>
@@ -346,6 +361,21 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         color: '#8E8E93',
         textAlign: 'center',
+    },
+    emptyActionButton: {
+        marginTop: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F2F2F7',
+        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+    },
+    emptyActionText: {
+        marginLeft: 6,
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#8E8E93',
     },
 });
 
