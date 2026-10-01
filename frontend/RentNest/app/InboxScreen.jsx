@@ -135,6 +135,12 @@ const InboxScreen = () => {
           data={userListings}
           renderItem={renderItem}
           keyExtractor={(item) => item.listingID.toString()}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No active rentals</Text>
+              <Text style={styles.emptySubtitle}>Your inbox will show rentals you own or are tenanting.</Text>
+            </View>
+          }
         />
       </View>
       <NavigationBar style={styles.navigationBar} />
@@ -168,6 +174,24 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 20,
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#888',
+    textAlign: 'center',
+    paddingHorizontal: 40,
   },
   listingContainer: {
     flexDirection: 'row',
