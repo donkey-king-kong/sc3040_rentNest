@@ -1,12 +1,12 @@
+import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
-import SplashScreen from './SplashScreen';
 
 export default function Index() {
   const router = useRouter();
 
-  const handleSplashFinish = () => {
+  useEffect(() => {
     router.replace('/LandingScreen');
-  };
+  }, [router]);
 
-  return <SplashScreen onFinish={handleSplashFinish} />;
+  return null;
 }
