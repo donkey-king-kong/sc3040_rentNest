@@ -239,7 +239,7 @@ const LeaveReview = () => {
     return (
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading review...</Text>
+        <Text style={styles.loadingText}>Preparing review...</Text>
       </View>
     );
   }
