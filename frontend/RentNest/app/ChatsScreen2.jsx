@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Dimensions, Animated, StatusBar} from 'react-native';
+import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Dimensions, Animated, StatusBar, ActivityIndicator} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import { FontAwesome } from '@expo/vector-icons';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -1165,7 +1165,7 @@ const handlePaymentAndAccept = async () => {
                                 <FontAwesome name="arrow-up" size={14} color={isAskingAi ? '#C8C8CC' : '#FFFFFF'} />
                             </TouchableOpacity>
                         </View>
-                        {aiAnswer !== '' && (
+                        {(submittedAiQuestion !== '' || aiAnswer !== '' || isAskingAi) && (
                             <ScrollView
                                 style={styles.aiAnswerContainer}
                                 contentContainerStyle={styles.aiAnswerContentContainer}
@@ -1186,7 +1186,14 @@ const handlePaymentAndAccept = async () => {
                                         <FontAwesome name="magic" size={10} color="#3D7DD8" />
                                         <Text style={styles.aiAnswerTitle}>AI RESPONSE</Text>
                                     </View>
-                                    <Text style={styles.aiAnswerText}>{aiAnswer}</Text>
+                                    {isAskingAi && aiAnswer === '' ? (
+                                        <View style={styles.aiLoadingRow}>
+                                            <ActivityIndicator size="small" color="#3D7DD8" />
+                                            <Text style={styles.aiLoadingText}>AI is thinking...</Text>
+                                        </View>
+                                    ) : (
+                                        <Text style={styles.aiAnswerText}>{aiAnswer}</Text>
+                                    )}
                                 </View>
                             </ScrollView>
                         )}
@@ -1995,6 +2002,18 @@ const styles = StyleSheet.create({
         fontSize: 13,
         lineHeight: 20,
         color: '#000000',
+    },
+    aiLoadingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingTop: 2,
+    },
+    aiLoadingText: {
+        fontSize: 13,
+        lineHeight: 20,
+        color: '#5F6368',
+        fontWeight: '500',
     },
     infoContainer: {
         marginBottom: 10,
