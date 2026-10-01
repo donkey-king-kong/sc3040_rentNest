@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { FontAwesome } from 'react-native-vector-icons'; // Import FontAwesome icons
+import { useRouter } from 'expo-router';
+import { FontAwesome } from '@expo/vector-icons';
 import NavigationBar from '../components/NavigationBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
@@ -9,7 +9,7 @@ import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 
 const ProfileScreen = () => {
-  const navigation = useNavigation();
+  const router = useRouter();
   const [user, setUser] = useState({
     userID: 1,
     name: 'Loading...',
@@ -23,32 +23,37 @@ const ProfileScreen = () => {
       try {
         const token = await AsyncStorage.getItem('token');
         if (!token) {
-          navigation.navigate('LandingScreen');
+          router.replace('/LandingScreen');
           return;
         }
 
+        const authHeaders = {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        };
+
         const decoded = jwtDecode(token);
         const userEmail = decoded.sub;
-
         const response = await axios.get(`${API_BASE_URL}/api/users/${userEmail}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
+          headers: authHeaders
         });
+
+        if (response.data.userID) {
+          await AsyncStorage.setItem('userId', response.data.userID.toString());
+        }
 
         setUser({
           userID: response.data.userID,
           name: response.data.name,
           email: response.data.email,
-          contact: response.data.contact,
+          contact: response.data.contact || 'No contact provided',
           photoURL: response.data.photoURL || 'https://t3.ftcdn.net/jpg/06/33/54/78/360_F_633547842_AugYzexTpMJ9z1YcpTKUBoqBF0CUCk10.jpg'
         });
 
       } catch (error) {
         console.error('Error fetching user data:', error);
-        navigation.navigate('LandingScreen');
+        router.replace('/LandingScreen');
       }
     };
 
@@ -57,7 +62,7 @@ const ProfileScreen = () => {
 
   // Function to navigate to EditProfileScreen
   const handleEditProfile = () => {
-    navigation.navigate('EditProfileScreen');
+    router.push('/EditProfileScreen');
   };
 
   // Function to navigate to LandingScreen
@@ -65,7 +70,7 @@ const ProfileScreen = () => {
     try {
       await AsyncStorage.multiRemove(['token', 'userId']);
       delete axios.defaults.headers.common['Authorization'];
-      navigation.navigate('LandingScreen');
+      router.replace('/LandingScreen');
     } catch (error) {
       console.error('Error during logout:', error);
     }

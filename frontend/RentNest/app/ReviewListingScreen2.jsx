@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useRoute } from '@react-navigation/native'; // Import useRoute for accessing route parameters
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 
 const ReviewListingScreen2 = () => {
-  const router = useRouter(); // Get the router object
-  const route = useRoute(); // Get the route object
-  const { listingid } = route.params; // Get listingID from route parameters
+  const router = useRouter();
+  const { listingid } = useLocalSearchParams();
 
   const [listingData, setListingData] = useState(null);
 

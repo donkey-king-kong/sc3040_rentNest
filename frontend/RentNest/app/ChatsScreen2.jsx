@@ -1,7 +1,7 @@
-import React, {useEffect, useState} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView} from 'react-native';
-import {useNavigation, useRoute} from '@react-navigation/native'; // Import useRoute for accessing route parameters
+import React, {useEffect, useRef, useState} from 'react';
+import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Dimensions, Animated} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
+import { FontAwesome } from '@expo/vector-icons';
 
 // Import Icons
 import sendIcon from '../assets/images/send.jpg';
@@ -17,13 +17,15 @@ import amex from "../assets/images/amex.jpg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
-import { jwtDecode } from 'jwt-decode';
+import MorphingInfinity from '../components/MorphingInfinity';
+
+const errorIcon = require('../assets/images/errorIcon.png');
+const retryButtonIcon = require('../assets/images/retryButton.png');
+const profilePic = require('../assets/images/chatProfilePic.jpg');
 
 const ChatsScreen2 = () => {
-    const route = useRoute();
     const router = useRouter();
-    const navigation = useNavigation();
-    const { partnerUserId, currentUser} = route.params;
+    const { partnerUserId, currentUser} = useLocalSearchParams();
     const [chat, setChat] = useState([]);
     const [rental, setRental] = useState([]);
     const [request, setRequest] = useState([]);
@@ -40,7 +42,11 @@ const ChatsScreen2 = () => {
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false)
     const [isPaymentSuccessfulModalVisible, setPaymentSuccessfulModalVisible] = useState(false)
     const [Loading, setLoading] = useState(true);
+    const chatScrollRef = useRef(null);
+    const summaryScrollRef = useRef(null);
+    const summarySheetY = useRef(new Animated.Value(600)).current;
     const [isSummaryModalVisible, setSummaryModalVisible] = useState(false);
+    const [parsedSummary, setParsedSummary] = useState(null);
     const [isGeneratingSummary, setGeneratingSummary] = useState(false);
     const [chatSummary, setChatSummary] = useState('');
     const [summaryError, setSummaryError] = useState('');
@@ -63,7 +69,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const chatResponse = await axios.get(`${API_BASE_URL}/api/chathistory/conversation`, {
@@ -81,21 +87,23 @@ const ChatsScreen2 = () => {
             const chatData = Array.isArray(chatResponse.data) ? chatResponse.data : [];
             setChat(chatData); // Store the fetched data in state
             if (chatData.length > 0) {
-                chatData.forEach((msg) => {
+                await Promise.all(chatData.map((msg) => {
                     if (msg.rentalId != null) {
-                        getRental(msg.rentalId);
+                        return getRental(msg.rentalId);
                     }
                     if (msg.requestId != null) {
                         console.log("requestid",msg.requestId);
-                        getRequest(msg.requestId);
+                        return getRequest(msg.requestId);
                     }
-                });
+                    return Promise.resolve();
+                }));
             }
-            getPartner();
+            await getPartner();
             setLoading(false);
         } catch (error) {
             console.error('Error fetching conversation:', error);
             setChat([]);
+            setLoading(false);
         }
     };
 
@@ -109,7 +117,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const rentalResponse = await axios.get(`${API_BASE_URL}/api/rentals/${rentalId}`, {
@@ -121,7 +129,6 @@ const ChatsScreen2 = () => {
             });
             console.log("Rental response", rentalResponse.data);
             setRental(rentalResponse.data); // Store the fetched data in state
-            setLoading(false);
         } catch (error) {
             console.error('Error fetching rentals:', error);
         }
@@ -137,7 +144,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const requestResponse = await axios.get(`${API_BASE_URL}/api/requests/${requestId}`, {
@@ -149,7 +156,6 @@ const ChatsScreen2 = () => {
             });
             console.log("Request response", requestResponse.data);
             setRequest(requestResponse.data); // Store the fetched data in state
-            setLoading(false);
         } catch (error) {
             console.error('Error fetching requests:', error);
         }
@@ -160,7 +166,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const listingResponse = await axios.get(`${API_BASE_URL}/api/listings/user/${currentUser}/listingIDs`, {
@@ -183,7 +189,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const partnerResponse = await axios.get(`${API_BASE_URL}/api/users/id/${partnerUserId}`, {
@@ -195,7 +201,6 @@ const ChatsScreen2 = () => {
             });
             console.log("Partner response", partnerResponse.data);
             setPartner(partnerResponse.data); // Store the fetched data in state
-            setLoading(false);
         }
         catch (error) {
             console.error('Error fetching partner:', error);
@@ -207,7 +212,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const flaggedResponse = await axios.put(`${API_BASE_URL}/api/users/setFlag/${partnerUserId}/1`, {
@@ -229,53 +234,114 @@ const ChatsScreen2 = () => {
         }
     }
 
-    const postMessage = async(messageToSend) => {
-        try{
-            const token = await AsyncStorage.getItem('token');
-            if (!token) {
-                console.log('No token found!');
-                navigation.replace('/LoginScreen');
-                return;
-            }
-            if (messageToSend.trim() !== ''){
-                console.log('rentalID:', chat.rentalId || null);
-                console.log('requestID:', chat.requestId || null);
-                const body = {
-                    receiverID: partnerUserId,
-                    senderID: currentUser,
-                    rentalID: chat.rentalId || null,
-                    requestID: chat.requestId || null,
-                    message: messageToSend,
-                    date: new Date().toISOString(),
-                };
-                const sendChatResponse = await axios.post(`${API_BASE_URL}/api/chathistory`, body,{
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    },
-                });
-                if (sendChatResponse.status === 201){
-                    await getConversation();
-                    setNewMessage('');
-                }else{
-                    console.log('Sending Message:', sendChatResponse.data);
-                }
-            }
+    const getSenderPhotoURL = () => {
+        const existingSenderMessage = chat.find(
+            (message) => Number(message.senderId) === Number(currentUser) && message.senderPhotoURL
+        );
+
+        return existingSenderMessage?.senderPhotoURL || null;
+    };
+
+    const buildOptimisticMessage = (messageText, tempMessageId) => ({
+        messageID: tempMessageId,
+        receiverId: Number(partnerUserId),
+        receiverName: partner.name,
+        receiverPhotoURL: partner.photoURL,
+        senderId: Number(currentUser),
+        senderName: 'You',
+        senderPhotoURL: getSenderPhotoURL(),
+        rentalId: chat.rentalId || null,
+        requestId: chat.requestId || null,
+        message: messageText,
+        date: new Date().toISOString(),
+        deliveryStatus: 'sending',
+    });
+
+    const sendMessageToBackend = async(messageText, tempMessageId) => {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+            console.log('No token found!');
+            router.replace('/LoginScreen');
+            throw new Error('Missing authentication token');
         }
-        catch (error) {
-            console.error('Error sending message:', error);
+
+        console.log('rentalID:', chat.rentalId || null);
+        console.log('requestID:', chat.requestId || null);
+        const body = {
+            receiverID: partnerUserId,
+            senderID: currentUser,
+            rentalID: chat.rentalId || null,
+            requestID: chat.requestId || null,
+            message: messageText,
+            date: new Date().toISOString(),
+        };
+        const sendChatResponse = await axios.post(`${API_BASE_URL}/api/chathistory`, body,{
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+        });
+
+        if (sendChatResponse.status === 201){
+            setChat((previousChat) => previousChat.map((message) => (
+                message.messageID === tempMessageId
+                    ? { ...sendChatResponse.data, deliveryStatus: 'sent' }
+                    : message
+            )));
+        }else{
+            console.log('Sending Message:', sendChatResponse.data);
+            setChat((previousChat) => previousChat.map((message) => (
+                message.messageID === tempMessageId
+                    ? { ...message, deliveryStatus: 'failed' }
+                    : message
+            )));
         }
-    }
+    };
 
     const sendMessage = async() => {
-        const messageToSend = newMessage.trim();
-        if (messageToSend === '') {
+        const messageText = newMessage.trim();
+        if (messageText === ''){
             return;
         }
 
-        await postMessage(messageToSend);
+        const tempMessageId = `temp-${Date.now()}`;
+        const optimisticMessage = buildOptimisticMessage(messageText, tempMessageId);
+        setNewMessage('');
+        setChat((previousChat) => [...previousChat, optimisticMessage]);
+
+        try{
+            await sendMessageToBackend(messageText, tempMessageId);
+        }
+        catch (error) {
+            console.error('Error sending message:', error);
+            setChat((previousChat) => previousChat.map((message) => (
+                message.messageID === tempMessageId
+                    ? { ...message, deliveryStatus: 'failed' }
+                    : message
+            )));
+        }
     }
+
+    const retryMessage = async(messageToRetry) => {
+        const retryMessageId = `temp-${Date.now()}`;
+        setChat((previousChat) => previousChat.map((message) => (
+            message.messageID === messageToRetry.messageID
+                ? { ...message, messageID: retryMessageId, deliveryStatus: 'sending' }
+                : message
+        )));
+
+        try {
+            await sendMessageToBackend(messageToRetry.message, retryMessageId);
+        } catch (error) {
+            console.error('Error retrying message:', error);
+            setChat((previousChat) => previousChat.map((message) => (
+                message.messageID === retryMessageId
+                    ? { ...message, deliveryStatus: 'failed' }
+                    : message
+            )));
+        }
+    };
 
     const getChatSummaryCacheKey = () => {
         if (!Array.isArray(chat) || chat.length === 0) {
@@ -301,7 +367,10 @@ const ChatsScreen2 = () => {
             setSummaryError('');
             setChatSummary(summaryCache.summary);
             setSummaryPlaceholder(summaryCache.placeholder);
+            try { setParsedSummary(JSON.parse(summaryCache.summary)); } catch { setParsedSummary(null); }
+            summarySheetY.setValue(600);
             setSummaryModalVisible(true);
+            Animated.spring(summarySheetY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
             return;
         }
 
@@ -313,7 +382,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
 
@@ -339,12 +408,18 @@ const ChatsScreen2 = () => {
                 summary: generatedSummary,
                 placeholder: isPlaceholderSummary,
             });
+            try { setParsedSummary(JSON.parse(generatedSummary)); } catch { setParsedSummary(null); }
+            summarySheetY.setValue(600);
             setSummaryModalVisible(true);
+            Animated.spring(summarySheetY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
         } catch (error) {
             console.error('Error generating chat summary:', error);
             setSummaryError('Unable to generate chat summary right now.');
             setSummaryPlaceholder(false);
+            setParsedSummary(null);
+            summarySheetY.setValue(600);
             setSummaryModalVisible(true);
+            Animated.spring(summarySheetY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
         } finally {
             setGeneratingSummary(false);
         }
@@ -359,7 +434,6 @@ const ChatsScreen2 = () => {
         try {
             setAskingAi(true);
             setSubmittedAiQuestion(questionToAsk);
-            setAiQuestion('');
             setAiAnswer('');
             setAiAnswerCategory('');
             setAiAnswerPlaceholder(false);
@@ -367,7 +441,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
 
@@ -393,6 +467,7 @@ const ChatsScreen2 = () => {
             setAiAnswerPlaceholder(false);
         } finally {
             setAskingAi(false);
+            setAiQuestion('');
         }
     }
 
@@ -428,7 +503,7 @@ const ChatsScreen2 = () => {
             console.log("listingid", listing)
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             if (rentalPrice.trim() !== '' && rentalDeposit.trim() !== '' && leaseExpiry.trim() !== ''){
@@ -474,7 +549,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const updatedRentalBody = {
@@ -514,7 +589,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
             const terminationRequestBody ={
@@ -564,7 +639,7 @@ const ChatsScreen2 = () => {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
-                navigation.replace('/LoginScreen');
+                router.replace('/LoginScreen');
                 return;
             }
 
@@ -647,7 +722,24 @@ const handlePaymentAndAccept = async () => {
     const isAccepted = chat.length > 0 ? isPaymentSuccessfulModalVisible : false;
     const isTerminationAccepted = chat.length>0 ? rental.status === "terminated" : false;
 
-    const renderMessage = ({ item }) => {
+    const getInitials = (name) => {
+        if (!name) return '?';
+        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    };
+
+    const AvatarCircle = ({ photoURL, name, size = 30, style }) => {
+        const dim = { width: size, height: size, borderRadius: size / 2 };
+        if (photoURL) {
+            return <Image source={{ uri: photoURL }} style={[dim, style]} />;
+        }
+        return (
+            <View style={[dim, styles.avatarCircle, style]}>
+                <Text style={[styles.avatarInitials, { fontSize: size * 0.38 }]}>{getInitials(name)}</Text>
+            </View>
+        );
+    };
+
+    const renderMessage = () => {
         if (!Array.isArray(chat) || chat.length === 0) {
             return (
                 <View style={styles.emptyMessageContainer}>
@@ -656,235 +748,262 @@ const handlePaymentAndAccept = async () => {
             );
         }
 
-        return chat.map((message) => {
-            const isOwner = Number(currentUser) === Number(rental.ownerUserId);
-            const isUser = Number(message.senderId) === Number(currentUser);
-            const rentalIdExists = message.rentalId !== null;
-            const requestIdExists = message.requestId !== null;
+        const groups = [];
+        chat.forEach((message) => {
+            const last = groups[groups.length - 1];
+            if (last && last[0].senderId === message.senderId && !message.rentalId && !message.requestId && !last[0].rentalId && !last[0].requestId) {
+                last.push(message);
+            } else {
+                groups.push([message]);
+            }
+        });
 
-            if (isOwner && rentalIdExists){
+        return groups.map((group, gi) => {
+            const first = group[0];
+            const isUser = Number(first.senderId) === Number(currentUser);
+            const isOwner = Number(currentUser) === Number(rental.ownerUserId);
+            const rentalIdExists = first.rentalId != null;
+            const requestIdExists = first.requestId != null;
+            const lastMsg = group[group.length - 1];
+            const timestamp = new Date(lastMsg.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            // Special card messages (rental offer / termination)
+            if (rentalIdExists || requestIdExists) {
                 return (
-                    <View key={message.messageID}>
-                        <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
-                            <View style={styles.rentalOfferContainer}>
-                                <View style={styles.headerContainer}>
-                                    <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
-                                    <Text style={styles.date}> {new Date(message.date).toLocaleTimeString()}</Text>
-                                </View>
-                                <View style={styles.rentalOfferMessage}>
-                                    <Text style={styles.rentalOfferTitle}>Rental Offer</Text>
-                                    <Text style={styles.messageText}>Rent: ${rental.rentalPrice} Per Month</Text>
-                                    <Text style={styles.messageText}>Rental Deposit: ${rental.depositPrice}</Text>
-                                    <Text style={styles.messageText}>Lease until {new Date(rental.leaseExpiry).toLocaleDateString()}</Text>
-                                    <View style={styles.pendingAcceptanceBox}>
-                                        <Text style={styles.pendingAcceptanceText}>{isAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
+                    <View key={first.messageID} style={styles.groupContainer}>
+                        <View style={isUser ? styles.bubbleRowRight : styles.bubbleRowLeft}>
+                            {!isUser && <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={30} style={{ marginRight: 8 }} />}
+                            <View style={[styles.bubble, styles.bubbleOther, { maxWidth: '80%' }]}>
+                                {rentalIdExists && (
+                                    <View style={styles.rentalOfferMessage}>
+                                        <Text style={styles.rentalOfferTitle}>Rental Offer</Text>
+                                        <Text style={styles.messageText}>Rent: ${rental.rentalPrice} Per Month</Text>
+                                        <Text style={styles.messageText}>Rental Deposit: ${rental.depositPrice}</Text>
+                                        <Text style={styles.messageText}>Lease until {new Date(rental.leaseExpiry).toLocaleDateString()}</Text>
+                                        {isOwner ? (
+                                            <View style={styles.pendingAcceptanceBox}>
+                                                <Text style={styles.pendingAcceptanceText}>{isAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
+                                            </View>
+                                        ) : rental.status === 'active' ? (
+                                            <View style={styles.pendingAcceptanceBox}>
+                                                <Text style={styles.pendingAcceptanceText}>Accepted</Text>
+                                            </View>
+                                        ) : (
+                                            <View style={styles.buttonAlignment}>
+                                                <TouchableOpacity style={styles.pendingRejectBox}>
+                                                    <Text style={styles.rejectText}>Reject</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity onPress={togglePaymentModal} style={styles.pendingAcceptBox}>
+                                                    <Text style={styles.acceptText}>Accept</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
                                     </View>
-                                </View>
+                                )}
+                                {requestIdExists && (
+                                    <View style={styles.rentalOfferMessage}>
+                                        <Text style={styles.rentalOfferTitle}>Termination of Lease Request</Text>
+                                        <Text style={styles.messageText}>Amount to be refunded: ${request.refundAmount}</Text>
+                                        {isUser ? (
+                                            <View style={styles.pendingAcceptanceBox}>
+                                                <Text style={styles.pendingAcceptanceText}>{isTerminationAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
+                                            </View>
+                                        ) : isTerminationAccepted ? (
+                                            <View style={styles.pendingAcceptanceBox}>
+                                                <Text style={styles.pendingAcceptanceText}>Accepted</Text>
+                                            </View>
+                                        ) : (
+                                            <View style={styles.buttonAlignment}>
+                                                <TouchableOpacity style={styles.pendingRejectBox}>
+                                                    <Text style={styles.rejectText}>Reject</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity onPress={acceptRequest} style={styles.pendingAcceptBox}>
+                                                    <Text style={styles.acceptText}>Accept</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
                             </View>
                         </View>
+                        <Text style={styles.groupTimestamp}>{timestamp}</Text>
                     </View>
                 );
             }
-            if (!isOwner && rentalIdExists){
-                return (
-                    <View key={message.messageID}>
-                        <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
-                            <View style={styles.rentalOfferContainer}>
-                                <View style={styles.headerContainer}>
-                                    <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
-                                    <Text style={styles.date}> {new Date(message.date).toLocaleTimeString()}</Text>
-                                </View>
-                                <View style={styles.rentalOfferMessage}>
-                                    <Text style={styles.rentalOfferTitle}>Rental Offer</Text>
-                                    <Text style={styles.messageText}>Rent: ${rental.rentalPrice} Per Month</Text>
-                                    <Text style={styles.messageText}>Rental Deposit: ${rental.depositPrice}</Text>
-                                    <Text style={styles.messageText}>Lease until {new Date(rental.leaseExpiry).toLocaleDateString()}</Text>
-                                    {rental.status === "active" ? (
-                                        <View style={styles.pendingAcceptanceBox}>
-                                            <Text style={styles.pendingAcceptanceText}>Accepted</Text>
-                                        </View>
+
+            // Regular message group
+            return (
+                <View key={`group-${gi}`} style={styles.groupContainer}>
+                    {group.map((message, mi) => {
+                        const showAvatar = !isUser && mi === 0;
+                        const avatarPlaceholder = !isUser && mi > 0;
+                        return (
+                            <View key={message.messageID} style={isUser ? styles.bubbleRowRight : styles.bubbleRowLeft}>
+                                {!isUser && (
+                                    showAvatar ? (
+                                        <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={30} style={{ marginRight: 8 }} />
                                     ) : (
-                                        <View style={styles.buttonAlignment}>
-                                            <TouchableOpacity style={styles.pendingRejectBox}>
-                                                <Text style={styles.rejectText}>Reject</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity onPress={togglePaymentModal} style={styles.pendingAcceptBox}>
-                                                <Text style={styles.acceptText}>Accept</Text>
+                                        <View style={styles.avatarSpacer} />
+                                    )
+                                )}
+                                <View style={[styles.bubble, isUser ? styles.bubbleSelf : styles.bubbleOther]}>
+                                    <Text style={[styles.bubbleText, isUser && styles.bubbleTextSelf]}>{message.message}</Text>
+                                    {message.deliveryStatus === 'sending' && (
+                                        <Text style={styles.sendingText}>Sending...</Text>
+                                    )}
+                                    {message.deliveryStatus === 'failed' && (
+                                        <View style={styles.failedMessageContainer}>
+                                            <Image source={errorIcon} style={styles.errorIcon} />
+                                            <Text style={styles.failedMessageText}>Failed</Text>
+                                            <TouchableOpacity style={styles.retryButton} onPress={() => retryMessage(message)}>
+                                                <Image source={retryButtonIcon} style={styles.retryIcon} />
+                                                <Text style={styles.retryText}>Retry</Text>
                                             </TouchableOpacity>
                                         </View>
                                     )}
                                 </View>
                             </View>
-                        </View>
-                    </View>
-                );
-            }
-            if (isUser && requestIdExists){
-                return (
-                    <View key={message.messageID}>
-                        <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
-                            <View style={styles.rentalOfferContainer}>
-                                <View style={styles.headerContainer}>
-                                    <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
-                                    <Text style={styles.date}> {new Date(message.date).toLocaleTimeString()}</Text>
-                                </View>
-                                <View style={styles.rentalOfferMessage}>
-                                    <Text style={styles.rentalOfferTitle}>Termination of Lease Request</Text>
-                                    <Text style={styles.messageText}>Amount to be refunded: ${request.refundAmount}</Text>
-                                    <View style={styles.pendingAcceptanceBox}>
-                                        <Text style={styles.pendingAcceptanceText}>{isTerminationAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-                );
-            }
-            if (!isUser && requestIdExists){
-                return (
-                    <View key={message.messageID}>
-                        <View key={message.messageID} style={styles.headerContainer}>
-                            <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
-                            <View style={styles.rentalOfferContainer}>
-                                <View style={styles.headerContainer}>
-                                    <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
-                                    <Text style={styles.date}> {new Date(message.date).toLocaleTimeString()}</Text>
-                                </View>
-                                <View style={styles.rentalOfferMessage}>
-                                    <Text style={styles.rentalOfferTitle}>Termination of Lease Request</Text>
-                                    <Text style={styles.messageText}>Amount to be refunded: ${request.refundAmount}</Text>
-                                    {isTerminationAccepted ?
-                                        <View style={styles.pendingAcceptanceBox}>
-                                            <Text style={styles.pendingAcceptanceText}>{isTerminationAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
-                                        </View> :
-                                        <View style={styles.buttonAlignment}>
-                                        <TouchableOpacity style={styles.pendingRejectBox}>
-                                            <Text style={styles.rejectText}>Reject</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={acceptRequest} style={styles.pendingAcceptBox}>
-                                            <Text style={styles.acceptText}>Accept</Text>
-                                        </TouchableOpacity>
-                                    </View>}
-                                    <Text style={styles.messageText}>The lease termination will proceed immediately if you choose to accept. Please review the termination details stated with your rental agreement.</Text>
-                                </View>
-                            </View>
-                        </View>
-                    </View>
-                );
-            }
-            else {
-                return (
-                    <View key={message.messageID} style={styles.headerContainer}>
-                        <Image source={{uri: message?.senderPhotoURL}} style={styles.avatar}/>
-                        <View style={styles.messageContainer}>
-                            <View style={styles.headerContainer}>
-                                <Text style={styles.sender}>{isUser ? 'You' : partner.name}</Text>
-                                <Text style={styles.date}> {new Date(message.date).toLocaleTimeString()}</Text>
-                            </View>
-                            <Text style={styles.messageText}>{message.message}</Text>
-                        </View>
-                    </View>
-                );
-            }
+                        );
+                    })}
+                    <Text style={[styles.groupTimestamp, isUser ? styles.groupTimestampRight : styles.groupTimestampLeft]}>
+                        {timestamp}
+                    </Text>
+                </View>
+            );
         });
     };
 
     if (Loading) {
         return (
-            <View style={[styles.screen, styles.content]}>
-                <Text>Loading chat history...</Text>
+            <View style={styles.loadingScreen}>
+                <MorphingInfinity size={86} color="#2FA84F" />
+                <Text style={styles.loadingText}>Loading chat history...</Text>
             </View>
         );
     }
 
-    const summaryTextToDisplay = summaryError || chatSummary;
-    const shouldScrollSummary = summaryTextToDisplay.length > 650;
-    const shouldScrollAiAnswer = aiAnswer.length > 650;
+    const shouldScrollAiAnswer = aiAnswer.length > 300;
 
     return (
         <View style={styles.container}>
-            {/* Header */}
+            {/* Header row 1: back + avatar + name + Reviews */}
             <View style={styles.nameHeaderContainer}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <FontAwesome name="chevron-left" size={18} color="#101820" />
+                </TouchableOpacity>
+                <AvatarCircle photoURL={partner.photoURL} name={partner.name} size={36} style={{ marginRight: 10 }} />
                 <Text style={styles.header}>{partner.name}</Text>
-                <View style={styles.headerActions}>
-                    <TouchableOpacity onPress={() => setAskAiModalVisible(true)} style={styles.aiSummaryButton}>
-                        <Text style={styles.aiSummaryButtonText}>Ask AI</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={getChatSummary} style={styles.aiSummaryButton} disabled={isGeneratingSummary}>
-                        <Text style={styles.aiSummaryButtonText}>{isGeneratingSummary ? 'Summarising...' : 'Summarise Chat'}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => {
-                        // Navigate to UserReviewsScreen while passing userId
-                        navigation.navigate('UserReviewsScreen', {
-                            userId: partnerUserId
-                        });
-                    }}>
-                        <Text style={styles.reviews}>Reviews</Text>
-                    </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                    style={styles.reviewsLink}
+                    onPress={() => router.push({ pathname: '/UserReviewsScreen', params: { userId: partnerUserId } })}
+                >
+                    <Text style={styles.reviews}>Reviews</Text>
+                </TouchableOpacity>
+            </View>
+
+            {/* Header row 2: Ask AI + Summarise Chat */}
+            <View style={styles.headerActionsRow}>
+                <TouchableOpacity onPress={() => setAskAiModalVisible(true)} style={styles.aiSummaryButton}>
+                    <Text style={styles.aiSummaryButtonText}>Ask AI</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={getChatSummary} style={styles.aiSummaryButton} disabled={isGeneratingSummary}>
+                    <Text style={styles.aiSummaryButtonText}>{isGeneratingSummary ? 'Summarising...' : 'Summarise Chat'}</Text>
+                </TouchableOpacity>
             </View>
 
             {/* Thin divider */}
             <View style={styles.thinDivider} />
 
-
-            <FlatList
-                data={chat.length > 0 ? [chat[0]] : []} // Pass first message or a placeholder
-                renderItem={renderMessage}
-                keyExtractor={item => item.messageID?.toString() || 'empty'}
+            <ScrollView
+                ref={chatScrollRef}
                 style={styles.chatList}
-            />
+                contentContainerStyle={styles.chatListContent}
+                onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: false })}
+            >
+                {renderMessage()}
+            </ScrollView>
 
             <View style={styles.inputContainer}>
-                <TouchableOpacity onPress={toggleAttachmentModal}>
-                    <Image source={paperclip} style={styles.icon}/>
+                <TouchableOpacity style={styles.inputIconButton} onPress={toggleAttachmentModal}>
+                    <FontAwesome name="paperclip" size={20} color="#555" />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={toggleFlagModal}>
-                    {isFlagged ? (
-                        <Image source={redFlag} style={styles.icon} />
-                    ) : (
-                        <Image source={flag} style={styles.icon} />
-                    )}
+                <TouchableOpacity style={styles.inputIconButton} onPress={toggleFlagModal}>
+                    <FontAwesome name={isFlagged ? 'flag' : 'flag-o'} size={20} color={isFlagged ? '#E94068' : '#555'} />
                 </TouchableOpacity>
                 <TextInput
                     style={styles.input}
                     placeholder="Enter Message"
                     value={newMessage}
                     onChangeText={setNewMessage}
-                    />
-                <TouchableOpacity onPress={sendMessage}>
-                    <Image source={sendIcon} style={styles.icon}/>
+                    onSubmitEditing={sendMessage}
+                    blurOnSubmit={false}
+                    returnKeyType="send"
+                />
+                <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+                    <FontAwesome name="send" size={16} color="#fff" />
                 </TouchableOpacity>
             </View>
 
             <Modal
-                animationType="slide"
+                animationType="none"
                 transparent={true}
                 visible={isSummaryModalVisible}
                 onRequestClose={() => setSummaryModalVisible(false)}
             >
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, styles.aiModalContent]}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>AI Chat Summary</Text>
-                            <TouchableOpacity onPress={() => setSummaryModalVisible(false)}>
-                                <Image source={x} style={styles.icon}/>
-                            </TouchableOpacity>
-                        </View>
-                        {isSummaryPlaceholder && (
-                            <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
+                <TouchableOpacity
+                    style={styles.summarySheetBackdrop}
+                    activeOpacity={1}
+                    onPress={() => setSummaryModalVisible(false)}
+                />
+                <Animated.View style={[styles.summarySheet, { transform: [{ translateY: summarySheetY }] }]}>
+                    <View style={styles.summarySheetHandle} />
+                    <Text style={styles.summarySheetTitle}>AI Chat Summary</Text>
+                    {isSummaryPlaceholder && (
+                        <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
+                    )}
+                    <ScrollView
+                        ref={summaryScrollRef}
+                        style={styles.summarySheetScroll}
+                        onLayout={() => summaryScrollRef.current?.scrollTo({ y: 0, animated: false })}
+                    >
+                        {summaryError ? (
+                            <Text style={styles.summaryText}>{summaryError}</Text>
+                        ) : parsedSummary ? (
+                            <View>
+                                <View style={styles.summaryCard}>
+                                    <Text style={styles.summaryCardLabel}>Overview</Text>
+                                    <Text style={styles.summaryCardContent}>{parsedSummary.overview}</Text>
+                                </View>
+                                {(parsedSummary.sections || []).map((section, idx) => (
+                                    <View key={idx} style={styles.summaryCard}>
+                                        <View style={styles.summaryCardHeaderRow}>
+                                            <FontAwesome name={section.icon} size={14} color="#555" style={{ marginRight: 6 }} />
+                                            <Text style={styles.summaryCardLabel}>{section.label}</Text>
+                                        </View>
+                                        {section.rows ? (
+                                            section.rows.map((row, ri) => (
+                                                <View key={ri} style={styles.summaryCardRow}>
+                                                    <Text style={styles.summaryCardRowLabel}>{row.label}</Text>
+                                                    <Text style={styles.summaryCardRowValue}>{row.value}</Text>
+                                                </View>
+                                            ))
+                                        ) : (
+                                            <Text style={styles.summaryCardContent}>{section.content}</Text>
+                                        )}
+                                    </View>
+                                ))}
+                                {parsedSummary.next_steps && (
+                                    <View style={[styles.summaryCard, styles.summaryNextStepsCard]}>
+                                        <Text style={[styles.summaryCardLabel, styles.summaryNextStepsLabel]}>Next Steps</Text>
+                                        <Text style={styles.summaryCardContent}>{parsedSummary.next_steps}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        ) : (
+                            <Text style={styles.summaryText}>{chatSummary}</Text>
                         )}
-                        <ScrollView
-                            style={[styles.aiResponseScroll, shouldScrollSummary && styles.aiResponseScrollLong]}
-                            scrollEnabled={shouldScrollSummary}
-                        >
-                            <Text style={styles.summaryText}>{summaryError || chatSummary}</Text>
-                        </ScrollView>
-                    </View>
-                </View>
+                    </ScrollView>
+                </Animated.View>
             </Modal>
 
             <Modal
@@ -906,21 +1025,24 @@ const handlePaymentAndAccept = async () => {
                         )}
                         <Text style={styles.modalDescription}>Ask questions related to this rental conversation only.</Text>
                         <TextInput
-                            style={styles.aiQuestionInput}
+                            style={[styles.aiQuestionInput, isAskingAi && styles.aiQuestionInputDisabled]}
                             placeholder="E.g. What is the tenant asking for?"
                             value={aiQuestion}
                             onChangeText={setAiQuestion}
                             onKeyPress={handleAiQuestionKeyPress}
                             multiline={true}
                             blurOnSubmit={false}
+                            editable={!isAskingAi}
                         />
-                        <View style={styles.longBlackButton}>
-                            <TouchableOpacity onPress={askAiQuestion} disabled={isAskingAi}>
-                                <Text style={styles.whiteButtonText}>{isAskingAi ? ' Asking AI... ' : ' Ask AI '}</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity style={styles.aiAskButton} onPress={askAiQuestion} disabled={isAskingAi}>
+                            <Text style={styles.whiteButtonText}>{isAskingAi ? 'Asking AI...' : 'Ask AI'}</Text>
+                        </TouchableOpacity>
                         {aiAnswer !== '' && (
-                            <View style={styles.aiAnswerContainer}>
+                            <ScrollView
+                                style={styles.aiAnswerContainer}
+                                contentContainerStyle={styles.aiAnswerContentContainer}
+                                nestedScrollEnabled={true}
+                            >
                                 {submittedAiQuestion !== '' && (
                                     <View style={styles.aiAskedQuestionContainer}>
                                         <Text style={styles.aiAskedQuestionLabel}>You Asked</Text>
@@ -928,13 +1050,8 @@ const handlePaymentAndAccept = async () => {
                                     </View>
                                 )}
                                 <Text style={styles.aiAnswerTitle}>{getAiAnswerTitle()}</Text>
-                                <ScrollView
-                                    style={[styles.aiResponseScroll, shouldScrollAiAnswer && styles.aiResponseScrollLong]}
-                                    scrollEnabled={shouldScrollAiAnswer}
-                                >
-                                    <Text style={styles.summaryText}>{aiAnswer}</Text>
-                                </ScrollView>
-                            </View>
+                                <Text style={styles.summaryText}>{aiAnswer}</Text>
+                            </ScrollView>
                         )}
                     </View>
                 </View>
@@ -1131,115 +1248,246 @@ const handlePaymentAndAccept = async () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 20,
+        paddingHorizontal: 16,
+        paddingTop: 12,
         backgroundColor: '#fff',
     },
-    header: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        marginBottom: 10,
-        marginRight: 10,
-    },
-    headerContent:{
-        flex: 1,
-    },
+    // Header row 1
     nameHeaderContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        marginBottom: 10,
     },
-    headerActions: {
-        flexDirection: 'row',
+    backButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
         alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F0F0F0',
+        marginRight: 10,
+    },
+    headerAvatarCircle: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#101820',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 10,
+    },
+    headerAvatarInitials: {
+        color: '#fff',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    header: {
+        flex: 1,
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#101820',
+    },
+    reviewsLink: {
+        marginLeft: 8,
+    },
+    reviews: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        textDecorationLine: 'underline',
+        color: '#101820',
+    },
+    // Header row 2
+    headerActionsRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 6,
     },
     aiSummaryButton: {
-        backgroundColor: '#000',
-        borderRadius: 12,
-        paddingVertical: 8,
-        paddingHorizontal: 12,
-        marginRight: 12,
-        marginBottom: 10,
+        flex: 1,
+        backgroundColor: '#101820',
+        borderRadius: 10,
+        paddingVertical: 10,
+        alignItems: 'center',
     },
     aiSummaryButtonText: {
         color: '#fff',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    headerContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    roleBox: {
-        backgroundColor: 'black',
-        padding: 5,
-        borderRadius: 5,
-        marginBottom: 5,
-        marginLeft: 80,
-    },
-    roleText: {
-        color: '#fff',
+        fontSize: 13,
         fontWeight: 'bold',
     },
     thinDivider: {
         height: 1,
         backgroundColor: '#ddd',
         width: '100%',
-        marginVertical: 10, // Keep margin around thin dividers
+        marginBottom: 8,
     },
-    rentalName:{
-        fontWeight: 'bold',
-        fontSize:15,
-    },
-    rentalText:{
-        fontSize: 10,
-    },
-    text: {
-        fontSize: 14,
-        color: '#666',
-        marginHorizontal: 20,
-        marginBottom: 10,
-    },
+    // Chat list
     chatList: {
-        flex: 1, // Take up all available space
+        flex: 1,
     },
-    messageContainer:{
-        padding: 20,
+    chatListContent: {
+        paddingVertical: 8,
     },
-    messageText:{
-        marginTop: 5,
+    // Message groups
+    groupContainer: {
+        marginBottom: 14,
     },
-    sender:{
-        fontWeight: 'bold',
+    bubbleRowLeft: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        marginBottom: 3,
     },
-    avatar: {
+    bubbleRowRight: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        marginBottom: 3,
+    },
+    avatarCircle: {
         width: 30,
         height: 30,
-        borderRadius: 20,
+        borderRadius: 15,
+        backgroundColor: '#555',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 8,
+        flexShrink: 0,
     },
-    date:{
-        fontSize: 10,
-        marginLeft: 10,
+    avatarInitials: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
     },
-    inputContainer:{
+    avatarSpacer: {
+        width: 38,
+    },
+    bubble: {
+        maxWidth: '72%',
+        borderRadius: 18,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    bubbleOther: {
+        backgroundColor: '#F0F0F0',
+        borderBottomLeftRadius: 4,
+    },
+    bubbleSelf: {
+        backgroundColor: '#2563EB',
+        borderBottomRightRadius: 4,
+    },
+    bubbleText: {
+        fontSize: 15,
+        color: '#101820',
+        lineHeight: 21,
+    },
+    bubbleTextSelf: {
+        color: '#fff',
+    },
+    groupTimestamp: {
+        fontSize: 11,
+        color: '#999',
+        marginTop: 2,
+    },
+    groupTimestampLeft: {
+        marginLeft: 38,
+    },
+    groupTimestampRight: {
+        textAlign: 'right',
+    },
+    // Loading
+    loadingScreen: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#F7F8FA',
+    },
+    loadingText: {
+        marginTop: 24,
+        color: '#101820',
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    // Delivery status
+    messageText: {
+        marginTop: 5,
+        fontSize: 14,
+        color: '#101820',
+    },
+    sendingText: {
+        marginTop: 4,
+        color: '#999',
+        fontSize: 11,
+    },
+    failedMessageContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        marginTop: 6,
+    },
+    errorIcon: {
+        width: 16,
+        height: 16,
+        marginRight: 4,
+    },
+    failedMessageText: {
+        color: '#E94068',
+        fontSize: 11,
+        fontWeight: '700',
+        marginRight: 8,
+    },
+    retryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 10,
+        backgroundColor: '#F1F1F1',
+    },
+    retryIcon: {
+        width: 12,
+        height: 12,
+        marginRight: 3,
+    },
+    retryText: {
+        color: '#101820',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    // Input bar
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 8,
         borderTopWidth: 1,
-        borderTopColor: '#ccc',
-        backgroundColor: '#f9f9f9',
+        borderTopColor: '#eee',
+        backgroundColor: '#fafafa',
+        gap: 6,
+    },
+    inputIconButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: '#F0F0F0',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     input: {
         flex: 1,
         height: 40,
         borderRadius: 20,
-        paddingHorizontal: 15,
-        backgroundColor: '#f1f1f1',
+        paddingHorizontal: 16,
+        backgroundColor: '#F0F0F0',
+        fontSize: 15,
+    },
+    sendButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: '#101820',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     icon: {
         width: 24,
         height: 24,
-        marginLeft: 10,
     },
     modalOverlay: {
         flex: 1,
@@ -1258,6 +1506,14 @@ const styles = StyleSheet.create({
     aiModalContent: {
         alignItems: 'stretch',
         maxHeight: '80%',
+        flexDirection: 'column',
+    },
+    aiAskButton: {
+        backgroundColor: '#000',
+        borderRadius: 10,
+        paddingVertical: 12,
+        alignItems: 'center',
+        marginBottom: 4,
     },
     modalHeader: {
         flexDirection: 'row',
@@ -1299,17 +1555,96 @@ const styles = StyleSheet.create({
     },
     summaryText: {
         fontSize: 14,
-        lineHeight: 20,
+        lineHeight: 24,
         textAlign: 'left',
         width: '100%',
         marginBottom: 10,
     },
-    aiResponseScroll: {
-        width: '100%',
+    summarySheetBackdrop: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    summarySheet: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        paddingHorizontal: 20,
+        paddingBottom: 32,
+        paddingTop: 12,
+        maxHeight: Dimensions.get('window').height * 0.75,
+    },
+    summarySheetHandle: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#ccc',
+        alignSelf: 'center',
+        marginBottom: 14,
+    },
+    summarySheetTitle: {
+        fontSize: 17,
+        fontWeight: '700',
+        marginBottom: 14,
+        color: '#101820',
+    },
+    summarySheetScroll: {
         flexGrow: 0,
     },
-    aiResponseScrollLong: {
-        maxHeight: 360,
+    summaryCard: {
+        backgroundColor: '#f7f7f7',
+        borderRadius: 12,
+        padding: 14,
+        marginBottom: 10,
+    },
+    summaryCardHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    summaryCardLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#555',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 4,
+    },
+    summaryCardContent: {
+        fontSize: 14,
+        lineHeight: 20,
+        color: '#101820',
+    },
+    summaryCardRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingVertical: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: '#ececec',
+    },
+    summaryCardRowLabel: {
+        fontSize: 13,
+        color: '#666',
+    },
+    summaryCardRowValue: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#101820',
+    },
+    summaryNextStepsCard: {
+        backgroundColor: '#EFF6FF',
+        borderLeftWidth: 3,
+        borderLeftColor: '#3B82F6',
+    },
+    summaryNextStepsLabel: {
+        color: '#3B82F6',
     },
     aiQuestionInput: {
         width: '100%',
@@ -1319,12 +1654,20 @@ const styles = StyleSheet.create({
         marginBottom: 15,
         fontSize: 14,
     },
+    aiQuestionInputDisabled: {
+        backgroundColor: '#e8e8e8',
+        color: '#555',
+    },
     aiAnswerContainer: {
         width: '100%',
         backgroundColor: '#f9f9f9',
         borderRadius: 10,
         padding: 12,
-        marginTop: 15,
+        maxHeight: 260,
+        marginTop: 10,
+    },
+    aiAnswerContentContainer: {
+        paddingBottom: 4,
     },
     aiAskedQuestionContainer: {
         backgroundColor: '#efefef',

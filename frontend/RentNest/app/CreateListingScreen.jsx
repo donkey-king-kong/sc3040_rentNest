@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Image, Alert } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NavigationBar from '../components/NavigationBar';
 import { API_BASE_URL } from '../config/api';
@@ -8,25 +8,25 @@ import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 
 const CreateListingScreen = () => {
-    const navigation = useNavigation();
+    const router = useRouter();
     const [token, setToken] = useState(null);
     const [listing, setListing] = useState({
         ownerUserID: null,
-        ownerName: null,
-        ownerPhotoURL: null,
+        ownerName: '',
+        ownerPhotoURL: '',
         tenantUserID: null,
-        name: null,
-        type: null,
-        floor: null,
-        unitNumber: null,
-        location: null,
-        postal: null,
-        price: null,
-        size: null,
-        beds: null,
-        bathroom: null,
-        description: null,
-        listingpicture: null,
+        name: '',
+        type: '',
+        floor: '',
+        unitNumber: '',
+        location: '',
+        postal: '',
+        price: '',
+        size: '',
+        beds: '',
+        bathroom: '',
+        description: '',
+        listingpicture: '',
     });
     const [modalVisible, setModalVisible] = useState(false);
 
@@ -113,7 +113,7 @@ const CreateListingScreen = () => {
                 listingpicture: listing.listingpicture
             };
 
-            const response = await axios.post(`${API_BASE_URL}/api/listings`, requestBody, {
+            await axios.post(`${API_BASE_URL}/api/listings`, requestBody, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -128,7 +128,7 @@ const CreateListingScreen = () => {
 
     const handleReturnHome = () => {
         setModalVisible(false);
-        navigation.navigate('HomeScreen');
+        router.replace('/HomeScreen');
     };
 
     return (

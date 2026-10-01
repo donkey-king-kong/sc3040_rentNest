@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import NavigationBar from '../components/NavigationBar';
@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from "axios";
 import { API_BASE_URL } from '../config/api';
 import { jwtDecode } from "jwt-decode";
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const InboxScreen = () => {
   const router = useRouter();
@@ -119,8 +120,9 @@ const InboxScreen = () => {
 
   if (isLoading) {
     return (
-      <View style={[styles.screen, styles.loadingContainer]}>
-        <Text>Loading...</Text>
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
@@ -151,8 +153,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   header: {
     fontSize: 28,
