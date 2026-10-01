@@ -19,6 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
 import MorphingInfinity from '../components/MorphingInfinity';
+import AvatarOrb from '../components/AvatarOrb';
 
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
@@ -1136,29 +1137,38 @@ const handlePaymentAndAccept = async () => {
             >
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, styles.aiModalContent]}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Ask AI About This Chat</Text>
-                            <TouchableOpacity onPress={() => setAskAiModalVisible(false)}>
-                                <Image source={x} style={styles.icon}/>
+                        <View style={styles.aiModalHeader}>
+                            <View style={styles.aiModalTitleGroup}>
+                                <AvatarOrb color="blue" size="sm" shape="squircle" blinking style={styles.aiModalOrb} />
+                                <Text style={styles.aiModalTitle}>Ask AI</Text>
+                            </View>
+                            <TouchableOpacity style={styles.aiModalCloseButton} onPress={() => setAskAiModalVisible(false)}>
+                                <FontAwesome name="times" size={22} color="#666A70" />
                             </TouchableOpacity>
                         </View>
                         {aiAnswer !== '' && isAiAnswerPlaceholder && (
                             <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder LLM guardrails.</Text>
                         )}
-                        <Text style={styles.modalDescription}>Ask questions related to this rental conversation only.</Text>
-                        <TextInput
-                            style={[styles.aiQuestionInput, isAskingAi && styles.aiQuestionInputDisabled]}
-                            placeholder="E.g. What is the tenant asking for?"
-                            value={aiQuestion}
-                            onChangeText={setAiQuestion}
-                            onKeyPress={handleAiQuestionKeyPress}
-                            multiline={true}
-                            blurOnSubmit={false}
-                            editable={!isAskingAi}
-                        />
-                        <TouchableOpacity style={styles.aiAskButton} onPress={askAiQuestion} disabled={isAskingAi}>
-                            <Text style={styles.whiteButtonText}>{isAskingAi ? 'Asking AI...' : 'Ask AI'}</Text>
-                        </TouchableOpacity>
+                        <View style={styles.aiQuestionRow}>
+                            <TextInput
+                                style={[styles.aiQuestionInput, isAskingAi && styles.aiQuestionInputDisabled]}
+                                placeholder="E.g. What is the tenant asking for?"
+                                placeholderTextColor="#6F7075"
+                                value={aiQuestion}
+                                onChangeText={setAiQuestion}
+                                onKeyPress={handleAiQuestionKeyPress}
+                                multiline={true}
+                                blurOnSubmit={false}
+                                editable={!isAskingAi}
+                            />
+                            <TouchableOpacity
+                                style={[styles.aiAskIconButton, isAskingAi && styles.aiAskIconButtonDisabled]}
+                                onPress={askAiQuestion}
+                                disabled={isAskingAi}
+                            >
+                                <FontAwesome name="arrow-up" size={16} color={isAskingAi ? '#C8C8CC' : '#FFFFFF'} />
+                            </TouchableOpacity>
+                        </View>
                         {aiAnswer !== '' && (
                             <ScrollView
                                 style={styles.aiAnswerContainer}
@@ -1172,7 +1182,7 @@ const handlePaymentAndAccept = async () => {
                                     </View>
                                 )}
                                 <Text style={styles.aiAnswerTitle}>{getAiAnswerTitle()}</Text>
-                                <Text style={styles.summaryText}>{aiAnswer}</Text>
+                                <Text style={styles.aiAnswerText}>{aiAnswer}</Text>
                             </ScrollView>
                         )}
                     </View>
@@ -1629,6 +1639,11 @@ const styles = StyleSheet.create({
         alignItems: 'stretch',
         maxHeight: '80%',
         flexDirection: 'column',
+        width: '86%',
+        borderRadius: 18,
+        paddingHorizontal: 0,
+        paddingVertical: 0,
+        overflow: 'hidden',
     },
     aiAskButton: {
         backgroundColor: '#000',
@@ -1643,6 +1658,37 @@ const styles = StyleSheet.create({
         width: '100%',
         alignItems: 'center',
         marginBottom: 10,
+    },
+    aiModalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 18,
+        paddingTop: 18,
+        paddingBottom: 18,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E8E8EC',
+    },
+    aiModalTitleGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    aiModalOrb: {
+        marginRight: 14,
+    },
+    aiModalTitle: {
+        fontSize: 28,
+        fontWeight: '800',
+        color: '#000000',
+        letterSpacing: -0.5,
+    },
+    aiModalCloseButton: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#E1E2E8',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     modalTitle: {
         fontSize: 18,
@@ -1840,49 +1886,85 @@ const styles = StyleSheet.create({
         color: '#ECECEF',
     },
     aiQuestionInput: {
-        width: '100%',
-        backgroundColor: '#f1f1f1',
-        borderRadius: 10,
-        padding: 12,
-        marginBottom: 15,
-        fontSize: 14,
+        flex: 1,
+        minHeight: 54,
+        maxHeight: 96,
+        backgroundColor: '#F1F1F3',
+        borderRadius: 16,
+        paddingHorizontal: 20,
+        paddingVertical: 14,
+        fontSize: 20,
+        lineHeight: 25,
+        color: '#101820',
     },
     aiQuestionInputDisabled: {
         backgroundColor: '#e8e8e8',
         color: '#555',
     },
+    aiQuestionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 18,
+        paddingVertical: 20,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E8E8EC',
+        gap: 12,
+    },
+    aiAskIconButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        backgroundColor: '#1C1C1E',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    aiAskIconButtonDisabled: {
+        backgroundColor: '#F1F1F3',
+    },
     aiAnswerContainer: {
         width: '100%',
-        backgroundColor: '#f9f9f9',
-        borderRadius: 10,
-        padding: 12,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 0,
+        paddingHorizontal: 18,
+        paddingVertical: 24,
         maxHeight: 260,
-        marginTop: 10,
     },
     aiAnswerContentContainer: {
         paddingBottom: 4,
     },
     aiAskedQuestionContainer: {
-        backgroundColor: '#efefef',
-        borderRadius: 8,
-        padding: 10,
-        marginBottom: 10,
+        backgroundColor: '#F1F1F5',
+        borderRadius: 16,
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+        marginBottom: 24,
     },
     aiAskedQuestionLabel: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        marginBottom: 4,
-        color: '#666',
+        fontSize: 14,
+        fontWeight: '800',
+        marginBottom: 10,
+        color: '#8E8E95',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     aiAskedQuestionText: {
-        fontSize: 14,
-        lineHeight: 20,
+        fontSize: 21,
+        lineHeight: 28,
+        color: '#000000',
     },
     aiAnswerTitle: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        marginBottom: 8,
-        color: '#666',
+        fontSize: 17,
+        fontWeight: '800',
+        marginBottom: 14,
+        color: '#8E8E95',
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    aiAnswerText: {
+        fontSize: 22,
+        lineHeight: 36,
+        color: '#000000',
+        fontWeight: '500',
     },
     infoContainer: {
         marginBottom: 10,
