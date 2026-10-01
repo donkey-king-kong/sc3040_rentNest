@@ -2,6 +2,7 @@ package RentNest.RentNest;
 import RentNest.controller.ReviewsController;
 import RentNest.dto.ReviewsDTO;
 import RentNest.model.Reviews;
+import RentNest.model.User;
 import RentNest.service.ReviewsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -19,6 +21,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -90,29 +93,48 @@ public class ReviewsControllerTest {
         verify(reviewsService, times(1)).getAllReviews();
     }
 
+    private User createUserWithId(Long id) throws Exception {
+        User user = new User();
+        java.lang.reflect.Field field = User.class.getDeclaredField("userID");
+        field.setAccessible(true);
+        field.set(user, id);
+        return user;
+    }
+
     // Test for updating a review
     @Test
-    public void testUpdateReview() {
+    public void testUpdateReview() throws Exception {
         Long reviewId = 1L;
         ReviewsDTO reviewsDTO = new ReviewsDTO();
         Reviews updatedReview = new Reviews();
-        when(reviewsService.updateReview(anyLong(), any(ReviewsDTO.class))).thenReturn(updatedReview);
 
-        ResponseEntity<Reviews> response = reviewsController.updateReview(reviewId, reviewsDTO);
+        User mockUser = createUserWithId(2L);
+        Authentication mockAuth = mock(Authentication.class);
+        when(mockAuth.getPrincipal()).thenReturn(mockUser);
+
+        when(reviewsService.updateReview(anyLong(), any(ReviewsDTO.class), anyLong())).thenReturn(updatedReview);
+
+        ResponseEntity<?> response = reviewsController.updateReview(reviewId, reviewsDTO, mockAuth);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(reviewsService, times(1)).updateReview(anyLong(), any(ReviewsDTO.class));
+        verify(reviewsService, times(1)).updateReview(anyLong(), any(ReviewsDTO.class), anyLong());
     }
 
     // Test for deleting a review
     @Test
-    public void testDeleteReview() {
+    public void testDeleteReview() throws Exception {
         Long reviewId = 1L;
 
-        ResponseEntity<Void> response = reviewsController.deleteReview(reviewId);
+        User mockUser = createUserWithId(2L);
+        Authentication mockAuth = mock(Authentication.class);
+        when(mockAuth.getPrincipal()).thenReturn(mockUser);
+
+        doNothing().when(reviewsService).deleteReview(anyLong(), anyLong());
+
+        ResponseEntity<?> response = reviewsController.deleteReview(reviewId, mockAuth);
 
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(reviewsService, times(1)).deleteReview(reviewId);
+        verify(reviewsService, times(1)).deleteReview(anyLong(), anyLong());
     }
 
     // Test for getting flagged reviews
