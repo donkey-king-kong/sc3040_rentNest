@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import axios from "axios";
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { FontAwesome } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MorphingInfinity from '../components/MorphingInfinity';
@@ -11,7 +13,8 @@ import errorImage from '../assets/images/error.png';
 
 const LeaveReview = () => {
   const router = useRouter();
-  const { ownerId, listingId, tenantId } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
+  const { ownerId, listingId, tenantId, revieweeName, ownerName, tenantName, revieweeRole, role } = useLocalSearchParams();
 
   // Add debug logging for route params
   console.log('Route Params:', { ownerId, listingId, tenantId });
@@ -235,6 +238,17 @@ const LeaveReview = () => {
     setRating(star);
   };
 
+  const getParamValue = (value) => Array.isArray(value) ? value[0] : value;
+  const displayedRevieweeName = getParamValue(revieweeName) || getParamValue(ownerName) || getParamValue(tenantName) || `User ${getParamValue(ownerId) || ''}`.trim();
+  const displayedRevieweeRole = getParamValue(revieweeRole) || getParamValue(role);
+  const ratingLabels = {
+    1: 'Poor',
+    2: 'Fair',
+    3: 'Okay',
+    4: 'Good',
+    5: 'Excellent',
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -245,44 +259,89 @@ const LeaveReview = () => {
   }
 
   return (
-      <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <Text style={styles.header}>{isEditing ? "Edit Review" : "Leave Review"}</Text>
+      <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.navHeader}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>‹ Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.navTitle}>Leave a review</Text>
+          <View style={styles.headerSpacer} />
+        </View>
 
-          <View style={styles.starsContainer}>
-            {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity key={star} onPress={() => handleStarPress(star)}>
-                  <Text style={star <= rating ? styles.selectedStar : styles.star}>★</Text>
-                </TouchableOpacity>
-            ))}
+        <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.revieweeCard}>
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarInitial}>{displayedRevieweeName.charAt(0).toUpperCase()}</Text>
+            </View>
+            <View style={styles.revieweeMeta}>
+              <Text style={styles.revieweeName}>{displayedRevieweeName}</Text>
+              {displayedRevieweeRole ? (
+                  <View style={styles.roleBadge}>
+                    <Text style={styles.roleBadgeText}>{displayedRevieweeRole}</Text>
+                  </View>
+              ) : null}
+            </View>
           </View>
 
-          <TextInput
-              style={styles.input}
-              placeholder="Review Title"
-              value={reviewTitle}
-              onChangeText={setReviewTitle}
-          />
+          <View style={styles.section}>
+            <Text style={styles.fieldLabel}>YOUR RATING</Text>
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity key={star} onPress={() => handleStarPress(star)} hitSlop={8}>
+                    <Text style={star <= rating ? styles.selectedStar : styles.star}>★</Text>
+                  </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.ratingHint}>{rating ? ratingLabels[rating] : 'Tap to rate'}</Text>
+          </View>
 
-          <TextInput
-              style={styles.textArea}
-              placeholder="Write your review here..."
-              value={reviewText}
-              onChangeText={setReviewText}
-              multiline
-              numberOfLines={4}
-          />
+          <View style={styles.inputGroup}>
+            <Text style={styles.fieldLabel}>TITLE</Text>
+            <TextInput
+                style={styles.input}
+                placeholder="Summarise your experience"
+                placeholderTextColor="#AEAEB2"
+                value={reviewTitle}
+                onChangeText={setReviewTitle}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.fieldLabel}>REVIEW</Text>
+            <TextInput
+                style={styles.textArea}
+                placeholder="Write your review here..."
+                placeholderTextColor="#AEAEB2"
+                value={reviewText}
+                onChangeText={setReviewText}
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+            />
+            <Text style={styles.characterCount}>{reviewText.length} / 500</Text>
+          </View>
+
+          {isEditing && (
+              <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+                <Text style={styles.deleteButtonText}>Delete review</Text>
+              </TouchableOpacity>
+          )}
         </ScrollView>
 
-        {isEditing && (
-            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-              <Text style={styles.deleteButtonText}>Delete Review</Text>
-            </TouchableOpacity>
-        )}
-
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>{isEditing ? "Update Review" : "Submit Review"}</Text>
-        </TouchableOpacity>
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 28) }]}>
+          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+            <FontAwesome name="check" size={13} color="#FFFFFF" style={styles.submitIcon} />
+            <Text style={styles.submitButtonText}>Submit review</Text>
+          </TouchableOpacity>
+        </View>
 
         <Modal
             animationType="slide"
@@ -315,14 +374,13 @@ const LeaveReview = () => {
             </View>
           </View>
         </Modal>
-      </View>
+      </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#fff',
   },
   loadingContainer: {
@@ -338,77 +396,185 @@ const styles = StyleSheet.create({
     color: '#2FA84F',
   },
   scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'flex-start',
-    paddingBottom: 80,
+    paddingHorizontal: 18,
+    paddingBottom: 24,
   },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+  navHeader: {
+    height: 52,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#F2F2F2',
+  },
+  backButton: {
+    minWidth: 72,
+    height: 40,
+    justifyContent: 'center',
+  },
+  backButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0A84FF',
+  },
+  navTitle: {
+    flex: 1,
     textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  headerSpacer: {
+    minWidth: 72,
+  },
+  content: {
+    flex: 1,
+  },
+  revieweeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 18,
+    marginBottom: 20,
+    paddingTop: 18,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#F2F2F2',
+  },
+  avatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3A3A3C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  avatarInitial: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  revieweeMeta: {
+    flex: 1,
+  },
+  revieweeName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  roleBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 5,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 999,
+    backgroundColor: '#F2F2F7',
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#636366',
   },
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 20,
+    columnGap: 8,
+    marginTop: 12,
   },
   star: {
-    fontSize: 40,
-    color: '#ccc',
+    fontSize: 32,
+    color: '#E5E5EA',
   },
   selectedStar: {
-    fontSize: 40,
-    color: '#FFD700',
+    fontSize: 32,
+    color: '#FF9F0A',
+  },
+  section: {
+    marginBottom: 18,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: '#AEAEB2',
+  },
+  ratingHint: {
+    marginTop: 6,
+    fontSize: 11,
+    color: '#AEAEB2',
+    textAlign: 'center',
+  },
+  inputGroup: {
+    marginBottom: 16,
   },
   input: {
-    height: 40,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginBottom: 20,
-    fontSize: 16,
+    marginTop: 8,
+    backgroundColor: '#F9F9F9',
+    borderWidth: 0.5,
+    borderColor: '#E5E5EA',
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    fontSize: 13,
+    color: '#3C3C3E',
   },
   textArea: {
+    marginTop: 8,
     height: 100,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    marginBottom: 20,
-    fontSize: 16,
+    backgroundColor: '#F9F9F9',
+    borderWidth: 0.5,
+    borderColor: '#E5E5EA',
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    fontSize: 13,
+    color: '#3C3C3E',
     textAlignVertical: 'top',
   },
+  characterCount: {
+    marginTop: 6,
+    fontSize: 11,
+    color: '#AEAEB2',
+    textAlign: 'right',
+  },
+  footer: {
+    paddingTop: 12,
+    paddingHorizontal: 18,
+    borderTopWidth: 0.5,
+    borderTopColor: '#F2F2F2',
+    backgroundColor: '#FFFFFF',
+  },
   submitButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: '#222222',
-    padding: 10,
-    borderRadius: 5,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#0A84FF',
+  },
+  submitIcon: {
+    marginRight: 7,
   },
   submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   deleteButton: {
-    backgroundColor: '#fff',
-    borderColor: '#222222',
-    borderWidth: 1,
-    padding: 10,
-    borderRadius: 5,
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    backgroundColor: '#F2F2F7',
     alignItems: 'center',
-    marginVertical: 50,
+    marginTop: 4,
+    marginBottom: 16,
   },
   deleteButtonText: {
-    color: '#222222',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#FF3B30',
+    fontSize: 13,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
