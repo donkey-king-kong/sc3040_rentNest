@@ -38,6 +38,7 @@ const ChatsScreen2 = () => {
     const [rentalDeposit, setRentalDeposit] = useState('');
     const [rentalDate, setRentalDate] = useState('');
     const [leaseExpiry, setLeaseExpiry] = useState('');
+    const [dateTooltip, setDateTooltip] = useState(null); // 'start' | 'end' | null
     const [isAttachmentModalVisible, setAttachmentModalVisible] = useState(false)
     const [isRentalModalVisible, setRentalModalVisible] = useState(false)
     const [isFlagModalVisible, setFlagModalVisible] = useState(false)
@@ -1342,28 +1343,71 @@ const handlePaymentAndAccept = async () => {
                         </View>
 
                         {/* Row 2: Lease start / Lease end */}
-                        <View style={styles.rentalOfferRow}>
-                            <View style={styles.rentalOfferFieldHalf}>
-                                <Text style={styles.rentalOfferFieldLabel}>Lease start</Text>
-                                <TextInput
-                                    style={styles.rentalOfferDateInput}
-                                    placeholder="DD MMM YY"
-                                    placeholderTextColor="#666"
-                                    value={rentalDate}
-                                    onChangeText={setRentalDate}
-                                />
-                            </View>
-                            <View style={styles.rentalOfferFieldHalf}>
-                                <Text style={styles.rentalOfferFieldLabel}>Lease end</Text>
-                                <TextInput
-                                    style={styles.rentalOfferDateInput}
-                                    placeholder="DD MMM YY"
-                                    placeholderTextColor="#666"
-                                    value={leaseExpiry}
-                                    onChangeText={setLeaseExpiry}
-                                />
-                            </View>
-                        </View>
+                        {(() => {
+                            const startDate = rentalDate ? new Date(rentalDate) : null;
+                            const endDate = leaseExpiry ? new Date(leaseExpiry) : null;
+                            const startInvalid = rentalDate.trim() !== '' && (!startDate || isNaN(startDate));
+                            const endInvalid = leaseExpiry.trim() !== '' && (!endDate || isNaN(endDate));
+                            const endBeforeStart = !endInvalid && !startInvalid && startDate && endDate && endDate <= startDate;
+                            const startMsg = startInvalid ? 'Invalid date format' : null;
+                            const endMsg = endInvalid ? 'Invalid date format' : endBeforeStart ? 'Must be after lease start' : null;
+                            return (
+                                <View style={styles.rentalOfferRow}>
+                                    <View style={styles.rentalOfferFieldHalf}>
+                                        <Text style={styles.rentalOfferFieldLabel}>Lease start</Text>
+                                        <View style={styles.rentalOfferDateWrapper}>
+                                            <TextInput
+                                                style={[styles.rentalOfferDateInput, startInvalid && styles.rentalOfferDateInputError]}
+                                                placeholder="YYYY-MM-DD"
+                                                placeholderTextColor="#666"
+                                                value={rentalDate}
+                                                onChangeText={(t) => { setRentalDate(t); setDateTooltip(null); }}
+                                            />
+                                            {startMsg && (
+                                                <TouchableOpacity
+                                                    style={styles.rentalOfferWarnIcon}
+                                                    onPressIn={() => setDateTooltip('start')}
+                                                    onPressOut={() => setDateTooltip(null)}
+                                                >
+                                                    <FontAwesome name="exclamation-circle" size={14} color="#F59E0B" />
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+                                        {dateTooltip === 'start' && startMsg && (
+                                            <View style={styles.rentalOfferTooltip}>
+                                                <Text style={styles.rentalOfferTooltipText}>{startMsg}</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                    <View style={styles.rentalOfferFieldHalf}>
+                                        <Text style={styles.rentalOfferFieldLabel}>Lease end</Text>
+                                        <View style={styles.rentalOfferDateWrapper}>
+                                            <TextInput
+                                                style={[styles.rentalOfferDateInput, (endInvalid || endBeforeStart) && styles.rentalOfferDateInputError]}
+                                                placeholder="YYYY-MM-DD"
+                                                placeholderTextColor="#666"
+                                                value={leaseExpiry}
+                                                onChangeText={(t) => { setLeaseExpiry(t); setDateTooltip(null); }}
+                                            />
+                                            {endMsg && (
+                                                <TouchableOpacity
+                                                    style={styles.rentalOfferWarnIcon}
+                                                    onPressIn={() => setDateTooltip('end')}
+                                                    onPressOut={() => setDateTooltip(null)}
+                                                >
+                                                    <FontAwesome name="exclamation-circle" size={14} color="#F59E0B" />
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+                                        {dateTooltip === 'end' && endMsg && (
+                                            <View style={styles.rentalOfferTooltip}>
+                                                <Text style={styles.rentalOfferTooltipText}>{endMsg}</Text>
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
+                            );
+                        })()}
 
                         {/* Offer Preview */}
                         {(() => {
@@ -2556,13 +2600,41 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 15,
     },
+    rentalOfferDateWrapper: {
+        position: 'relative',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
     rentalOfferDateInput: {
+        flex: 1,
         backgroundColor: '#2C2C2E',
         borderRadius: 10,
         paddingHorizontal: 12,
+        paddingRight: 32,
         height: 44,
         color: '#fff',
         fontSize: 14,
+    },
+    rentalOfferDateInputError: {
+        borderWidth: 1,
+        borderColor: '#F59E0B',
+    },
+    rentalOfferWarnIcon: {
+        position: 'absolute',
+        right: 10,
+        padding: 4,
+    },
+    rentalOfferTooltip: {
+        backgroundColor: '#3A2E00',
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        marginTop: 4,
+    },
+    rentalOfferTooltipText: {
+        color: '#F59E0B',
+        fontSize: 11,
+        fontWeight: '600',
     },
     rentalOfferPreview: {
         backgroundColor: '#2A3A5C',
