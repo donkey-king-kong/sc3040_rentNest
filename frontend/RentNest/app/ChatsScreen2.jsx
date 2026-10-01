@@ -1466,6 +1466,8 @@ const styles = StyleSheet.create({
     },
     reviewsLink: {
         marginLeft: 8,
+        alignSelf: 'center',
+        justifyContent: 'center',
     },
     reviews: {
         fontSize: 14,
@@ -2362,10 +2364,10 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     reviews:{
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: 'bold',
         textDecorationLine: 'underline',
-        marginBottom: 10,
+        color: '#101820',
     },
     emptyMessageContainer: {
         padding: 20,
