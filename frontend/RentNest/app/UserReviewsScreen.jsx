@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     },
     emptySubtitle: {
         marginTop: 6,
-        maxWidth: 220,
+        maxWidth: 320,
         fontSize: 13,
         lineHeight: 20,
         color: '#8E8E93',
