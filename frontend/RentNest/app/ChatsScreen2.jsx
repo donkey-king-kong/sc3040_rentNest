@@ -1738,7 +1738,7 @@ const handlePaymentAndAccept = async () => {
                                         ) : (
                                             <>
                                                 <FontAwesome name="lock" size={13} color="#fff" style={{ marginRight: 8 }} />
-                                                <Text style={styles.payButtonText}>Pay {depositLabel} and accept offer</Text>
+                                                <Text style={styles.payButtonText}>Pay {depositLabel}</Text>
                                             </>
                                         )}
                                     </TouchableOpacity>
