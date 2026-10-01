@@ -86,7 +86,7 @@ const UserReviewsScreen = () => {
                             id: review.reviewID,
                             reviewer: review.reviewerName,
                             // date: formattedDate, // Formatting the date to be more readable
-                            avatar: review.avatar || avatars[index % avatars.length], // Use different avatars for each review
+                            avatar: review.reviewerPhotoURL || review.photoURL || review.avatar || avatars[index % avatars.length],
                             rating: review.rating,
                             title: review.title,
                             content: review.text,
