@@ -182,18 +182,20 @@ const UserReviewsScreen = () => {
         });
     };
 
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <MorphingInfinity size={86} color="#2FA84F" />
-                <Text style={styles.loadingText}>Loading reviews...</Text>
-            </View>
-        );
-    }
-
     return (
         <View style={styles.container}>
-            {error ? (
+            <View style={styles.headerBar}>
+                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                    <FontAwesome name="chevron-left" size={18} color="#101820" />
+                </TouchableOpacity>
+                <Text style={styles.header}>Reviews</Text>
+            </View>
+            {loading ? (
+                <View style={styles.loadingContent}>
+                    <MorphingInfinity size={86} color="#2FA84F" />
+                    <Text style={styles.loadingText}>Loading reviews...</Text>
+                </View>
+            ) : error ? (
                 <Text style={{ color: 'red', marginBottom: 10 }}>{error}</Text>
             ) : reviews.length === 0 ? (
                 <View style={styles.emptyState}>
@@ -210,15 +212,12 @@ const UserReviewsScreen = () => {
                     </TouchableOpacity>
                 </View>
             ) : (
-                <>
-                    <Text style={styles.header}>Reviews</Text>
-                    <FlatList
-                        data={reviews}
-                        renderItem={renderReview}
-                        keyExtractor={(item) => item.id.toString()}
-                        contentContainerStyle={styles.list}
-                    />
-                </>
+                <FlatList
+                    data={reviews}
+                    renderItem={renderReview}
+                    keyExtractor={(item) => item.id.toString()}
+                    contentContainerStyle={styles.list}
+                />
             )}
         </View>
     );
@@ -253,7 +252,23 @@ const styles = StyleSheet.create({
     header: {
         fontSize: 24,
         fontWeight: 'bold',
-        marginBottom: 20,
+        color: '#101820',
+    },
+    headerBar: {
+        height: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
+    backButton: {
+        position: 'absolute',
+        left: 0,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     list: {
         paddingBottom: 20,
@@ -322,11 +337,10 @@ const styles = StyleSheet.create({
     flaggedText: {
         color: 'red',
     },
-    loadingContainer: {
+    loadingContent: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#FFFFFF',
     },
     loadingText: {
         marginTop: 12,
