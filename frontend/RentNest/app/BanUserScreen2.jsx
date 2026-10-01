@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useRoute } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 
 const BanUsersScreen2 = () => {
   const router = useRouter();
-  const route = useRoute();
-  const { userid } = route.params || {};
+  const { userid } = useLocalSearchParams();
 
   const [flaggedUser, setFlaggedUser] = useState(null);
 

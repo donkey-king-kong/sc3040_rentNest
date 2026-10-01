@@ -2,9 +2,7 @@ package RentNest.service;
 
 import RentNest.dto.AiChatSummaryResponseDTO;
 import RentNest.dto.AiChatQuestionResponseDTO;
-import RentNest.model.AiChatSummaryCache;
 import RentNest.model.ChatHistory;
-import RentNest.repository.AiChatSummaryCacheRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -19,22 +17,18 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 @Service
 public class AiChatService {
-    private static final Logger logger = LoggerFactory.getLogger(AiChatService.class);
-
+    private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
     private static final String PLACEHOLDER_PREFIX = "[HARDCODED PLACEHOLDER]";
     private static final Duration LLM_CONNECT_TIMEOUT = Duration.ofSeconds(5);
     private static final Duration LLM_REQUEST_TIMEOUT = Duration.ofSeconds(20);
-    private static final int LOG_BODY_PREVIEW_LIMIT = 500;
     private static final List<String> PLACEHOLDER_API_KEYS = List.of(
             "YOUR_LLM_API_KEY",
             "YOUR_GEMINI_API_KEY",
@@ -42,7 +36,6 @@ public class AiChatService {
     );
 
     private final ChatHistoryService chatHistoryService;
-    private final AiChatSummaryCacheRepository aiChatSummaryCacheRepository;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
@@ -58,9 +51,8 @@ public class AiChatService {
     @Value("${llm.model:gemini-3.6-flash}")
     private String llmModel;
 
-    public AiChatService(ChatHistoryService chatHistoryService, AiChatSummaryCacheRepository aiChatSummaryCacheRepository) {
+    public AiChatService(ChatHistoryService chatHistoryService) {
         this.chatHistoryService = chatHistoryService;
-        this.aiChatSummaryCacheRepository = aiChatSummaryCacheRepository;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(LLM_CONNECT_TIMEOUT)
                 .build();
@@ -68,47 +60,16 @@ public class AiChatService {
     }
 
     public AiChatSummaryResponseDTO generateChatSummary(Long userA, Long userB) {
-        Long latestMessageId = chatHistoryService.getLatestMessageIdBetweenUsers(userA, userB);
-        Long cacheUserA = Math.min(userA, userB);
-        Long cacheUserB = Math.max(userA, userB);
-        Optional<AiChatSummaryCache> existingCache = aiChatSummaryCacheRepository.findByUserAIdAndUserBId(cacheUserA, cacheUserB);
+        List<ChatHistory> conversation = chatHistoryService.getConversationBetweenUsers(userA, userB);
 
-        if (latestMessageId == null) {
-            logger.info("Using placeholder summary because conversation is empty for userA={}, userB={}", userA, userB);
+        if (conversation.isEmpty()) {
             return new AiChatSummaryResponseDTO(
                     PLACEHOLDER_PREFIX + " No messages found between these users yet.",
                     true
             );
         }
 
-        if (existingCache.isPresent() && latestMessageId.equals(existingCache.get().getLastMessageId())) {
-            logger.info("Returning cached AI chat summary for userA={}, userB={}, lastMessageId={}",
-                    userA,
-                    userB,
-                    latestMessageId);
-            return new AiChatSummaryResponseDTO(existingCache.get().getSummary(), false);
-        }
-
-        List<ChatHistory> conversation = existingCache
-                .map(cache -> chatHistoryService.getConversationBetweenUsersAfterMessageId(userA, userB, cache.getLastMessageId()))
-                .orElseGet(() -> chatHistoryService.getConversationBetweenUsers(userA, userB));
-        logger.info("Generating AI chat summary for userA={}, userB={}, messageCount={}, provider={}, model={}",
-                userA,
-                userB,
-                conversation.size(),
-                llmProvider,
-                llmModel);
-
-        if (conversation.isEmpty() && existingCache.isPresent()) {
-            logger.info("Returning cached AI chat summary because no new messages were found for userA={}, userB={}",
-                    userA,
-                    userB);
-            return new AiChatSummaryResponseDTO(existingCache.get().getSummary(), false);
-        }
-
-        String configurationIssue = getLlmConfigurationIssue();
-        if (configurationIssue != null) {
-            logger.warn("Using placeholder summary because LLM is not configured: {}", configurationIssue);
+        if (!isLlmConfigured()) {
             return new AiChatSummaryResponseDTO(generatePlaceholderSummary(conversation), true);
         }
 
@@ -120,38 +81,40 @@ public class AiChatService {
                 - Use only facts explicitly stated in the transcript.
                 - Do not speculate about who is owner or tenant based on names.
                 - Do not comment on funny, odd, duplicated, or confusing names.
-                - Keep the summary professional, concise, and useful.
-                - Use plain text only. Do not use Markdown, asterisks, hashtags, or bold formatting.
-                - Return exactly the output template below.
-                - Fill every line in the output template.
-                - Do not stop after a heading.
-                - If a detail is not available, write Not mentioned.
-                - Keep the full response under 140 words.
+                - Include only sections that have actual content from the conversation.
+                - Each section value must be one short sentence or a structured list of key-value pairs, nothing longer.
+                - Output valid JSON only. No markdown, no explanation, no trailing text.
 
-                Output template:
-                Summary:
-                One sentence describing the overall discussion.
+                Output a JSON object with these fields:
+                - "overview": always required, one sentence summary of what was discussed
+                - "next_steps": always required, one sentence on what happens next, or "No clear next step mentioned"
+                - "sections": an array of 0-4 objects, each with "label", "icon", and "content"
+                  - Only include a section if that topic was actually discussed
+                  - For structured data (prices, dates), use "rows": [{"label": "...", "value": "..."}] instead of "content"
+                  - Choose "label" and "icon" from this list only:
+                    "Rent & deposit" -> "dollar"
+                    "Viewing & move-in" -> "calendar"
+                    "Location" -> "map-marker"
+                    "Repairs & maintenance" -> "wrench"
+                    "Lease terms" -> "file-text-o"
+                    "Utilities" -> "bolt"
+                    "Legal & disputes" -> "balance-scale"
 
-                Key Details:
-                Rent/deposit: ...
-                Viewing/move-in: ...
-                Location/amenities: ...
-
-                Next Steps:
-                Mention the agreed next step, or say No clear next step mentioned.
+                Example output:
+                {"overview":"Discussed unit condition and agreed on a weekend viewing.","next_steps":"Tenant will confirm availability by Friday.","sections":[{"label":"Viewing & move-in","icon":"calendar","rows":[{"label":"Viewing","value":"Sat 19 Sep 2:30 PM"},{"label":"Earliest move-in","value":"Oct 1"}]},{"label":"Location","icon":"map-marker","content":"Blk 18B, #12-04 near bus stop"}]}
                 """;
 
-        String prompt = buildSummaryPrompt(existingCache, conversation);
+        String prompt = """
+                Chat transcript:
+                %s
+                """.formatted(formatConversation(conversation));
 
         String summary = callLlm(systemInstruction, prompt);
-        saveSummaryCache(existingCache, cacheUserA, cacheUserB, summary, latestMessageId);
-        logger.info("Generated AI chat summary for userA={}, userB={}", userA, userB);
         return new AiChatSummaryResponseDTO(summary, false);
     }
 
     public AiChatQuestionResponseDTO askQuestion(Long userA, Long userB, String question) {
         if (question == null || question.trim().isEmpty()) {
-            logger.info("Rejected Ask AI request because question is empty for userA={}, userB={}", userA, userB);
             return new AiChatQuestionResponseDTO(
                     false,
                     "empty_question",
@@ -163,7 +126,6 @@ public class AiChatService {
         String normalizedQuestion = question.toLowerCase(Locale.ROOT);
 
         if (isSummaryQuestion(normalizedQuestion)) {
-            logger.info("Routing Ask AI summary question to summary generator for userA={}, userB={}", userA, userB);
             AiChatSummaryResponseDTO summary = generateChatSummary(userA, userB);
             return new AiChatQuestionResponseDTO(
                     true,
@@ -174,7 +136,6 @@ public class AiChatService {
         }
 
         if (isAiHelpQuestion(normalizedQuestion)) {
-            logger.info("Answering Ask AI help question locally for userA={}, userB={}", userA, userB);
             return new AiChatQuestionResponseDTO(
                     true,
                     "rental_conversation",
@@ -184,10 +145,6 @@ public class AiChatService {
         }
 
         if (isOutOfScopeQuestion(normalizedQuestion)) {
-            logger.info("Rejected Ask AI question as out of scope for userA={}, userB={}, questionLength={}",
-                    userA,
-                    userB,
-                    question.trim().length());
             return new AiChatQuestionResponseDTO(
                     false,
                     "out_of_scope",
@@ -197,16 +154,8 @@ public class AiChatService {
         }
 
         List<ChatHistory> conversation = chatHistoryService.getConversationBetweenUsers(userA, userB);
-        logger.info("Answering Ask AI question for userA={}, userB={}, messageCount={}, provider={}, model={}, questionLength={}",
-                userA,
-                userB,
-                conversation.size(),
-                llmProvider,
-                llmModel,
-                question.trim().length());
 
         if (conversation.isEmpty()) {
-            logger.info("Ask AI response uses no-context message because conversation is empty for userA={}, userB={}", userA, userB);
             return new AiChatQuestionResponseDTO(
                     true,
                     "rental_conversation",
@@ -215,9 +164,7 @@ public class AiChatService {
             );
         }
 
-        String configurationIssue = getLlmConfigurationIssue();
-        if (configurationIssue != null) {
-            logger.warn("Using placeholder Ask AI answer because LLM is not configured: {}", configurationIssue);
+        if (!isLlmConfigured()) {
             return new AiChatQuestionResponseDTO(
                     true,
                     "rental_conversation",
@@ -261,7 +208,6 @@ public class AiChatService {
                 """.formatted(formatConversation(conversation), question.trim());
 
         String answer = callLlm(systemInstruction, prompt);
-        logger.info("Generated Ask AI answer for userA={}, userB={}", userA, userB);
 
         return new AiChatQuestionResponseDTO(
                 true,
@@ -271,28 +217,15 @@ public class AiChatService {
         );
     }
 
-    private String getLlmConfigurationIssue() {
-        if (llmApiKey == null || llmApiKey.isBlank()) {
-            return "llm.api-key is missing";
-        }
-
-        if (PLACEHOLDER_API_KEYS.contains(llmApiKey)) {
-            return "llm.api-key still uses a placeholder value";
-        }
-
-        if (!isSupportedProvider(llmProvider)) {
-            return "llm.provider is unsupported: " + llmProvider;
-        }
-
-        if (llmApiUrl == null || llmApiUrl.isBlank()) {
-            return "llm.api-url is missing";
-        }
-
-        if (llmModel == null || llmModel.isBlank()) {
-            return "llm.model is missing";
-        }
-
-        return null;
+    private boolean isLlmConfigured() {
+        return llmApiKey != null
+                && !llmApiKey.isBlank()
+                && !PLACEHOLDER_API_KEYS.contains(llmApiKey)
+                && isSupportedProvider(llmProvider)
+                && llmApiUrl != null
+                && !llmApiUrl.isBlank()
+                && llmModel != null
+                && !llmModel.isBlank();
     }
 
     private boolean isSupportedProvider(String provider) {
@@ -327,48 +260,6 @@ public class AiChatService {
         );
     }
 
-    private String buildSummaryPrompt(Optional<AiChatSummaryCache> existingCache, List<ChatHistory> conversation) {
-        if (existingCache.isPresent()) {
-            return """
-                    Previous summary:
-                    %s
-
-                    New chat messages after the previous summary:
-                    %s
-
-                    Update the previous summary using only the new chat messages above.
-                    Return the complete updated summary in the required output template.
-                    """.formatted(existingCache.get().getSummary(), formatConversation(conversation));
-        }
-
-        return """
-                Chat transcript:
-                %s
-                """.formatted(formatConversation(conversation));
-    }
-
-    private void saveSummaryCache(
-            Optional<AiChatSummaryCache> existingCache,
-            Long userA,
-            Long userB,
-            String summary,
-            Long latestMessageId
-    ) {
-        AiChatSummaryCache cache = existingCache.orElseGet(AiChatSummaryCache::new);
-        Date now = new Date();
-
-        if (cache.getId() == null) {
-            cache.setUserAId(userA);
-            cache.setUserBId(userB);
-            cache.setCreatedAt(now);
-        }
-
-        cache.setSummary(summary);
-        cache.setLastMessageId(latestMessageId);
-        cache.setUpdatedAt(now);
-        aiChatSummaryCacheRepository.save(cache);
-    }
-
     private String formatConversation(List<ChatHistory> conversation) {
         StringBuilder transcript = new StringBuilder();
         Long firstSenderId = conversation.get(0).getSenderId();
@@ -388,7 +279,6 @@ public class AiChatService {
     }
 
     private String callLlm(String systemInstruction, String prompt) {
-        logger.info("Calling configured LLM provider={}, model={}", llmProvider, llmModel);
         if ("openrouter".equalsIgnoreCase(llmProvider)) {
             return callOpenRouter(systemInstruction, prompt);
         }
@@ -411,7 +301,7 @@ public class AiChatService {
                             )
                     ),
                     "temperature", 0.2,
-                    "max_tokens", 768
+                    "max_tokens", 2000
             );
 
             HttpRequest request = HttpRequest.newBuilder()
@@ -427,26 +317,22 @@ public class AiChatService {
                     .build();
 
             HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-            String responseBody = decodeResponseBody(response);
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                logger.error("OpenRouter API returned status {} with body: {}",
-                        response.statusCode(),
-                        preview(responseBody));
                 throw new RuntimeException("OpenRouter API returned status " + response.statusCode());
             }
 
-            JsonNode responseJson = objectMapper.readTree(responseBody);
+            JsonNode responseJson = objectMapper.readTree(decodeResponseBody(response));
             JsonNode textNode = responseJson.path("choices").path(0).path("message").path("content");
 
             if (textNode.isMissingNode() || textNode.asText().isBlank()) {
-                logger.error("OpenRouter API returned empty content with body: {}", preview(responseBody));
                 throw new RuntimeException("OpenRouter API returned an empty response");
             }
 
-            return textNode.asText().trim();
+            String result = textNode.asText().trim();
+            log.info("[OpenRouter] LLM response:\n{}", result);
+            return result;
         } catch (Exception e) {
-            logger.error("OpenRouter API call failed for model={}", llmModel, e);
             throw new RuntimeException("Unable to call OpenRouter API: " + e.getMessage());
         }
     }
@@ -473,75 +359,78 @@ public class AiChatService {
                     llmModel
             );
 
+            log.info("[Gemini] Calling model: {}", llmModel);
+            log.info("[Gemini] System instruction ({} chars):\n{}", systemInstruction.length(), systemInstruction);
+            log.info("[Gemini] User prompt ({} chars):\n{}", prompt.length(), prompt);
+
             Map<String, Object> requestBody = Map.of(
                     "systemInstruction", Map.of(
-                            "parts", List.of(
-                                    Map.of("text", systemInstruction)
-                            )
+                            "parts", List.of(Map.of("text", systemInstruction))
                     ),
                     "contents", List.of(
                             Map.of(
                                     "role", "user",
-                                    "parts", List.of(
-                                            Map.of("text", prompt)
-                                    )
+                                    "parts", List.of(Map.of("text", prompt))
                             )
                     ),
                     "generationConfig", Map.of(
                             "temperature", 0.2,
-                            "maxOutputTokens", 2048,
-                            "thinkingConfig", Map.of(
-                                    "thinkingBudget", 256
-                            )
+                            "maxOutputTokens", 2000
                     )
             );
+
+            String requestBodyJson = objectMapper.writeValueAsString(requestBody);
+            log.info("[Gemini] Sending request to: {}", url);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(LLM_REQUEST_TIMEOUT)
                     .header("Content-Type", "application/json")
                     .header("x-goog-api-key", llmApiKey)
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson))
                     .build();
 
+            long startMs = System.currentTimeMillis();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            logger.info("Gemini raw response body: {}", response.body());
+            long elapsedMs = System.currentTimeMillis() - startMs;
+
+            log.info("[Gemini] HTTP {} received in {}ms", response.statusCode(), elapsedMs);
 
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                logger.error("Gemini API returned status {} with body: {}",
-                        response.statusCode(),
-                        preview(response.body()));
-                throw new RuntimeException("Gemini API returned status " + response.statusCode());
+                log.error("[Gemini] HTTP {} error body: {}", response.statusCode(), response.body());
+                throw new RuntimeException("Gemini API returned status " + response.statusCode() + ": " + response.body());
             }
 
             JsonNode responseJson = objectMapper.readTree(response.body());
+
+            // Log token usage
+            JsonNode usageNode = responseJson.path("usageMetadata");
+            if (!usageNode.isMissingNode()) {
+                log.info("[Gemini] Token usage — prompt: {}, candidates: {}, total: {}",
+                        usageNode.path("promptTokenCount").asInt(),
+                        usageNode.path("candidatesTokenCount").asInt(),
+                        usageNode.path("totalTokenCount").asInt());
+            }
+
+            // Log finish reason
+            JsonNode finishReason = responseJson.path("candidates").path(0).path("finishReason");
+            if (!finishReason.isMissingNode()) {
+                log.info("[Gemini] Finish reason: {}", finishReason.asText());
+            }
+
             JsonNode textNode = responseJson.path("candidates").path(0).path("content").path("parts").path(0).path("text");
 
             if (textNode.isMissingNode() || textNode.asText().isBlank()) {
-                logger.error("Gemini API returned empty content with body: {}", preview(response.body()));
+                log.error("[Gemini] Unexpected response structure: {}", response.body());
                 throw new RuntimeException("Gemini API returned an empty response");
             }
 
-            String generatedText = textNode.asText().trim();
-            logger.info("Gemini extracted response text: {}", generatedText);
-            return generatedText;
+            String result = textNode.asText().trim();
+            log.info("[Gemini] Response ({} chars):\n{}", result.length(), result);
+            return result;
         } catch (Exception e) {
-            logger.error("Gemini API call failed for model={}", llmModel, e);
             throw new RuntimeException("Unable to call Gemini API: " + e.getMessage());
         }
-    }
-
-    private String preview(String value) {
-        if (value == null || value.isBlank()) {
-            return "[empty]";
-        }
-
-        String normalized = value.replaceAll("\\s+", " ").trim();
-        if (normalized.length() <= LOG_BODY_PREVIEW_LIMIT) {
-            return normalized;
-        }
-
-        return normalized.substring(0, LOG_BODY_PREVIEW_LIMIT) + "...";
     }
 
     private boolean isOutOfScopeQuestion(String question) {

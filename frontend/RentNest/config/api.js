@@ -6,6 +6,7 @@ const BACKEND_PORT = '8080';
 const getExpoHost = () => {
     const hostUri =
         Constants.expoConfig?.hostUri ||
+        Constants.expoGoConfig?.debuggerHost ||
         Constants.manifest2?.extra?.expoClient?.hostUri ||
         Constants.manifest?.debuggerHost;
 
@@ -21,7 +22,7 @@ const getApiBaseUrl = () => {
         return `http://${window.location.hostname}:${BACKEND_PORT}`;
     }
 
-    if (Platform.OS === 'android') {
+    if (Platform.OS === 'android' && !Constants.expoGoConfig?.debuggerHost && !Constants.expoConfig?.hostUri) {
         return `http://10.0.2.2:${BACKEND_PORT}`;
     }
 
@@ -34,6 +35,7 @@ export const API_BASE_URL = getApiBaseUrl();
 export const ENDPOINTS = {
     LOGIN: '/auth/login',
     SIGNUP: '/auth/signup',
+    RESET_PASSWORD: '/auth/reset-password',
     LISTINGS: "/api/listings",
     RENTALS: '/api/rentals',
     PAYMENTS: '/api/payment',
