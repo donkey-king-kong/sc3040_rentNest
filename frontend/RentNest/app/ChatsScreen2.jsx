@@ -1,7 +1,8 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Dimensions, Animated} from 'react-native';
+import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Dimensions, Animated, StatusBar} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import { FontAwesome } from '@expo/vector-icons';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
 // Import Icons
 import sendIcon from '../assets/images/send.jpg';
@@ -25,6 +26,7 @@ const profilePic = require('../assets/images/chatProfilePic.jpg');
 
 const ChatsScreen2 = () => {
     const router = useRouter();
+    const safeAreaInsets = useSafeAreaInsets();
     const { partnerUserId, currentUser} = useLocalSearchParams();
     const [chat, setChat] = useState([]);
     const [rental, setRental] = useState([]);
@@ -360,6 +362,20 @@ const ChatsScreen2 = () => {
         ].join('|');
     }
 
+    const parseSummaryJson = (summaryText) => {
+        if (!summaryText) {
+            return null;
+        }
+
+        const cleanedSummary = summaryText
+            .trim()
+            .replace(/^```(?:json)?\s*/i, '')
+            .replace(/\s*```$/i, '')
+            .trim();
+
+        return JSON.parse(cleanedSummary);
+    }
+
     const getChatSummary = async () => {
         const cacheKey = getChatSummaryCacheKey();
 
@@ -367,7 +383,7 @@ const ChatsScreen2 = () => {
             setSummaryError('');
             setChatSummary(summaryCache.summary);
             setSummaryPlaceholder(summaryCache.placeholder);
-            try { setParsedSummary(JSON.parse(summaryCache.summary)); } catch { setParsedSummary(null); }
+            try { setParsedSummary(parseSummaryJson(summaryCache.summary)); } catch { setParsedSummary(null); }
             summarySheetY.setValue(600);
             setSummaryModalVisible(true);
             Animated.spring(summarySheetY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
@@ -408,7 +424,7 @@ const ChatsScreen2 = () => {
                 summary: generatedSummary,
                 placeholder: isPlaceholderSummary,
             });
-            try { setParsedSummary(JSON.parse(generatedSummary)); } catch { setParsedSummary(null); }
+            try { setParsedSummary(parseSummaryJson(generatedSummary)); } catch { setParsedSummary(null); }
             summarySheetY.setValue(600);
             setSummaryModalVisible(true);
             Animated.spring(summarySheetY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
@@ -886,6 +902,7 @@ const handlePaymentAndAccept = async () => {
 
     return (
         <View style={styles.container}>
+            <StatusBar barStyle={isSummaryModalVisible ? 'light-content' : 'dark-content'} />
             {/* Header row 1: back + avatar + name + Reviews */}
             <View style={styles.nameHeaderContainer}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -955,7 +972,15 @@ const handlePaymentAndAccept = async () => {
                     activeOpacity={1}
                     onPress={() => setSummaryModalVisible(false)}
                 />
-                <Animated.View style={[styles.summarySheet, { transform: [{ translateY: summarySheetY }] }]}>
+                <Animated.View
+                    style={[
+                        styles.summarySheet,
+                        {
+                            paddingBottom: Math.max(safeAreaInsets.bottom, 16),
+                            transform: [{ translateY: summarySheetY }],
+                        },
+                    ]}
+                >
                     <View style={styles.summarySheetHandle} />
                     <View style={styles.summarySheetHeader}>
                         <View style={styles.summarySheetTitleGroup}>
@@ -978,6 +1003,11 @@ const handlePaymentAndAccept = async () => {
                     <ScrollView
                         ref={summaryScrollRef}
                         style={styles.summarySheetScroll}
+                        contentContainerStyle={[
+                            styles.summarySheetScrollContent,
+                            { paddingBottom: Math.max(safeAreaInsets.bottom + 28, 44) },
+                        ]}
+                        showsVerticalScrollIndicator={false}
                         onLayout={() => summaryScrollRef.current?.scrollTo({ y: 0, animated: false })}
                     >
                         {summaryError ? (
@@ -1597,12 +1627,14 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         backgroundColor: '#2B2B2E',
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
         paddingHorizontal: 24,
-        paddingBottom: 32,
+        paddingBottom: 0,
         paddingTop: 18,
-        maxHeight: Dimensions.get('window').height * 0.75,
+        height: Dimensions.get('window').height * 0.75,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -8 },
         shadowOpacity: 0.28,
@@ -1659,7 +1691,10 @@ const styles = StyleSheet.create({
         fontWeight: '800',
     },
     summarySheetScroll: {
-        flexGrow: 0,
+        flex: 1,
+    },
+    summarySheetScrollContent: {
+        paddingBottom: 44,
     },
     summaryCard: {
         paddingVertical: 18,
@@ -1705,8 +1740,9 @@ const styles = StyleSheet.create({
         lineHeight: 24,
         fontWeight: '800',
         color: '#F4F4F6',
-        flex: 1.2,
+        flex: 1.15,
         textAlign: 'right',
+        flexShrink: 1,
     },
     summaryCardRowValueSmall: {
         fontSize: 15,
@@ -1720,9 +1756,9 @@ const styles = StyleSheet.create({
         color: '#34E65A',
     },
     summaryNextStepsCard: {
-        backgroundColor: '#26382A',
+        backgroundColor: 'rgba(50, 215, 75, 0.15)',
         borderWidth: 1,
-        borderColor: '#3B7943',
+        borderColor: 'rgba(50, 215, 75, 0.3)',
         borderRadius: 16,
         paddingHorizontal: 18,
         paddingVertical: 18,

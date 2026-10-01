@@ -329,7 +329,7 @@ public class AiChatService {
                 throw new RuntimeException("OpenRouter API returned an empty response");
             }
 
-            String result = textNode.asText().trim();
+            String result = stripJsonCodeFence(textNode.asText());
             log.info("[OpenRouter] LLM response:\n{}", result);
             return result;
         } catch (Exception e) {
@@ -428,12 +428,23 @@ public class AiChatService {
                 throw new RuntimeException("Gemini API returned an empty response");
             }
 
-            String result = textNode.asText().trim();
+            String result = stripJsonCodeFence(textNode.asText());
             log.info("[Gemini] Response ({} chars):\n{}", result.length(), result);
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Unable to call Gemini API: " + e.getMessage());
         }
+    }
+
+    private String stripJsonCodeFence(String text) {
+        if (text == null) {
+            return "";
+        }
+
+        return text.trim()
+                .replaceFirst("(?is)^```(?:json)?\\s*", "")
+                .replaceFirst("(?is)\\s*```$", "")
+                .trim();
     }
 
     private boolean isOutOfScopeQuestion(String question) {
