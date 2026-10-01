@@ -1173,12 +1173,21 @@ const handlePaymentAndAccept = async () => {
                             >
                                 {submittedAiQuestion !== '' && (
                                     <View style={styles.aiAskedQuestionContainer}>
-                                        <Text style={styles.aiAskedQuestionLabel}>You Asked</Text>
+                                        <View style={styles.aiSectionLabelRow}>
+                                            <FontAwesome name="user" size={10} color="#AEAEB2" />
+                                            <Text style={styles.aiAskedQuestionLabel}>YOU ASKED</Text>
+                                        </View>
                                         <Text style={styles.aiAskedQuestionText}>{submittedAiQuestion}</Text>
                                     </View>
                                 )}
-                                <Text style={styles.aiAnswerTitle}>{getAiAnswerTitle()}</Text>
-                                <Text style={styles.aiAnswerText}>{aiAnswer}</Text>
+                                {submittedAiQuestion !== '' && <View style={styles.aiSectionDivider} />}
+                                <View style={styles.aiResponseSection}>
+                                    <View style={styles.aiSectionLabelRow}>
+                                        <FontAwesome name="magic" size={10} color="#3D7DD8" />
+                                        <Text style={styles.aiAnswerTitle}>AI RESPONSE</Text>
+                                    </View>
+                                    <Text style={styles.aiAnswerText}>{aiAnswer}</Text>
+                                </View>
                             </ScrollView>
                         )}
                     </View>
@@ -1946,36 +1955,45 @@ const styles = StyleSheet.create({
         paddingBottom: 4,
     },
     aiAskedQuestionContainer: {
-        backgroundColor: '#F1F1F5',
-        borderRadius: 12,
-        paddingHorizontal: 12,
-        paddingVertical: 12,
         marginBottom: 12,
     },
+    aiResponseSection: {
+        marginTop: 12,
+    },
+    aiSectionLabelRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginBottom: 5,
+    },
+    aiSectionDivider: {
+        height: 0.5,
+        backgroundColor: '#F2F2F2',
+        width: '100%',
+    },
     aiAskedQuestionLabel: {
-        fontSize: 12,
-        fontWeight: '600',
-        marginBottom: 6,
-        color: '#8E8E95',
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#AEAEB2',
         textTransform: 'uppercase',
-        letterSpacing: 0.3,
+        letterSpacing: 0.7,
     },
     aiAskedQuestionText: {
         fontSize: 13,
         lineHeight: 18,
+        fontWeight: '500',
         color: '#000000',
     },
     aiAnswerTitle: {
-        fontSize: 12,
-        fontWeight: '600',
-        marginBottom: 6,
-        color: '#8E8E95',
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#3D7DD8',
         textTransform: 'uppercase',
-        letterSpacing: 0.3,
+        letterSpacing: 0.7,
     },
     aiAnswerText: {
         fontSize: 13,
-        lineHeight: 19,
+        lineHeight: 20,
         color: '#000000',
     },
     infoContainer: {
