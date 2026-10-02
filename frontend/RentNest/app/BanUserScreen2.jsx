@@ -1,15 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
+import { FontAwesome } from '@expo/vector-icons';
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const BanUsersScreen2 = () => {
   const router = useRouter();
   const { userid } = useLocalSearchParams();
 
   const [flaggedUser, setFlaggedUser] = useState(null);
+  const [isRouteLoading, setIsRouteLoading] = useState(false);
+  const navigateTimeoutRef = useRef(null);
+  const resetTimeoutRef = useRef(null);
+
+  const navigateWithLoading = (route, replace = false) => {
+    setIsRouteLoading(true);
+    navigateTimeoutRef.current = setTimeout(() => {
+      if (replace) {
+        router.replace(route);
+      } else {
+        router.push(route);
+      }
+      resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
+    }, 180);
+  };
 
   const getFlaggedUser = async () => {
     try {
@@ -93,9 +110,7 @@ const BanUsersScreen2 = () => {
         },
       });
 
-      // Go back and trigger refresh
-      router.setParams({ refresh: 'true' });
-      router.back();
+      navigateWithLoading('/BanUserScreen?refresh=true', true);
     } catch (error) {
       console.error("Failed to ignore user:", error);
     }
@@ -105,18 +120,38 @@ const BanUsersScreen2 = () => {
     if (userid) {
       getFlaggedUser();
     }
+
+    return () => {
+      if (navigateTimeoutRef.current) {
+        clearTimeout(navigateTimeoutRef.current);
+      }
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
+      }
+    };
   }, [userid]);
 
-  if (!flaggedUser) {
+  if (!flaggedUser || isRouteLoading) {
     return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>
+          {isRouteLoading ? 'Loading flagged users...' : 'Loading user review...'}
+        </Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      <View style={styles.topHeaderRow}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigateWithLoading('/BanUserScreen?refresh=true', true)}>
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </TouchableOpacity>
+        <Text style={styles.screenTitle}>Review Flagged User</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
       <View style={styles.userBox}>
         <View style={styles.header}>
           <Image source={{ uri: flaggedUser.photoURL }} style={styles.userImage} />
@@ -149,6 +184,42 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 15,
     backgroundColor: '#f9f9f9',
+  },
+  topHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+  },
+  screenTitle: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#101820',
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 42,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   userBox: {
     backgroundColor: '#fff',
