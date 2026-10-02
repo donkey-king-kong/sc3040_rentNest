@@ -40,6 +40,11 @@ const RentPaymentScreen = () => {
   const [fieldTouched, setFieldTouched] = useState({});
   const [selectedPayment, setSelectedPayment] = useState(null);
   const notificationTimeoutRef = useRef(null);
+  const paymentSheetTouchStartYRef = useRef(null);
+  const closePaymentSheet = () => {
+    setSelectedPayment(null);
+    setIsModalVisible(false);
+  };
   const paymentSheetPanResponder = useRef(
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gestureState) => (
@@ -50,8 +55,7 @@ const RentPaymentScreen = () => {
         ),
         onPanResponderRelease: (_, gestureState) => {
           if (gestureState.dy > 70 || gestureState.vy > 0.7) {
-            setSelectedPayment(null);
-            setIsModalVisible(false);
+            closePaymentSheet();
           }
         },
       })
@@ -384,9 +388,22 @@ const RentPaymentScreen = () => {
   //   setIsPaymentSuccessful(true);
   // };
 
-  const handleReturnPress = () => {
-    setSelectedPayment(null);
-    setIsModalVisible(false);
+  const handleReturnPress = closePaymentSheet;
+
+  const handlePaymentSheetTouchStart = (event) => {
+    paymentSheetTouchStartYRef.current = event.nativeEvent.pageY;
+  };
+
+  const handlePaymentSheetTouchEnd = (event) => {
+    const startY = paymentSheetTouchStartYRef.current;
+    paymentSheetTouchStartYRef.current = null;
+
+    if (startY === null) return;
+
+    const dragDistance = event.nativeEvent.pageY - startY;
+    if (dragDistance > 70) {
+      closePaymentSheet();
+    }
   };
 
   return (
@@ -495,7 +512,11 @@ const RentPaymentScreen = () => {
             <View style={styles.modalOverlay}>
               <TouchableWithoutFeedback>
                 <View style={styles.modalContent} {...paymentSheetPanResponder.panHandlers}>
-                  <ScrollView contentContainerStyle={styles.modalScroll}>
+                  <ScrollView
+                      contentContainerStyle={styles.modalScroll}
+                      onTouchStart={handlePaymentSheetTouchStart}
+                      onTouchEnd={handlePaymentSheetTouchEnd}
+                  >
                     <View style={styles.modalBottom}>
                       <View style={styles.modalHandleHitArea}>
                         <View style={styles.modalHandle} />
