@@ -6,6 +6,7 @@ import RentNest.service.ChatHistoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import RentNest.model.User;
@@ -154,7 +155,15 @@ public class ChatHistoryController {
      */
     // Get conversation between two users
     @GetMapping("/conversation")
-    public ResponseEntity<?> getConversationBetweenUsers(@RequestParam("userA") Long userA, @RequestParam("userB") Long userB) {
+    public ResponseEntity<?> getConversationBetweenUsers(@RequestParam("userA") Long userA, @RequestParam("userB") Long userB, Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof User authenticatedUser)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Authentication required.");
+        }
+        Long callerId = authenticatedUser.getUserID();
+        if (!callerId.equals(userA) && !callerId.equals(userB)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You are not allowed to access this conversation.");
+        }
+
         try {
             // Check if both users exist
             Optional<User> userAExists = userRepository.findById(userA);
