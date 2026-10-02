@@ -36,6 +36,7 @@ const RentPaymentScreen = () => {
   const [cardCvv, setCardCvv] = useState('');
   const [cardName, setCardName] = useState('');
   const [fieldTouched, setFieldTouched] = useState({});
+  const [selectedPayment, setSelectedPayment] = useState(null);
   const notificationTimeoutRef = useRef(null);
 
 
@@ -80,6 +81,16 @@ const RentPaymentScreen = () => {
       date.toLocaleString('default', { month: 'long', year: 'numeric' })
   );
 
+  const getMonthStart = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+
+  const addMonths = (date, months) => {
+    const nextDate = new Date(date);
+    nextDate.setMonth(nextDate.getMonth() + months);
+    return getMonthStart(nextDate);
+  };
+
+  const getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
   const formatPaymentDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-SG', {
@@ -108,27 +119,57 @@ const RentPaymentScreen = () => {
 
   const getOutstandingMonths = () => {
     const payments = paymentHistory?.payments || [];
-    if (!payments.length) return [];
-
-    // Get the latest payment date
-    const lastPaymentDate = new Date(Math.max(...payments.map(payment => new Date(payment.date))));
-    const currentDate = new Date();
+    const acceptedDateValue = paymentHistory?.acceptedAt || paymentHistory?.rentalDate;
+    const acceptedDate = acceptedDateValue ? new Date(acceptedDateValue) : null;
+    const currentMonth = getMonthStart(new Date());
+    const startMonth = acceptedDate && !Number.isNaN(acceptedDate.getTime())
+        ? getMonthStart(acceptedDate)
+        : currentMonth;
+    const paidMonthKeys = new Set(
+        payments
+            .map(payment => new Date(payment.date))
+            .filter(date => !Number.isNaN(date.getTime()))
+            .map(getMonthKey)
+    );
 
     const outstandingMonths = [];
-    let nextPaymentDate = new Date(lastPaymentDate);
-    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1); // Start from the next month
+    let paymentMonth = new Date(startMonth);
 
-    while (nextPaymentDate <= currentDate) {
-      outstandingMonths.push({
-        month: formatMonthYear(nextPaymentDate),
-        amount: paymentHistory?.rentalPrice || amt || 0,
-        paid: false,
-        dueDate: new Date(nextPaymentDate),
-      });
-      nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+    while (paymentMonth <= currentMonth) {
+      if (!paidMonthKeys.has(getMonthKey(paymentMonth))) {
+        outstandingMonths.push({
+          month: formatMonthYear(paymentMonth),
+          amount: paymentHistory?.rentalPrice || amt || 0,
+          paid: false,
+          dueDate: new Date(paymentMonth),
+          status: getMonthKey(paymentMonth) === getMonthKey(currentMonth) ? 'dueNow' : 'overdue',
+        });
+      }
+      paymentMonth = addMonths(paymentMonth, 1);
     }
 
     return outstandingMonths;
+  };
+
+  const getLockedFutureMonths = () => {
+    const leaseExpiryDate = paymentHistory?.leaseExpiry ? new Date(paymentHistory.leaseExpiry) : null;
+    if (!leaseExpiryDate || Number.isNaN(leaseExpiryDate.getTime())) return [];
+
+    const lockedMonths = [];
+    const leaseExpiryMonth = getMonthStart(leaseExpiryDate);
+    let nextMonth = addMonths(getMonthStart(new Date()), 1);
+
+    while (nextMonth <= leaseExpiryMonth && lockedMonths.length < 3) {
+      lockedMonths.push({
+        month: formatMonthYear(nextMonth),
+        amount: paymentHistory?.rentalPrice || amt || 0,
+        dueDate: new Date(nextMonth),
+        status: 'locked',
+      });
+      nextMonth = addMonths(nextMonth, 1);
+    }
+
+    return lockedMonths;
   };
 
   const handlePaymentSubmit = async () => {
@@ -151,7 +192,11 @@ const RentPaymentScreen = () => {
         return;
       }
 
-      const paymentToSubmit = outstandingMonths[0]; // Payment to submit (assumes we pay for the first outstanding month)
+      const paymentToSubmit = selectedPayment || outstandingMonths[0];
+      if (!paymentToSubmit) {
+        console.error('No outstanding payment selected.');
+        return;
+      }
 
       // Extract month and year
       const [month, year] = paymentToSubmit.month.split(' ');
@@ -212,6 +257,7 @@ const RentPaymentScreen = () => {
         setCardCvv('');
         setCardName('');
         setFieldTouched({});
+        setSelectedPayment(null);
         setShowPaymentUpdated(true);
         if (notificationTimeoutRef.current) {
           clearTimeout(notificationTimeoutRef.current);
@@ -258,6 +304,7 @@ const RentPaymentScreen = () => {
   const payments = paymentHistory?.payments || [];
   const monthlyRent = paymentHistory?.rentalPrice || amt || 0;
   const outstandingTotal = outstandingMonths.reduce((total, payment) => total + (Number(payment.amount) || 0), 0);
+  const paymentInModal = selectedPayment || outstandingMonths[0];
   const cardDigits = cardNumber.replace(/\D/g, '');
   const cardPrefix = Number(cardDigits.slice(0, 4));
   const isVisa = cardDigits.startsWith('4');
@@ -302,8 +349,11 @@ const RentPaymentScreen = () => {
 
   const sortedPaidMonths = paidMonths.sort((a, b) => new Date(b.date) - new Date(a.date));
   const sortedOutstandingMonths = outstandingMonths.sort((a, b) => a.dueDate - b.dueDate);
+  const sortedLockedFutureMonths = getLockedFutureMonths().sort((a, b) => a.dueDate - b.dueDate);
+  const displayedOutstandingMonths = [...sortedOutstandingMonths, ...sortedLockedFutureMonths];
 
-  const handlePayButtonPress = () => {
+  const handlePayButtonPress = (payment) => {
+    setSelectedPayment(payment);
     setIsModalVisible(true);
   };
 
@@ -312,6 +362,7 @@ const RentPaymentScreen = () => {
   // };
 
   const handleReturnPress = () => {
+    setSelectedPayment(null);
     setIsModalVisible(false);
   };
 
@@ -337,40 +388,50 @@ const RentPaymentScreen = () => {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.panelScrollContent}
           >
-            {sortedOutstandingMonths.length === 0 ? (
+            {displayedOutstandingMonths.length === 0 ? (
                 <View style={styles.emptyCard}>
                   <MaterialIcons name="check-circle" size={24} color="#2FA84F" />
                   <Text style={styles.emptyTitle}>All caught up</Text>
                   <Text style={styles.noOutstandingText}>You have no outstanding payments.</Text>
                 </View>
             ) : (
-                sortedOutstandingMonths.map((payment, index) => (
+                displayedOutstandingMonths.map((payment) => {
+                  const isLocked = payment.status === 'locked';
+                  const isOverdue = payment.status === 'overdue';
+                  const isDueNow = payment.status === 'dueNow';
+
+                  return (
                     <View
                         key={payment.month}
-                        style={[styles.outstandingCard, index > 0 && styles.lockedOutstandingCard]}
+                        style={[
+                          styles.outstandingCard,
+                          isOverdue && styles.overdueOutstandingCard,
+                          isLocked && styles.lockedOutstandingCard,
+                        ]}
                     >
                       <View style={styles.outstandingCopy}>
                         <View style={styles.outstandingHeader}>
-                          <Text style={[styles.outstandingMonth, index > 0 && styles.lockedText]}>{payment.month}</Text>
-                          {index === 0 && (
-                              <View style={styles.dueBadge}>
-                                <Text style={styles.dueBadgeText}>Due now</Text>
+                          <Text style={[styles.outstandingMonth, isLocked && styles.lockedText]}>{payment.month}</Text>
+                          {!isLocked && (
+                              <View style={[styles.dueBadge, isOverdue && styles.overdueBadge]}>
+                                <Text style={styles.dueBadgeText}>{isDueNow ? 'Due Now' : 'Overdue'}</Text>
                               </View>
                           )}
                         </View>
-                        <Text style={[styles.outstandingAmount, index > 0 && styles.lockedText]}>
+                        <Text style={[styles.outstandingAmount, isLocked && styles.lockedText]}>
                           {formatCurrency(payment.amount)}
                         </Text>
                       </View>
-                      {index === 0 ? (
-                          <TouchableOpacity style={styles.payNowButton} onPress={handlePayButtonPress}>
+                      {!isLocked ? (
+                          <TouchableOpacity style={styles.payNowButton} onPress={() => handlePayButtonPress(payment)}>
                             <Text style={styles.payNowButtonText}>Pay now</Text>
                           </TouchableOpacity>
                       ) : (
                           <MaterialIcons name="lock-outline" size={22} color="#8E8E8E" />
                       )}
                     </View>
-                ))
+                  );
+                })
             )}
           </ScrollView>
         </View>
@@ -422,10 +483,10 @@ const RentPaymentScreen = () => {
                   <View style={styles.modalSummary}>
                     <View>
                       <Text style={styles.modalSummaryLabel}>
-                        {outstandingMonths.length > 0 ? `${outstandingMonths[0].month} Rent` : 'Monthly rent'}
+                        {paymentInModal ? `${paymentInModal.month} Rent` : 'Monthly rent'}
                       </Text>
                       <Text style={styles.modalSummaryAmount}>
-                        {formatCurrency(outstandingMonths.length > 0 ? outstandingMonths[0].amount : monthlyRent)}
+                        {formatCurrency(paymentInModal ? paymentInModal.amount : monthlyRent)}
                       </Text>
                     </View>
                   </View>
@@ -518,7 +579,7 @@ const RentPaymentScreen = () => {
                           <Text style={styles.payButtonText}>Processing...</Text>
                         </View>
                     ) : (
-                        <Text style={styles.payButtonText}>Pay {formatCurrency(outstandingMonths.length > 0 ? outstandingMonths[0].amount : 0)}</Text>
+                        <Text style={styles.payButtonText}>Pay {formatCurrency(paymentInModal ? paymentInModal.amount : 0)}</Text>
                     )}
                   </TouchableOpacity>
                   <View style={styles.encryptedRow}>
@@ -653,6 +714,9 @@ const styles = StyleSheet.create({
     borderColor: '#E2E2E2',
     backgroundColor: '#F7F8FA',
   },
+  overdueOutstandingCard: {
+    borderColor: '#E24848',
+  },
   outstandingCopy: {
     flex: 1,
     marginRight: 12,
@@ -679,6 +743,9 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  overdueBadge: {
+    backgroundColor: '#E24848',
   },
   dueBadgeText: {
     color: '#fff',
