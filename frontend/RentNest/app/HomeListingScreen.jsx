@@ -115,8 +115,12 @@ const HomeListingScreen = () => {
         console.log('Processed listing data:', defaultListing);
         setListing(defaultListing);
 
-        // Keep the loading screen visible until all listing sections have finished loading.
-        await fetchSecondaryListingData(tokenValue);
+        // Show the listing once core details are ready; secondary sections load in the background.
+        setLoading(false);
+        fetchSecondaryListingData(tokenValue, defaultListing.ownerUserID)
+          .catch(error => {
+            console.warn('Secondary listing data failed:', error?.message);
+          });
       } catch (error) {
         console.error('Error in fetchListingData:', error);
         console.error('Error details:', { //Remove when demo
@@ -130,7 +134,7 @@ const HomeListingScreen = () => {
       }
     };
 
-    const fetchSecondaryListingData = async (tokenValue) => {
+    const fetchSecondaryListingData = async (tokenValue, ownerUserID) => {
       const headers = authHeaders(tokenValue);
       const requestConfig = { headers, timeout: 20000 };
       const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -199,28 +203,18 @@ const HomeListingScreen = () => {
             });
             setPriceInsights(Object.values(uniquePrices));
           }),
-        axios.get(`${API_BASE_URL}/api/reviews/${listingId}`, requestConfig)
+        axios.get(`${API_BASE_URL}/api/reviews/byUser/${ownerUserID}`, requestConfig)
           .then(response => {
-            console.log('[HomeListingScreen] Reviews request endpoint:', `${API_BASE_URL}/api/reviews/${listingId}`);
-            console.log('[HomeListingScreen] Reviews request listingId:', listingId);
-            console.log('[HomeListingScreen] Reviews response status:', response.status);
-            console.log('[HomeListingScreen] Reviews response is array:', Array.isArray(response.data));
-            console.log('[HomeListingScreen] Reviews response payload:', response.data);
-
             const reviewList = Array.isArray(response.data) ? response.data : [];
-            if (response.data && !Array.isArray(response.data)) {
-              console.warn('[HomeListingScreen] Expected reviews array but received:', typeof response.data);
-            }
-
             const formattedReviews = reviewList.map(review => ({
-              reviewId: review.id,
+              reviewId: review.reviewID ?? review.reviewid ?? review.id,
               rating: review.rating,
               title: review.title || 'Review',
               text: review.text,
               user: {
-                userID: review.userId,
-                name: review.userName || 'Anonymous',
-                photoURL: review.userPhotoURL || 'https://via.placeholder.com/50'
+                userID: review.reviewerID ?? review.reviewerId ?? review.userId,
+                name: review.reviewerName || review.userName || 'Anonymous',
+                photoURL: review.reviewerPhotoURL || review.userPhotoURL || 'https://via.placeholder.com/50'
               },
               flagged: review.flagged || false
             }));
@@ -708,6 +702,19 @@ placesContainer: {
     userName: {
       fontSize: 14,
       color: '#555',
+    },
+    noReviewsContainer: {
+      borderWidth: 1,
+      borderColor: '#dcdcdc',
+      borderRadius: 5,
+      paddingVertical: 14,
+      alignItems: 'center',
+      backgroundColor: '#fff',
+    },
+    noReviewsText: {
+      fontSize: 14,
+      color: '#777',
+      fontWeight: '600',
     },
 container: {
     padding: 15,
