@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   Modal,
   TextInput,
+  ActivityIndicator,
   Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -16,6 +17,8 @@ import axios from "axios";
 import {API_BASE_URL} from "../config/api";
 import MorphingInfinity from '../components/MorphingInfinity';
 
+const notificationBellIcon = require('../assets/images/notificationBell.png');
+
 
 // Rent Payment Screen
 const RentPaymentScreen = () => {
@@ -23,7 +26,8 @@ const RentPaymentScreen = () => {
   const { listingId, tenantId } = useLocalSearchParams();
   const [paymentHistory, setPaymentHistory] = useState(null); // State to store listing data
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isPaymentSuccessful, setIsPaymentSuccessful] = useState(false);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [showPaymentUpdated, setShowPaymentUpdated] = useState(false);
   const [loading, setLoading] = useState(true); // New loading state
   const [rentalID, setRentalID] = useState(null);
   const [amt, setAmount] = useState(null);
@@ -32,6 +36,7 @@ const RentPaymentScreen = () => {
   const [cardCvv, setCardCvv] = useState('');
   const [cardName, setCardName] = useState('');
   const [fieldTouched, setFieldTouched] = useState({});
+  const notificationTimeoutRef = useRef(null);
 
 
 // localhost:8080/api/payment/monthlyPayment
@@ -127,7 +132,7 @@ const RentPaymentScreen = () => {
   };
 
   const handlePaymentSubmit = async () => {
-    if (!isCardFormValid) {
+    if (isSubmittingPayment || !isCardFormValid) {
       setFieldTouched({
         cardNumber: true,
         cardExpiry: true,
@@ -138,6 +143,7 @@ const RentPaymentScreen = () => {
     }
 
     try {
+      setIsSubmittingPayment(true);
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.log('No token found!');
@@ -199,14 +205,27 @@ const RentPaymentScreen = () => {
       });
 
       if (response.status === 200) {
-        setIsPaymentSuccessful(true);
         await getPaymentHistory(); // Fetch the latest payment history
-        // Optionally refresh payment history or outstanding months here
+        setIsModalVisible(false);
+        setCardNumber('');
+        setCardExpiry('');
+        setCardCvv('');
+        setCardName('');
+        setFieldTouched({});
+        setShowPaymentUpdated(true);
+        if (notificationTimeoutRef.current) {
+          clearTimeout(notificationTimeoutRef.current);
+        }
+        notificationTimeoutRef.current = setTimeout(() => {
+          setShowPaymentUpdated(false);
+        }, 2000);
       } else {
         console.error('Payment failed:', response.data);
       }
     } catch (error) {
       console.error('Error processing payment:', error);
+    } finally {
+      setIsSubmittingPayment(false);
     }
   };
 
@@ -218,6 +237,12 @@ const RentPaymentScreen = () => {
     } else {
       setLoading(false); // If listingId or tenantId is null, stop loading
     }
+
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
   }, [listingId, tenantId]);
 
   if (loading) {
@@ -287,7 +312,6 @@ const RentPaymentScreen = () => {
   // };
 
   const handleReturnPress = () => {
-    setIsPaymentSuccessful(false);
     setIsModalVisible(false);
   };
 
@@ -387,123 +411,137 @@ const RentPaymentScreen = () => {
             <View style={styles.modalContent}>
               <ScrollView contentContainerStyle={styles.modalScroll}>
                 <View style={styles.modalBottom}>
-                  {!isPaymentSuccessful ? (
-                      <>
-                        <View style={styles.modalHandle} />
-                        <View style={styles.modalHeader}>
-                          <Text style={styles.modalTitle}>Card payment</Text>
-                          <View style={styles.secureBadge}>
-                            <MaterialIcons name="lock-outline" size={16} color="#666" />
-                            <Text style={styles.secureText}>Secure</Text>
-                          </View>
-                        </View>
-                        <View style={styles.modalSummary}>
-                          <View>
-                            <Text style={styles.modalSummaryLabel}>
-                              {outstandingMonths.length > 0 ? `${outstandingMonths[0].month} Rent` : 'Monthly rent'}
-                            </Text>
-                            <Text style={styles.modalSummaryAmount}>
-                              {formatCurrency(outstandingMonths.length > 0 ? outstandingMonths[0].amount : monthlyRent)}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.cardBrandRow}>
-                          <View style={[styles.cardBrandBadge, styles.visaBadge]}>
-                            <Text style={styles.visaText}>VISA</Text>
-                          </View>
-                          <View style={[styles.cardBrandBadge, styles.mastercardBadge]}>
-                            <View style={styles.mastercardCircles}>
-                              <View style={[styles.mastercardCircle, styles.mastercardRed]} />
-                              <View style={[styles.mastercardCircle, styles.mastercardYellow]} />
-                            </View>
-                            <Text style={styles.mastercardText}>mastercard</Text>
-                          </View>
-                        </View>
-                        <Text style={styles.inputLabel}>CARD NUMBER</Text>
-                        <TextInput
-                            style={[styles.input, hasFieldError('cardNumber', isCardNumberValid) && styles.inputError]}
-                            placeholder="4111 1111 1111 1111"
-                            placeholderTextColor="#8E8E8E"
-                            keyboardType="numeric"
-                            value={cardNumber}
-                            onChangeText={(value) => setCardNumber(formatCardNumberInput(value))}
-                            onBlur={() => markFieldTouched('cardNumber')}
-                            maxLength={19}
-                        />
-                        {hasFieldError('cardNumber', isCardNumberValid) && (
-                            <Text style={styles.errorText}>Enter a valid Visa or Mastercard number.</Text>
-                        )}
-                        <View style={styles.row}>
-                          <View style={styles.expirationInput}>
-                            <Text style={styles.inputLabel}>EXPIRY</Text>
-                            <TextInput
-                                style={[styles.input, hasFieldError('cardExpiry', isExpiryValid) && styles.inputError]}
-                                placeholder="MM/YY"
-                                placeholderTextColor="#8E8E8E"
-                                keyboardType="numeric"
-                                value={cardExpiry}
-                                onChangeText={(value) => setCardExpiry(formatExpiryInput(value))}
-                                onBlur={() => markFieldTouched('cardExpiry')}
-                                maxLength={5}
-                            />
-                            {hasFieldError('cardExpiry', isExpiryValid) && (
-                                <Text style={styles.errorText}>Use a valid future date.</Text>
-                            )}
-                          </View>
-                          <View style={styles.cvvInput}>
-                            <Text style={styles.inputLabel}>CVV</Text>
-                            <TextInput
-                                style={[styles.input, hasFieldError('cardCvv', isCvvValid) && styles.inputError]}
-                                placeholder="123"
-                                placeholderTextColor="#8E8E8E"
-                                keyboardType="numeric"
-                                value={cardCvv}
-                                onChangeText={(value) => setCardCvv(value.replace(/\D/g, '').slice(0, 3))}
-                                onBlur={() => markFieldTouched('cardCvv')}
-                                maxLength={3}
-                                secureTextEntry
-                            />
-                            {hasFieldError('cardCvv', isCvvValid) && (
-                                <Text style={styles.errorText}>Enter 3 digits.</Text>
-                            )}
-                          </View>
-                        </View>
-                        <Text style={styles.inputLabel}>NAME ON CARD</Text>
-                        <TextInput
-                            style={[styles.input, hasFieldError('cardName', isCardNameValid) && styles.inputError]}
-                            placeholder="As it appears on your card"
-                            placeholderTextColor="#8E8E8E"
-                            autoCapitalize="words"
-                            value={cardName}
-                            onChangeText={setCardName}
-                            onBlur={() => markFieldTouched('cardName')}
-                        />
-                        {hasFieldError('cardName', isCardNameValid) && (
-                            <Text style={styles.errorText}>Enter the name on your card.</Text>
-                        )}
-                        <TouchableOpacity
-                            style={[styles.payButton, !isCardFormValid && styles.disabledPayButton]}
-                            onPress={handlePaymentSubmit}
-                            disabled={!isCardFormValid}
-                        >
-                          <Text style={styles.payButtonText}>Pay {formatCurrency(outstandingMonths.length > 0 ? outstandingMonths[0].amount : 0)}</Text>
-                        </TouchableOpacity>
-                        <View style={styles.encryptedRow}>
-                          <MaterialIcons name="verified-user" size={16} color="#666" />
-                          <Text style={styles.encryptedText}>Payments are encrypted and never stored</Text>
-                        </View>
-                      </>
-                  ) : (
-                      <>
-                        <Image source={require('../assets/images/confirmation.png')} style={styles.successImage} />
-                        <Text style={styles.successText}>Payment Successful!</Text>
-                        <TouchableOpacity style={styles.payButton2} onPress={handleReturnPress}>
-                          <Text style={styles.payButtonText}>Return</Text>
-                        </TouchableOpacity>
-                      </>
+                  <View style={styles.modalHandle} />
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Card payment</Text>
+                    <View style={styles.secureBadge}>
+                      <MaterialIcons name="lock-outline" size={16} color="#666" />
+                      <Text style={styles.secureText}>Secure</Text>
+                    </View>
+                  </View>
+                  <View style={styles.modalSummary}>
+                    <View>
+                      <Text style={styles.modalSummaryLabel}>
+                        {outstandingMonths.length > 0 ? `${outstandingMonths[0].month} Rent` : 'Monthly rent'}
+                      </Text>
+                      <Text style={styles.modalSummaryAmount}>
+                        {formatCurrency(outstandingMonths.length > 0 ? outstandingMonths[0].amount : monthlyRent)}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.cardBrandRow}>
+                    <View style={[styles.cardBrandBadge, styles.visaBadge]}>
+                      <Text style={styles.visaText}>VISA</Text>
+                    </View>
+                    <View style={[styles.cardBrandBadge, styles.mastercardBadge]}>
+                      <View style={styles.mastercardCircles}>
+                        <View style={[styles.mastercardCircle, styles.mastercardRed]} />
+                        <View style={[styles.mastercardCircle, styles.mastercardYellow]} />
+                      </View>
+                      <Text style={styles.mastercardText}>mastercard</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.inputLabel}>CARD NUMBER</Text>
+                  <TextInput
+                      style={[styles.input, hasFieldError('cardNumber', isCardNumberValid) && styles.inputError]}
+                      placeholder="4111 1111 1111 1111"
+                      placeholderTextColor="#8E8E8E"
+                      keyboardType="numeric"
+                      value={cardNumber}
+                      onChangeText={(value) => setCardNumber(formatCardNumberInput(value))}
+                      onBlur={() => markFieldTouched('cardNumber')}
+                      maxLength={19}
+                      editable={!isSubmittingPayment}
+                  />
+                  {hasFieldError('cardNumber', isCardNumberValid) && (
+                      <Text style={styles.errorText}>Enter a valid Visa or Mastercard number.</Text>
                   )}
+                  <View style={styles.row}>
+                    <View style={styles.expirationInput}>
+                      <Text style={styles.inputLabel}>EXPIRY</Text>
+                      <TextInput
+                          style={[styles.input, hasFieldError('cardExpiry', isExpiryValid) && styles.inputError]}
+                          placeholder="MM/YY"
+                          placeholderTextColor="#8E8E8E"
+                          keyboardType="numeric"
+                          value={cardExpiry}
+                          onChangeText={(value) => setCardExpiry(formatExpiryInput(value))}
+                          onBlur={() => markFieldTouched('cardExpiry')}
+                          maxLength={5}
+                          editable={!isSubmittingPayment}
+                      />
+                      {hasFieldError('cardExpiry', isExpiryValid) && (
+                          <Text style={styles.errorText}>Use a valid future date.</Text>
+                      )}
+                    </View>
+                    <View style={styles.cvvInput}>
+                      <Text style={styles.inputLabel}>CVV</Text>
+                      <TextInput
+                          style={[styles.input, hasFieldError('cardCvv', isCvvValid) && styles.inputError]}
+                          placeholder="123"
+                          placeholderTextColor="#8E8E8E"
+                          keyboardType="numeric"
+                          value={cardCvv}
+                          onChangeText={(value) => setCardCvv(value.replace(/\D/g, '').slice(0, 3))}
+                          onBlur={() => markFieldTouched('cardCvv')}
+                          maxLength={3}
+                          secureTextEntry
+                          editable={!isSubmittingPayment}
+                      />
+                      {hasFieldError('cardCvv', isCvvValid) && (
+                          <Text style={styles.errorText}>Enter 3 digits.</Text>
+                      )}
+                    </View>
+                  </View>
+                  <Text style={styles.inputLabel}>NAME ON CARD</Text>
+                  <TextInput
+                      style={[styles.input, hasFieldError('cardName', isCardNameValid) && styles.inputError]}
+                      placeholder="As it appears on your card"
+                      placeholderTextColor="#8E8E8E"
+                      autoCapitalize="words"
+                      value={cardName}
+                      onChangeText={setCardName}
+                      onBlur={() => markFieldTouched('cardName')}
+                      editable={!isSubmittingPayment}
+                  />
+                  {hasFieldError('cardName', isCardNameValid) && (
+                      <Text style={styles.errorText}>Enter the name on your card.</Text>
+                  )}
+                  <TouchableOpacity
+                      style={[styles.payButton, (!isCardFormValid || isSubmittingPayment) && styles.disabledPayButton]}
+                      onPress={handlePaymentSubmit}
+                      disabled={!isCardFormValid || isSubmittingPayment}
+                  >
+                    {isSubmittingPayment ? (
+                        <View style={styles.payButtonContent}>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text style={styles.payButtonText}>Processing...</Text>
+                        </View>
+                    ) : (
+                        <Text style={styles.payButtonText}>Pay {formatCurrency(outstandingMonths.length > 0 ? outstandingMonths[0].amount : 0)}</Text>
+                    )}
+                  </TouchableOpacity>
+                  <View style={styles.encryptedRow}>
+                    <MaterialIcons name="verified-user" size={16} color="#666" />
+                    <Text style={styles.encryptedText}>Payments are encrypted and never stored</Text>
+                  </View>
                 </View>
               </ScrollView>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+            visible={showPaymentUpdated}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+        >
+          <View style={styles.notificationOverlay} pointerEvents="none">
+            <View style={styles.notificationCard}>
+              <View style={styles.notificationIconBox}>
+                <Image source={notificationBellIcon} style={styles.notificationIcon} />
+              </View>
+              <Text style={styles.notificationText}>Payment Successful</Text>
             </View>
           </View>
         </Modal>
@@ -698,64 +736,23 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#2FA84F',
   },
-  paymentBox: {
-    backgroundColor: '#fff',
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  paymentDate: {
-    fontSize: 16,
-  },
-  paymentAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   payButton: {
     backgroundColor: '#101820',
     paddingVertical: 15,
     borderRadius: 12,
     marginTop: 2,
   },
-  payButton2: {
-    backgroundColor: '#101820',
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 10,
-    width: 120,
-    alignSelf: 'center',
-  },
-
   payButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '800',
     textAlign: 'center',
   },
-  paymentRow: {
+  payButtonContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  paymentInfo: {
-    alignItems: 'flex-end',
-  },
-  paymentStatus: {
-    fontSize: 12,
-    color: '#28a745',
-  },
-  smallText: {
-    fontSize: 12,
-    color: '#666',
+    justifyContent: 'center',
+    gap: 10,
   },
   modalOverlay: {
     flex: 1,
@@ -909,19 +906,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
-  successImage: {
-    width: 80,
-    height: 80,
-    marginBottom: 20,
-    borderRadius: 50,
-    alignSelf: 'center',
-  },
-  successText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
   expirationInput: {
     flex: 1,
   },
@@ -942,6 +926,46 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 13,
     fontWeight: '600',
+  },
+  notificationOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
+  notificationCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    backgroundColor: 'rgba(45, 45, 45, 0.82)',
+    borderRadius: 28,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    elevation: 8,
+  },
+  notificationIconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(58, 58, 58, 0.72)',
+    marginBottom: 16,
+  },
+  notificationIcon: {
+    width: 34,
+    height: 40,
+    resizeMode: 'contain',
+  },
+  notificationText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
   },
 });
 
