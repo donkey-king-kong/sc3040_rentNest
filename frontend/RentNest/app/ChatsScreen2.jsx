@@ -672,8 +672,8 @@ const ChatsScreen2 = () => {
                 rentalPrice: rental.rentalPrice,
                 depositPrice: rental.depositPrice,
                 rentalDate: rental.rentalDate,
-                leaseExpiry: new Date().toISOString(),
-                paymentHistory: "First payment made on " + new Date().toISOString(),
+                leaseExpiry: rental.leaseExpiry,
+                paymentHistory: rental.paymentHistory,
                 status: "terminated",
             };
             const terminateRentalResponse = await axios.put(`${API_BASE_URL}/api/rentals/${rental.rentalID}`, terminateRentalBody, {
