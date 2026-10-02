@@ -9,7 +9,7 @@ import {
   TextInput,
   Image,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
@@ -327,17 +327,74 @@ const RentPaymentScreen = () => {
                 <View style={styles.modalBottom}>
                   {!isPaymentSuccessful ? (
                       <>
-                        <Text style={styles.modalTitle}>Card Payment</Text>
-                        <TextInput style={styles.input} placeholder="Card Number" keyboardType="numeric" />
-                        <View style={styles.row}>
-                          <TextInput style={[styles.input, styles.expirationInput]} placeholder="Expiration (MM/YY)" keyboardType="numeric" />
-                          <TextInput style={[styles.input, styles.cvvInput]} placeholder="CVV" keyboardType="numeric" secureTextEntry />
+                        <View style={styles.modalHandle} />
+                        <View style={styles.modalHeader}>
+                          <Text style={styles.modalTitle}>Card payment</Text>
+                          <View style={styles.secureBadge}>
+                            <MaterialIcons name="lock-outline" size={16} color="#666" />
+                            <Text style={styles.secureText}>Secure</Text>
+                          </View>
                         </View>
-                        <TextInput style={styles.input} placeholder="Postal Code" keyboardType="numeric" />
-                        <TextInput style={styles.input} placeholder="Location" />
-                        <TouchableOpacity style={styles.payButton} onPress={handlePaymentSubmit} disabled={outstandingMonths.length === 0}>
+                        <View style={styles.modalSummary}>
+                          <View>
+                            <Text style={styles.modalSummaryLabel}>
+                              {outstandingMonths.length > 0 ? `${outstandingMonths[0].month} Rent` : 'Monthly rent'}
+                            </Text>
+                            <Text style={styles.modalSummaryAmount}>
+                              {formatCurrency(outstandingMonths.length > 0 ? outstandingMonths[0].amount : monthlyRent)}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.cardBrandRow}>
+                          <FontAwesome name="cc-visa" size={38} color="#101820" />
+                          <FontAwesome name="cc-mastercard" size={38} color="#101820" />
+                        </View>
+                        <Text style={styles.inputLabel}>CARD NUMBER</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="0000 0000 0000 0000"
+                            placeholderTextColor="#8E8E8E"
+                            keyboardType="numeric"
+                        />
+                        <View style={styles.row}>
+                          <View style={styles.expirationInput}>
+                            <Text style={styles.inputLabel}>EXPIRY</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="MM/YY"
+                                placeholderTextColor="#8E8E8E"
+                                keyboardType="numeric"
+                            />
+                          </View>
+                          <View style={styles.cvvInput}>
+                            <Text style={styles.inputLabel}>CVV</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="123"
+                                placeholderTextColor="#8E8E8E"
+                                keyboardType="numeric"
+                                secureTextEntry
+                            />
+                          </View>
+                        </View>
+                        <Text style={styles.inputLabel}>NAME ON CARD</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="As it appears on your card"
+                            placeholderTextColor="#8E8E8E"
+                            autoCapitalize="words"
+                        />
+                        <TouchableOpacity
+                            style={[styles.payButton, outstandingMonths.length === 0 && styles.disabledPayButton]}
+                            onPress={handlePaymentSubmit}
+                            disabled={outstandingMonths.length === 0}
+                        >
                           <Text style={styles.payButtonText}>Pay {formatCurrency(outstandingMonths.length > 0 ? outstandingMonths[0].amount : 0)}</Text>
                         </TouchableOpacity>
+                        <View style={styles.encryptedRow}>
+                          <MaterialIcons name="verified-user" size={16} color="#666" />
+                          <Text style={styles.encryptedText}>Payments are encrypted and never stored</Text>
+                        </View>
                       </>
                   ) : (
                       <>
@@ -566,24 +623,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   payButton: {
-    backgroundColor: 'black',
-    paddingVertical: 10,
-    borderRadius: 5,
-    marginTop: 10,
+    backgroundColor: '#101820',
+    paddingVertical: 15,
+    borderRadius: 12,
+    marginTop: 2,
   },
   payButton2: {
-      backgroundColor: 'black',
-      paddingVertical: 10,
-      borderRadius: 5,
-      marginTop: 10,
-      width: 120, // Set a specific width (adjust as needed)
-        alignSelf: 'center', // Center the button horizontally
-      },
+    backgroundColor: '#101820',
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 10,
+    width: 120,
+    alignSelf: 'center',
+  },
 
   payButtonText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '800',
     textAlign: 'center',
   },
   paymentRow: {
@@ -610,11 +667,13 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#fff',
-    padding: 20,
-    borderTopLeftRadius: 10, // Add rounded corners at the top
-    borderTopRightRadius: 10,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 22,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     width: '100%', // Full width of the screen
-    maxHeight: '60%', // Limit height to keep it manageable
+    maxHeight: '86%',
   },
   modalScroll: {
     paddingBottom: 0,
@@ -622,22 +681,84 @@ const styles = StyleSheet.create({
   modalBottom: {
     paddingBottom: 10,
   },
+  modalHandle: {
+    width: 48,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#D8D8D8',
+    alignSelf: 'center',
+    marginBottom: 18,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
   modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#101820',
+  },
+  secureBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  secureText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalSummary: {
+    backgroundColor: '#F7F8FA',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E7E7E7',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginBottom: 18,
+  },
+  modalSummaryLabel: {
+    color: '#666',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  modalSummaryAmount: {
+    color: '#101820',
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '800',
+  },
+  cardBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 18,
+  },
+  inputLabel: {
+    color: '#333',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginBottom: 7,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
-    fontSize: 14,
+    borderColor: '#D8D8D8',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginBottom: 14,
+    fontSize: 16,
+    color: '#101820',
+    backgroundColor: '#fff',
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 12,
   },
   successImage: {
     width: 80,
@@ -652,17 +773,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 10,
   },
-   row: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-    },
-    expirationInput: {
-      flex: 0.7, // Takes 70% of the row space
-      marginRight: 10, // Small gap to the CVV input
-    },
-    cvvInput: {
-      flex: 0.3, // Takes 30% of the row space
-    },
+  expirationInput: {
+    flex: 1,
+  },
+  cvvInput: {
+    flex: 1,
+  },
+  disabledPayButton: {
+    backgroundColor: '#999',
+  },
+  encryptedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 14,
+  },
+  encryptedText: {
+    color: '#666',
+    fontSize: 13,
+    fontWeight: '600',
+  },
 });
 
 export default RentPaymentScreen;
