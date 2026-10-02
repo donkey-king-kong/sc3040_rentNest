@@ -9,6 +9,7 @@ import {
   TextInput,
   ActivityIndicator,
   Image,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import {useLocalSearchParams, useRouter} from "expo-router";
@@ -473,10 +474,12 @@ const RentPaymentScreen = () => {
             animationType="slide"
             onRequestClose={handleReturnPress}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <ScrollView contentContainerStyle={styles.modalScroll}>
-                <View style={styles.modalBottom}>
+          <TouchableWithoutFeedback onPress={handleReturnPress}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={styles.modalContent}>
+                  <ScrollView contentContainerStyle={styles.modalScroll}>
+                    <View style={styles.modalBottom}>
                   <View style={styles.modalHandle} />
                   <View style={styles.modalHeader}>
                     <Text style={styles.modalTitle}>Card payment</Text>
@@ -591,10 +594,12 @@ const RentPaymentScreen = () => {
                     <MaterialIcons name="verified-user" size={16} color="#666" />
                     <Text style={styles.encryptedText}>Payments are encrypted and never stored</Text>
                   </View>
+                    </View>
+                  </ScrollView>
                 </View>
-              </ScrollView>
+              </TouchableWithoutFeedback>
             </View>
-          </View>
+          </TouchableWithoutFeedback>
         </Modal>
         <Modal
             visible={showPaymentUpdated}
