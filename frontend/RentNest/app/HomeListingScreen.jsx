@@ -179,7 +179,7 @@ const HomeListingScreen = () => {
           }
 
           if (status !== 'LOADING') {
-            console.warn('Nearby amenities returned unexpected status:', status);
+            console.log('Nearby amenities unavailable:', status);
             applyNearbyAmenities([]);
             return;
           }
@@ -187,7 +187,7 @@ const HomeListingScreen = () => {
           await wait(2000);
         }
 
-        console.warn('Nearby amenities are still loading after timeout');
+        console.log('Nearby amenities are still loading after timeout; showing empty state');
         applyNearbyAmenities([]);
       };
 
