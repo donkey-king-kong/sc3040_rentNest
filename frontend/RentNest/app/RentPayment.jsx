@@ -422,7 +422,7 @@ const RentPaymentScreen = () => {
                         <Text style={styles.inputLabel}>CARD NUMBER</Text>
                         <TextInput
                             style={[styles.input, hasFieldError('cardNumber', isCardNumberValid) && styles.inputError]}
-                            placeholder="0000 0000 0000 0000"
+                            placeholder="4111 1111 1111 1111"
                             placeholderTextColor="#8E8E8E"
                             keyboardType="numeric"
                             value={cardNumber}
