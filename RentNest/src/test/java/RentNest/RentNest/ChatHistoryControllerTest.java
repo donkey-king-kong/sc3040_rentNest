@@ -14,7 +14,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import java.util.Arrays;
@@ -175,14 +174,6 @@ class ChatHistoryControllerTest {
         assertEquals(partnerIDs, response.getBody());
     }
 
-    private Authentication mockAuthAs(Long userId) {
-        User user = mock(User.class);
-        when(user.getUserID()).thenReturn(userId);
-        Authentication auth = mock(Authentication.class);
-        when(auth.getPrincipal()).thenReturn(user);
-        return auth;
-    }
-
     @Test
     public void testGetConversationBetweenUsers() {
         // Given
@@ -195,7 +186,7 @@ class ChatHistoryControllerTest {
         when(chatHistoryService.getConversationBetweenUsers(userA, userB)).thenReturn(conversation);
 
         // When
-        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB, mockAuthAs(userA));
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -210,7 +201,7 @@ class ChatHistoryControllerTest {
         when(userRepository.findById(userA)).thenReturn(Optional.empty());
 
         // When
-        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB, mockAuthAs(userA));
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB);
 
         // Then
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
@@ -226,7 +217,7 @@ class ChatHistoryControllerTest {
         when(userRepository.findById(userB)).thenReturn(Optional.empty());
 
         // When
-        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB, mockAuthAs(userA));
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB);
 
         // Then
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
@@ -243,7 +234,7 @@ class ChatHistoryControllerTest {
         when(chatHistoryService.getConversationBetweenUsers(userA, userB)).thenReturn(Arrays.asList());
 
         // When
-        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB, mockAuthAs(userA));
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB);
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
