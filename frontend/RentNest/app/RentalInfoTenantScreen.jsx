@@ -136,7 +136,15 @@ const RentalInfoTenant = () => {
 
   return (
       <ScrollView style={styles.container}>
-        <View style={styles.row}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Go back to inbox"
+          >
+            <FontAwesome name="angle-left" size={30} color="#101820" />
+          </TouchableOpacity>
           <Text style={styles.title}>Rental Info</Text>
           {/* Chat Button */}
           <TouchableOpacity
@@ -221,10 +229,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    flex: 1,
     textAlign: 'left',
   },
   image: {
