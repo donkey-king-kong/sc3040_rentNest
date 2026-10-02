@@ -9,7 +9,7 @@ import {
   TextInput,
   Image,
 } from 'react-native';
-import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
@@ -27,6 +27,11 @@ const RentPaymentScreen = () => {
   const [loading, setLoading] = useState(true); // New loading state
   const [rentalID, setRentalID] = useState(null);
   const [amt, setAmount] = useState(null);
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [fieldTouched, setFieldTouched] = useState({});
 
 
 // localhost:8080/api/payment/monthlyPayment
@@ -79,6 +84,23 @@ const RentPaymentScreen = () => {
     });
   };
 
+  const formatCardNumberInput = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+  };
+
+  const formatExpiryInput = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+    if (digits.length <= 2) {
+      return digits;
+    }
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  };
+
+  const markFieldTouched = (field) => {
+    setFieldTouched((previous) => ({ ...previous, [field]: true }));
+  };
+
   const getOutstandingMonths = () => {
     const payments = paymentHistory?.payments || [];
     if (!payments.length) return [];
@@ -105,6 +127,16 @@ const RentPaymentScreen = () => {
   };
 
   const handlePaymentSubmit = async () => {
+    if (!isCardFormValid) {
+      setFieldTouched({
+        cardNumber: true,
+        cardExpiry: true,
+        cardCvv: true,
+        cardName: true,
+      });
+      return;
+    }
+
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
@@ -154,7 +186,7 @@ const RentPaymentScreen = () => {
 
       const paymentData = {
         rentalID: rentalID,
-        amount: amt,
+        amount: paymentToSubmit.amount,
         date: paymentDate.toISOString(), // Convert to ISO string
       };
 
@@ -201,6 +233,36 @@ const RentPaymentScreen = () => {
   const payments = paymentHistory?.payments || [];
   const monthlyRent = paymentHistory?.rentalPrice || amt || 0;
   const outstandingTotal = outstandingMonths.reduce((total, payment) => total + (Number(payment.amount) || 0), 0);
+  const cardDigits = cardNumber.replace(/\D/g, '');
+  const cardPrefix = Number(cardDigits.slice(0, 4));
+  const isVisa = cardDigits.startsWith('4');
+  const isMastercard =
+      /^(5[1-5])/.test(cardDigits) ||
+      (cardPrefix >= 2221 && cardPrefix <= 2720);
+  const isCardNumberValid = cardDigits.length === 16 && (isVisa || isMastercard);
+  const isExpiryValid = (() => {
+    const match = cardExpiry.match(/^(\d{2})\/(\d{2})$/);
+    if (!match) return false;
+
+    const month = Number(match[1]);
+    const year = 2000 + Number(match[2]);
+    if (month < 1 || month > 12) return false;
+
+    const now = new Date();
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const expiryMonth = new Date(year, month - 1, 1);
+    return expiryMonth >= currentMonth;
+  })();
+  const isCvvValid = /^\d{3}$/.test(cardCvv);
+  const isCardNameValid = /^[A-Za-z][A-Za-z\s'.-]{1,}$/.test(cardName.trim());
+  const isCardFormValid =
+      outstandingMonths.length > 0 &&
+      rentalID !== null &&
+      isCardNumberValid &&
+      isExpiryValid &&
+      isCvvValid &&
+      isCardNameValid;
+  const hasFieldError = (field, isValid) => fieldTouched[field] && !isValid;
 
   const paidMonths = payments.map((payment) => {
     return {
@@ -346,48 +408,83 @@ const RentPaymentScreen = () => {
                           </View>
                         </View>
                         <View style={styles.cardBrandRow}>
-                          <FontAwesome name="cc-visa" size={38} color="#101820" />
-                          <FontAwesome name="cc-mastercard" size={38} color="#101820" />
+                          <View style={[styles.cardBrandBadge, styles.visaBadge]}>
+                            <Text style={styles.visaText}>VISA</Text>
+                          </View>
+                          <View style={[styles.cardBrandBadge, styles.mastercardBadge]}>
+                            <View style={styles.mastercardCircles}>
+                              <View style={[styles.mastercardCircle, styles.mastercardRed]} />
+                              <View style={[styles.mastercardCircle, styles.mastercardYellow]} />
+                            </View>
+                            <Text style={styles.mastercardText}>mastercard</Text>
+                          </View>
                         </View>
                         <Text style={styles.inputLabel}>CARD NUMBER</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, hasFieldError('cardNumber', isCardNumberValid) && styles.inputError]}
                             placeholder="0000 0000 0000 0000"
                             placeholderTextColor="#8E8E8E"
                             keyboardType="numeric"
+                            value={cardNumber}
+                            onChangeText={(value) => setCardNumber(formatCardNumberInput(value))}
+                            onBlur={() => markFieldTouched('cardNumber')}
+                            maxLength={19}
                         />
+                        {hasFieldError('cardNumber', isCardNumberValid) && (
+                            <Text style={styles.errorText}>Enter a valid Visa or Mastercard number.</Text>
+                        )}
                         <View style={styles.row}>
                           <View style={styles.expirationInput}>
                             <Text style={styles.inputLabel}>EXPIRY</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, hasFieldError('cardExpiry', isExpiryValid) && styles.inputError]}
                                 placeholder="MM/YY"
                                 placeholderTextColor="#8E8E8E"
                                 keyboardType="numeric"
+                                value={cardExpiry}
+                                onChangeText={(value) => setCardExpiry(formatExpiryInput(value))}
+                                onBlur={() => markFieldTouched('cardExpiry')}
+                                maxLength={5}
                             />
+                            {hasFieldError('cardExpiry', isExpiryValid) && (
+                                <Text style={styles.errorText}>Use a valid future date.</Text>
+                            )}
                           </View>
                           <View style={styles.cvvInput}>
                             <Text style={styles.inputLabel}>CVV</Text>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, hasFieldError('cardCvv', isCvvValid) && styles.inputError]}
                                 placeholder="123"
                                 placeholderTextColor="#8E8E8E"
                                 keyboardType="numeric"
+                                value={cardCvv}
+                                onChangeText={(value) => setCardCvv(value.replace(/\D/g, '').slice(0, 3))}
+                                onBlur={() => markFieldTouched('cardCvv')}
+                                maxLength={3}
                                 secureTextEntry
                             />
+                            {hasFieldError('cardCvv', isCvvValid) && (
+                                <Text style={styles.errorText}>Enter 3 digits.</Text>
+                            )}
                           </View>
                         </View>
                         <Text style={styles.inputLabel}>NAME ON CARD</Text>
                         <TextInput
-                            style={styles.input}
+                            style={[styles.input, hasFieldError('cardName', isCardNameValid) && styles.inputError]}
                             placeholder="As it appears on your card"
                             placeholderTextColor="#8E8E8E"
                             autoCapitalize="words"
+                            value={cardName}
+                            onChangeText={setCardName}
+                            onBlur={() => markFieldTouched('cardName')}
                         />
+                        {hasFieldError('cardName', isCardNameValid) && (
+                            <Text style={styles.errorText}>Enter the name on your card.</Text>
+                        )}
                         <TouchableOpacity
-                            style={[styles.payButton, outstandingMonths.length === 0 && styles.disabledPayButton]}
+                            style={[styles.payButton, !isCardFormValid && styles.disabledPayButton]}
                             onPress={handlePaymentSubmit}
-                            disabled={outstandingMonths.length === 0}
+                            disabled={!isCardFormValid}
                         >
                           <Text style={styles.payButtonText}>Pay {formatCurrency(outstandingMonths.length > 0 ? outstandingMonths[0].amount : 0)}</Text>
                         </TouchableOpacity>
@@ -737,6 +834,47 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 18,
   },
+  cardBrandBadge: {
+    width: 64,
+    height: 38,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  visaBadge: {
+    backgroundColor: '#1434CB',
+  },
+  visaText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+    fontStyle: 'italic',
+    letterSpacing: 0.5,
+  },
+  mastercardBadge: {
+    backgroundColor: '#101820',
+  },
+  mastercardCircles: {
+    flexDirection: 'row',
+    marginBottom: -1,
+  },
+  mastercardCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+  },
+  mastercardRed: {
+    backgroundColor: '#EB001B',
+    marginRight: -6,
+  },
+  mastercardYellow: {
+    backgroundColor: '#F79E1B',
+  },
+  mastercardText: {
+    color: '#fff',
+    fontSize: 7,
+    fontWeight: '700',
+  },
   inputLabel: {
     color: '#333',
     fontSize: 13,
@@ -754,6 +892,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#101820',
     backgroundColor: '#fff',
+  },
+  inputError: {
+    borderColor: '#D64545',
+    backgroundColor: '#FFF8F8',
+  },
+  errorText: {
+    color: '#D64545',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: -8,
+    marginBottom: 10,
   },
   row: {
     flexDirection: 'row',
