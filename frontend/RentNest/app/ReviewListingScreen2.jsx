@@ -151,7 +151,10 @@ const ReviewListingScreen2 = () => {
 
         <TouchableOpacity
           style={styles.viewFullListingButton}
-          onPress={() => router.push(`/HomeListingScreen?listingid=${listingData.listingID}`)} // Navigate to Full Listing Screen
+          onPress={() => router.push({
+            pathname: '/HomeListingScreen',
+            params: { listingId: listingData.listingID },
+          })}
         >
           <Text style={styles.buttonText}>View Full Listing</Text>
         </TouchableOpacity>
