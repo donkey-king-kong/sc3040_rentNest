@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Image,
   TouchableWithoutFeedback,
+  PanResponder,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import {useLocalSearchParams, useRouter} from "expo-router";
@@ -39,6 +40,19 @@ const RentPaymentScreen = () => {
   const [fieldTouched, setFieldTouched] = useState({});
   const [selectedPayment, setSelectedPayment] = useState(null);
   const notificationTimeoutRef = useRef(null);
+  const paymentSheetPanResponder = useRef(
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => (
+            gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
+        ),
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dy > 70 || gestureState.vy > 0.7) {
+            setSelectedPayment(null);
+            setIsModalVisible(false);
+          }
+        },
+      })
+  ).current;
 
 
 // localhost:8080/api/payment/monthlyPayment
@@ -480,7 +494,9 @@ const RentPaymentScreen = () => {
                 <View style={styles.modalContent}>
                   <ScrollView contentContainerStyle={styles.modalScroll}>
                     <View style={styles.modalBottom}>
-                  <View style={styles.modalHandle} />
+                      <View style={styles.modalHandleHitArea} {...paymentSheetPanResponder.panHandlers}>
+                        <View style={styles.modalHandle} />
+                      </View>
                   <View style={styles.modalHeader}>
                     <Text style={styles.modalTitle}>Card payment</Text>
                     <View style={styles.secureBadge}>
@@ -852,13 +868,17 @@ const styles = StyleSheet.create({
   modalBottom: {
     paddingBottom: 10,
   },
+  modalHandleHitArea: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 2,
+    paddingBottom: 16,
+  },
   modalHandle: {
     width: 48,
     height: 5,
     borderRadius: 3,
     backgroundColor: '#D8D8D8',
-    alignSelf: 'center',
-    marginBottom: 18,
   },
   modalHeader: {
     flexDirection: 'row',
