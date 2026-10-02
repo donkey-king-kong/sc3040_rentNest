@@ -422,14 +422,11 @@ const styles = StyleSheet.create({
   separator: {
     height: 1,
     backgroundColor: '#ccc',
-    marginTop: 26,
-    marginBottom: 5,
+    marginVertical: 5,
   },
   logoutButton: {
     paddingVertical: 15,
     paddingHorizontal: 20,
-    backgroundColor: '#fff',
-    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
   },
