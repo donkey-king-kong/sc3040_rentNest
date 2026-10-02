@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
@@ -12,11 +12,8 @@ const BanUsersScreen = () => {
   const [flaggedUsersData, setFlaggedUsersData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [isRouteLoading, setIsRouteLoading] = useState(false);
   const router = useRouter();
   const { refresh } = useLocalSearchParams();
-  const navigateTimeoutRef = useRef(null);
-  const resetTimeoutRef = useRef(null);
 
   const getFlaggedUsers = async () => {
     try {
@@ -71,15 +68,6 @@ const BanUsersScreen = () => {
 
   useEffect(() => {
     getFlaggedUsers();
-
-    return () => {
-      if (navigateTimeoutRef.current) {
-        clearTimeout(navigateTimeoutRef.current);
-      }
-      if (resetTimeoutRef.current) {
-        clearTimeout(resetTimeoutRef.current);
-      }
-    };
   }, []);
 
   // Effect to handle refresh parameter
@@ -89,21 +77,11 @@ const BanUsersScreen = () => {
     }
   }, [refresh]);
 
-  const navigateWithLoading = (route) => {
-    setIsRouteLoading(true);
-    navigateTimeoutRef.current = setTimeout(() => {
-      router.push(route);
-      resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
-    }, 180);
-  };
-
-  if (isLoading || isRouteLoading) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>
-          {isRouteLoading ? 'Loading user review...' : 'Loading flagged users...'}
-        </Text>
+        <Text style={styles.loadingText}>Loading flagged users...</Text>
       </View>
     );
   }
@@ -146,7 +124,7 @@ const BanUsersScreen = () => {
             {/* Review Button */}
             <TouchableOpacity
               style={styles.reviewButton}
-              onPress={() => navigateWithLoading(`/BanUserScreen2?userid=${item.userid}`)}
+              onPress={() => router.push(`/BanUserScreen2?userid=${item.userid}`)}
             >
               <Text style={styles.reviewButtonText}>Review</Text>
             </TouchableOpacity>

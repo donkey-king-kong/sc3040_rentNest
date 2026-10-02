@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
@@ -11,11 +11,8 @@ const ProcessReviewsScreen = () => {
   const [reviewsData, setReviewsData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [isRouteLoading, setIsRouteLoading] = useState(false);
   const router = useRouter();
   const { refresh } = useLocalSearchParams();
-  const navigateTimeoutRef = useRef(null);
-  const resetTimeoutRef = useRef(null);
 
   const getFlaggedReviews = async () => {
     try {
@@ -64,15 +61,6 @@ const ProcessReviewsScreen = () => {
 
   useEffect(() => {
     getFlaggedReviews();
-
-    return () => {
-      if (navigateTimeoutRef.current) {
-        clearTimeout(navigateTimeoutRef.current);
-      }
-      if (resetTimeoutRef.current) {
-        clearTimeout(resetTimeoutRef.current);
-      }
-    };
   }, [refresh]);
 
   // Search function to filter reviews by title or text
@@ -85,21 +73,11 @@ const ProcessReviewsScreen = () => {
     );
   };
 
-  const navigateWithLoading = (route) => {
-    setIsRouteLoading(true);
-    navigateTimeoutRef.current = setTimeout(() => {
-      router.push(route);
-      resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
-    }, 180);
-  };
-
-  if (!reviewsData || isRouteLoading) {
+  if (!reviewsData) {
     return (
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>
-          {isRouteLoading ? 'Loading review details...' : 'Loading flagged reviews...'}
-        </Text>
+        <Text style={styles.loadingText}>Loading flagged reviews...</Text>
       </View>
     );
   }
@@ -159,7 +137,7 @@ const ProcessReviewsScreen = () => {
             {/* Review Button */}
             <TouchableOpacity
               style={styles.reviewButton}
-              onPress={() => navigateWithLoading(`/ProcessReviewsScreen2?reviewid=${item.reviewid}`)}
+              onPress={() => router.push(`/ProcessReviewsScreen2?reviewid=${item.reviewid}`)}
             >
               <Text style={styles.reviewButtonText}>Review</Text>
             </TouchableOpacity>

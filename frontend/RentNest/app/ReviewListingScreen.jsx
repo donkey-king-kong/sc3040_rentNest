@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
@@ -11,11 +11,8 @@ const ReviewListingsScreen = () => {
   const [listingsData, setListingsData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  const [isRouteLoading, setIsRouteLoading] = useState(false);
   const router = useRouter();
   const { refresh } = useLocalSearchParams();
-  const navigateTimeoutRef = useRef(null);
-  const resetTimeoutRef = useRef(null);
 
   const getFlaggedListings = async () => {
     try {
@@ -69,15 +66,6 @@ const ReviewListingsScreen = () => {
 
   useEffect(() => {
     getFlaggedListings();
-
-    return () => {
-      if (navigateTimeoutRef.current) {
-        clearTimeout(navigateTimeoutRef.current);
-      }
-      if (resetTimeoutRef.current) {
-        clearTimeout(resetTimeoutRef.current);
-      }
-    };
   }, [refresh]); // Refresh when the refresh parameter changes
 
   // Search function to filter listings by owner name or listing name
@@ -90,21 +78,11 @@ const ReviewListingsScreen = () => {
     );
   };
 
-  const navigateWithLoading = (route) => {
-    setIsRouteLoading(true);
-    navigateTimeoutRef.current = setTimeout(() => {
-      router.push(route);
-      resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
-    }, 180);
-  };
-
-  if (!listingsData || isRouteLoading) {
+  if (!listingsData) {
     return (
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>
-          {isRouteLoading ? 'Loading listing review...' : 'Loading flagged listings...'}
-        </Text>
+        <Text style={styles.loadingText}>Loading flagged listings...</Text>
       </View>
     );
   }
@@ -166,7 +144,7 @@ const ReviewListingsScreen = () => {
             {/* Review Button */}
             <TouchableOpacity
               style={styles.reviewButton}
-              onPress={() => navigateWithLoading(`/ReviewListingScreen2?listingid=${item.listingID}`)}
+              onPress={() => router.push(`/ReviewListingScreen2?listingid=${item.listingID}`)}
             >
               <Text style={styles.reviewButtonText}>Review</Text>
             </TouchableOpacity>

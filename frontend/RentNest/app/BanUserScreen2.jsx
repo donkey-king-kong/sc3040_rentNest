@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
@@ -12,21 +12,6 @@ const BanUsersScreen2 = () => {
   const { userid } = useLocalSearchParams();
 
   const [flaggedUser, setFlaggedUser] = useState(null);
-  const [isRouteLoading, setIsRouteLoading] = useState(false);
-  const navigateTimeoutRef = useRef(null);
-  const resetTimeoutRef = useRef(null);
-
-  const navigateWithLoading = (route, replace = false) => {
-    setIsRouteLoading(true);
-    navigateTimeoutRef.current = setTimeout(() => {
-      if (replace) {
-        router.replace(route);
-      } else {
-        router.push(route);
-      }
-      resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
-    }, 180);
-  };
 
   const getFlaggedUser = async () => {
     try {
@@ -110,7 +95,7 @@ const BanUsersScreen2 = () => {
         },
       });
 
-      navigateWithLoading('/BanUserScreen?refresh=true', true);
+      router.replace('/BanUserScreen?refresh=true');
     } catch (error) {
       console.error("Failed to ignore user:", error);
     }
@@ -120,24 +105,13 @@ const BanUsersScreen2 = () => {
     if (userid) {
       getFlaggedUser();
     }
-
-    return () => {
-      if (navigateTimeoutRef.current) {
-        clearTimeout(navigateTimeoutRef.current);
-      }
-      if (resetTimeoutRef.current) {
-        clearTimeout(resetTimeoutRef.current);
-      }
-    };
   }, [userid]);
 
-  if (!flaggedUser || isRouteLoading) {
+  if (!flaggedUser) {
     return (
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>
-          {isRouteLoading ? 'Loading flagged users...' : 'Loading user review...'}
-        </Text>
+        <Text style={styles.loadingText}>Loading user review...</Text>
       </View>
     );
   }
@@ -145,7 +119,7 @@ const BanUsersScreen2 = () => {
   return (
     <View style={styles.container}>
       <View style={styles.topHeaderRow}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigateWithLoading('/BanUserScreen?refresh=true', true)}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/BanUserScreen?refresh=true')}>
           <FontAwesome name="chevron-left" size={18} color="#101820" />
         </TouchableOpacity>
         <Text style={styles.screenTitle}>Review Flagged User</Text>

@@ -132,6 +132,15 @@ const AdminScreen = () => {
     },
   ];
 
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.routeLoadingText}>Loading flagged reports...</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.headerContainer}>
@@ -139,50 +148,41 @@ const AdminScreen = () => {
         <Text style={styles.subheader}>Monitor flagged activity and jump into the right moderation queue.</Text>
       </View>
 
-      {isLoading ? (
-        <View style={styles.loadingCard}>
-          <MorphingInfinity size={86} color="#2FA84F" />
-          <Text style={styles.loadingText}>Loading flagged reports...</Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.summaryRow}>
-            {statCards.map((stat) => (
-              <View key={stat.label} style={[styles.statCard, stat.tone]}>
-                <Text style={[styles.statValue, stat.valueStyle]}>{stat.value}</Text>
-                <Text style={[styles.statLabel, stat.labelStyle]}>{stat.label}</Text>
+      <View style={styles.summaryRow}>
+        {statCards.map((stat) => (
+          <View key={stat.label} style={[styles.statCard, stat.tone]}>
+            <Text style={[styles.statValue, stat.valueStyle]}>{stat.value}</Text>
+            <Text style={[styles.statLabel, stat.labelStyle]}>{stat.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.cardList}>
+        {navigationCards.map((card) => (
+          <TouchableOpacity
+            key={card.title}
+            style={[styles.navCard, card.styles.card]}
+            activeOpacity={0.85}
+            onPress={() => router.push(card.route)}
+          >
+            <View style={[styles.cardIconWrap, card.styles.iconWrap]}>
+              <FontAwesome name={card.icon} size={24} color={card.styles.icon} />
+            </View>
+
+            <View style={styles.cardCopy}>
+              <View style={styles.cardTitleRow}>
+                <Text style={styles.cardTitle}>{card.title}</Text>
+                <View style={[styles.countBadge, card.styles.badge]}>
+                  <Text style={[styles.countBadgeText, card.styles.badgeText]}>{card.count}</Text>
+                </View>
               </View>
-            ))}
-          </View>
+              <Text style={styles.cardDescription}>{card.description}</Text>
+            </View>
 
-          <View style={styles.cardList}>
-            {navigationCards.map((card) => (
-              <TouchableOpacity
-                key={card.title}
-                style={[styles.navCard, card.styles.card]}
-                activeOpacity={0.85}
-                onPress={() => router.push(card.route)}
-              >
-                <View style={[styles.cardIconWrap, card.styles.iconWrap]}>
-                  <FontAwesome name={card.icon} size={24} color={card.styles.icon} />
-                </View>
-
-                <View style={styles.cardCopy}>
-                  <View style={styles.cardTitleRow}>
-                    <Text style={styles.cardTitle}>{card.title}</Text>
-                    <View style={[styles.countBadge, card.styles.badge]}>
-                      <Text style={[styles.countBadgeText, card.styles.badgeText]}>{card.count}</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.cardDescription}>{card.description}</Text>
-                </View>
-
-                <FontAwesome name="chevron-right" size={18} color="#8E8E93" />
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
-      )}
+            <FontAwesome name="chevron-right" size={18} color="#8E8E93" />
+          </TouchableOpacity>
+        ))}
+      </View>
     </ScrollView>
   );
 };
@@ -210,24 +210,17 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: '#666A70',
   },
-  loadingCard: {
-    minHeight: 240,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
-    padding: 24,
-    shadowColor: '#101820',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-    elevation: 3,
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
   },
-  loadingText: {
-    marginTop: 14,
-    fontSize: 15,
-    color: '#666A70',
-    fontWeight: '600',
+  routeLoadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   summaryRow: {
     flexDirection: 'row',
