@@ -84,11 +84,12 @@ http://localhost:8080/swagger-ui/index.html
 ### Database Configuration
 The app uses a shared Supabase PostgreSQL database. The real connection details are not committed to Git. Get the database URL, username, and password from the team.
 
-## Pre-Configured Users
+## Pre-Configured Users (Non-Exhaustive)
 | Role | Name | Email | Password |
 | --- | --- | --- | --- |
-| Owner | Superman | superman@gmail.com | 12345678 |
-| User Viewer | Batman | batman@gmail.com | 12345678 |
+| Owner | Superman | superman@gmail.com | superman123 |
+| User Viewer | Batman | batman@gmail.com | batman123 |
+| Admin | Admin | admin@gmail.com | admin123 |
 
 ## Tech Stack
 - Frontend: React Native, Expo, JavaScript

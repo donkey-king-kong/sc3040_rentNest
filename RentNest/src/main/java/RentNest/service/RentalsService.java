@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,6 +45,9 @@ public class RentalsService {
         rentalsDTO.setLeaseExpiry(rentals.getLeaseExpiry());
         rentalsDTO.setPaymentHistory(rentals.getPaymentHistory());
         rentalsDTO.setStatus(rentals.getStatus());
+        rentalsDTO.setCreatedAt(rentals.getCreatedAt());
+        rentalsDTO.setAcceptedAt(rentals.getAcceptedAt());
+        rentalsDTO.setTerminatedAt(rentals.getTerminatedAt());
 
         // Map the foreign key relationship (Listing to RentalsDTO)
         ListingsDTO listingsDTO = new ListingsDTO();
@@ -85,6 +89,7 @@ public class RentalsService {
         rental.setPaymentHistory(rentalDTO.getPaymentHistory());
         rental.setStatus(rentalDTO.getStatus());
         rental.setListings(listing);
+        setInitialStatusTimestamps(rental);
 
         return rentalsRepository.save(rental);
     }
@@ -120,6 +125,7 @@ public class RentalsService {
     }
 
     // Update a rental
+    @Transactional
     public Rentals updateRental(Long rentalID, RentalsDTO updatedRentalDTO) {
         Optional<Rentals> existingRentalOpt = rentalsRepository.findById(rentalID);
         if (existingRentalOpt.isPresent()) {
@@ -132,7 +138,7 @@ public class RentalsService {
             existingRental.setRentalDate(updatedRentalDTO.getRentalDate());
             existingRental.setLeaseExpiry(updatedRentalDTO.getLeaseExpiry());
             existingRental.setPaymentHistory(updatedRentalDTO.getPaymentHistory());
-            existingRental.setStatus(updatedRentalDTO.getStatus());
+            applyStatusTransition(existingRental, updatedRentalDTO.getStatus());
 
             // Fetch the listing by listingID from the ListingsRepository
             Listings listing = listingsRepository.findById(updatedRentalDTO.getListingID())
@@ -188,6 +194,7 @@ public class RentalsService {
         rental.setPaymentHistory(rentalDTO.getPaymentHistory());
         rental.setStatus("pending"); // Set rental status to "pending"
         rental.setListings(listing);
+        setInitialStatusTimestamps(rental);
 
         Rentals savedRental = rentalsRepository.save(rental); // Save the rental first and get its ID
 
@@ -242,6 +249,9 @@ public class RentalsService {
         // Change the status from "pending" to "active" to accept the contract
         if ("pending".equals(existingRental.getStatus())) {
             existingRental.setStatus("active");
+            if (existingRental.getAcceptedAt() == null) {
+                existingRental.setAcceptedAt(new Date());
+            }
         } else {
             throw new RuntimeException("Rental is not in pending status");
         }
@@ -287,5 +297,27 @@ public class RentalsService {
             throw new IllegalArgumentException("No tenants found for listingID: " + listingID);
         }
         return tenantIDs;
+    }
+
+    private void setInitialStatusTimestamps(Rentals rental) {
+        Date now = new Date();
+        if ("active".equals(rental.getStatus()) && rental.getAcceptedAt() == null) {
+            rental.setAcceptedAt(now);
+        }
+        if ("terminated".equals(rental.getStatus()) && rental.getTerminatedAt() == null) {
+            rental.setTerminatedAt(now);
+        }
+    }
+
+    private void applyStatusTransition(Rentals rental, String newStatus) {
+        String previousStatus = rental.getStatus();
+        rental.setStatus(newStatus);
+
+        if ("active".equals(newStatus) && !"active".equals(previousStatus) && rental.getAcceptedAt() == null) {
+            rental.setAcceptedAt(new Date());
+        }
+        if ("terminated".equals(newStatus) && !"terminated".equals(previousStatus) && rental.getTerminatedAt() == null) {
+            rental.setTerminatedAt(new Date());
+        }
     }
 }
