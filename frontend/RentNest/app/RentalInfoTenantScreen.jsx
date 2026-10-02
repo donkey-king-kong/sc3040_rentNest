@@ -96,7 +96,7 @@ const RentalInfoTenant = () => {
   const handleLeaveReview = () => {
     if (listing && listing.ownerId) {
       console.log('Attempting to navigate with:', { ownerId: listing.ownerId, listingId, tenantId });
-      router.push({ pathname: '/LeaveReview', params: { ownerId: listing.ownerId, listingId, tenantId } });
+      router.push({ pathname: '/LeaveReview', params: { ownerId: listing.ownerId, listingId, tenantId, revieweeName: listing.ownerName, revieweeRole: 'Owner' } });
     } else {
       console.error('Listing information is missing, cannot navigate to LeaveReview');
     }

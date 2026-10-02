@@ -1,16 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, Image } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Modal, Image, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import axios from "axios";
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { FontAwesome } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import MorphingInfinity from '../components/MorphingInfinity';
 
-import confirmationImage from '../assets/images/confirmation.png';
 import errorImage from '../assets/images/error.png';
+const notificationBellIcon = require('../assets/images/notificationBell.png');
 
 const LeaveReview = () => {
   const router = useRouter();
-  const { ownerId, listingId, tenantId } = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
+  const { ownerId, listingId, tenantId, revieweeName, ownerName, tenantName, revieweeRole, role, revieweePhotoURL } = useLocalSearchParams();
 
   // Add debug logging for route params
   console.log('Route Params:', { ownerId, listingId, tenantId });
@@ -25,6 +29,11 @@ const LeaveReview = () => {
   const [reviewId, setReviewId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isError, setIsError] = useState(false);
+  const [revieweeProfile, setRevieweeProfile] = useState(null);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [initialReview, setInitialReview] = useState(null);
+  const notificationTimeoutRef = useRef(null);
 
   useEffect(() => {
     // Validate required parameters
@@ -64,8 +73,25 @@ const LeaveReview = () => {
     if (token && ownerId && tenantId) {
       console.log('Fetching review with token and params:', { ownerId, tenantId });
       fetchReview();
+      fetchRevieweeProfile();
     }
   }, [token, ownerId, tenantId]);
+
+  const fetchRevieweeProfile = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/users/id/${ownerId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      setRevieweeProfile(response.data);
+    } catch (error) {
+      console.error('Error fetching reviewee profile:', error);
+    }
+  };
 
   const fetchReview = async () => {
     try {
@@ -90,15 +116,22 @@ const LeaveReview = () => {
         setReviewText(userReview.text);
         setIsEditing(true);
         setReviewId(userReview.reviewid);
+        setInitialReview({
+          rating: userReview.rating,
+          title: userReview.title || '',
+          text: userReview.text || '',
+        });
       } else {
         console.log('No existing review found for this user-owner pair.');
         setIsEditing(false);
+        setInitialReview(null);
       }
     } catch (error) {
       if (error.response && error.response.status === 404) {
         // No review found
         console.log('No review found for this user-owner pair. Navigating to create mode.');
         setIsEditing(false);
+        setInitialReview(null);
       } else {
         let errorMessage = "Error fetching review.";
         if (error.response) {
@@ -120,6 +153,10 @@ const LeaveReview = () => {
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
     if (!ownerId || !tenantId) {
       setModalMessage("Missing required parameters. Please try again.");
       setIsError(true);
@@ -135,6 +172,7 @@ const LeaveReview = () => {
     }
 
     try {
+      setIsSubmitting(true);
       const reviewData = {
         userID: ownerId,
         rating,
@@ -172,7 +210,7 @@ const LeaveReview = () => {
       }
 
       if (response.status === 200 || response.status === 201) {
-        setModalMessage(isEditing ? "Review Updated Successfully!" : "Review Submitted Successfully!");
+        setModalMessage(isEditing ? "Review Updated" : "Review Submitted");
         setIsError(false);
         setModalVisible(true);
         setRating(0);
@@ -198,6 +236,8 @@ const LeaveReview = () => {
       setModalMessage(errorMessage);
       setIsError(true);
       setModalVisible(true);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -218,7 +258,7 @@ const LeaveReview = () => {
           'Content-Type': 'application/json'
         }
       });
-      setModalMessage("Review Deleted!");
+      setModalMessage("Review Deleted");
       console.log(`Response Status: ${response.status}. Review Deleted successfully!`); // Added log
       setIsError(false);
       setModalVisible(true);
@@ -234,167 +274,444 @@ const LeaveReview = () => {
     setRating(star);
   };
 
+  const getParamValue = (value) => {
+    const paramValue = Array.isArray(value) ? value[0] : value;
+    return paramValue && paramValue !== 'undefined' ? paramValue : undefined;
+  };
+  const displayedRevieweeName = getParamValue(revieweeName) || getParamValue(ownerName) || getParamValue(tenantName) || `User ${getParamValue(ownerId) || ''}`.trim();
+  const displayedRevieweeRole = getParamValue(revieweeRole) || getParamValue(role) || 'User';
+  const displayedRevieweePhotoURL = getParamValue(revieweePhotoURL)
+      || revieweeProfile?.photoURL
+      || revieweeProfile?.profilePhotoURL
+      || revieweeProfile?.profilePicture
+      || revieweeProfile?.avatar;
+  const canShowRevieweePhoto = displayedRevieweePhotoURL && !avatarLoadFailed;
+  const hasRequiredFields = rating > 0 && Boolean(reviewTitle.trim()) && Boolean(reviewText.trim());
+  const hasReviewChanged = !isEditing || !initialReview
+      || rating !== initialReview.rating
+      || reviewTitle.trim() !== initialReview.title.trim()
+      || reviewText.trim() !== initialReview.text.trim();
+  const isFormSubmitDisabled = !hasRequiredFields || !hasReviewChanged;
+  const isSubmitDisabled = isSubmitting || isFormSubmitDisabled;
+  const ratingLabels = {
+    1: 'Poor',
+    2: 'Fair',
+    3: 'Okay',
+    4: 'Good',
+    5: 'Excellent',
+  };
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [displayedRevieweePhotoURL]);
+
+  useEffect(() => {
+    if (!modalVisible || isError) {
+      return undefined;
+    }
+
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
+
+    notificationTimeoutRef.current = setTimeout(() => {
+      setModalVisible(false);
+      router.replace({
+        pathname: '/UserReviewsScreen',
+        params: {
+          userId: ownerId,
+          currentUser: tenantId,
+          revieweeName: displayedRevieweeName,
+          revieweeRole: displayedRevieweeRole,
+          revieweePhotoURL: displayedRevieweePhotoURL,
+        },
+      });
+    }, 2000);
+
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
+  }, [modalVisible, isError, router, ownerId, tenantId, displayedRevieweeName, displayedRevieweeRole, displayedRevieweePhotoURL]);
+
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Preparing review...</Text>
       </View>
     );
   }
 
   return (
-      <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <Text style={styles.header}>{isEditing ? "Edit Review" : "Leave Review"}</Text>
+      <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.navHeader}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <FontAwesome name="chevron-left" size={18} color="#101820" />
+          </TouchableOpacity>
+          <Text style={styles.navTitle}>Leave a review</Text>
+          <View style={styles.headerSpacer} />
+        </View>
 
-          <View style={styles.starsContainer}>
-            {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity key={star} onPress={() => handleStarPress(star)}>
-                  <Text style={star <= rating ? styles.selectedStar : styles.star}>★</Text>
-                </TouchableOpacity>
-            ))}
-          </View>
-
-          <TextInput
-              style={styles.input}
-              placeholder="Review Title"
-              value={reviewTitle}
-              onChangeText={setReviewTitle}
-          />
-
-          <TextInput
-              style={styles.textArea}
-              placeholder="Write your review here..."
-              value={reviewText}
-              onChangeText={setReviewText}
-              multiline
-              numberOfLines={4}
-          />
-        </ScrollView>
-
-        {isEditing && (
-            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-              <Text style={styles.deleteButtonText}>Delete Review</Text>
-            </TouchableOpacity>
-        )}
-
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>{isEditing ? "Update Review" : "Submit Review"}</Text>
-        </TouchableOpacity>
-
-        <Modal
-            animationType="slide"
-            transparent={true}
-            visible={modalVisible}
-            onRequestClose={() => setModalVisible(false)}
+        <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
         >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Image
-                  source={isError ? errorImage : confirmationImage}
-                  style={styles.confirmationImage}
-                  resizeMode="contain"
-              />
-              <Text style={styles.modalText}>{modalMessage}</Text>
-
-              <TouchableOpacity
-                  style={styles.returnButton}
-                  onPress={() => {
-                    setModalVisible(false);
-                    if (isError && modalMessage.includes("Authentication error")) {
-                      router.replace('/LoginScreen');
-                    } else {
-                      router.push({ pathname: '/RentalInfoTenantScreen', params: { listingId, tenantId, ownerId } });
-                    }
-                  }}
-              >
-                <Text style={styles.returnButtonText}>Return</Text>
-              </TouchableOpacity>
+          <View style={styles.revieweeCard}>
+            <View style={styles.avatarCircle}>
+              {canShowRevieweePhoto ? (
+                  <Image
+                      source={{ uri: displayedRevieweePhotoURL }}
+                      style={styles.avatarImage}
+                      onError={() => setAvatarLoadFailed(true)}
+                  />
+              ) : (
+                  <Text style={styles.avatarInitial}>{displayedRevieweeName.charAt(0).toUpperCase()}</Text>
+              )}
+            </View>
+            <View style={styles.revieweeMeta}>
+              <Text style={styles.revieweeName}>{displayedRevieweeName}</Text>
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleBadgeText}>{displayedRevieweeRole}</Text>
+              </View>
             </View>
           </View>
+
+          <View style={styles.section}>
+            <Text style={styles.fieldLabel}>YOUR RATING</Text>
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity key={star} onPress={() => handleStarPress(star)} hitSlop={8}>
+                    <Text style={star <= rating ? styles.selectedStar : styles.star}>★</Text>
+                  </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.ratingHint}>{rating ? ratingLabels[rating] : 'Tap to rate'}</Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.fieldLabel}>TITLE</Text>
+            <TextInput
+                style={styles.input}
+                placeholder="Summarise your experience"
+                placeholderTextColor="#AEAEB2"
+                value={reviewTitle}
+                onChangeText={setReviewTitle}
+            />
+          </View>
+
+          <View style={styles.reviewInputGroup}>
+            <Text style={styles.fieldLabel}>REVIEW</Text>
+            <TextInput
+                style={styles.textArea}
+                placeholder="Write your review here..."
+                placeholderTextColor="#AEAEB2"
+                value={reviewText}
+                onChangeText={setReviewText}
+                multiline
+                numberOfLines={4}
+                maxLength={500}
+            />
+            <Text style={styles.characterCount}>{reviewText.length} / 500</Text>
+          </View>
+
+          {isEditing && (
+              <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+                <Text style={styles.deleteButtonText}>Delete review</Text>
+              </TouchableOpacity>
+          )}
+        </ScrollView>
+
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 28) }]}>
+          <TouchableOpacity
+              style={[
+                styles.submitButton,
+                isFormSubmitDisabled && !isSubmitting && styles.submitButtonDisabled,
+                isSubmitting && styles.submitButtonSubmitting,
+              ]}
+              onPress={handleSubmit}
+              disabled={isSubmitDisabled}
+              activeOpacity={isSubmitDisabled ? 1 : 0.75}
+          >
+            {isSubmitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" style={styles.submitLoadingIcon} />
+            ) : (
+                <FontAwesome name="check" size={13} color={isFormSubmitDisabled ? "#8E8E93" : "#FFFFFF"} style={styles.submitIcon} />
+            )}
+            <Text style={[styles.submitButtonText, isFormSubmitDisabled && !isSubmitting && styles.submitButtonTextDisabled]}>
+              {isSubmitting ? (isEditing ? 'Updating review...' : 'Submitting review...') : 'Submit review'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Modal
+            animationType={isError ? "slide" : "fade"}
+            transparent={true}
+            visible={modalVisible}
+            statusBarTranslucent={!isError}
+            onRequestClose={() => setModalVisible(false)}
+        >
+          {isError ? (
+              <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                  <Image
+                      source={errorImage}
+                      style={styles.confirmationImage}
+                      resizeMode="contain"
+                  />
+                  <Text style={styles.modalText}>{modalMessage}</Text>
+
+                  <TouchableOpacity
+                      style={styles.returnButton}
+                      onPress={() => {
+                        setModalVisible(false);
+                        if (modalMessage.includes("Authentication error")) {
+                          router.replace('/LoginScreen');
+                        } else {
+                          router.push({ pathname: '/RentalInfoTenantScreen', params: { listingId, tenantId, ownerId } });
+                        }
+                      }}
+                  >
+                    <Text style={styles.returnButtonText}>Return</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+          ) : (
+              <View style={styles.notificationOverlay} pointerEvents="none">
+                <View style={styles.notificationCard}>
+                  <View style={styles.notificationIconBox}>
+                    <Image source={notificationBellIcon} style={styles.notificationIcon} />
+                  </View>
+                  <Text style={styles.notificationText}>{modalMessage}</Text>
+                </View>
+              </View>
+          )}
         </Modal>
-      </View>
+      </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#fff',
   },
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'flex-start',
-    paddingBottom: 80,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
   },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2FA84F',
+  },
+  scrollContainer: {
+    paddingHorizontal: 18,
+    paddingBottom: 24,
+  },
+  navHeader: {
+    height: 52,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#F2F2F2',
+  },
+  backButton: {
+    minWidth: 40,
+    height: 40,
+    justifyContent: 'center',
+  },
+  navTitle: {
+    flex: 1,
     textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  headerSpacer: {
+    minWidth: 40,
+  },
+  content: {
+    flexGrow: 1,
+  },
+  revieweeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 18,
+    marginBottom: 20,
+    paddingTop: 18,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#F2F2F2',
+  },
+  avatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3A3A3C',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    overflow: 'hidden',
+  },
+  avatarInitial: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  revieweeMeta: {
+    flex: 1,
+  },
+  revieweeName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  roleBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#F2F2F7',
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#636366',
   },
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 20,
+    columnGap: 10,
+    marginTop: 16,
   },
   star: {
     fontSize: 40,
-    color: '#ccc',
+    color: '#E5E5EA',
   },
   selectedStar: {
     fontSize: 40,
-    color: '#FFD700',
+    color: '#FF9F0A',
+  },
+  section: {
+    marginBottom: 22,
+  },
+  fieldLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: '#AEAEB2',
+  },
+  ratingHint: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#AEAEB2',
+    textAlign: 'center',
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  reviewInputGroup: {
+    marginBottom: 24,
   },
   input: {
-    height: 40,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginBottom: 20,
-    fontSize: 16,
+    marginTop: 8,
+    backgroundColor: '#F9F9F9',
+    borderWidth: 0.5,
+    borderColor: '#E5E5EA',
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    fontSize: 13,
+    color: '#3C3C3E',
   },
   textArea: {
+    marginTop: 8,
     height: 100,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    marginBottom: 20,
-    fontSize: 16,
+    backgroundColor: '#F9F9F9',
+    borderWidth: 0.5,
+    borderColor: '#E5E5EA',
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    fontSize: 13,
+    color: '#3C3C3E',
     textAlignVertical: 'top',
   },
+  characterCount: {
+    marginTop: 6,
+    fontSize: 11,
+    color: '#AEAEB2',
+    textAlign: 'right',
+  },
+  footer: {
+    paddingTop: 14,
+    paddingHorizontal: 18,
+    borderTopWidth: 0.5,
+    borderTopColor: '#f2f2f2',
+    backgroundColor: '#FFFFFF',
+  },
   submitButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: '#222222',
-    padding: 10,
-    borderRadius: 5,
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#0A84FF',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#E5E5EA',
+  },
+  submitButtonSubmitting: {
+    backgroundColor: '#007AFF',
+    opacity: 1,
+  },
+  submitIcon: {
+    marginRight: 7,
+  },
+  submitLoadingIcon: {
+    marginRight: 8,
+    transform: [{ scale: 1.15 }],
   },
   submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  submitButtonTextDisabled: {
+    color: '#8E8E93',
   },
   deleteButton: {
-    backgroundColor: '#fff',
-    borderColor: '#222222',
-    borderWidth: 1,
-    padding: 10,
-    borderRadius: 5,
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    backgroundColor: '#F2F2F7',
     alignItems: 'center',
-    marginVertical: 50,
+    marginTop: 4,
+    marginBottom: 16,
   },
   deleteButtonText: {
-    color: '#222222',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#FF3B30',
+    fontSize: 13,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
@@ -427,6 +744,46 @@ const styles = StyleSheet.create({
   returnButtonText: {
     color: '#fff',
     fontSize: 16,
+  },
+  notificationOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
+  notificationCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    backgroundColor: 'rgba(45, 45, 45, 0.82)',
+    borderRadius: 28,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    elevation: 8,
+  },
+  notificationIconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(58, 58, 58, 0.72)',
+    marginBottom: 16,
+  },
+  notificationIcon: {
+    width: 34,
+    height: 40,
+    resizeMode: 'contain',
+  },
+  notificationText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
   },
 });
 

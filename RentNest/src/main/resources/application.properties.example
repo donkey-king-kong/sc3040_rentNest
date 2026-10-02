@@ -14,3 +14,10 @@ security.jwt.expiration-time=3600000
 # External APIs
 LTADATAMALL_ACCOUNTKEY=YOUR_API_KEY
 URA_ACCESSKEY=YOUR_API_KEY
+
+# Gemini LLM API for AI chat summary and Ask AI guardrails
+# Put the real key only in application.properties. Do not commit real API keys.
+llm.provider=gemini
+llm.api-key=YOUR_GEMINI_API_KEY
+llm.api-url=https://generativelanguage.googleapis.com/v1beta/models
+llm.model=gemini-3.6-flash
