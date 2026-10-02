@@ -121,15 +121,20 @@ const RentPaymentScreen = () => {
     const payments = paymentHistory?.payments || [];
     const acceptedDateValue = paymentHistory?.acceptedAt || paymentHistory?.rentalDate;
     const acceptedDate = acceptedDateValue ? new Date(acceptedDateValue) : null;
+    const validPaymentDates = payments
+        .map(payment => new Date(payment.date))
+        .filter(date => !Number.isNaN(date.getTime()));
+    const earliestPaymentDate = validPaymentDates.length > 0
+        ? new Date(Math.min(...validPaymentDates.map(date => date.getTime())))
+        : null;
     const currentMonth = getMonthStart(new Date());
     const startMonth = acceptedDate && !Number.isNaN(acceptedDate.getTime())
         ? getMonthStart(acceptedDate)
+        : earliestPaymentDate
+            ? getMonthStart(earliestPaymentDate)
         : currentMonth;
     const paidMonthKeys = new Set(
-        payments
-            .map(payment => new Date(payment.date))
-            .filter(date => !Number.isNaN(date.getTime()))
-            .map(getMonthKey)
+        validPaymentDates.map(getMonthKey)
     );
 
     const outstandingMonths = [];
