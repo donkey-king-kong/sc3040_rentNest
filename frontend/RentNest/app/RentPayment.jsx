@@ -408,7 +408,17 @@ const RentPaymentScreen = () => {
 
   return (
       <View style={styles.screen}>
-        <Text style={styles.title}>Rent Payment</Text>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+          >
+            <MaterialIcons name="arrow-back-ios-new" size={22} color="#101820" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Rent Payment</Text>
+        </View>
 
         <View style={styles.summaryGrid}>
           <View style={styles.summaryCard}>
@@ -680,10 +690,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7F8FA',
+    borderWidth: 1,
+    borderColor: '#E7E7E7',
+    marginRight: 12,
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 18,
     color: '#101820',
   },
   summaryGrid: {
