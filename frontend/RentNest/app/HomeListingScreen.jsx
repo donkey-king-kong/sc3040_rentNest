@@ -201,7 +201,18 @@ const HomeListingScreen = () => {
           }),
         axios.get(`${API_BASE_URL}/api/reviews/${listingId}`, requestConfig)
           .then(response => {
-            const formattedReviews = (response.data || []).map(review => ({
+            console.log('[HomeListingScreen] Reviews request endpoint:', `${API_BASE_URL}/api/reviews/${listingId}`);
+            console.log('[HomeListingScreen] Reviews request listingId:', listingId);
+            console.log('[HomeListingScreen] Reviews response status:', response.status);
+            console.log('[HomeListingScreen] Reviews response is array:', Array.isArray(response.data));
+            console.log('[HomeListingScreen] Reviews response payload:', response.data);
+
+            const reviewList = Array.isArray(response.data) ? response.data : [];
+            if (response.data && !Array.isArray(response.data)) {
+              console.warn('[HomeListingScreen] Expected reviews array but received:', typeof response.data);
+            }
+
+            const formattedReviews = reviewList.map(review => ({
               reviewId: review.id,
               rating: review.rating,
               title: review.title || 'Review',
