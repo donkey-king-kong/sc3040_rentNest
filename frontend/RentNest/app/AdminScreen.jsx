@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -79,6 +79,28 @@ const AdminScreen = () => {
     fetchFlaggedCounts({ initial: true });
   }, []);
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Log out',
+      "You'll need to sign in again to access the admin panel.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AsyncStorage.multiRemove(['token', 'userId']);
+              router.replace('/LandingScreen');
+            } catch (error) {
+              console.error('Error during logout:', error);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const navigationCards = [
     {
       title: 'Reviews',
@@ -138,22 +160,24 @@ const AdminScreen = () => {
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.headerContainer}>
         <View style={styles.titleRow}>
-          <Text style={styles.header}>RentNest Management</Text>
+          <Text style={styles.header}>Admin</Text>
           <View style={styles.adminPill}>
             <Text style={styles.adminPillText}>Admin</Text>
           </View>
         </View>
 
         <View style={styles.metaRow}>
-          <Text style={styles.lastUpdatedText}>{formatLastUpdated(lastUpdated)}</Text>
+          <Text style={styles.lastUpdatedText}>
+            {formatLastUpdated(lastUpdated)}
+            <Text style={styles.metaDivider}>  ·  </Text>
+          </Text>
           <TouchableOpacity
-            style={[styles.refreshButton, isRefreshing && styles.refreshButtonDisabled]}
+            style={[styles.refreshLink, isRefreshing && styles.refreshButtonDisabled]}
             activeOpacity={0.8}
             onPress={() => fetchFlaggedCounts()}
             disabled={isRefreshing}
           >
-            <FontAwesome name="refresh" size={13} color="#B54708" />
-            <Text style={styles.refreshText}>{isRefreshing ? 'Refreshing' : 'Refresh'}</Text>
+            <Text style={styles.refreshText}>{isRefreshing ? 'Refreshing ↺' : 'Refresh ↺'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -194,6 +218,14 @@ const AdminScreen = () => {
           );
         })}
       </View>
+
+      <View style={styles.separator} />
+
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <FontAwesome name="sign-out" size={20} color="black" style={styles.icon} />
+        <Text style={styles.logoutText}>Log out</Text>
+        <Text style={styles.arrow}> &gt;</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -238,31 +270,24 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   lastUpdatedText: {
-    flex: 1,
-    fontSize: 14,
+    fontSize: 12,
     color: '#666A70',
   },
-  refreshButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 999,
-    backgroundColor: '#FFF7E8',
-    borderWidth: 1,
-    borderColor: '#FEDF89',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
+  metaDivider: {
+    color: '#9CA3AF',
+  },
+  refreshLink: {
+    paddingVertical: 4,
   },
   refreshButtonDisabled: {
     opacity: 0.6,
   },
   refreshText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#B54708',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666A70',
   },
   loadingContainer: {
     flex: 1,
@@ -393,6 +418,32 @@ const styles = StyleSheet.create({
   },
   mutedBadgeText: {
     color: '#667085',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#ccc',
+    marginTop: 26,
+    marginBottom: 5,
+  },
+  logoutButton: {
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoutText: {
+    fontSize: 16,
+    color: 'black',
+    flex: 1,
+  },
+  arrow: {
+    fontSize: 16,
+    color: 'black',
+  },
+  icon: {
+    marginRight: 10,
   },
 });
 
