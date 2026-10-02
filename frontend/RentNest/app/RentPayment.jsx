@@ -45,6 +45,9 @@ const RentPaymentScreen = () => {
         onMoveShouldSetPanResponder: (_, gestureState) => (
             gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
         ),
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => (
+            gestureState.dy > 18 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
+        ),
         onPanResponderRelease: (_, gestureState) => {
           if (gestureState.dy > 70 || gestureState.vy > 0.7) {
             setSelectedPayment(null);
@@ -491,10 +494,10 @@ const RentPaymentScreen = () => {
           <TouchableWithoutFeedback onPress={handleReturnPress}>
             <View style={styles.modalOverlay}>
               <TouchableWithoutFeedback>
-                <View style={styles.modalContent}>
+                <View style={styles.modalContent} {...paymentSheetPanResponder.panHandlers}>
                   <ScrollView contentContainerStyle={styles.modalScroll}>
                     <View style={styles.modalBottom}>
-                      <View style={styles.modalHandleHitArea} {...paymentSheetPanResponder.panHandlers}>
+                      <View style={styles.modalHandleHitArea}>
                         <View style={styles.modalHandle} />
                       </View>
                   <View style={styles.modalHeader}>
