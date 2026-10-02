@@ -831,13 +831,13 @@ const styles = StyleSheet.create({
   cardBrandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 18,
+    gap: 10,
+    marginBottom: 16,
   },
   cardBrandBadge: {
-    width: 64,
-    height: 38,
-    borderRadius: 6,
+    width: 48,
+    height: 30,
+    borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -846,7 +846,7 @@ const styles = StyleSheet.create({
   },
   visaText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '900',
     fontStyle: 'italic',
     letterSpacing: 0.5,
@@ -859,20 +859,20 @@ const styles = StyleSheet.create({
     marginBottom: -1,
   },
   mastercardCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
   },
   mastercardRed: {
     backgroundColor: '#EB001B',
-    marginRight: -6,
+    marginRight: -5,
   },
   mastercardYellow: {
     backgroundColor: '#F79E1B',
   },
   mastercardText: {
     color: '#fff',
-    fontSize: 7,
+    fontSize: 6,
     fontWeight: '700',
   },
   inputLabel: {
