@@ -230,7 +230,7 @@ const RentPaymentScreen = () => {
   };
 
   return (
-      <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.screen}>
         <Text style={styles.title}>Rent Payment</Text>
 
         <View style={styles.summaryGrid}>
@@ -244,64 +244,77 @@ const RentPaymentScreen = () => {
           </View>
         </View>
 
-        {/* Outstanding Payments */}
         <Text style={styles.sectionTitle}>OUTSTANDING PAYMENTS</Text>
-        {sortedOutstandingMonths.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <MaterialIcons name="check-circle" size={28} color="#2FA84F" />
-              <Text style={styles.emptyTitle}>All caught up</Text>
-              <Text style={styles.noOutstandingText}>You have no outstanding payments.</Text>
-            </View>
-        ) : (
-            sortedOutstandingMonths.map((payment, index) => (
-                <View
-                    key={payment.month}
-                    style={[styles.outstandingCard, index > 0 && styles.lockedOutstandingCard]}
-                >
-                  <View style={styles.outstandingCopy}>
-                    <View style={styles.outstandingHeader}>
-                      <Text style={[styles.outstandingMonth, index > 0 && styles.lockedText]}>{payment.month}</Text>
-                      {index === 0 && (
-                          <View style={styles.dueBadge}>
-                            <Text style={styles.dueBadgeText}>Due now</Text>
-                          </View>
+        <View style={styles.outstandingPanel}>
+          <ScrollView
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.panelScrollContent}
+          >
+            {sortedOutstandingMonths.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <MaterialIcons name="check-circle" size={24} color="#2FA84F" />
+                  <Text style={styles.emptyTitle}>All caught up</Text>
+                  <Text style={styles.noOutstandingText}>You have no outstanding payments.</Text>
+                </View>
+            ) : (
+                sortedOutstandingMonths.map((payment, index) => (
+                    <View
+                        key={payment.month}
+                        style={[styles.outstandingCard, index > 0 && styles.lockedOutstandingCard]}
+                    >
+                      <View style={styles.outstandingCopy}>
+                        <View style={styles.outstandingHeader}>
+                          <Text style={[styles.outstandingMonth, index > 0 && styles.lockedText]}>{payment.month}</Text>
+                          {index === 0 && (
+                              <View style={styles.dueBadge}>
+                                <Text style={styles.dueBadgeText}>Due now</Text>
+                              </View>
+                          )}
+                        </View>
+                        <Text style={[styles.outstandingAmount, index > 0 && styles.lockedText]}>
+                          {formatCurrency(payment.amount)}
+                        </Text>
+                      </View>
+                      {index === 0 ? (
+                          <TouchableOpacity style={styles.payNowButton} onPress={handlePayButtonPress}>
+                            <Text style={styles.payNowButtonText}>Pay now</Text>
+                          </TouchableOpacity>
+                      ) : (
+                          <MaterialIcons name="lock-outline" size={22} color="#8E8E8E" />
                       )}
                     </View>
-                    <Text style={[styles.outstandingAmount, index > 0 && styles.lockedText]}>
-                      {formatCurrency(payment.amount)}
-                    </Text>
-                  </View>
-                  {index === 0 ? (
-                      <TouchableOpacity style={styles.payNowButton} onPress={handlePayButtonPress}>
-                        <Text style={styles.payNowButtonText}>Pay now</Text>
-                      </TouchableOpacity>
-                  ) : (
-                      <MaterialIcons name="lock-outline" size={26} color="#8E8E8E" />
-                  )}
-                </View>
-            ))
-        )}
+                ))
+            )}
+          </ScrollView>
+        </View>
 
-        {/* Payment History */}
         <Text style={styles.sectionTitle}>PAYMENT HISTORY</Text>
-        {sortedPaidMonths.length === 0 ? (
-            <Text style={styles.noOutstandingText}>You have no payment history.</Text>
-        ) : (
-            sortedPaidMonths.map((payment, index) => (
-                <View key={payment.paymentID || `${payment.month}-${index}`} style={styles.historyRow}>
-                  <View style={styles.historyStatusIcon}>
-                    <MaterialIcons name="check" size={24} color="#2FA84F" />
-                  </View>
-                  <View style={styles.historyCopy}>
-                    <Text style={styles.historyMonth}>{payment.month}</Text>
-                    <Text style={styles.historyDate}>{formatPaymentDate(payment.date)}</Text>
-                  </View>
-                  <Text style={styles.historyAmount}>{formatCurrency(payment.amount)}</Text>
-                </View>
-            ))
-        )}
+        <View style={styles.historyPanel}>
+          <ScrollView
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.panelScrollContent}
+          >
+            {sortedPaidMonths.length === 0 ? (
+                <Text style={styles.noOutstandingText}>You have no payment history.</Text>
+            ) : (
+                sortedPaidMonths.map((payment, index) => (
+                    <View key={payment.paymentID || `${payment.month}-${index}`} style={styles.historyRow}>
+                      <View style={styles.historyStatusIcon}>
+                        <MaterialIcons name="check" size={20} color="#2FA84F" />
+                      </View>
+                      <View style={styles.historyCopy}>
+                        <Text style={styles.historyMonth}>{payment.month}</Text>
+                        <Text style={styles.historyDate}>{formatPaymentDate(payment.date)}</Text>
+                      </View>
+                      <Text style={styles.historyAmount}>{formatCurrency(payment.amount)}</Text>
+                    </View>
+                ))
+            )}
+          </ScrollView>
+        </View>
 
-        {/* Payment Modal */}
         <Modal
             visible={isModalVisible}
             transparent={true}
@@ -340,15 +353,17 @@ const RentPaymentScreen = () => {
             </View>
           </View>
         </Modal>
-      </ScrollView>
+      </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
+  screen: {
+    flex: 1,
     backgroundColor: '#fff',
-    paddingBottom: 36,
+    paddingHorizontal: 20,
+    paddingTop: 44,
+    paddingBottom: 24,
   },
   loadingContainer: {
     flex: 1,
@@ -363,57 +378,70 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 24,
+    marginBottom: 18,
     color: '#101820',
   },
   summaryGrid: {
     flexDirection: 'row',
-    gap: 14,
-    marginBottom: 28,
+    gap: 12,
+    marginBottom: 18,
   },
   summaryCard: {
     flex: 1,
     backgroundColor: '#F7F8FA',
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 18,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: '#E7E7E7',
   },
   summaryLabel: {
-    fontSize: 16,
+    fontSize: 13,
     color: '#666',
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   summaryValue: {
-    fontSize: 30,
-    lineHeight: 36,
+    fontSize: 23,
+    lineHeight: 28,
     color: '#101820',
     fontWeight: '800',
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 15,
     fontWeight: '800',
-    marginBottom: 14,
-    marginTop: 6,
+    marginBottom: 8,
+    marginTop: 4,
     color: '#333',
     letterSpacing: 0.8,
+  },
+  outstandingPanel: {
+    maxHeight: 270,
+    minHeight: 124,
+    marginBottom: 14,
+  },
+  historyPanel: {
+    flex: 1,
+    minHeight: 170,
+    borderTopWidth: 1,
+    borderTopColor: '#EFEFEF',
+  },
+  panelScrollContent: {
+    paddingBottom: 8,
   },
   emptyCard: {
     alignItems: 'center',
     backgroundColor: '#F7F8FA',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E7E7E7',
-    padding: 24,
-    marginBottom: 28,
+    padding: 18,
   },
   emptyTitle: {
-    marginTop: 10,
-    fontSize: 18,
+    marginTop: 8,
+    fontSize: 16,
     fontWeight: '800',
     color: '#101820',
   },
@@ -422,12 +450,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#fff',
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#101820',
-    paddingVertical: 20,
-    paddingHorizontal: 18,
-    marginBottom: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 10,
   },
   lockedOutstandingCard: {
     borderColor: '#E2E2E2',
@@ -441,28 +469,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 6,
+    gap: 8,
+    marginBottom: 4,
   },
   outstandingMonth: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
     color: '#101820',
   },
   outstandingAmount: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '700',
     color: '#666',
   },
   dueBadge: {
     backgroundColor: '#101820',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   dueBadgeText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '800',
   },
   lockedText: {
@@ -471,48 +499,48 @@ const styles = StyleSheet.create({
   payNowButton: {
     borderWidth: 1,
     borderColor: '#101820',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 22,
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
     backgroundColor: '#101820',
   },
   payNowButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '800',
   },
   historyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#ECECEC',
   },
   historyStatusIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#EAF7EE',
-    marginRight: 16,
+    marginRight: 12,
   },
   historyCopy: {
     flex: 1,
   },
   historyMonth: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '800',
     color: '#101820',
   },
   historyDate: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
     color: '#666',
     marginTop: 2,
   },
   historyAmount: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '800',
     color: '#2FA84F',
   },
