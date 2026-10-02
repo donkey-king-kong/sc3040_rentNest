@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -20,8 +20,7 @@ import MorphingInfinity from '../components/MorphingInfinity';
 // Rent Payment Screen
 const RentPaymentScreen = () => {
   const router = useRouter();
-  const { listingId, tenantId, refresh } = useLocalSearchParams();
-  const [refreshing, setRefreshing] = useState(false);
+  const { listingId, tenantId } = useLocalSearchParams();
   const [paymentHistory, setPaymentHistory] = useState(null); // State to store listing data
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isPaymentSuccessful, setIsPaymentSuccessful] = useState(false);
@@ -48,10 +47,10 @@ const RentPaymentScreen = () => {
           'Content-Type': 'application/json'
         },
       });
-      const rentalID = response.data.payments.length > 0 ? response.data.payments[0].rentalID : null;
+      const payments = response.data.payments || [];
+      const rentalID = payments.length > 0 ? payments[0].rentalID : null;
       setRentalID(rentalID);
-      const amt = response.data.payments.length > 0 ? response.data.payments[0].amount : 0; // Default to 0
-      setAmount(amt);
+      setAmount(response.data.rentalPrice || (payments.length > 0 ? payments[0].amount : 0));
       console.log("Payments response", response.status, response.data);
       setPaymentHistory(response.data);
     } catch (error) {
@@ -62,11 +61,30 @@ const RentPaymentScreen = () => {
   };
 
 
+  const formatCurrency = (value) => {
+    const amount = Number(value) || 0;
+    return `S$${amount.toLocaleString()}`;
+  };
+
+  const formatMonthYear = (date) => (
+      date.toLocaleString('default', { month: 'long', year: 'numeric' })
+  );
+
+  const formatPaymentDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-SG', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
   const getOutstandingMonths = () => {
-    if (!paymentHistory || !paymentHistory.payments.length) return [];
+    const payments = paymentHistory?.payments || [];
+    if (!payments.length) return [];
 
     // Get the latest payment date
-    const lastPaymentDate = new Date(Math.max(...paymentHistory.payments.map(payment => new Date(payment.date))));
+    const lastPaymentDate = new Date(Math.max(...payments.map(payment => new Date(payment.date))));
     const currentDate = new Date();
 
     const outstandingMonths = [];
@@ -75,9 +93,10 @@ const RentPaymentScreen = () => {
 
     while (nextPaymentDate <= currentDate) {
       outstandingMonths.push({
-        month: nextPaymentDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
-        amount: amt || 0,
+        month: formatMonthYear(nextPaymentDate),
+        amount: paymentHistory?.rentalPrice || amt || 0,
         paid: false,
+        dueDate: new Date(nextPaymentDate),
       });
       nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
     }
@@ -179,19 +198,23 @@ const RentPaymentScreen = () => {
   }
 
 
-  const paidMonths = paymentHistory.payments.map((payment) => {
+  const payments = paymentHistory?.payments || [];
+  const monthlyRent = paymentHistory?.rentalPrice || amt || 0;
+  const outstandingTotal = outstandingMonths.reduce((total, payment) => total + (Number(payment.amount) || 0), 0);
+
+  const paidMonths = payments.map((payment) => {
     return {
       paymentID: payment.paymentID,
       rentalID: payment.rentalID,
-      month: new Date(payment.date).toLocaleString('default', { month: 'long', year: 'numeric' }),
-      amount: amt,
+      month: formatMonthYear(new Date(payment.date)),
+      amount: payment.amount || monthlyRent,
       paid: true,
       date: payment.date,
     };
   });
 
   const sortedPaidMonths = paidMonths.sort((a, b) => new Date(b.date) - new Date(a.date));
-  const sortedOutstandingMonths = outstandingMonths.sort((a, b) => new Date(b.month) - new Date(a.month));
+  const sortedOutstandingMonths = outstandingMonths.sort((a, b) => a.dueDate - b.dueDate);
 
   const handlePayButtonPress = () => {
     setIsModalVisible(true);
@@ -210,34 +233,70 @@ const RentPaymentScreen = () => {
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Rent Payment</Text>
 
+        <View style={styles.summaryGrid}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Outstanding</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(outstandingTotal)}</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Monthly rent</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(monthlyRent)}</Text>
+          </View>
+        </View>
+
         {/* Outstanding Payments */}
-        <Text style={styles.sectionTitle}>Outstanding Payments</Text>
+        <Text style={styles.sectionTitle}>OUTSTANDING PAYMENTS</Text>
         {sortedOutstandingMonths.length === 0 ? (
-            <Text style={styles.noOutstandingText}>You have no outstanding payments.</Text>
+            <View style={styles.emptyCard}>
+              <MaterialIcons name="check-circle" size={28} color="#2FA84F" />
+              <Text style={styles.emptyTitle}>All caught up</Text>
+              <Text style={styles.noOutstandingText}>You have no outstanding payments.</Text>
+            </View>
         ) : (
             sortedOutstandingMonths.map((payment, index) => (
-                <View key={index} style={styles.paymentBox}>
-                  <Text style={styles.paymentDate}>{payment.month}</Text>
-                  <Text style={styles.paymentAmount}>${amt}</Text>
-                  <TouchableOpacity style={styles.payButton} onPress={handlePayButtonPress}>
-                    <Text style={styles.payButtonText}>Pay</Text>
-                  </TouchableOpacity>
+                <View
+                    key={payment.month}
+                    style={[styles.outstandingCard, index > 0 && styles.lockedOutstandingCard]}
+                >
+                  <View style={styles.outstandingCopy}>
+                    <View style={styles.outstandingHeader}>
+                      <Text style={[styles.outstandingMonth, index > 0 && styles.lockedText]}>{payment.month}</Text>
+                      {index === 0 && (
+                          <View style={styles.dueBadge}>
+                            <Text style={styles.dueBadgeText}>Due now</Text>
+                          </View>
+                      )}
+                    </View>
+                    <Text style={[styles.outstandingAmount, index > 0 && styles.lockedText]}>
+                      {formatCurrency(payment.amount)}
+                    </Text>
+                  </View>
+                  {index === 0 ? (
+                      <TouchableOpacity style={styles.payNowButton} onPress={handlePayButtonPress}>
+                        <Text style={styles.payNowButtonText}>Pay now</Text>
+                      </TouchableOpacity>
+                  ) : (
+                      <MaterialIcons name="lock-outline" size={26} color="#8E8E8E" />
+                  )}
                 </View>
             ))
         )}
 
         {/* Payment History */}
-        <Text style={styles.sectionTitle}>Payment History</Text>
+        <Text style={styles.sectionTitle}>PAYMENT HISTORY</Text>
         {sortedPaidMonths.length === 0 ? (
             <Text style={styles.noOutstandingText}>You have no payment history.</Text>
         ) : (
             sortedPaidMonths.map((payment, index) => (
-                <View key={index} style={styles.paymentRow}>
-                  <Text style={styles.paymentDate}>{payment.month}</Text>
-                  <View style={styles.paymentInfo}>
-                    <Text style={styles.paymentAmount}>${amt}</Text>
-                    <Text style={styles.paymentStatus}></Text>
+                <View key={payment.paymentID || `${payment.month}-${index}`} style={styles.historyRow}>
+                  <View style={styles.historyStatusIcon}>
+                    <MaterialIcons name="check" size={24} color="#2FA84F" />
                   </View>
+                  <View style={styles.historyCopy}>
+                    <Text style={styles.historyMonth}>{payment.month}</Text>
+                    <Text style={styles.historyDate}>{formatPaymentDate(payment.date)}</Text>
+                  </View>
+                  <Text style={styles.historyAmount}>{formatCurrency(payment.amount)}</Text>
                 </View>
             ))
         )}
@@ -264,7 +323,7 @@ const RentPaymentScreen = () => {
                         <TextInput style={styles.input} placeholder="Postal Code" keyboardType="numeric" />
                         <TextInput style={styles.input} placeholder="Location" />
                         <TouchableOpacity style={styles.payButton} onPress={handlePaymentSubmit} disabled={outstandingMonths.length === 0}>
-                          <Text style={styles.payButtonText}>Pay ${outstandingMonths.length > 0 ? outstandingMonths[0].amount : 0}</Text>
+                          <Text style={styles.payButtonText}>Pay {formatCurrency(outstandingMonths.length > 0 ? outstandingMonths[0].amount : 0)}</Text>
                         </TouchableOpacity>
                       </>
                   ) : (
@@ -289,6 +348,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     backgroundColor: '#fff',
+    paddingBottom: 36,
   },
   loadingContainer: {
     flex: 1,
@@ -303,14 +363,158 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   title: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 24,
+    color: '#101820',
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 28,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: '#F7F8FA',
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: '#E7E7E7',
+  },
+  summaryLabel: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  summaryValue: {
+    fontSize: 30,
+    lineHeight: 36,
+    color: '#101820',
+    fontWeight: '800',
   },
   sectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 14,
+    marginTop: 6,
+    color: '#333',
+    letterSpacing: 0.8,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E7E7E7',
+    padding: 24,
+    marginBottom: 28,
+  },
+  emptyTitle: {
+    marginTop: 10,
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontWeight: '800',
+    color: '#101820',
+  },
+  outstandingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#101820',
+    paddingVertical: 20,
+    paddingHorizontal: 18,
+    marginBottom: 14,
+  },
+  lockedOutstandingCard: {
+    borderColor: '#E2E2E2',
+    backgroundColor: '#F7F8FA',
+  },
+  outstandingCopy: {
+    flex: 1,
+    marginRight: 12,
+  },
+  outstandingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 6,
+  },
+  outstandingMonth: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#101820',
+  },
+  outstandingAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#666',
+  },
+  dueBadge: {
+    backgroundColor: '#101820',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  dueBadgeText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  lockedText: {
+    color: '#8E8E8E',
+  },
+  payNowButton: {
+    borderWidth: 1,
+    borderColor: '#101820',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    backgroundColor: '#101820',
+  },
+  payNowButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECECEC',
+  },
+  historyStatusIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EAF7EE',
+    marginRight: 16,
+  },
+  historyCopy: {
+    flex: 1,
+  },
+  historyMonth: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#101820',
+  },
+  historyDate: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 2,
+  },
+  historyAmount: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#2FA84F',
   },
   paymentBox: {
     backgroundColor: '#fff',
