@@ -14,7 +14,7 @@ import {useLocalSearchParams, useRouter} from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
-import {ActivityIndicator} from "react-native"; // Assuming you're using Expo for vector icons
+import MorphingInfinity from '../components/MorphingInfinity';
 
 
 // Rent Payment Screen
@@ -172,7 +172,7 @@ const RentPaymentScreen = () => {
   if (loading) {
     return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0000ff" />
+          <MorphingInfinity size={86} color="#2FA84F" />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
     );
@@ -289,6 +289,18 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   title: {
     fontSize: 24,
