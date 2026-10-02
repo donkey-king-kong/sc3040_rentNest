@@ -89,14 +89,10 @@ const BanUsersScreen = () => {
     }
   }, [refresh]);
 
-  const navigateWithLoading = (route, replace = false) => {
+  const navigateWithLoading = (route) => {
     setIsRouteLoading(true);
     navigateTimeoutRef.current = setTimeout(() => {
-      if (replace) {
-        router.replace(route);
-      } else {
-        router.push(route);
-      }
+      router.push(route);
       resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
     }, 180);
   };
@@ -115,7 +111,7 @@ const BanUsersScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigateWithLoading('/AdminScreen', true)}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/AdminScreen')}>
           <FontAwesome name="chevron-left" size={18} color="#101820" />
         </TouchableOpacity>
         <Text style={styles.header}>Ban Flagged Users</Text>

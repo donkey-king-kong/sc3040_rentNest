@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,9 +18,6 @@ const AdminScreen = () => {
   const router = useRouter();
   const [counts, setCounts] = useState(EMPTY_COUNTS);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRouteLoading, setIsRouteLoading] = useState(false);
-  const navigateTimeoutRef = useRef(null);
-  const resetTimeoutRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -63,22 +60,8 @@ const AdminScreen = () => {
 
     return () => {
       isMounted = false;
-      if (navigateTimeoutRef.current) {
-        clearTimeout(navigateTimeoutRef.current);
-      }
-      if (resetTimeoutRef.current) {
-        clearTimeout(resetTimeoutRef.current);
-      }
     };
   }, []);
-
-  const navigateWithLoading = (route) => {
-    setIsRouteLoading(true);
-    navigateTimeoutRef.current = setTimeout(() => {
-      router.push(route);
-      resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
-    }, 180);
-  };
 
   const totalFlagged = counts.reviews + counts.users + counts.listings;
 
@@ -149,15 +132,6 @@ const AdminScreen = () => {
     },
   ];
 
-  if (isRouteLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.routeLoadingText}>Opening moderation queue...</Text>
-      </View>
-    );
-  }
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.headerContainer}>
@@ -187,7 +161,7 @@ const AdminScreen = () => {
                 key={card.title}
                 style={[styles.navCard, card.styles.card]}
                 activeOpacity={0.85}
-                onPress={() => navigateWithLoading(card.route)}
+                onPress={() => router.push(card.route)}
               >
                 <View style={[styles.cardIconWrap, card.styles.iconWrap]}>
                   <FontAwesome name={card.icon} size={24} color={card.styles.icon} />
@@ -254,18 +228,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#666A70',
     fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F7F8FA',
-  },
-  routeLoadingText: {
-    marginTop: 24,
-    color: '#101820',
-    fontSize: 18,
-    fontWeight: '700',
   },
   summaryRow: {
     flexDirection: 'row',
