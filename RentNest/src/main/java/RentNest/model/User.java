@@ -1,6 +1,8 @@
 package RentNest.model;
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -32,6 +34,10 @@ public class User implements UserDetails {
 
     @Column(nullable = false)
     private int flagged;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
     //Override Methods from implement
 
@@ -131,5 +137,8 @@ public class User implements UserDetails {
         return flagged;
     }
 
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 
 }

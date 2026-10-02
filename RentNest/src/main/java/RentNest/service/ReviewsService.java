@@ -38,6 +38,7 @@ public class ReviewsService {
         // Fetch and map reviewer details
         User reviewer = reviews.getReviewer(); // Directly get the reviewer from the Reviews entity
         if (reviewer != null) {
+            reviewsDTO.setReviewerID(reviewer.getUserID());
             reviewsDTO.setReviewerName(reviewer.getName());
             reviewsDTO.setReviewerEmail(reviewer.getEmail());
             reviewsDTO.setReviewerPhotoURL(reviewer.getPhotoURL());
@@ -95,10 +96,12 @@ public class ReviewsService {
     }
 
     // Update reviews
-    public Reviews updateReview(Long id, ReviewsDTO reviewDTO) {
+    public Reviews updateReview(Long id, ReviewsDTO reviewDTO, Long authenticatedUserId) {
         // Find the existing review by ID
         Reviews existingReview = reviewsRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Review not found with id: " + id));
+
+        assertReviewAuthor(existingReview, authenticatedUserId);
 
         // Update fields that can be modified
         existingReview.setRating(reviewDTO.getRating());
@@ -106,20 +109,24 @@ public class ReviewsService {
         existingReview.setText(reviewDTO.getText());
         existingReview.setFlagged(reviewDTO.isFlagged());
 
-        // If the reviewer needs to be updated, fetch the reviewer
-        if (reviewDTO.getReviewerID() != null && !reviewDTO.getReviewerID().equals(existingReview.getReviewer().getUserID())) {
-            User reviewer = userRepository.findById(reviewDTO.getReviewerID())
-                    .orElseThrow(() -> new RuntimeException("Reviewer not found"));
-            existingReview.setReviewer(reviewer);
-        }
-
         // Save and return the updated review
         return reviewsRepository.save(existingReview);
     }
 
     // Delete
-    public void deleteReview(Long id) {
-        reviewsRepository.deleteById(id);
+    public void deleteReview(Long id, Long authenticatedUserId) {
+        Reviews existingReview = reviewsRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Review not found with id: " + id));
+
+        assertReviewAuthor(existingReview, authenticatedUserId);
+        reviewsRepository.delete(existingReview);
+    }
+
+    private void assertReviewAuthor(Reviews review, Long authenticatedUserId) {
+        if (review.getReviewer() == null || authenticatedUserId == null
+                || !review.getReviewer().getUserID().equals(authenticatedUserId)) {
+            throw new SecurityException("Only the review author can modify this review.");
+        }
     }
 
     // Get Flagged Reviews

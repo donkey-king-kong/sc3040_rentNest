@@ -110,6 +110,8 @@ const LoginScreen = () => {
             placeholderTextColor="#666"
             keyboardType="email-address"
             autoCapitalize="none"
+            returnKeyType="next"
+            onSubmitEditing={() => passwordInputRef.current?.focus()}
             onChangeText={(text) => {
               setEmail(text);
               setFieldErrors((previousErrors) => ({ ...previousErrors, email: false }));
@@ -130,6 +132,8 @@ const LoginScreen = () => {
             placeholder="Enter your password"
             placeholderTextColor="#666"
             secureTextEntry={!isPasswordVisible}
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
             onChangeText={(text) => {
               setPassword(text);
               setFieldErrors((previousErrors) => ({ ...previousErrors, password: false }));

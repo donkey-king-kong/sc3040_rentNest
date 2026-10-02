@@ -1,12 +1,14 @@
 package RentNest.controller;
 
 import RentNest.model.Reviews;
+import RentNest.model.User;
 import RentNest.dto.ReviewsDTO;
 import RentNest.service.ReviewsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -46,16 +48,24 @@ public class ReviewsController {
 
     // Update Review
     @PutMapping("/{id}")
-    public ResponseEntity<Reviews> updateReview(@PathVariable Long id, @RequestBody ReviewsDTO reviewDTO) {
-        Reviews updatedReview = reviewsService.updateReview(id, reviewDTO);
-        return ResponseEntity.ok(updatedReview);
+    public ResponseEntity<?> updateReview(@PathVariable Long id, @RequestBody ReviewsDTO reviewDTO, Authentication authentication) {
+        try {
+            Reviews updatedReview = reviewsService.updateReview(id, reviewDTO, getAuthenticatedUserId(authentication));
+            return ResponseEntity.ok(updatedReview);
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
     }
 
     // Delete Review
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteReview(@PathVariable Long id) {
-        reviewsService.deleteReview(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> deleteReview(@PathVariable Long id, Authentication authentication) {
+        try {
+            reviewsService.deleteReview(id, getAuthenticatedUserId(authentication));
+            return ResponseEntity.noContent().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
     }
 
     // Get Flagged Reviews
@@ -93,14 +103,7 @@ public class ReviewsController {
             // Fetch the reviews for the given userID
             List<ReviewsDTO> userReviews = reviewsService.getReviewsByUser(userId);
 
-            // If the list is empty, return 204 NO CONTENT
-            if (userReviews.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.OK)
-                        .contentType(MediaType.TEXT_PLAIN)
-                        .body("No reviews found for the specified user.");
-            }
-
-            // Return the reviews as the response
+            // Return a JSON array for both populated and empty review lists.
             return ResponseEntity.ok(userReviews);
 
         } catch (IllegalArgumentException e) {
@@ -131,5 +134,13 @@ public class ReviewsController {
                     .contentType(MediaType.TEXT_PLAIN)
                     .body(errorMessage);
         }
+    }
+
+    private Long getAuthenticatedUserId(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof User authenticatedUser)) {
+            throw new SecurityException("Authentication required.");
+        }
+
+        return authenticatedUser.getUserID();
     }
 }
