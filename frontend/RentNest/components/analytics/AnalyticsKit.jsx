@@ -346,23 +346,6 @@ export const Meter = ({ label, metric }) => {
 
 const showLabel = (index, count) => count <= 6 || index % 2 === 0;
 
-const TableView = ({ points, unit }) => (
-  <View style={styles.table}>
-    {points.map((point) => (
-      <View key={point.bucket} style={styles.tableRow}>
-        <Text style={styles.tableCell}>{fullBucket(point.bucket)}</Text>
-        <Text style={[styles.tableCell, styles.tableValue]}>{formatValue(point.value, unit)}</Text>
-      </View>
-    ))}
-  </View>
-);
-
-const TableToggle = ({ shown, onPress }) => (
-  <Pressable onPress={onPress} accessibilityRole="button" style={styles.tableToggle}>
-    <Text style={styles.tableToggleText}>{shown ? 'Hide table' : 'View as table'}</Text>
-  </Pressable>
-);
-
 const SeriesUnavailable = ({ series }) => (
   <View style={styles.chartCard}>
     <Text style={styles.tileUnavailable}>Not available</Text>
@@ -377,7 +360,6 @@ const PLOT_HEIGHT = 140;
 /** Single-series bar chart. Tap a bar to read its value. `maxValue` fixes the scale, e.g. 100 for percentages. */
 export const BarChart = ({ series, emptyText, maxValue }) => {
   const [selected, setSelected] = useState(null);
-  const [showTable, setShowTable] = useState(false);
 
   if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
 
@@ -433,8 +415,6 @@ export const BarChart = ({ series, emptyText, maxValue }) => {
         ))}
       </View>
 
-      <TableToggle shown={showTable} onPress={() => setShowTable((shown) => !shown)} />
-      {showTable ? <TableView points={points} unit={series.unit} /> : null}
     </View>
   );
 };
@@ -448,7 +428,6 @@ const LINE_INSET = 8; // keeps the end markers inside the plot
 export const LineChart = ({ series, emptyText, maxValue }) => {
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState(null);
-  const [showTable, setShowTable] = useState(false);
 
   if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
 
@@ -521,8 +500,6 @@ export const LineChart = ({ series, emptyText, maxValue }) => {
         )) : null}
       </View>
 
-      <TableToggle shown={showTable} onPress={() => setShowTable((shown) => !shown)} />
-      {showTable ? <TableView points={points} unit={series.unit} /> : null}
     </View>
   );
 };
@@ -531,7 +508,6 @@ export const LineChart = ({ series, emptyText, maxValue }) => {
 
 /** Parts of a whole as one segmented bar, with a labelled legend so identity never relies on color alone. */
 export const ShareBar = ({ series, emptyText }) => {
-  const [showTable, setShowTable] = useState(false);
 
   if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
 
@@ -564,8 +540,6 @@ export const ShareBar = ({ series, emptyText }) => {
         ))}
       </View>
 
-      <TableToggle shown={showTable} onPress={() => setShowTable((shown) => !shown)} />
-      {showTable ? <TableView points={points} unit={series.unit} /> : null}
     </View>
   );
 };
@@ -575,7 +549,6 @@ export const ShareBar = ({ series, emptyText }) => {
 /** One cell per month: filled = occupied, outlined = vacant. Tap a cell to read it. */
 export const OccupancyStrip = ({ series }) => {
   const [selected, setSelected] = useState(null);
-  const [showTable, setShowTable] = useState(false);
 
   if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
 
@@ -629,8 +602,6 @@ export const OccupancyStrip = ({ series }) => {
         <Text style={styles.legendText}>Vacant</Text>
       </View>
 
-      <TableToggle shown={showTable} onPress={() => setShowTable((shown) => !shown)} />
-      {showTable ? <TableView points={points} unit="status" /> : null}
     </View>
   );
 };
@@ -976,34 +947,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.inkSecondary,
     marginRight: 16,
-  },
-  tableToggle: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-  },
-  tableToggleText: {
-    fontSize: 13,
-    color: COLORS.ink,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-  table: {
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  tableCell: {
-    fontSize: 13,
-    color: COLORS.ink,
-  },
-  tableValue: {
-    fontWeight: '600',
   },
 });
