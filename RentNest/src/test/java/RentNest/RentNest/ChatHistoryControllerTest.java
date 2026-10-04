@@ -13,6 +13,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 
@@ -186,7 +188,7 @@ class ChatHistoryControllerTest {
         when(chatHistoryService.getConversationBetweenUsers(userA, userB)).thenReturn(conversation);
 
         // When
-        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB);
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB, authenticatedAs(userA));
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
@@ -201,7 +203,7 @@ class ChatHistoryControllerTest {
         when(userRepository.findById(userA)).thenReturn(Optional.empty());
 
         // When
-        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB);
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB, authenticatedAs(userA));
 
         // Then
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
@@ -217,7 +219,7 @@ class ChatHistoryControllerTest {
         when(userRepository.findById(userB)).thenReturn(Optional.empty());
 
         // When
-        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB);
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB, authenticatedAs(userA));
 
         // Then
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
@@ -234,10 +236,31 @@ class ChatHistoryControllerTest {
         when(chatHistoryService.getConversationBetweenUsers(userA, userB)).thenReturn(Arrays.asList());
 
         // When
-        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB);
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(userA, userB, authenticatedAs(userA));
 
         // Then
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("No messages found between user " + userA + " and user " + userB + ".", response.getBody());
+    }
+    @Test
+    public void conversationRequiresAuthentication() {
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(1L, 2L, null);
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        verifyNoInteractions(chatHistoryService, userRepository);
+    }
+
+    @Test
+    public void conversationRejectsNonParticipant() {
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(1L, 2L, authenticatedAs(3L));
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verifyNoInteractions(chatHistoryService, userRepository);
+    }
+
+    private Authentication authenticatedAs(Long userId) {
+        User user = new User();
+        ReflectionTestUtils.setField(user, "userID", userId);
+        Authentication authentication = mock(Authentication.class);
+        when(authentication.getPrincipal()).thenReturn(user);
+        return authentication;
     }
 }

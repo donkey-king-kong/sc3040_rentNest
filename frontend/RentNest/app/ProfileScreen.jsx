@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { FontAwesome } from 'react-native-vector-icons'; // Import FontAwesome icons
+import { useRouter } from 'expo-router';
+import { FontAwesome } from '@expo/vector-icons';
 import NavigationBar from '../components/NavigationBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
@@ -9,7 +9,7 @@ import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 
 const ProfileScreen = () => {
-  const navigation = useNavigation();
+  const router = useRouter();
   const [user, setUser] = useState({
     userID: 1,
     name: 'Loading...',
@@ -23,7 +23,7 @@ const ProfileScreen = () => {
       try {
         const token = await AsyncStorage.getItem('token');
         if (!token) {
-          navigation.navigate('LandingScreen');
+          router.replace('/LandingScreen');
           return;
         }
 
@@ -53,7 +53,7 @@ const ProfileScreen = () => {
 
       } catch (error) {
         console.error('Error fetching user data:', error);
-        navigation.navigate('LandingScreen');
+        router.replace('/LandingScreen');
       }
     };
 
@@ -62,7 +62,7 @@ const ProfileScreen = () => {
 
   // Function to navigate to EditProfileScreen
   const handleEditProfile = () => {
-    navigation.navigate('EditProfileScreen');
+    router.push('/EditProfileScreen');
   };
 
   // Function to navigate to LandingScreen
@@ -70,7 +70,7 @@ const ProfileScreen = () => {
     try {
       await AsyncStorage.multiRemove(['token', 'userId']);
       delete axios.defaults.headers.common['Authorization'];
-      navigation.navigate('LandingScreen');
+      router.replace('/LandingScreen');
     } catch (error) {
       console.error('Error during logout:', error);
     }

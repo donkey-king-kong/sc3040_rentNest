@@ -1,10 +1,9 @@
 // Previous imports remain unchanged
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Modal, Alert} from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Modal, Alert} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import MapView, { Marker } from '../components/AppMap';
-import {useRouter} from "expo-router";
+import {useRouter, useLocalSearchParams} from "expo-router";
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
@@ -15,8 +14,7 @@ const HomeListingScreen = () => {
   console.log('Initializing HomeListingScreen component');
 
   const router = useRouter();
-  const route = useRoute();
-  const { listingId } = route.params;
+  const { listingId } = useLocalSearchParams();
 
   const [listing, setListing] = useState(null);
   const [nearbySchools, setNearbySchools] = useState([]);
@@ -130,8 +128,12 @@ const HomeListingScreen = () => {
         console.log('Processed listing data:', defaultListing);
         setListing(defaultListing);
 
-        // Keep the loading screen visible until all listing sections have finished loading.
-        await fetchSecondaryListingData(tokenValue);
+        // Show the listing once core details are ready; secondary sections load in the background.
+        setLoading(false);
+        fetchSecondaryListingData(tokenValue, defaultListing.ownerUserID)
+          .catch(error => {
+            console.warn('Secondary listing data failed:', error?.message);
+          });
       } catch (error) {
         console.error('Error in fetchListingData:', error);
         console.error('Error details:', { //Remove when demo
@@ -145,7 +147,7 @@ const HomeListingScreen = () => {
       }
     };
 
-    const fetchSecondaryListingData = async (tokenValue) => {
+    const fetchSecondaryListingData = async (tokenValue, ownerUserID) => {
       const headers = authHeaders(tokenValue);
       const requestConfig = { headers, timeout: 20000 };
       const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -190,7 +192,7 @@ const HomeListingScreen = () => {
           }
 
           if (status !== 'LOADING') {
-            console.warn('Nearby amenities returned unexpected status:', status);
+            console.log('Nearby amenities unavailable:', status);
             applyNearbyAmenities([]);
             return;
           }
@@ -198,7 +200,7 @@ const HomeListingScreen = () => {
           await wait(2000);
         }
 
-        console.warn('Nearby amenities are still loading after timeout');
+        console.log('Nearby amenities are still loading after timeout; showing empty state');
         applyNearbyAmenities([]);
       };
 
@@ -214,17 +216,18 @@ const HomeListingScreen = () => {
             });
             setPriceInsights(Object.values(uniquePrices));
           }),
-        axios.get(`${API_BASE_URL}/api/reviews/${listingId}`, requestConfig)
+        axios.get(`${API_BASE_URL}/api/reviews/byUser/${ownerUserID}`, requestConfig)
           .then(response => {
-            const formattedReviews = (response.data || []).map(review => ({
-              reviewId: review.id,
+            const reviewList = Array.isArray(response.data) ? response.data : [];
+            const formattedReviews = reviewList.map(review => ({
+              reviewId: review.reviewID ?? review.reviewid ?? review.id,
               rating: review.rating,
               title: review.title || 'Review',
               text: review.text,
               user: {
-                userID: review.userId,
-                name: review.userName || 'Anonymous',
-                photoURL: review.userPhotoURL || 'https://via.placeholder.com/50'
+                userID: review.reviewerID ?? review.reviewerId ?? review.userId,
+                name: review.reviewerName || review.userName || 'Anonymous',
+                photoURL: review.reviewerPhotoURL || review.userPhotoURL || 'https://via.placeholder.com/50'
               },
               flagged: review.flagged || false
             }));
@@ -233,7 +236,10 @@ const HomeListingScreen = () => {
       ]).then(results => {
         results.forEach((result, index) => {
           if (result.status === 'rejected') {
-            console.warn(`Secondary listing request ${index} failed:`, result.reason?.message);
+            const status = result.reason?.response?.status;
+            if (status !== 404) {
+              console.warn(`Secondary listing request ${index} failed:`, result.reason?.message);
+            }
           }
         });
       });
@@ -305,7 +311,12 @@ const HomeListingScreen = () => {
 
   return (
     <ScrollView style={styles.box}>
-      <Image source={{ uri: listing.imageURL }} style={styles.image} />
+      <View style={styles.imageWrapper}>
+        <Image source={{ uri: listing.imageURL }} style={styles.image} />
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </TouchableOpacity>
+      </View>
       <View style={styles.container}>
         {/* Display the name and address */}
         <Text style={styles.name}>{listing.name}</Text>
@@ -441,16 +452,12 @@ const HomeListingScreen = () => {
                         <Text style={styles.cellHeader}>Lease Date</Text>
                         <Text style={styles.cellHeader}>Rent Price</Text>
                     </View>
-                    <FlatList
-                         data={priceInsights}
-                         keyExtractor={(item) => item.leaseDate}
-                         renderItem={({ item }) => (
-                             <View style={styles.row}>
-                             <Text style={styles.cell}>{item.leaseDate}</Text>
-                             <Text style={styles.cell}>${item.rentPrice}</Text>
-                           </View>
-                         )}
-                     />
+                    {priceInsights.map((item) => (
+                      <View key={item.leaseDate} style={styles.row}>
+                        <Text style={styles.cell}>{item.leaseDate}</Text>
+                        <Text style={styles.cell}>${item.rentPrice}</Text>
+                      </View>
+                    ))}
                 </View>
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
@@ -534,10 +541,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  imageWrapper: {
+    position: 'relative',
+  },
   image: {
     width: '100%',
     height: 250,
     borderRadius: 10,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.85)',
   },
   name: {
     fontSize: 24,
@@ -698,6 +719,19 @@ placesContainer: {
     userName: {
       fontSize: 14,
       color: '#555',
+    },
+    noReviewsContainer: {
+      borderWidth: 1,
+      borderColor: '#dcdcdc',
+      borderRadius: 5,
+      paddingVertical: 14,
+      alignItems: 'center',
+      backgroundColor: '#fff',
+    },
+    noReviewsText: {
+      fontSize: 14,
+      color: '#777',
+      fontWeight: '600',
     },
 container: {
     padding: 15,

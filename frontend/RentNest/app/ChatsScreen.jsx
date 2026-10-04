@@ -318,31 +318,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyStateContainer: {
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 40,
+    paddingHorizontal: 40,
   },
   emptyTextContainer: {
-    flexShrink: 1,
-    maxWidth: 460,
-    marginRight: 48,
+    alignItems: 'center',
+    marginBottom: 32,
   },
   emptyTitle: {
-    color: '#4A4A4A',
-    fontSize: 26,
+    color: '#333',
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   emptyDescription: {
-    color: '#666',
+    color: '#888',
     fontSize: 16,
     lineHeight: 24,
+    textAlign: 'center',
   },
   emptyImage: {
-    width: 380,
-    height: 280,
+    width: 220,
+    height: 160,
   },
 });
 

@@ -12,6 +12,9 @@ public class RentalsDTO {
     private Date leaseExpiry;
     private String paymentHistory;
     private String status;
+    private Date createdAt;
+    private Date acceptedAt;
+    private Date terminatedAt;
 
     // Getters
     public Long getRentalID() {
@@ -50,6 +53,18 @@ public class RentalsDTO {
         return status;
     }
 
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
+    public Date getAcceptedAt() {
+        return acceptedAt;
+    }
+
+    public Date getTerminatedAt() {
+        return terminatedAt;
+    }
+
     // Setters
     public void setRentalID(Long rentalID) {
         this.rentalID = rentalID;
@@ -85,5 +100,17 @@ public class RentalsDTO {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public void setAcceptedAt(Date acceptedAt) {
+        this.acceptedAt = acceptedAt;
+    }
+
+    public void setTerminatedAt(Date terminatedAt) {
+        this.terminatedAt = terminatedAt;
     }
 }

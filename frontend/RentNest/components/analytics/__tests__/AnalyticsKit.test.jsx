@@ -37,6 +37,13 @@ jest.mock('expo-router', () => ({
 }));
 
 // Every string rendered inside a <Text>, flattened
+// React 19 commits test renders asynchronously unless they are wrapped in act.
+const renderStatic = (element) => {
+  let tree;
+  act(() => { tree = create(element); });
+  return tree;
+};
+
 const renderedText = (tree) => tree.root.findAllByType(Text)
   .map((node) => [].concat(node.props.children).filter((child) => typeof child === 'string' || typeof child === 'number').join(''))
   .filter(Boolean);
@@ -93,13 +100,13 @@ describe('buildPeriod', () => {
 
 describe('StatTile', () => {
   it('keeps the label and value when decorated with an icon and tone', () => {
-    const text = renderedText(create(<StatTile icon="home" tone="blue" label="Listings" metric={available(8)} />));
+    const text = renderedText(renderStatic(<StatTile icon="home" tone="blue" label="Listings" metric={available(8)} />));
     expect(text).toContain('Listings');
     expect(text).toContain('8');
   });
 
   it('shows a measured zero as 0', () => {
-    const tree = create(<StatTile label="Listings" metric={available(0)} />);
+    const tree = renderStatic(<StatTile label="Listings" metric={available(0)} />);
     const text = renderedText(tree);
     expect(text).toContain('0');
     expect(text).not.toContain('Not available');
@@ -110,7 +117,7 @@ describe('StatTile', () => {
       ...available(3, 'count', 'period'),
       coverage: { start: '2026-09-16T18:26:00Z', end: '2026-10-01T00:00:00Z', complete: false },
     };
-    const text = renderedText(create(<StatTile label="Offers sent" metric={metric} />));
+    const text = renderedText(renderStatic(<StatTile label="Offers sent" metric={metric} />));
     expect(text.some((item) => item.startsWith('Tracked since '))).toBe(true);
     expect(text).not.toContain('Selected period');
   });
@@ -120,19 +127,19 @@ describe('StatTile', () => {
       ...available(3, 'count', 'period'),
       coverage: { start: '2026-01-01T00:00:00Z', end: '2026-04-01T00:00:00Z', complete: true },
     };
-    expect(renderedText(create(<StatTile label="Offers sent" metric={metric} />))).toContain('Selected period');
+    expect(renderedText(renderStatic(<StatTile label="Offers sent" metric={metric} />))).toContain('Selected period');
   });
 
   it('shows a change line only when the change could be calculated', () => {
-    const withChange = renderedText(create(<StatTile label="New users" metric={available(2)} change={available(100, 'percent', 'period')} />));
+    const withChange = renderedText(renderStatic(<StatTile label="New users" metric={available(2)} change={available(100, 'percent', 'period')} />));
     expect(withChange).toContain('+100.0% vs previous period');
 
-    const withoutChange = renderedText(create(<StatTile label="New users" metric={available(2)} change={unavailable('Needs the previous period.')} />));
+    const withoutChange = renderedText(renderStatic(<StatTile label="New users" metric={available(2)} change={unavailable('Needs the previous period.')} />));
     expect(withoutChange.some((item) => item.includes('vs previous period'))).toBe(false);
   });
 
   it('shows unavailable metrics as not available with the reason, never 0', () => {
-    const tree = create(<StatTile label="Listing views" metric={unavailable('Not tracked yet.')} />);
+    const tree = renderStatic(<StatTile label="Listing views" metric={unavailable('Not tracked yet.')} />);
     const text = renderedText(tree);
     expect(text).toContain('Not available');
     expect(text).toContain('Not tracked yet.');
@@ -156,7 +163,7 @@ describe('BarChart', () => {
       availability: 'available', unit: 'SGD', basis: 'period', definition: '', reason: null,
       points: [{ bucket: '2026-01', value: 0 }, { bucket: '2026-02', value: 0 }],
     };
-    const text = renderedText(create(<BarChart series={series} emptyText="No rent recorded in this period" />));
+    const text = renderedText(renderStatic(<BarChart series={series} emptyText="No rent recorded in this period" />));
     expect(text).toContain('No rent recorded in this period');
   });
 
@@ -165,14 +172,14 @@ describe('BarChart', () => {
       availability: 'available', unit: 'percent', basis: 'period', definition: '', reason: null,
       points: [{ bucket: '2026-01', value: 0 }],
     };
-    const text = renderedText(create(<BarChart series={series} emptyText="No occupancy in this period" maxValue={100} />));
+    const text = renderedText(renderStatic(<BarChart series={series} emptyText="No occupancy in this period" maxValue={100} />));
     expect(text).toContain('No occupancy in this period');
     expect(text).toContain('100.0%');
   });
 
   it('shows an unavailable series as not available', () => {
     const series = { availability: 'unavailable', unit: 'count', basis: 'period', reason: 'Not tracked yet.', points: [] };
-    const text = renderedText(create(<BarChart series={series} emptyText="unused" />));
+    const text = renderedText(renderStatic(<BarChart series={series} emptyText="unused" />));
     expect(text).toContain('Not available');
     expect(text).toContain('Not tracked yet.');
   });
@@ -214,10 +221,10 @@ describe('LineChart', () => {
 
   it('shows the empty message and an unavailable series truthfully', () => {
     const empty = { ...series, points: [{ bucket: '2026-01', value: 0 }] };
-    expect(renderedText(create(<LineChart series={empty} emptyText="No occupancy in this period" />))).toContain('No occupancy in this period');
+    expect(renderedText(renderStatic(<LineChart series={empty} emptyText="No occupancy in this period" />))).toContain('No occupancy in this period');
 
     const unavailableSeries = { availability: 'unavailable', unit: 'percent', basis: 'period', reason: 'No listings.', points: [] };
-    const text = renderedText(create(<LineChart series={unavailableSeries} emptyText="unused" />));
+    const text = renderedText(renderStatic(<LineChart series={unavailableSeries} emptyText="unused" />));
     expect(text).toContain('Not available');
     expect(text).toContain('No listings.');
   });
@@ -234,7 +241,7 @@ describe('ShareBar', () => {
         { bucket: 'Neither', value: 4 },
       ],
     };
-    const text = renderedText(create(<ShareBar series={series} emptyText="No users yet" />));
+    const text = renderedText(renderStatic(<ShareBar series={series} emptyText="No users yet" />));
     expect(text).toContain('8 in total');
     expect(text).toContain('Owners only');
     expect(text).toContain('2 · 25.0%');
@@ -244,7 +251,7 @@ describe('ShareBar', () => {
 
   it('says when there is nothing to show', () => {
     const series = { availability: 'available', unit: 'count', basis: 'snapshot', points: [{ bucket: 'Neither', value: 0 }] };
-    expect(renderedText(create(<ShareBar series={series} emptyText="No users yet" />))).toContain('No users yet');
+    expect(renderedText(renderStatic(<ShareBar series={series} emptyText="No users yet" />))).toContain('No users yet');
   });
 });
 

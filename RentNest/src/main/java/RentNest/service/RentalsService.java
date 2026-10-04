@@ -5,7 +5,6 @@ import RentNest.dto.RentalsDTO;
 import RentNest.model.ChatHistory;
 import RentNest.model.Rentals;
 import RentNest.repository.RentalsRepository;
-import RentNest.dto.ChatHistoryDTO;
 import RentNest.repository.ChatHistoryRepository;
 import RentNest.model.Listings;
 import RentNest.dto.ListingsDTO;
@@ -46,6 +45,9 @@ public class RentalsService {
         rentalsDTO.setLeaseExpiry(rentals.getLeaseExpiry());
         rentalsDTO.setPaymentHistory(rentals.getPaymentHistory());
         rentalsDTO.setStatus(rentals.getStatus());
+        rentalsDTO.setCreatedAt(rentals.getCreatedAt());
+        rentalsDTO.setAcceptedAt(rentals.getAcceptedAt());
+        rentalsDTO.setTerminatedAt(rentals.getTerminatedAt());
 
         // Map the foreign key relationship (Listing to RentalsDTO)
         ListingsDTO listingsDTO = new ListingsDTO();
@@ -123,6 +125,7 @@ public class RentalsService {
     }
 
     // Update a rental
+    @Transactional
     public Rentals updateRental(Long rentalID, RentalsDTO updatedRentalDTO) {
         Optional<Rentals> existingRentalOpt = rentalsRepository.findById(rentalID);
         if (existingRentalOpt.isPresent()) {
@@ -192,6 +195,7 @@ public class RentalsService {
         rental.setPaymentHistory(rentalDTO.getPaymentHistory());
         rental.setStatus("pending"); // Set rental status to "pending"
         rental.setListings(listing);
+        recordStatusChange(rental);
 
         Rentals savedRental = rentalsRepository.save(rental); // Save the rental first and get its ID
 
@@ -307,4 +311,5 @@ public class RentalsService {
         }
         return tenantIDs;
     }
+
 }

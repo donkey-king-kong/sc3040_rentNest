@@ -61,7 +61,7 @@ public class ReviewsController {
         if (requestedReviewer != null && !requestedReviewer.equals(existing.get().getReviewerId()) && !user.isAdmin()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        Reviews updatedReview = reviewsService.updateReview(id, reviewDTO);
+        Reviews updatedReview = reviewsService.updateReview(id, reviewDTO, user);
         return ResponseEntity.ok(updatedReview);
     }
 
@@ -75,7 +75,7 @@ public class ReviewsController {
         if (user == null || !(user.isAdmin() || review.get().isWrittenBy(user))) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        reviewsService.deleteReview(id);
+        reviewsService.deleteReview(id, user);
         return ResponseEntity.noContent().build();
     }
 
@@ -114,14 +114,7 @@ public class ReviewsController {
             // Fetch the reviews for the given userID
             List<ReviewsDTO> userReviews = reviewsService.getReviewsByUser(userId);
 
-            // If the list is empty, return 204 NO CONTENT
-            if (userReviews.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.OK)
-                        .contentType(MediaType.TEXT_PLAIN)
-                        .body("No reviews found for the specified user.");
-            }
-
-            // Return the reviews as the response
+            // Return a JSON array for both populated and empty review lists.
             return ResponseEntity.ok(userReviews);
 
         } catch (IllegalArgumentException e) {
@@ -153,4 +146,5 @@ public class ReviewsController {
                     .body(errorMessage);
         }
     }
+
 }

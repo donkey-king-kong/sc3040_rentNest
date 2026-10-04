@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useRoute } from '@react-navigation/native'; // Import useRoute for accessing route parameters
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
+import { FontAwesome } from '@expo/vector-icons';
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const ReviewListingScreen2 = () => {
-  const router = useRouter(); // Get the router object
-  const route = useRoute(); // Get the route object
-  const { listingid } = route.params; // Get listingID from route parameters
+  const router = useRouter();
+  const { listingid } = useLocalSearchParams();
 
   const [listingData, setListingData] = useState(null);
 
@@ -114,14 +114,23 @@ const ReviewListingScreen2 = () => {
 
   if (!listingData) {
     return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading listing review...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      <View style={styles.topHeaderRow}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/ReviewListingScreen?refresh=true')}>
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </TouchableOpacity>
+        <Text style={styles.screenTitle}>Review Flagged Listing</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
       <View style={styles.listingBox}>
         {/* Flag Image at the top right corner */}
         <Image
@@ -142,7 +151,10 @@ const ReviewListingScreen2 = () => {
 
         <TouchableOpacity
           style={styles.viewFullListingButton}
-          onPress={() => router.push(`/HomeListingScreen?listingid=${listingData.listingID}`)} // Navigate to Full Listing Screen
+          onPress={() => router.push({
+            pathname: '/HomeListingScreen',
+            params: { listingId: listingData.listingID },
+          })}
         >
           <Text style={styles.buttonText}>View Full Listing</Text>
         </TouchableOpacity>
@@ -172,6 +184,42 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 15,
     backgroundColor: '#f9f9f9',
+  },
+  topHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+  },
+  screenTitle: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#101820',
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 42,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   listingBox: {
     backgroundColor: '#fff',

@@ -222,7 +222,9 @@ public class PaymentService {
         // Using a map to store the rental price, lease expiry, and the payments
         Map<String, Object> response = new HashMap<>();
         response.put("rentalPrice", rentalPrice);  // Add the rental price
+        response.put("rentalDate", rental.getRentalDate());  // Add rental start date as fallback for older rentals
         response.put("leaseExpiry", leaseExpiry);  // Add the lease expiry date
+        response.put("acceptedAt", rental.getAcceptedAt());  // Add accepted date for overdue month calculation
         response.put("payments", payments);        // Add the list of payments
 
         return response;
@@ -231,5 +233,3 @@ public class PaymentService {
 
 
 }
-
-

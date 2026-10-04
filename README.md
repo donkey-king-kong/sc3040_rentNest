@@ -5,7 +5,7 @@ RentNest helps property owners list rental homes and users search for available 
 ## Setup Instructions
 
 ### Required Installs
-- Java JDK
+- Java JDK 21
 - Maven
 - Node.js and npm
 - Expo Go mobile app, if testing on a physical phone
@@ -36,6 +36,8 @@ URA_ACCESSKEY=dummy
 ```
 
 ### Frontend Setup
+The merged frontend uses Expo SDK 57. Use a compatible Expo Go version or development build for mobile testing.
+
 1. Go to the frontend directory:
 ```bash
 cd frontend/RentNest
@@ -57,6 +59,17 @@ w = web
 i = iOS simulator
 a = Android emulator
 ```
+
+### Mobile Demo
+1. Connect your phone and computer to the same Wi-Fi.
+2. Start the backend and find your computer's Wi-Fi IPv4 address using `ipconfig`.
+3. In the frontend PowerShell terminal, set the backend address before starting Expo:
+```powershell
+$env:EXPO_PUBLIC_API_BASE_URL = "http://YOUR_COMPUTER_IP:8080"
+npm.cmd run start
+```
+4. Open the project on your phone using the Expo QR code. Keep both servers running.
+5. Check login, listings, admin moderation, analytics, and the rental flows used in your demo.
 
 ### Backend Setup
 1. Go to the backend directory:
@@ -86,12 +99,14 @@ The app uses a shared Supabase PostgreSQL database. The real connection details 
 
 The backend runs with `spring.jpa.hibernate.ddl-auto=validate`, so it never changes the shared schema. Read [docs/db/README.md](docs/db/README.md) before changing any entity class.
 
-## Pre-Configured Users
+## Pre-Configured Users (Non-Exhaustive)
+
+These are the accounts documented on main. Confirm the current passwords with the team before the demo.
 | Role | Name | Email | Password |
 | --- | --- | --- | --- |
-| Owner | Superman | superman@gmail.com | 12345678 |
-| User Viewer | Batman | batman@gmail.com | 12345678 |
-| Admin | Admin | admin@gmail.com | 12345678 |
+| Owner | Superman | superman@gmail.com | superman123 |
+| User Viewer | Batman | batman@gmail.com | batman123 |
+| Admin | Admin | admin@gmail.com | admin123 |
 
 ## Tech Stack
 - Frontend: React Native, Expo, JavaScript
@@ -103,3 +118,19 @@ The backend runs with `spring.jpa.hibernate.ddl-auto=validate`, so it never chan
 - [Hawker Centre API](https://data.gov.sg/api/action/datastore_search?resource_id=d_68a42f09f350881996d83f9cd73ab02f)
 - [Bus Stop API](https://datamall2.mytransport.sg/ltaodataservice/BusStops)
 - [URA Rental Prices API](https://www.ura.gov.sg/uraDataService/invokeUraDS?service=PMI_Resi_Rental&refPeriod=14q1)
+
+## Verification
+Backend tests use an isolated H2 database:
+```powershell
+cd RentNest
+mvn test
+```
+Use JDK 21. If your installed JDK is 26, the current Mockito/Byte Buddy dependency requires:
+```powershell
+mvn test "-DargLine=-Dnet.bytebuddy.experimental=true"
+```
+Frontend checks, from `frontend/RentNest`:
+```powershell
+npx.cmd expo install --check
+npm.cmd test -- --watchAll=false --runInBand
+```

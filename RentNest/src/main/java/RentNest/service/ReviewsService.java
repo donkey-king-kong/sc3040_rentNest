@@ -38,6 +38,7 @@ public class ReviewsService {
         // Fetch and map reviewer details
         User reviewer = reviews.getReviewer(); // Directly get the reviewer from the Reviews entity
         if (reviewer != null) {
+            reviewsDTO.setReviewerID(reviewer.getUserID());
             reviewsDTO.setReviewerName(reviewer.getName());
             reviewsDTO.setReviewerEmail(reviewer.getEmail());
             reviewsDTO.setReviewerPhotoURL(reviewer.getPhotoURL());
@@ -95,10 +96,22 @@ public class ReviewsService {
     }
 
     // Update reviews
-    public Reviews updateReview(Long id, ReviewsDTO reviewDTO) {
+    public Reviews updateReview(Long id, ReviewsDTO reviewDTO, User authenticatedUser) {
         // Find the existing review by ID
         Reviews existingReview = reviewsRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Review not found with id: " + id));
+
+        assertReviewAuthor(existingReview, authenticatedUser);
+
+        Long requestedReviewer = reviewDTO.getReviewerID();
+        if (requestedReviewer != null && !requestedReviewer.equals(existingReview.getReviewerId())) {
+            if (!authenticatedUser.isAdmin()) {
+                throw new SecurityException("Only an admin can reassign a review.");
+            }
+            User reviewer = userRepository.findById(requestedReviewer)
+                    .orElseThrow(() -> new RuntimeException("Reviewer not found"));
+            existingReview.setReviewer(reviewer);
+        }
 
         // Update fields that can be modified
         existingReview.setRating(reviewDTO.getRating());
@@ -107,20 +120,23 @@ public class ReviewsService {
         // The flag is not copied from the request: editing a reported review must not clear its report.
         // Flags change only through the setFlag moderation endpoint.
 
-        // If the reviewer needs to be updated, fetch the reviewer
-        if (reviewDTO.getReviewerID() != null && !reviewDTO.getReviewerID().equals(existingReview.getReviewer().getUserID())) {
-            User reviewer = userRepository.findById(reviewDTO.getReviewerID())
-                    .orElseThrow(() -> new RuntimeException("Reviewer not found"));
-            existingReview.setReviewer(reviewer);
-        }
-
         // Save and return the updated review
         return reviewsRepository.save(existingReview);
     }
 
     // Delete
-    public void deleteReview(Long id) {
-        reviewsRepository.deleteById(id);
+    public void deleteReview(Long id, User authenticatedUser) {
+        Reviews existingReview = reviewsRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Review not found with id: " + id));
+
+        assertReviewAuthor(existingReview, authenticatedUser);
+        reviewsRepository.delete(existingReview);
+    }
+
+    private void assertReviewAuthor(Reviews review, User authenticatedUser) {
+        if (authenticatedUser == null || !(authenticatedUser.isAdmin() || review.isWrittenBy(authenticatedUser))) {
+            throw new SecurityException("Only the review author or an admin can modify this review.");
+        }
     }
 
     // Get Flagged Reviews

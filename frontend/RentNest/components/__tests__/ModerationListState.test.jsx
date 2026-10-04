@@ -6,15 +6,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ModerationListState, { moderationLoadError } from '../ModerationListState';
 import BanUserScreen from '../../app/BanUserScreen';
 import ProcessReviewsScreen from '../../app/ProcessReviewsScreen';
+import AdminScreen from '../../app/AdminScreen';
+
+const mockPush = jest.fn();
 
 jest.mock('axios');
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 jest.mock('../../config/api', () => ({ API_BASE_URL: 'http://test.local', ENDPOINTS: {} }));
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn(), setParams: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn(), setParams: jest.fn() }),
   useLocalSearchParams: () => ({}),
 }));
+
+// React 19 commits test renders asynchronously unless they are wrapped in act.
+const renderStatic = (element) => {
+  let tree;
+  act(() => { tree = create(element); });
+  return tree;
+};
 
 const renderedText = (tree) => tree.root.findAllByType(Text)
   .map((node) => [].concat(node.props.children).filter((child) => typeof child === 'string').join(''))
@@ -28,14 +38,14 @@ beforeEach(async () => {
 
 describe('ModerationListState', () => {
   it('shows a loading state', () => {
-    const text = renderedText(create(<ModerationListState loading emptyText="No reported users right now." />));
+    const text = renderedText(renderStatic(<ModerationListState loading emptyText="No reported users right now." />));
     expect(text).toContain('Loading…');
     expect(text).not.toContain('No reported users right now.');
   });
 
   it('shows an error with a retry button instead of the empty message', () => {
     const onRetry = jest.fn();
-    const tree = create(<ModerationListState error="Something failed." onRetry={onRetry} emptyText="No reported users right now." />);
+    const tree = renderStatic(<ModerationListState error="Something failed." onRetry={onRetry} emptyText="No reported users right now." />);
     const text = renderedText(tree);
     expect(text).toContain('Something failed.');
     expect(text).toContain('Try again');
@@ -43,13 +53,13 @@ describe('ModerationListState', () => {
   });
 
   it('tells a searching admin that nothing matched, not that nothing is reported', () => {
-    const text = renderedText(create(<ModerationListState searching emptyText="No reported users right now." />));
+    const text = renderedText(renderStatic(<ModerationListState searching emptyText="No reported users right now." />));
     expect(text).toContain('No results match your search.');
     expect(text).not.toContain('No reported users right now.');
   });
 
   it('shows the empty message when the list is genuinely empty', () => {
-    const text = renderedText(create(<ModerationListState emptyText="No reported users right now." />));
+    const text = renderedText(renderStatic(<ModerationListState emptyText="No reported users right now." />));
     expect(text).toContain('No reported users right now.');
   });
 });
@@ -108,5 +118,28 @@ describe('moderation screens', () => {
     expect(text).toContain("Can't reach the server. Check your connection and try again.");
     expect(text).not.toContain('Loading...');
     expect(text).not.toContain('Loading…');
+  });
+});
+
+describe('merged admin dashboard', () => {
+  it('keeps analytics navigation alongside the incoming moderation counts', async () => {
+    const counts = { reviews: 1, users: 2, listings: 3 };
+    axios.get.mockImplementation(async (url) => {
+      const type = Object.keys(counts).find(key => url.includes('/' + key + '/'));
+      return { data: Array.from({ length: counts[type] }, (_, index) => ({ id: index })) };
+    });
+    let tree;
+    await act(async () => { tree = create(<AdminScreen />); });
+    const text = renderedText(tree);
+    expect(text).toEqual(expect.arrayContaining(['Platform Analytics', 'Reviews', 'Users', 'Listings']));
+    const analyticsButton = tree.root.findAll(node => {
+      return typeof node.props.onPress === 'function'
+        && node.findAllByType(Text).some(child => child.props.children === 'Platform Analytics');
+    })[0];
+    expect(analyticsButton).toBeDefined();
+    await act(async () => { analyticsButton.props.onPress(); });
+    expect(mockPush).toHaveBeenCalledWith('/AdminAnalyticsScreen');
+    const allText = tree.root.findAllByType(Text).map(node => node.props.children);
+    expect(allText).toEqual(expect.arrayContaining([1, 2, 3]));
   });
 });
