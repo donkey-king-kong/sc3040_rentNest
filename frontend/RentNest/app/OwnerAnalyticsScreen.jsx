@@ -49,7 +49,7 @@ const OwnerAnalyticsScreen = () => {
       </>
     );
   }
-  if (!data && loading) return <LoadingState message="Loading..." textStyle={styles.loadingText} />;
+  if (!data && loading) return <LoadingState message="Loading analytics..." textStyle={styles.loadingText} />;
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
   const m = data.metrics;

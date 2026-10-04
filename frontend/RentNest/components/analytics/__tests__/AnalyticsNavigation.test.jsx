@@ -111,3 +111,22 @@ it('shows a completed days-on-market interval with both dates while retaining vi
   await press(tree, 'Back to profile');
   expect(mockReplace).toHaveBeenCalledWith('/ProfileScreen');
  });
+
+it.each(['loaded', 'error'])('property analytics supports back navigation when %s', async state => {
+  if (state === 'error') useAnalytics.mockReturnValue({ data: null, loading: false, error: 'Unable to load analytics', retry: jest.fn() });
+  const tree = await render(ListingAnalyticsScreen);
+  await press(tree, 'Back to owner analytics');
+  expect(mockBack).toHaveBeenCalledTimes(1);
+  expect(mockReplace).not.toHaveBeenCalled();
+  mockCanGoBack.mockReturnValue(false);
+  await press(tree, 'Back to owner analytics');
+  expect(mockReplace).toHaveBeenCalledWith('/OwnerAnalyticsScreen');
+});
+
+it('property analytics shows the requested loading message before displaying its header', async () => {
+  useAnalytics.mockReturnValue({ data: null, loading: true });
+  const tree = await render(ListingAnalyticsScreen);
+  expect(text(tree)).toContain('Loading analytics...');
+  expect(text(tree)).not.toContain('Property analytics');
+  await act(async () => tree.unmount());
+});

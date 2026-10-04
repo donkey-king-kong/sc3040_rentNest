@@ -32,7 +32,20 @@ const ListingAnalyticsScreen = () => {
   const ownedListings = useOwnedListings();
   const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_LISTING(listingId), period);
 
-  const header = <Stack.Screen options={{ title: 'Property analytics' }} />;
+  const header = (
+    <>
+      <Stack.Screen options={{ title: 'Property analytics' }} />
+      <View style={styles.header}>
+        <Pressable style={styles.backButton}
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/OwnerAnalyticsScreen')}
+          accessibilityRole="button" accessibilityLabel="Back to owner analytics">
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </Pressable>
+        <Text style={styles.headerTitle}>Property analytics</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+    </>
+  );
 
   if (unauthenticated) {
     return (
@@ -42,7 +55,7 @@ const ListingAnalyticsScreen = () => {
       </>
     );
   }
-  if (!data && loading) return <>{header}<LoadingState /></>;
+  if (!data && loading) return <LoadingState message="Loading analytics..." textStyle={styles.loadingText} />;
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
   const m = data.metrics;
@@ -196,6 +209,11 @@ const ListingAnalyticsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#FFFFFF', width: '100%', maxWidth: 1120, alignSelf: 'center' },
+  backButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  headerTitle: { flex: 1, fontSize: 24, fontWeight: '700', textAlign: 'center', color: '#101820' },
+  headerSpacer: { width: 44 },
+  loadingText: { marginTop: 14, fontSize: 16, fontWeight: '600', color: '#101820' },
   marketDates: { flexGrow: 1, flexBasis: '45%', margin: 5, padding: 12, backgroundColor: COLORS.card, borderRadius: 12 },
   dateLabel: { fontSize: 12, color: COLORS.inkSecondary },
   dateValue: { fontSize: 15, color: COLORS.ink, fontWeight: '600', marginTop: 2, marginBottom: 10 },
