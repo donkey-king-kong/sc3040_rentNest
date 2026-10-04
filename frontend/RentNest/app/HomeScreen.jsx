@@ -1,21 +1,16 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import NavigationBar from '../components/NavigationBar';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const emptyForm = { query: '', minPrice: '', maxPrice: '', minBeds: '', types: [] };
 
-// Labels for the three AI-assisted stages the backend reports in `ai`, so the screen
-// never presents a rule-based fallback as an AI result.
-const aiLabels = {
-  filter: { ai: 'Search read by AI', rules: 'Search read by keyword rules', off: 'AI search off' },
-  sorting: { ai: 'Order refined by AI', similarity: 'Ordered by similarity score', off: 'AI ordering off' },
-  summaries: { ai: 'AI summaries', pending: 'AI summaries generating', off: 'AI summaries off' },
-};
 const aiLabel = (stage, value) => aiLabels[stage]?.[value] || null;
 const historyKey = token => `recommendation-views:${jwtDecode(token).sub}`;
 async function readHistory(token) {
@@ -115,11 +110,18 @@ export default function HomeScreen() {
           {[['minPrice', 'Min S$/month'], ['maxPrice', 'Max S$/month'], ['minBeds', 'Min bedrooms']].map(([key, label]) =>
             <TextInput key={key} accessibilityLabel={label} style={styles.input} placeholder={label} keyboardType="numeric" value={form[key]} onChangeText={value => update(key, value)} />)}
         </View>
-        <View style={styles.row}>
-          {['HDB', 'Condo', 'Landed'].map(type => <TouchableOpacity key={type} accessibilityRole="checkbox" accessibilityState={{ checked: form.types.includes(type) }}
-            style={[styles.chip, form.types.includes(type) && styles.selected]}
-            onPress={() => update('types', form.types.includes(type) ? form.types.filter(t => t !== type) : [...form.types, type])}>
-            <Text>{type}</Text></TouchableOpacity>)}
+        <View style={styles.pickerContainer}>
+          <Picker
+            accessibilityLabel="Property type"
+            selectedValue={form.types[0] || ''}
+            onValueChange={value => update('types', value ? [value] : [])}
+            style={styles.picker}
+          >
+            <Picker.Item label="All property types" value="" />
+            <Picker.Item label="HDB" value="HDB" />
+            <Picker.Item label="Condo" value="Condo" />
+            <Picker.Item label="Landed" value="Landed" />
+          </Picker>
           <TouchableOpacity style={styles.chip} onPress={() => { setForm(emptyForm); fetchListings(emptyForm); }}><Text>Reset</Text></TouchableOpacity>
         </View>
       </View>}
@@ -129,19 +131,12 @@ export default function HomeScreen() {
       </View>
       <Text style={styles.muted}>Personalisation uses up to 50 recently opened homes, saved on this device for your account.</Text>
       {error ? <View><Text accessibilityRole="alert" style={styles.error}>{error}</Text><TouchableOpacity onPress={() => fetchListings(form)}><Text style={styles.link}>Retry</Text></TouchableOpacity></View> : null}
-      {loading ? <ActivityIndicator accessibilityLabel="Loading recommendations" style={{ margin: 20 }} /> : null}
+      {loading ? <View accessibilityLabel="Loading recommendations" style={styles.loader}><MorphingInfinity size={86} color="#2FA84F" /></View> : null}
       {!loading && !error && result && <FlatList data={items} keyExtractor={item => String(item.listingID)}
         contentContainerStyle={{ paddingBottom: 20 }}
         ListHeaderComponent={<View style={{ marginVertical: 12 }}>
           <Text style={styles.heading}>{result.mode === 'personalized' ? 'Recommended for you' : 'Homes to explore'} · {result.total} matches</Text>
           <Text style={styles.muted}>Applied: {result.filters.locations?.join(' / ') || 'All locations'} · {result.filters.types.join(', ') || 'All types'} · S${result.filters.minPrice ?? 0}–{result.filters.maxPrice ?? 'Any'} · {result.filters.minBeds ?? 0}+ bedrooms</Text>
-          <View style={styles.row}>
-            {['filter', 'sorting', 'summaries'].map(stage => {
-              const label = aiLabel(stage, result.ai?.[stage]);
-              return label ? <Text key={stage} style={[styles.badge, result.ai[stage] === 'ai' && styles.badgeOn]}>{label}</Text> : null;
-            })}
-          </View>
-          {result.notices.filter(Boolean).map(notice => <Text key={notice} style={styles.muted}>{notice}</Text>)}
           {result.total > items.length && <Text style={styles.muted}>Showing the top {items.length}. Narrow your search for more specific results.</Text>}
         </View>}
         ListEmptyComponent={<Text style={styles.heading}>No available homes match. Try a wider budget or fewer filters.</Text>}
@@ -150,10 +145,7 @@ export default function HomeScreen() {
           <View style={{ padding: 14 }}><Text style={styles.heading}>{item.name || 'Rental property'}</Text>
             {item.demo && <Text style={styles.muted}>Sample listing · illustrative stock photo</Text>}
             <Text>{item.summary}</Text>
-            {item.summarySource === 'ai' && <Text style={styles.muted}>AI-written summary from this listing’s details</Text>}
             {item.marketNote ? <Text style={styles.market}>{item.marketNote}</Text> : null}
-            {result.mode === 'personalized' && <Text style={styles.link}>Match score: {item.score}/100</Text>}
-            {item.reasons.map(reason => <Text key={reason} style={styles.muted}>• {reason}</Text>)}
           </View>
         </TouchableOpacity>} />}
       <NavigationBar />
@@ -168,16 +160,17 @@ const styles = StyleSheet.create({
   muted: { color: '#555', fontSize: 13, marginBottom: 6, lineHeight: 19 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 8, alignItems: 'center' },
   input: { flex: 1, minWidth: 95, borderWidth: 1, borderColor: '#aaa', borderRadius: 8, padding: 12 },
+  pickerContainer: { flex: 1, minWidth: 220, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#aaa', borderRadius: 8, overflow: 'hidden' },
+  picker: { flex: 1, height: 52 },
   button: { backgroundColor: '#182c25', borderRadius: 8, padding: 13 },
   buttonText: { color: '#fff', fontWeight: 'bold' },
   link: { color: '#205c43', marginVertical: 6, fontWeight: '600' },
   chip: { padding: 9, borderWidth: 1, borderColor: '#aaa', borderRadius: 8 },
   selected: { backgroundColor: '#d8eee0', borderColor: '#205c43' },
-  badge: { fontSize: 12, color: '#555', backgroundColor: '#f0f2f0', borderRadius: 6, paddingVertical: 4, paddingHorizontal: 8 },
-  badgeOn: { color: '#205c43', backgroundColor: '#d8eee0', fontWeight: '600' },
   market: { color: '#205c43', fontSize: 13, marginTop: 4, marginBottom: 2 },
-  card: { borderWidth: 1, borderColor: '#ddd', borderRadius: 12, marginBottom: 16, overflow: 'hidden' },
-  image: { width: '100%', height: 200 },
-  placeholder: { backgroundColor: '#edf1ee', justifyContent: 'center', alignItems: 'center' },
+  loader: { alignItems: 'center', justifyContent: 'center', paddingVertical: 24 },
+  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#dce5df', borderRadius: 14, marginBottom: 16, overflow: 'hidden', shadowColor: '#183c2b', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 },
+  image: { width: '100%', height: 210 },
+  placeholder: { backgroundColor: '#edf5ef', justifyContent: 'center', alignItems: 'center' },
   error: { color: '#a42020', marginVertical: 8 },
 });
