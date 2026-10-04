@@ -43,3 +43,9 @@ rentnest.ai.summary.amenity-radius-meters=1000
 # Timeouts. On expiry the request falls back to the rule-based path rather than failing.
 rentnest.ai.connect-timeout-ms=3000
 rentnest.ai.read-timeout-ms=9000
+# Gemini LLM API for AI chat summary and Ask AI guardrails
+# Put the real key only in application.properties. Do not commit real API keys.
+llm.provider=gemini
+llm.api-key=YOUR_GEMINI_API_KEY
+llm.api-url=https://generativelanguage.googleapis.com/v1beta/models
+llm.model=gemini-3.6-flash

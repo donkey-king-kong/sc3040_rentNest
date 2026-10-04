@@ -2,18 +2,17 @@ import React, {useEffect, useState} from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
-import {useNavigation, useRoute} from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const RentalInfoOwner = () => {
-  const route = useRoute();
-  const navigation = useNavigation();
-  const { listingId } = route.params;
+  const router = useRouter();
+  const { listingId, refresh } = useLocalSearchParams();
   const [refreshing, setRefreshing] = useState(false);
-  const { refresh } = useLocalSearchParams();
-  const [listing, setListing] = useState(null); // State to store listing data
+  const [listing, setListing] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Fetch listing details
   const getListingID = async () => {
@@ -21,10 +20,9 @@ const RentalInfoOwner = () => {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.log('No token found!');
-        navigation.replace('/LoginScreen');
+        router.replace('/LoginScreen');
         return;
       }
-      console.log("Trying endpoint : GET",`${API_BASE_URL}/api/listings/${listingId}`);
       const response = await axios.get(`${API_BASE_URL}/api/listings/${listingId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -32,20 +30,19 @@ const RentalInfoOwner = () => {
           'Content-Type': 'application/json'
         },
       });
-      console.log("Listings response", response.data);
-      
-      // Add dummy data if tenantId is null
+
       const listingData = response.data;
       if (!listingData.tenantId) {
         listingData.tenantId = 0;
         listingData.tenantName = 'No Tenant yet...';
         listingData.tenantPhotoURL = 'https://media.istockphoto.com/id/1495088043/vector/user-profile-icon-avatar-or-person-icon-profile-picture-portrait-symbol-default-portrait.jpg?s=612x612&w=0&k=20&c=dhV2p1JwmloBTOaGAtaA3AW1KSnjsdMt7-U_3EZElZ0=';
       }
-      
-      setListing(listingData); // Store the fetched data with dummy values if needed
 
+      setListing(listingData);
     } catch (error) {
       console.error('Error fetching listing:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -61,18 +58,32 @@ const RentalInfoOwner = () => {
   }, [refresh]);
 
   const handleTenantPress = (tenantId, listingId) => {
-    navigation.push('TenantOverview', { tenantId, listingId });
+    router.push({pathname: '/TenantOverview', params: { tenantId, listingId }});
   };
 
   const handleShowRentalListing = () => {
     if (listing) {
-      navigation.navigate('HomeListingScreen', { listingId: listing.listingID });
+      router.push({pathname: '/HomeListingScreen', params: { listingId: listing.listingID }});
     }
   };
 
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading rental info...</Text>
+      </View>
+    );
+  }
+
   return (
       <ScrollView style={styles.container}>
-        <Text style={styles.title}>Rental Info</Text>
+        <View style={styles.titleRow}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <FontAwesome name="chevron-left" size={18} color="#101820" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Rental Info</Text>
+        </View>
 
         {/* Image */}
         {listing && (
@@ -148,7 +159,7 @@ const RentalInfoOwner = () => {
 
               <TouchableOpacity
                   style={styles.transparentButton}
-                  onPress={() => navigation.navigate('EditListingScreen', { listingId })}
+                  onPress={() => router.push({pathname: '/EditListingScreen', params: { listingId }})}
               >
                 <FontAwesome name="edit" style={[styles.icon, styles.lighterIcon]} />
                 <Text style={styles.buttonText}>Edit Listing</Text>
@@ -164,13 +175,37 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    paddingHorizontal: 20, // Padding for entire container
+    paddingHorizontal: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0F0F0',
+    marginRight: 12,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'left',
   },
   image: {
     width: '100%',

@@ -3,6 +3,8 @@ package RentNest.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+import java.time.LocalDateTime;
 
 import java.time.Instant;
 
@@ -55,6 +57,9 @@ public class Listings {
     public boolean isDemo() {
         return description != null && description.startsWith("FICTIONAL DEMO:");
     }
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
     // Getters
     public Long getListingID() {
@@ -173,6 +178,10 @@ public class Listings {
 
     public Double getLongitude() {
         return longitude;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
     }
 
     // Setters

@@ -4,18 +4,21 @@
     "slug": "RentNest",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/images/app-icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
+    "backgroundColor": "#12132A",
     "splash": {
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#12132A"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/adaptive-icon-clean.png",
+        "backgroundColor": "#12132A"
       }
     },
     "web": {

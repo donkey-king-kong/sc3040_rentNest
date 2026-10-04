@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useRoute } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
+import { FontAwesome } from '@expo/vector-icons';
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const BanUsersScreen2 = () => {
   const router = useRouter();
-  const route = useRoute();
-  const { userid } = route.params || {};
+  const { userid } = useLocalSearchParams();
 
   const [flaggedUser, setFlaggedUser] = useState(null);
 
@@ -95,9 +95,7 @@ const BanUsersScreen2 = () => {
         },
       });
 
-      // Go back and trigger refresh
-      router.setParams({ refresh: 'true' });
-      router.back();
+      router.replace('/BanUserScreen?refresh=true');
     } catch (error) {
       console.error("Failed to ignore user:", error);
     }
@@ -111,14 +109,23 @@ const BanUsersScreen2 = () => {
 
   if (!flaggedUser) {
     return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading user review...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      <View style={styles.topHeaderRow}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/BanUserScreen?refresh=true')}>
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </TouchableOpacity>
+        <Text style={styles.screenTitle}>Review Flagged User</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
       <View style={styles.userBox}>
         <View style={styles.header}>
           <Image source={{ uri: flaggedUser.photoURL }} style={styles.userImage} />
@@ -151,6 +158,42 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 15,
     backgroundColor: '#f9f9f9',
+  },
+  topHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+  },
+  screenTitle: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#101820',
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 42,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   userBox: {
     backgroundColor: '#fff',

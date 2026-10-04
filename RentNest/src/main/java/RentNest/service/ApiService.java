@@ -64,8 +64,11 @@ public class ApiService {
     }
 
     public List<School> getSchoolsByListingId(Long listingId, double radiusMeters) {
-        String postalCode = Integer.toString(getPostalByListingId(listingId));
-        return getSchoolsNearPostalCode(postalCode,radiusMeters);
+        double[] listingCoordinates = getCoordinatesForListing(listingId);
+        if (!hasValidCoordinates(listingCoordinates)) {
+            return new ArrayList<>();
+        }
+        return getSchoolsNearCoordinates(listingCoordinates[0], listingCoordinates[1], radiusMeters);
     }
 
     public List<School> getSchoolsNearPostalCode(String postalCode, double radiusMeters) {
@@ -75,9 +78,10 @@ public class ApiService {
             logger.warn("[Coordinates] Skipping nearby schools because postalCode={} could not be resolved", postalCode);
             return new ArrayList<>();
         }
-        double postalLatitude = postalCoordinates[0];
-        double postalLongitude = postalCoordinates[1];
-        
+        return getSchoolsNearCoordinates(postalCoordinates[0], postalCoordinates[1], radiusMeters);
+    }
+
+    public List<School> getSchoolsNearCoordinates(double latitude, double longitude, double radiusMeters) {
         List<School> schools = new ArrayList<>();
 
         // Retrieve all school entries using offset parameter
@@ -98,7 +102,7 @@ public class ApiService {
             school.setLatitude(schoolLatitude);
             double schoolLongitude = schoolCoordinates[1];
             school.setLongitude(schoolLongitude);
-            double distance = calculateDistance(postalLatitude, postalLongitude, schoolLatitude, schoolLongitude);
+            double distance = calculateDistance(latitude, longitude, schoolLatitude, schoolLongitude);
             if (distance <= radiusMeters) {
                 nearbySchools.add(school);
             }
@@ -134,8 +138,11 @@ public class ApiService {
     }
 
     public List<HawkerCentre> getHawkerCentresByListingId(Long listingId, double radiusMeters) {
-        String postalCode = Integer.toString(getPostalByListingId(listingId));
-        return getHawkerCentresNearPostalCode(postalCode,radiusMeters);
+        double[] listingCoordinates = getCoordinatesForListing(listingId);
+        if (!hasValidCoordinates(listingCoordinates)) {
+            return new ArrayList<>();
+        }
+        return getHawkerCentresNearCoordinates(listingCoordinates[0], listingCoordinates[1], radiusMeters);
     }
 
     public List<HawkerCentre> getHawkerCentresNearPostalCode(String postalCode, double radiusMeters) {
@@ -145,9 +152,10 @@ public class ApiService {
             logger.warn("[Coordinates] Skipping nearby hawker centres because postalCode={} could not be resolved", postalCode);
             return new ArrayList<>();
         }
-        double postalLatitude = postalCoordinates[0];
-        double postalLongitude = postalCoordinates[1];
-        
+        return getHawkerCentresNearCoordinates(postalCoordinates[0], postalCoordinates[1], radiusMeters);
+    }
+
+    public List<HawkerCentre> getHawkerCentresNearCoordinates(double latitude, double longitude, double radiusMeters) {
         List<HawkerCentre> hawkerCentres = new ArrayList<>();
 
         // Retrieve all hawker centre entries using offset parameter
@@ -168,7 +176,7 @@ public class ApiService {
                 hawkerCentre.setLatitude(hawkerLatitude);
                 double hawkerLongitude = hawkerCoordinates[1];
                 hawkerCentre.setLongitude(hawkerLongitude);
-                double distance = calculateDistance(postalLatitude, postalLongitude, hawkerLatitude, hawkerLongitude);
+                double distance = calculateDistance(latitude, longitude, hawkerLatitude, hawkerLongitude);
                 if (distance <= radiusMeters) {
                     nearbyHawkerCentres.add(hawkerCentre);
                 }
@@ -221,10 +229,13 @@ public class ApiService {
     private String LTADATAMALL_ACCOUNTKEY;
 
     public List<BusStop> getBusStopsByListingId(Long listingId, double radiusMeters) {
-        String postalCode = Integer.toString(getPostalByListingId(listingId));
-        logger.info("[LTA DataMall] Fetching bus stops for listingId={}, postalCode={}, radiusMeters={}",
-                listingId, postalCode, radiusMeters);
-        return getBusStopsNearPostalCode(postalCode,radiusMeters);
+        double[] listingCoordinates = getCoordinatesForListing(listingId);
+        if (!hasValidCoordinates(listingCoordinates)) {
+            return new ArrayList<>();
+        }
+        logger.info("[LTA DataMall] Fetching bus stops for listingId={}, latitude={}, longitude={}, radiusMeters={}",
+                listingId, listingCoordinates[0], listingCoordinates[1], radiusMeters);
+        return getBusStopsNearCoordinates(listingCoordinates[0], listingCoordinates[1], radiusMeters);
     }
 
     public List<BusStop> getBusStopsNearPostalCode(String postalCode, double radiusMeters) {
@@ -238,7 +249,10 @@ public class ApiService {
         double postalLongitude = postalCoordinates[1];
         logger.info("[LTA DataMall] Postal code {} resolved to latitude={}, longitude={}",
                 postalCode, postalLatitude, postalLongitude);
+        return getBusStopsNearCoordinates(postalLatitude, postalLongitude, radiusMeters);
+    }
 
+    public List<BusStop> getBusStopsNearCoordinates(double latitude, double longitude, double radiusMeters) {
         List<BusStop> busStops = new ArrayList<>();
         int skip = 0;
         boolean hasMoreData = true;
@@ -275,13 +289,13 @@ public class ApiService {
         // Filter bus stops within radius
         List<BusStop> nearbyBusStops = new ArrayList<>();
         for (BusStop busStop : busStops) {
-            double distance = calculateDistance(postalLatitude, postalLongitude, busStop.getLatitude(), busStop.getLongitude());
+            double distance = calculateDistance(latitude, longitude, busStop.getLatitude(), busStop.getLongitude());
             if (distance <= radiusMeters) {
                 nearbyBusStops.add(busStop);
             }
         }
-        logger.info("[LTA DataMall] Nearby bus stops found={} within radiusMeters={} for postalCode={}",
-                nearbyBusStops.size(), radiusMeters, postalCode);
+        logger.info("[LTA DataMall] Nearby bus stops found={} within radiusMeters={} for latitude={}, longitude={}",
+                nearbyBusStops.size(), radiusMeters, latitude, longitude);
         
         return nearbyBusStops;
     }
@@ -333,6 +347,17 @@ public class ApiService {
                     logger.warn("[Coordinates] Postal code {} not found in postal_code_coordinates", normalizedPostalCode);
                     return new double[]{0.0, 0.0};
                 });
+    }
+
+    private double[] getCoordinatesForListing(Long listingId) {
+        Listings listing = listingsRepository.findById(listingId)
+                .orElseThrow(() -> new IllegalArgumentException("Listing not found with id: " + listingId));
+        if (listing.getLatitude() != null && listing.getLongitude() != null) {
+            return new double[]{listing.getLatitude(), listing.getLongitude()};
+        }
+
+        logger.warn("[Coordinates] Listing {} has no saved latitude/longitude; falling back to postal code lookup", listingId);
+        return getCoordinatesFromPostalCode(Integer.toString(listing.getPostal()));
     }
 
     private int countOneMapResults(String jsonResponse) {
