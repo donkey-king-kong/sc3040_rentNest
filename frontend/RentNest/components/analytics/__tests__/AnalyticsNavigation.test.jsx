@@ -8,9 +8,12 @@ import { useAnalytics, useOwnedListings } from '../AnalyticsKit';
 import listingResponse from './fixtures/listing-response.json';
 
 const mockPush = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn();
+const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
-  useRouter: () => ({ push: mockPush, replace: jest.fn(), setParams: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace, back: mockBack, canGoBack: mockCanGoBack, setParams: jest.fn() }),
   useLocalSearchParams: () => ({ listingId: '2' }),
 }));
 jest.mock('../AnalyticsKit', () => ({
@@ -38,6 +41,7 @@ const render = async Component => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockCanGoBack.mockReturnValue(true);
   useAnalytics.mockReturnValue({ data: listingResponse, loading: false });
   useOwnedListings.mockReturnValue({ loading: false, items: [{ listingID: 2, name: 'A2', type: 'Apartment', location: 'Singapore' }] });
 });
@@ -80,6 +84,8 @@ it('admin navigation exposes rental, user and safety sections without stacking t
   expect(text(tree)).toContain('Moderation and safety');
   expect(text(tree)).toContain('Flagged items by type');
   expect(text(tree)).toContain('Not yet available');
+  await press(tree, 'Back to admin');
+  expect(mockReplace).toHaveBeenCalledWith('/AdminScreen');
 });
 
 it('shows a completed days-on-market interval with both dates while retaining view tracking', async () => {
@@ -95,3 +101,13 @@ it('shows a completed days-on-market interval with both dates while retaining vi
   expect(text(tree)).toContain('Payments recorded');
   expect(text(tree)).not.toContain('Time to accepted offer');
 });
+
+ it('owner analytics returns to the previous screen or falls back to profile', async () => {
+  const tree = await render(OwnerAnalyticsScreen);
+  await press(tree, 'Back to profile');
+  expect(mockBack).toHaveBeenCalledTimes(1);
+  expect(mockReplace).not.toHaveBeenCalled();
+  mockCanGoBack.mockReturnValue(false);
+  await press(tree, 'Back to profile');
+  expect(mockReplace).toHaveBeenCalledWith('/ProfileScreen');
+ });

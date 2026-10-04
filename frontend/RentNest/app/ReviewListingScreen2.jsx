@@ -4,8 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
-import { FontAwesome } from '@expo/vector-icons';
-import MorphingInfinity from '../components/MorphingInfinity';
+import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 
 const ReviewListingScreen2 = () => {
   const router = useRouter();
@@ -114,22 +113,13 @@ const ReviewListingScreen2 = () => {
 
   if (!listingData) {
     return (
-      <View style={styles.loadingContainer}>
-        <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading listing review...</Text>
-      </View>
+      <AdminLoadingState message="Loading listing review..." />
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.topHeaderRow}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/ReviewListingScreen?refresh=true')}>
-          <FontAwesome name="chevron-left" size={18} color="#101820" />
-        </TouchableOpacity>
-        <Text style={styles.screenTitle}>Review Flagged Listing</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AdminHeader title="Review Flagged Listing" onBack={() => router.replace('/ReviewListingScreen?refresh=true')} backLabel="Back to listings" inset />
 
       <View style={styles.listingBox}>
         {/* Flag Image at the top right corner */}
@@ -182,44 +172,8 @@ const ReviewListingScreen2 = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
-    backgroundColor: '#f9f9f9',
-  },
-  topHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 2,
-  },
-  screenTitle: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#101820',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 42,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 20,
     backgroundColor: '#F7F8FA',
-  },
-  loadingText: {
-    marginTop: 24,
-    color: '#101820',
-    fontSize: 18,
-    fontWeight: '700',
   },
   listingBox: {
     backgroundColor: '#fff',

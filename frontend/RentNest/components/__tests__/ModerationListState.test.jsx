@@ -143,3 +143,22 @@ describe('merged admin dashboard', () => {
     expect(allText).toEqual(expect.arrayContaining([1, 2, 3]));
   });
 });
+
+describe('admin count recovery', () => {
+  it('shows unavailable counts on failure and real zero counts after retry succeeds', async () => {
+    axios.get.mockRejectedValue(new Error('Network unavailable'));
+    let tree;
+    await act(async () => { tree = create(<AdminScreen />); });
+    expect(renderedText(tree)).toContain("Some report counts couldn't be loaded.");
+    expect(renderedText(tree).filter(value => value === 'Unavailable')).toHaveLength(3);
+    expect(tree.root.findAllByType(Text).map(node => node.props.children)).not.toContain(0);
+
+    axios.get.mockResolvedValue({ data: [] });
+    const retry = tree.root.findAll(node => node.props.accessibilityLabel === 'Retry report counts'
+      && typeof node.props.onPress === 'function')[0];
+    await act(async () => { await retry.props.onPress(); });
+    expect(renderedText(tree)).not.toContain("Some report counts couldn't be loaded.");
+    expect(renderedText(tree)).not.toContain('Unavailable');
+    expect(tree.root.findAllByType(Text).filter(node => node.props.children === 0)).toHaveLength(3);
+  });
+});

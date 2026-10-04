@@ -97,7 +97,7 @@ const ProfileScreen = () => {
 
         <View style={styles.separator} />
 
-        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('OwnerAnalyticsScreen')}>
+        <TouchableOpacity style={styles.button} onPress={() => router.push('/OwnerAnalyticsScreen')}>
           <FontAwesome name="bar-chart" size={20} color="black" style={styles.icon} />
           <Text style={styles.buttonText}>Analytics</Text>
           <Text style={styles.arrow}> &gt;</Text>

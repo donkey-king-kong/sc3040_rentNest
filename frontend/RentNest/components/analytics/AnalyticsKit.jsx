@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, ActivityIndicator, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { FontAwesome } from 'react-native-vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { API_BASE_URL } from '../../config/api';
+import MorphingInfinity from '../MorphingInfinity';
 
 // Chart colors: one validated series hue; "vacant" is a neutral with a border for relief
 export const COLORS = {
@@ -226,7 +227,7 @@ export const Section = ({ title, note, children }) => (
 
 export const TileRow = ({ children }) => <View style={styles.tileRow}>{children}</View>;
 
-export const PeriodSelector = ({ value, onChange, loading }) => (
+export const PeriodSelector = ({ value, onChange, loading, accentColor }) => (
   <View style={styles.periodRow}>
     <Text style={styles.periodLabel}>Period</Text>
     {PERIOD_OPTIONS.map((option) => {
@@ -235,7 +236,7 @@ export const PeriodSelector = ({ value, onChange, loading }) => (
         <Pressable
           key={option.key}
           onPress={() => onChange(option.key)}
-          style={[styles.chip, selected && styles.chipSelected]}
+          style={[styles.chip, selected && styles.chipSelected, selected && accentColor && { backgroundColor: accentColor, borderColor: accentColor }]}
           accessibilityRole="button"
           accessibilityLabel={`${option.label} period`}
           aria-pressed={selected}
@@ -245,14 +246,14 @@ export const PeriodSelector = ({ value, onChange, loading }) => (
         </Pressable>
       );
     })}
-    {loading ? <ActivityIndicator size="small" color={COLORS.inkMuted} style={styles.periodSpinner} /> : null}
+    {loading ? <View style={styles.periodSpinner}><MorphingInfinity size={24} color="#2FA84F" /></View> : null}
   </View>
 );
 
-export const LoadingState = () => (
+export const LoadingState = ({ message = "Loading analytics…", textStyle } = {}) => (
   <View style={styles.centerState}>
-    <ActivityIndicator size="large" color={COLORS.ink} />
-    <Text style={styles.stateText}>Loading analytics…</Text>
+    <MorphingInfinity size={86} color="#2FA84F" />
+    <Text style={[styles.stateText, textStyle]}>{message}</Text>
   </View>
 );
 

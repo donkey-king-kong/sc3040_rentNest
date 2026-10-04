@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Text, StyleSheet } from 'react-native';
+import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 import { Stack, useRouter } from 'expo-router';
 import AnalyticsLayout from '../components/analytics/AnalyticsLayout';
 import { ENDPOINTS } from '../config/api';
@@ -7,7 +9,6 @@ import {
   DEFAULT_PERIOD,
   ErrorState,
   LineChart,
-  LoadingState,
   Meter,
   Section,
   ShareBar,
@@ -22,7 +23,12 @@ const AdminAnalyticsScreen = () => {
   const [period, setPeriod] = useState(DEFAULT_PERIOD);
   const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_ADMIN_SUMMARY, period);
 
-  const header = <Stack.Screen options={{ title: 'Platform analytics' }} />;
+  const header = (
+    <>
+      <Stack.Screen options={{ title: 'Platform analytics' }} />
+<AdminHeader title="Platform analytics" onBack={() => router.replace('/AdminScreen')} backLabel="Back to admin" />
+    </>
+  );
 
   if (unauthenticated) {
     return (
@@ -32,7 +38,7 @@ const AdminAnalyticsScreen = () => {
       </>
     );
   }
-  if (!data && loading) return <>{header}<LoadingState /></>;
+  if (!data && loading) return <AdminLoadingState />;
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
   const m = data.metrics;
@@ -40,7 +46,7 @@ const AdminAnalyticsScreen = () => {
   return (
     <>
       {header}
-      <AnalyticsLayout title="Platform analytics" subtitle="Platform performance, people and safety, organised by topic."
+      <AnalyticsLayout compactTabs periodAccent="#16794B" header={<Text style={styles.subtitle}>Rental activity, users and moderation.</Text>}
         tabs={['Overview', 'Rentals', 'Users', 'Safety']} tab={tab} onTabChange={setTab}
         period={period} onPeriodChange={setPeriod} loading={loading} error={error}>
         {tab === 'Overview' ? (
@@ -119,5 +125,9 @@ const AdminAnalyticsScreen = () => {
     </>
   );
 };
+
+const styles = StyleSheet.create({
+  subtitle: { fontSize: 14, color: '#666A70', marginBottom: 12 },
+});
 
 export default AdminAnalyticsScreen;

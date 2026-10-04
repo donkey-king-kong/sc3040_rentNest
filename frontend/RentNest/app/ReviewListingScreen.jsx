@@ -5,8 +5,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import ModerationListState, { moderationLoadError } from '../components/ModerationListState';
-import { FontAwesome } from '@expo/vector-icons';
-import MorphingInfinity from '../components/MorphingInfinity';
+import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 
 const ReviewListingsScreen = () => {
   const [listingsData, setListingsData] = useState(null);
@@ -85,22 +84,13 @@ const ReviewListingsScreen = () => {
 
   if (!listingsData) {
     return (
-      <View style={styles.loadingContainer}>
-        <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading flagged listings...</Text>
-      </View>
+      <AdminLoadingState message="Loading flagged listings..." />
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/AdminScreen')}>
-          <FontAwesome name="chevron-left" size={18} color="#101820" />
-        </TouchableOpacity>
-        <Text style={styles.header}>Review Listings</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AdminHeader title="Review Listings" onBack={() => router.replace('/AdminScreen')} backLabel="Back to admin" inset />
 
       {/* Search Bar */}
       <TextInput
@@ -172,43 +162,8 @@ const ReviewListingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
-    backgroundColor: '#f9f9f9',
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 2,
-  },
-  headerSpacer: {
-    width: 42,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 20,
     backgroundColor: '#F7F8FA',
-  },
-  loadingText: {
-    marginTop: 24,
-    color: '#101820',
-    fontSize: 18,
-    fontWeight: '700',
   },
   searchInput: {
     height: 40,

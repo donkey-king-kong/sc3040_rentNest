@@ -26,7 +26,20 @@ const OwnerAnalyticsScreen = () => {
   const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_SUMMARY, period);
   const listings = useOwnedListings();
 
-  const header = <Stack.Screen options={{ title: 'Analytics' }} />;
+  const header = (
+    <>
+      <Stack.Screen options={{ title: 'Analytics' }} />
+      <View style={styles.header}>
+        <Pressable style={styles.backButton}
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/ProfileScreen')}
+          accessibilityRole="button" accessibilityLabel="Back to profile">
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </Pressable>
+        <Text style={styles.headerTitle}>Analytics overview</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+    </>
+  );
 
   if (unauthenticated) {
     return (
@@ -36,7 +49,7 @@ const OwnerAnalyticsScreen = () => {
       </>
     );
   }
-  if (!data && loading) return <>{header}<LoadingState /></>;
+  if (!data && loading) return <LoadingState message="Loading..." textStyle={styles.loadingText} />;
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
   const m = data.metrics;
@@ -44,7 +57,7 @@ const OwnerAnalyticsScreen = () => {
   return (
     <>
       {header}
-      <AnalyticsLayout title="Analytics overview" subtitle="Your portfolio at a glance. Choose a tab to explore the details."
+      <AnalyticsLayout header={<Text style={styles.subtitle}>Your portfolio at a glance. Choose a tab to explore the details.</Text>}
         tabs={['Overview', 'Rent', 'Occupancy', 'Offers', 'Properties']} tab={tab} onTabChange={setTab}
         period={period} onPeriodChange={setPeriod} loading={loading} error={error}>
         {tab === 'Overview' ? (
@@ -156,6 +169,12 @@ const OwnerAnalyticsScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#FFFFFF', width: '100%', maxWidth: 1120, alignSelf: 'center' },
+  backButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  headerTitle: { flex: 1, fontSize: 24, fontWeight: '700', textAlign: 'center', color: '#101820' },
+  headerSpacer: { width: 44 },
+  subtitle: { fontSize: 14, color: COLORS.inkSecondary, marginBottom: 16 },
+  loadingText: { marginTop: 14, fontSize: 16, fontWeight: '600', color: '#101820' },
   inlineError: {
     fontSize: 13,
     color: COLORS.error,
