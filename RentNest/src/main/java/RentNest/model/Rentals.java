@@ -3,6 +3,7 @@ package RentNest.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.util.Date;
 
@@ -25,6 +26,16 @@ public class Rentals {
     private Date leaseExpiry;
     private String paymentHistory;
     private String status;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private Date createdAt;
+
+    @Column(name = "accepted_at")
+    private Date acceptedAt;
+
+    @Column(name = "terminated_at")
+    private Date terminatedAt;
 
     // Getters
     public Long getRentalID() {
@@ -112,6 +123,18 @@ public class Rentals {
         return status;
     }
 
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
+    public Date getAcceptedAt() {
+        return acceptedAt;
+    }
+
+    public Date getTerminatedAt() {
+        return terminatedAt;
+    }
+
     // Setters
     public void setRentalID(Long rentalID) {
         this.rentalID = rentalID;
@@ -147,5 +170,17 @@ public class Rentals {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public void setAcceptedAt(Date acceptedAt) {
+        this.acceptedAt = acceptedAt;
+    }
+
+    public void setTerminatedAt(Date terminatedAt) {
+        this.terminatedAt = terminatedAt;
     }
 }
