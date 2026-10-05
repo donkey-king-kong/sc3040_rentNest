@@ -108,7 +108,7 @@ const TenantOverview = () => {
     return (
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading rental information...</Text>
+        <Text style={styles.loadingText}>Loading tenant information...</Text>
       </View>
     );
   }
@@ -157,14 +157,14 @@ const TenantOverview = () => {
 
       {/* Outstanding Payments */}
       {outstandingPayments.length > 0 ? (
-        outstandingPayments.map((payment, index) => (
+        [...outstandingPayments].sort((a, b) => new Date(b) - new Date(a)).map((dateStr, index) => (
           <View key={`outstanding-${index}`} style={styles.paymentRow}>
-            <Text style={styles.paymentDate}>{payment.month}</Text>
+            <Text style={styles.paymentDate}>
+              {new Date(dateStr).toLocaleString('default', { month: 'long', year: 'numeric' })}
+            </Text>
             <View style={styles.paymentInfo}>
-              <Text style={styles.paymentAmount}>${payment.amount}</Text>
-              <Text style={[styles.paymentStatus, styles.pendingStatus]}>
-                <Text style={styles.smallText1}>Payment Pending</Text>
-              </Text>
+              <Text style={styles.paymentAmount}>${rental.rentalPrice}</Text>
+              <Text style={styles.smallText1}>Payment Pending</Text>
             </View>
           </View>
         ))
@@ -183,7 +183,7 @@ const TenantOverview = () => {
           <View style={styles.paymentInfo}>
             <Text style={styles.paymentAmount}>${payment.amount}</Text>
             <Text style={styles.paymentStatus}>
-              <Text style={styles.smallText2}>Paid on {payment.date}</Text>
+              <Text style={styles.smallText2}>Paid on {formatDate(payment.date)}</Text>
             </Text>
           </View>
         </View>
