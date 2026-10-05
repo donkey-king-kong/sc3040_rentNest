@@ -7,6 +7,8 @@ import listingResponse from './fixtures/listing-response.json';
 import { Circle, Path } from 'react-native-svg';
 import {
   BarChart,
+  DonutChart,
+  MetricRow,
   LineChart,
   PERIOD_OPTIONS,
   ShareBar,
@@ -99,8 +101,8 @@ describe('buildPeriod', () => {
 });
 
 describe('StatTile', () => {
-  it('keeps the label and value when decorated with an icon and tone', () => {
-    const text = renderedText(renderStatic(<StatTile icon="home" tone="blue" label="Listings" metric={available(8)} />));
+  it('keeps the label and value for a featured overview metric', () => {
+    const text = renderedText(renderStatic(<StatTile featured label="Listings" metric={available(8)} />));
     expect(text).toContain('Listings');
     expect(text).toContain('8');
   });
@@ -112,22 +114,22 @@ describe('StatTile', () => {
     expect(text).not.toContain('Not available');
   });
 
-  it('labels demo-history metrics by the selected period even with legacy coverage metadata', () => {
+  it('omits period labels for demo-history metrics with legacy coverage metadata', () => {
     const metric = {
       ...available(3, 'count', 'period'),
       coverage: { start: '2026-09-16T18:26:00Z', end: '2026-10-01T00:00:00Z', complete: false },
     };
     const text = renderedText(renderStatic(<StatTile label="Offers sent" metric={metric} />));
-    expect(text).toContain('Selected period');
+    expect(text).not.toContain('Selected period');
     expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
   });
 
-  it('labels a fully covered period metric normally', () => {
+  it('omits period labels for fully covered metrics', () => {
     const metric = {
       ...available(3, 'count', 'period'),
       coverage: { start: '2026-01-01T00:00:00Z', end: '2026-04-01T00:00:00Z', complete: true },
     };
-    expect(renderedText(renderStatic(<StatTile label="Offers sent" metric={metric} />))).toContain('Selected period');
+    expect(renderedText(renderStatic(<StatTile label="Offers sent" metric={metric} />))).not.toContain('Selected period');
   });
 
   it('shows a change line only when the change could be calculated', () => {
@@ -363,5 +365,28 @@ describe('ListingAnalyticsScreen', () => {
 
     expect(text).toContain("Can't reach the server. Check your connection and try again.");
     expect(text).toContain('Try again');
+  });
+});
+
+describe('Admin user presentation', () => {
+  it('shows the donut total and counts and percentages, including zero groups', () => {
+    const series = { availability: 'available', points: [{ bucket: 'Owners', value: 2 }, { bucket: 'Tenants', value: 6 }, { bucket: 'Neither', value: 0 }] };
+    const tree = renderStatic(<DonutChart series={series} emptyText="No users yet" />);
+    expect(renderedText(tree)).toEqual(expect.arrayContaining(['8', 'Total users', 'Owners', '2 (25.0%)', '6 (75.0%)', '0 (0.0%)']));
+    const segments = tree.root.findAllByType(Circle).filter(node => node.props.strokeDasharray);
+    expect(segments).toHaveLength(2);
+    expect(segments.every(node => Number.isFinite(node.props.strokeDashoffset))).toBe(true);
+  });
+  it('handles empty and unavailable distribution data', () => {
+    expect(renderedText(renderStatic(<DonutChart series={{ availability: 'available', points: [] }} emptyText="No users yet" />))).toContain('No users yet');
+    expect(renderedText(renderStatic(<DonutChart series={{ availability: 'unavailable', reason: 'No tracking data' }} />))).toEqual(expect.arrayContaining(['Not available', 'No tracking data']));
+  });
+  it('retains growth comparisons and tappable metric definitions', async () => {
+    const tree = renderStatic(<MetricRow label="New users" metric={{ ...available(0), definition: 'Accounts created in the selected period.' }} change={available(20, 'percent')} />);
+    expect(renderedText(tree)).toEqual(expect.arrayContaining(['New users', '0', '+20.0% vs previous period']));
+    const target = tree.root.findAll(node => node.props.accessibilityLabel === 'New users: 0' && typeof node.props.onPress === 'function')[0];
+    await act(async () => target.props.onPress());
+    expect(renderedText(tree)).toContain('Accounts created in the selected period.');
+    expect(renderedText(renderStatic(<MetricRow label="New listings" metric={unavailable('No tracking data')} />))).toEqual(expect.arrayContaining(['Not available', 'No tracking data']));
   });
 });

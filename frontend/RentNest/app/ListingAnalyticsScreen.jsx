@@ -62,7 +62,7 @@ const ListingAnalyticsScreen = () => {
   return (
     <>
       {header}
-      <AnalyticsLayout tabs={TABS} tab={tab} onTabChange={setTab}
+      <AnalyticsLayout compactTabs periodAccent="#16794B" tabs={TABS} tab={tab} onTabChange={setTab}
         period={period} onPeriodChange={setPeriod} loading={loading} error={error}
         header={<>
       <View style={styles.listingHeader}>
@@ -84,13 +84,13 @@ const ListingAnalyticsScreen = () => {
         <>
           <Section title="At a glance">
             <TileRow>
-              <StatTile icon="dollar" tone="orange" label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
-              <StatTile icon="pie-chart" tone="violet" label="Occupancy in period" metric={m.averageOccupancyRate} change={m.averageOccupancyRateChange} />
+              <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
+              <StatTile featured label="Occupancy in period" metric={m.averageOccupancyRate} change={m.averageOccupancyRateChange} />
             </TileRow>
           </Section>
           <Section title="Time to accepted offer" note="From publication to the first accepted rental offer. This value stops at acceptance and is independent of the selected period.">
             <TileRow>
-              <StatTile icon="calendar" tone="blue" label="Days on market" metric={m.daysOnMarket} />
+              <StatTile label="Days on market" metric={m.daysOnMarket} />
               <View style={styles.marketDates}>
                 <Text style={styles.dateLabel}>Published</Text>
                 <Text style={styles.dateValue}>{listing.listedAt ? formatDay(listing.listedAt) : 'Not recorded'}</Text>
@@ -101,8 +101,8 @@ const ListingAnalyticsScreen = () => {
           </Section>
           <Section title="Listing interest">
             <TileRow>
-              <StatTile icon="eye" tone="blue" label="Listing views" metric={m.listingViews} />
-              <StatTile icon="users" tone="violet" label="Unique viewers" metric={m.uniqueListingViewers} />
+              <StatTile label="Listing views" metric={m.listingViews} />
+              <StatTile label="Unique viewers" metric={m.uniqueListingViewers} />
             </TileRow>
           </Section>
         </>
@@ -112,15 +112,15 @@ const ListingAnalyticsScreen = () => {
         <>
           <Section title="Activity in this period" note="Events dated within the selected period.">
             <TileRow>
-              <StatTile icon="paper-plane" tone="green" label="Offers sent" metric={m.offersSentCount} />
-              <StatTile icon="check-circle" tone="violet" label="Offers accepted" metric={m.offersAcceptedCount} />
+              <StatTile label="Offers sent" metric={m.offersSentCount} />
+              <StatTile label="Offers accepted" metric={m.offersAcceptedCount} />
             </TileRow>
           </Section>
           <Section title="Offers and tenancies (all time)">
             <TileRow>
-              <StatTile icon="paper-plane" tone="green" label="Offers sent" metric={m.rentalRecordCount} />
-              <StatTile icon="check-circle" tone="violet" label="Accepted" metric={m.acceptedRentalRecordCount} />
-              <StatTile icon="users" tone="green" label="Tenants hosted" metric={m.tenantsHostedCount} />
+              <StatTile label="Offers sent" metric={m.rentalRecordCount} />
+              <StatTile label="Accepted" metric={m.acceptedRentalRecordCount} />
+              <StatTile label="Tenants hosted" metric={m.tenantsHostedCount} />
             </TileRow>
             <Meter label="Acceptance rate" metric={m.acceptanceRate} />
           </Section>
@@ -131,11 +131,11 @@ const ListingAnalyticsScreen = () => {
         <>
           <Section title="Rent">
             <TileRow>
-              <StatTile icon="dollar" tone="orange" label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
-              <StatTile icon="credit-card" tone="magenta" label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
+              <StatTile label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
+              <StatTile label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
             </TileRow>
           </Section>
-          <Section title="Monthly rent recorded" note="Grouped by the month each payment is for, not the day it was made.">
+          <Section title="Monthly rent recorded" note="By rental month, rather than payment date.">
             <BarChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" />
           </Section>
         </>
@@ -145,8 +145,8 @@ const ListingAnalyticsScreen = () => {
         <>
           <Section title="Occupancy">
             <TileRow>
-              <StatTile icon="pie-chart" tone="violet" label="Occupancy in period" metric={m.averageOccupancyRate} change={m.averageOccupancyRateChange} />
-              <StatTile icon="clock-o" tone="blue" label="Average tenancy" metric={m.averageTenancyMonths} />
+              <StatTile label="Occupancy in period" metric={m.averageOccupancyRate} change={m.averageOccupancyRateChange} />
+              <StatTile label="Average tenancy" metric={m.averageTenancyMonths} />
             </TileRow>
           </Section>
           <Section title="Month by month" note="A month counts as occupied when an accepted tenancy covers any part of it.">

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
-import { FontAwesome } from 'react-native-vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
@@ -17,21 +16,11 @@ export const COLORS = {
   card: '#f9f9f9',
   border: '#EAEAEA',
   grid: '#EAEAEA',
-  series: '#2a78d6',
-  seriesTrack: '#dbe7f7',
+  series: '#111111',
+  seriesTrack: '#EEEEEE',
   vacant: '#FFFFFF',
   vacantBorder: '#c8c7c2',
   error: '#b3261e',
-};
-
-// Decorative tile tones: icon color on a white badge (at least 4.4:1) and a light tint that keeps text above 4.5:1.
-// Red is left out on purpose so ordinary tiles never read as errors.
-export const TONES = {
-  blue: { background: '#eaf2fc', icon: '#2a78d6' },
-  green: { background: '#e6f4ec', icon: '#16794b' },
-  violet: { background: '#eeecf8', icon: '#4a3aa7' },
-  orange: { background: '#fdeee6', icon: '#b94a17' },
-  magenta: { background: '#fbeaf1', icon: '#b83f6c' },
 };
 
 // Categorical palette in fixed order (validated): identity is never color alone, labels always accompany it
@@ -200,7 +189,6 @@ export const formatDay = (iso) => {
   return `${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
 };
 
-const basisLabel = (metric) => (metric.basis === 'period' ? 'Selected period' : 'Current');
 
 export const formatChange = (metric) => {
   if (!metric || metric.availability !== 'available') return null;
@@ -267,38 +255,31 @@ export const ErrorState = ({ message, onRetry, actionLabel = 'Try again' }) => (
 /**
  * A single metric. Tap to show how it is calculated. Unavailable metrics show "Not available", never 0.
  * `change` is an optional percent-change metric, shown underneath only when it could be calculated.
- * `icon` (a FontAwesome name) and `tone` (a TONES key) are decoration only; the label carries the meaning.
+ * `featured` gives the main overview figures more visual emphasis.
  */
-export const StatTile = ({ label, metric, change, icon, tone }) => {
+export const StatTile = ({ label, metric, change, featured = false }) => {
   const [showDefinition, setShowDefinition] = useState(false);
   const { width } = useWindowDimensions();
   if (!metric) return null;
   const available = metric.availability === 'available';
-  const colors = TONES[tone];
 
   return (
     <Pressable
-      style={[styles.tile, width >= 1000 && styles.wideTile, colors && { backgroundColor: colors.background, borderColor: colors.background }]}
+      style={[styles.tile, width >= 1000 && styles.wideTile, featured && styles.featuredTile]}
       onPress={() => setShowDefinition((shown) => !shown)}
       accessibilityRole="button"
       accessibilityLabel={`${label}: ${available ? formatValue(metric.value, metric.unit) : 'not available'}`}
       accessibilityHint="Shows how this metric is calculated"
     >
       <View style={styles.tileHeader}>
-        {icon ? (
-          <View style={styles.tileIcon} importantForAccessibility="no" accessibilityElementsHidden>
-            <FontAwesome name={icon} size={14} color={colors ? colors.icon : COLORS.inkSecondary} />
-          </View>
-        ) : null}
         <Text style={styles.tileLabel}>{label}</Text>
       </View>
       {available ? (
-        <Text style={styles.tileValue}>{formatValue(metric.value, metric.unit)}</Text>
+        <Text style={[styles.tileValue, featured && styles.featuredValue]}>{formatValue(metric.value, metric.unit)}</Text>
       ) : (
         <Text style={styles.tileUnavailable}>Not available</Text>
       )}
       {available && formatChange(change) ? <Text style={styles.tileChange}>{formatChange(change)}</Text> : null}
-      <Text style={styles.tileBasis}>{basisLabel(metric)}</Text>
       {!available && metric.reason ? <Text style={styles.tileReason}>{metric.reason}</Text> : null}
       {showDefinition ? <Text style={styles.tileDefinition}>{metric.definition}</Text> : null}
     </Pressable>
@@ -458,7 +439,7 @@ export const LineChart = ({ series, emptyText, maxValue }) => {
               <Line x1={0} x2={width} y1={LINE_INSET} y2={LINE_INSET} stroke={COLORS.grid} strokeWidth={1} />
               <Line x1={0} x2={width} y1={LINE_HEIGHT / 2} y2={LINE_HEIGHT / 2} stroke={COLORS.grid} strokeWidth={1} />
               <Line x1={0} x2={width} y1={baseline} y2={baseline} stroke={COLORS.inkMuted} strokeWidth={1} />
-              {areaPath ? <Path d={areaPath} fill={COLORS.series} fillOpacity={0.12} /> : null}
+              {areaPath ? <Path d={areaPath} fill={COLORS.series} fillOpacity={0.06} /> : null}
               {selected !== null ? (
                 <Line x1={coords[selected][0]} x2={coords[selected][0]} y1={LINE_INSET} y2={baseline}
                   stroke={COLORS.inkMuted} strokeWidth={1} strokeDasharray="3,3" />
@@ -538,6 +519,72 @@ export const ShareBar = ({ series, emptyText }) => {
   );
 };
 
+// ---------- Donut chart ----------
+
+export const DonutChart = ({ series, emptyText, totalLabel = 'Total users' }) => {
+  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
+  const points = (series.points || []).map(point => ({ ...point, value: Math.max(0, Number(point.value) || 0) }));
+  const total = points.reduce((sum, point) => sum + point.value, 0);
+  const radius = 68;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+  return (
+    <View style={styles.chartCard}>
+      <View style={styles.donut} accessible accessibilityLabel={total > 0 ? totalLabel + ': ' + total : emptyText}>
+        <Svg width={180} height={180} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Circle cx={90} cy={90} r={radius} fill="none" stroke={COLORS.border} strokeWidth={24} />
+          {total > 0 ? points.map((point, index) => {
+            const length = point.value / total * circumference;
+            const start = offset;
+            offset += length;
+            return point.value > 0 ? (
+              <Circle key={point.bucket} cx={90} cy={90} r={radius} fill="none"
+                stroke={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} strokeWidth={24}
+                strokeDasharray={[length, circumference]} strokeDashoffset={-start}
+                rotation={-90} origin="90,90" />
+            ) : null;
+          }) : null}
+        </Svg>
+        <View style={styles.donutCentre} pointerEvents="none">
+          <Text style={styles.donutTotal}>{withCommas(total)}</Text>
+          <Text style={styles.donutLabel}>{totalLabel}</Text>
+        </View>
+      </View>
+      {total === 0 ? <Text style={styles.chartReadout}>{emptyText}</Text> : null}
+      <View style={styles.shareLegend}>
+        {points.map((point, index) => (
+          <View key={point.bucket} style={styles.shareLegendRow}>
+            <View style={[styles.legendSwatch, { backgroundColor: CATEGORY_COLORS[index % CATEGORY_COLORS.length] }]} />
+            <Text style={styles.shareLegendLabel}>{point.bucket}</Text>
+            <Text style={styles.shareLegendValue}>{withCommas(point.value) + ' (' + (total === 0 ? '0.0' : (point.value / total * 100).toFixed(1)) + '%)'}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+export const MetricRow = ({ label, metric, change }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!metric) return null;
+  const available = metric.availability === 'available';
+  const comparison = available ? formatChange(change) : null;
+  return (
+    <Pressable style={styles.metricRow} onPress={() => setExpanded(value => !value)}
+      accessibilityRole="button" accessibilityState={{ expanded }}
+      accessibilityLabel={label + ': ' + (available ? formatValue(metric.value, metric.unit) : 'not available')}
+      accessibilityHint="Shows how this metric is calculated">
+      <View style={styles.metricRowMain}>
+        <Text style={styles.metricRowLabel}>{label}</Text>
+        <Text style={styles.metricRowValue}>{available ? formatValue(metric.value, metric.unit) : 'Not available'}</Text>
+      </View>
+      {comparison ? <Text style={styles.metricRowComparison}>{comparison}</Text> : null}
+      {!available && metric.reason ? <Text style={styles.tileReason}>{metric.reason}</Text> : null}
+      {expanded && metric.definition ? <Text style={styles.tileDefinition}>{metric.definition}</Text> : null}
+    </Pressable>
+  );
+};
+
 // ---------- Occupancy strip ----------
 
 /** One cell per month: filled = occupied, outlined = vacant. Tap a cell to read it. */
@@ -601,14 +648,20 @@ export const OccupancyStrip = ({ series }) => {
 };
 
 const styles = StyleSheet.create({
+  donut: { width: 180, height: 180, alignSelf: 'center', marginVertical: 8 },
+  donutCentre: { position: 'absolute', top: 0, bottom: 0, left: 30, right: 30, alignItems: 'center', justifyContent: 'center' },
+  donutTotal: { fontSize: 26, fontWeight: '700', color: COLORS.ink },
+  donutLabel: { fontSize: 12, color: COLORS.inkSecondary, marginTop: 4 },
+  metricRow: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  metricRowMain: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  metricRowLabel: { flex: 1, fontSize: 15, color: COLORS.inkSecondary },
+  metricRowValue: { fontSize: 22, fontWeight: '600', color: COLORS.ink, flexShrink: 1 },
+  metricRowComparison: { fontSize: 12, color: COLORS.inkSecondary, marginTop: 6, textAlign: 'right' },
   section: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.ink,
-    marginBottom: 4,
+    fontSize: 18, fontWeight: '600', color: COLORS.ink, marginBottom: 8,
   },
   sectionNote: {
     fontSize: 13,
@@ -622,28 +675,20 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   tile: {
-    flexGrow: 1,
-    flexBasis: '45%',
-    margin: 5,
-    padding: 12,
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    flexGrow: 1, flexBasis: '45%', minWidth: 130, margin: 5, padding: 16, backgroundColor: COLORS.surface, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border,
   },
   tileLabel: {
     flex: 1,
     fontSize: 13,
     color: COLORS.inkSecondary,
   },
+  featuredTile: { backgroundColor: '#FAFAFA', borderColor: '#D8D8D8' },
+  featuredValue: { fontSize: 28, fontWeight: '700' },
   wideTile: {
     flexBasis: '22%',
   },
   tileValue: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: COLORS.ink,
-    marginTop: 4,
+    fontSize: 24, fontWeight: '600', color: COLORS.ink, marginTop: 10,
   },
   tileUnavailable: {
     fontSize: 15,
@@ -654,20 +699,6 @@ const styles = StyleSheet.create({
   tileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  tileIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: COLORS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  tileBasis: {
-    fontSize: 11,
-    color: COLORS.inkSecondary,
-    marginTop: 4,
   },
   tileChange: {
     fontSize: 12,
@@ -689,12 +720,7 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.border,
   },
   meter: {
-    padding: 12,
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginTop: 10,
+    paddingVertical: 14, paddingHorizontal: 0, marginTop: 10,
   },
   meterHeader: {
     flexDirection: 'row',
@@ -789,18 +815,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   chartCard: {
-    padding: 12,
-    backgroundColor: COLORS.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginTop: 6,
+    paddingVertical: 16, paddingHorizontal: 12, backgroundColor: COLORS.surface, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, marginTop: 6,
   },
   chartReadout: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.ink,
-    marginBottom: 10,
+    fontSize: 13, fontWeight: '400', color: COLORS.inkSecondary, marginBottom: 16,
   },
   plotRow: {
     flexDirection: 'row',

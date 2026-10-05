@@ -57,23 +57,23 @@ const OwnerAnalyticsScreen = () => {
   return (
     <>
       {header}
-      <AnalyticsLayout header={<Text style={styles.subtitle}>Your portfolio at a glance. Choose a tab to explore the details.</Text>}
+      <AnalyticsLayout compactTabs periodAccent="#16794B"
         tabs={['Overview', 'Rent', 'Occupancy', 'Offers', 'Properties']} tab={tab} onTabChange={setTab}
         period={period} onPeriodChange={setPeriod} loading={loading} error={error}>
         {tab === 'Overview' ? (
           <>
             <Section title="At a glance">
               <TileRow>
-                <StatTile icon="dollar" tone="orange" label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
-                <StatTile icon="home" tone="blue" label="Listings" metric={m.listingCount} />
-                <StatTile icon="key" tone="green" label="Active tenancies" metric={m.activeTenancyCount} />
-                <StatTile icon="calendar" tone="blue" label="Avg. days on market" metric={m.averageDaysOnMarket} />
+                <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
+                <StatTile featured label="Listings" metric={m.listingCount} />
+                <StatTile label="Active tenancies" metric={m.activeTenancyCount} />
+                <StatTile label="Avg. days on market" metric={m.averageDaysOnMarket} />
               </TileRow>
             </Section>
             <Section title="Reviews" note="Reviews are about you as an owner, not about a specific property.">
               <TileRow>
-                <StatTile icon="star" tone="orange" label="Average rating" metric={m.ownerAverageRating} />
-                <StatTile icon="comment" tone="violet" label="Reviews" metric={m.ownerReviewCount} />
+                <StatTile label="Average rating" metric={m.ownerAverageRating} />
+                <StatTile label="Reviews" metric={m.ownerReviewCount} />
               </TileRow>
             </Section>
           </>
@@ -83,11 +83,11 @@ const OwnerAnalyticsScreen = () => {
           <>
             <Section title="Rent">
               <TileRow>
-                <StatTile icon="dollar" tone="orange" label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
-                <StatTile icon="credit-card" tone="magenta" label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
+                <StatTile label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
+                <StatTile label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
               </TileRow>
             </Section>
-            <Section title="Monthly rent recorded" note="Grouped by the month each payment is for, not the day it was made.">
+            <Section title="Monthly rent recorded" note="By rental month, rather than payment date.">
               <BarChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" />
             </Section>
           </>
@@ -97,12 +97,12 @@ const OwnerAnalyticsScreen = () => {
           <>
             <Section title="Occupancy and tenants">
               <TileRow>
-                <StatTile icon="home" tone="blue" label="Listings" metric={m.listingCount} />
-                <StatTile icon="key" tone="green" label="Active tenancies" metric={m.activeTenancyCount} />
-                <StatTile icon="users" tone="green" label="Tenants hosted (all time)" metric={m.tenantsHostedCount} />
-                <StatTile icon="clock-o" tone="blue" label="Average tenancy" metric={m.averageTenancyMonths} />
-                <StatTile icon="pie-chart" tone="violet" label="Avg. occupancy" metric={m.averageOccupancyRate} change={m.averageOccupancyRateChange} />
-                <StatTile icon="user-plus" tone="green" label="Tenants in period" metric={m.tenantsInPeriodCount} change={m.tenantsInPeriodChange} />
+                <StatTile label="Listings" metric={m.listingCount} />
+                <StatTile label="Active tenancies" metric={m.activeTenancyCount} />
+                <StatTile label="Tenants hosted (all time)" metric={m.tenantsHostedCount} />
+                <StatTile label="Average tenancy" metric={m.averageTenancyMonths} />
+                <StatTile label="Avg. occupancy" metric={m.averageOccupancyRate} change={m.averageOccupancyRateChange} />
+                <StatTile label="Tenants in period" metric={m.tenantsInPeriodCount} change={m.tenantsInPeriodChange} />
               </TileRow>
               <Meter label="Occupancy rate right now" metric={m.occupancyRate} />
             </Section>
@@ -116,18 +116,18 @@ const OwnerAnalyticsScreen = () => {
           <>
             <Section title="Activity in this period" note="Events dated within the selected period. Tap a number for details.">
               <TileRow>
-                <StatTile icon="plus-square" tone="blue" label="New listings" metric={m.newListingCount} />
-                <StatTile icon="paper-plane" tone="green" label="Offers sent" metric={m.offersSentCount} change={m.offersSentChange} />
-                <StatTile icon="check-circle" tone="violet" label="Offers accepted" metric={m.offersAcceptedCount} />
-                <StatTile icon="sign-out" tone="magenta" label="Terminations" metric={m.terminationsCount} />
+                <StatTile label="New listings" metric={m.newListingCount} />
+                <StatTile label="Offers sent" metric={m.offersSentCount} change={m.offersSentChange} />
+                <StatTile label="Offers accepted" metric={m.offersAcceptedCount} />
+                <StatTile label="Terminations" metric={m.terminationsCount} />
               </TileRow>
             </Section>
             <Section title="Offers (all time)">
               <TileRow>
-                <StatTile icon="paper-plane" tone="green" label="Offers sent" metric={m.rentalRecordCount} />
-                <StatTile icon="check-circle" tone="violet" label="Accepted" metric={m.acceptedRentalRecordCount} />
-                <StatTile icon="hourglass-half" tone="orange" label="Pending" metric={m.pendingRentalRecordCount} />
-                <StatTile icon="times-circle" tone="magenta" label="Terminated" metric={m.terminatedRentalRecordCount} />
+                <StatTile label="Offers sent" metric={m.rentalRecordCount} />
+                <StatTile label="Accepted" metric={m.acceptedRentalRecordCount} />
+                <StatTile label="Pending" metric={m.pendingRentalRecordCount} />
+                <StatTile label="Terminated" metric={m.terminatedRentalRecordCount} />
               </TileRow>
               <Meter label="Acceptance rate" metric={m.acceptanceRate} />
             </Section>
@@ -173,7 +173,6 @@ const styles = StyleSheet.create({
   backButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
   headerTitle: { flex: 1, fontSize: 24, fontWeight: '700', textAlign: 'center', color: '#101820' },
   headerSpacer: { width: 44 },
-  subtitle: { fontSize: 14, color: COLORS.inkSecondary, marginBottom: 16 },
   loadingText: { marginTop: 14, fontSize: 16, fontWeight: '600', color: '#101820' },
   inlineError: {
     fontSize: 13,

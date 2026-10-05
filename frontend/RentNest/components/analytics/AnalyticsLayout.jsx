@@ -22,8 +22,8 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs, tab, on
       <View style={styles.container}>
         <View style={[styles.header, compactTabs && styles.adminHeader]}>
           {header || <>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
+            {title ? <Text style={styles.title}>{title}</Text> : null}
+            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </>}
           <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} />
           <TabContainer
@@ -55,7 +55,7 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs, tab, on
 }
 
 const styles = StyleSheet.create({
-  adminScreen: { backgroundColor: '#F7F8FA' },
+  adminScreen: { backgroundColor: COLORS.surface },
   adminHeader: { backgroundColor: '#FFFFFF', paddingTop: 0 },
   screen: { flex: 1, backgroundColor: COLORS.surface },
   container: { flex: 1, width: '100%', maxWidth: 1120, alignSelf: 'center' },
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, color: COLORS.inkSecondary, marginTop: 4, marginBottom: 16 },
   compactTabs: { flexGrow: 0 },
   compactTabRow: { flexGrow: 1, flexDirection: 'row', gap: 4 },
-  compactTab: { flexGrow: 1, minHeight: 44, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center',
+  compactTab: { flexGrow: 1, flexShrink: 0, minHeight: 44, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center',
     borderBottomWidth: 3, borderBottomColor: 'transparent' },
   compactSelectedTab: { borderBottomColor: '#16794B' },
   compactSelectedText: { color: '#16794B', fontWeight: '700' },

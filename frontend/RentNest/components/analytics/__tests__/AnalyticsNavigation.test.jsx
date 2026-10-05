@@ -83,7 +83,8 @@ it('admin navigation exposes rental, user and safety sections without stacking t
   await press(tree, 'Safety tab');
   expect(text(tree)).toContain('Moderation and safety');
   expect(text(tree)).toContain('Flagged items by type');
-  expect(text(tree)).toContain('Not yet available');
+  expect(text(tree)).not.toContain('Not yet available');
+  expect(text(tree)).not.toContain('Report resolution rate');
   await press(tree, 'Back to admin');
   expect(mockReplace).toHaveBeenCalledWith('/AdminScreen');
 });
@@ -129,4 +130,34 @@ it('property analytics shows the requested loading message before displaying its
   expect(text(tree)).toContain('Loading analytics...');
   expect(text(tree)).not.toContain('Property analytics');
   await act(async () => tree.unmount());
+});
+
+it('admin rentals divides recorded offers without double counting and removes user growth', async () => {
+  useAnalytics.mockReturnValue({ data: {
+    ...listingResponse,
+    metrics: { ...listingResponse.metrics,
+      rentalRecordCount: { availability: 'available', value: 10, unit: 'count' },
+      acceptedRentalRecordCount: { availability: 'available', value: 6, unit: 'count' },
+      terminationRate: { availability: 'available', value: 50, unit: 'percent' },
+    },
+  }, loading: false });
+  const tree = await render(AdminAnalyticsScreen);
+  await press(tree, 'Rentals tab');
+  expect(text(tree)).toEqual(expect.arrayContaining(['Recorded offers', '10', 'Accepted', 'Remaining', '6 (60.0%)', '4 (40.0%)', 'Termination rate', '50.0%']));
+  expect(text(tree)).not.toContain('Acceptance rate');
+  await press(tree, 'Users tab');
+  expect(text(tree)).toContain('User distribution');
+  expect(text(tree)).not.toContain('Growth in this period');
+  expect(text(tree)).not.toContain('New users');
+});
+
+it('does not fabricate an offer distribution when counts are unavailable', async () => {
+  useAnalytics.mockReturnValue({ data: { ...listingResponse, metrics: {
+    ...listingResponse.metrics,
+    rentalRecordCount: { availability: 'unavailable', reason: 'Offer history unavailable' },
+  } }, loading: false });
+  const tree = await render(AdminAnalyticsScreen);
+  await press(tree, 'Rentals tab');
+  expect(text(tree)).toContain('Offer history unavailable');
+  expect(text(tree)).not.toContain('Recorded offers');
 });

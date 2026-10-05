@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
-import { Text, StyleSheet } from 'react-native';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 import { Stack, useRouter } from 'expo-router';
 import AnalyticsLayout from '../components/analytics/AnalyticsLayout';
 import { ENDPOINTS } from '../config/api';
 import {
-  BarChart,
   DEFAULT_PERIOD,
   ErrorState,
   LineChart,
   Meter,
   Section,
-  ShareBar,
+  DonutChart,
+  MetricRow,
   StatTile,
   TileRow,
   useAnalytics,
@@ -42,24 +41,40 @@ const AdminAnalyticsScreen = () => {
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
   const m = data.metrics;
+  const totalOffers = Number(m.rentalRecordCount?.value);
+  const acceptedOffers = Number(m.acceptedRentalRecordCount?.value);
+  const offersAvailable = m.rentalRecordCount?.availability === 'available'
+    && m.acceptedRentalRecordCount?.availability === 'available'
+    && Number.isFinite(totalOffers) && Number.isFinite(acceptedOffers)
+    && totalOffers >= 0 && acceptedOffers >= 0 && acceptedOffers <= totalOffers;
+  const offerDistribution = offersAvailable ? {
+    availability: 'available',
+    points: [
+      { bucket: 'Accepted', value: acceptedOffers },
+      { bucket: 'Remaining', value: totalOffers - acceptedOffers },
+    ],
+  } : {
+    availability: 'unavailable',
+    reason: m.rentalRecordCount?.reason || m.acceptedRentalRecordCount?.reason || 'Offer counts are unavailable.',
+  };
 
   return (
     <>
       {header}
-      <AnalyticsLayout compactTabs periodAccent="#16794B" header={<Text style={styles.subtitle}>Rental activity, users and moderation.</Text>}
+      <AnalyticsLayout compactTabs periodAccent="#16794B"
         tabs={['Overview', 'Rentals', 'Users', 'Safety']} tab={tab} onTabChange={setTab}
         period={period} onPeriodChange={setPeriod} loading={loading} error={error}>
         {tab === 'Overview' ? (
           <>
             <Section title="Overview">
               <TileRow>
-                <StatTile icon="dollar" tone="orange" label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
-                <StatTile icon="credit-card" tone="magenta" label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
-                <StatTile icon="users" tone="blue" label="Registered users" metric={m.registeredUserCount} />
-                <StatTile icon="home" tone="blue" label="Listings" metric={m.listingCount} />
+                <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
+                <StatTile featured label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
+                <StatTile label="Registered users" metric={m.registeredUserCount} />
+                <StatTile label="Listings" metric={m.listingCount} />
               </TileRow>
             </Section>
-            <Section title="Monthly rent recorded" note="Grouped by the month each payment is for, not the day it was made.">
+            <Section title="Monthly rent recorded" note="By rental month, rather than payment date.">
               <LineChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" />
             </Section>
           </>
@@ -69,33 +84,23 @@ const AdminAnalyticsScreen = () => {
           <>
             <Section title="Rental activity in this period">
               <TileRow>
-                <StatTile icon="paper-plane" tone="green" label="Offers sent" metric={m.offersSentCount} />
-                <StatTile icon="check-circle" tone="violet" label="Offers accepted" metric={m.offersAcceptedCount} />
-                <StatTile icon="sign-out" tone="magenta" label="Terminations" metric={m.terminationsCount} />
-                <StatTile icon="calendar" tone="blue" label="Avg. days on market" metric={m.averageDaysOnMarket} />
+                <StatTile label="Offers sent" metric={m.offersSentCount} />
+                <StatTile label="Offers accepted" metric={m.offersAcceptedCount} />
+                <StatTile label="Terminations" metric={m.terminationsCount} />
+                <StatTile label="Avg. days on market" metric={m.averageDaysOnMarket} />
               </TileRow>
             </Section>
-            <Section title="Rentals (all time)">
-              <TileRow>
-                <StatTile icon="paper-plane" tone="green" label="Offers sent" metric={m.rentalRecordCount} />
-                <StatTile icon="check-circle" tone="violet" label="Accepted" metric={m.acceptedRentalRecordCount} />
-              </TileRow>
-              <Meter label="Acceptance rate" metric={m.acceptanceRate} />
-              <Meter label="Termination rate" metric={m.terminationRate} />
+            <Section title="Rentals (all time)" note="Accepted includes active and terminated rentals.">
+              <DonutChart series={offerDistribution} totalLabel="Recorded offers" emptyText="No recorded offers yet" />
+              <MetricRow label="Termination rate" metric={m.terminationRate} />
             </Section>
           </>
         ) : null}
 
         {tab === 'Users' ? (
           <>
-            <Section title="Growth in this period" note="Accounts created and listings published during the selected period.">
-              <TileRow>
-                <StatTile icon="user-plus" tone="green" label="New users" metric={m.newUserCount} change={m.newUserCountChange} />
-                <StatTile icon="plus-square" tone="blue" label="New listings" metric={m.newListingCount} change={m.newListingCountChange} />
-              </TileRow>
-            </Section>
-            <Section title="User distribution" note="Every user is counted in exactly one group, so the groups add up to all users.">
-              <ShareBar series={data.series.userDistribution} emptyText="No users yet" />
+            <Section title="User distribution">
+              <DonutChart series={data.series.userDistribution} emptyText="No users yet" />
             </Section>
           </>
         ) : null}
@@ -104,20 +109,15 @@ const AdminAnalyticsScreen = () => {
           <>
             <Section title="Moderation and safety" note="Counts items currently flagged, not the number of reports submitted.">
               <TileRow>
-                <StatTile icon="flag" tone="orange" label="Flagged listings" metric={m.flaggedListingCount} />
-                <StatTile icon="user-times" tone="orange" label="Flagged users" metric={m.flaggedUserCount} />
-                <StatTile icon="comment" tone="orange" label="Flagged reviews" metric={m.flaggedReviewCount} />
-                <StatTile icon="ban" tone="magenta" label="Banned users" metric={m.bannedUserCount} />
+                <StatTile label="Flagged listings" metric={m.flaggedListingCount} />
+                <StatTile label="Flagged users" metric={m.flaggedUserCount} />
+                <StatTile label="Flagged reviews" metric={m.flaggedReviewCount} />
+                <StatTile label="Banned users" metric={m.bannedUserCount} />
               </TileRow>
               <Meter label="User ban rate" metric={m.userBanRate} />
             </Section>
             <Section title="Flagged items by type">
-              <BarChart series={data.series.flaggedItemsByType} emptyText="Nothing is flagged right now" />
-            </Section>
-            <Section title="Not yet available">
-              <TileRow>
-                <StatTile icon="check-square-o" tone="green" label="Report resolution rate" metric={m.reportResolutionRate} />
-              </TileRow>
+              <DonutChart series={data.series.flaggedItemsByType} totalLabel="Flagged items" emptyText="Nothing is flagged right now" />
             </Section>
           </>
         ) : null}
@@ -126,8 +126,5 @@ const AdminAnalyticsScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  subtitle: { fontSize: 14, color: '#666A70', marginBottom: 12 },
-});
 
 export default AdminAnalyticsScreen;
