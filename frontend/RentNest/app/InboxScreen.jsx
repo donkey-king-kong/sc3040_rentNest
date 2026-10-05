@@ -143,7 +143,7 @@ const InboxScreen = () => {
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
         <Text style={styles.loadingText}>
-          {isRouteLoading ? 'Loading rental info...' : 'Loading...'}
+          {isRouteLoading ? 'Loading rental info...' : 'Loading inbox...'}
         </Text>
       </View>
     );
