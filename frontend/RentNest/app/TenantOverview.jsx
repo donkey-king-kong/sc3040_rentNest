@@ -58,7 +58,7 @@ const TenantOverview = () => {
         }
 
         const outstandingResponse = await axios.get(
-          `${API_BASE_URL}${ENDPOINTS.OUTSTANDING_PAYMENTS(listingId)}`,
+          `${API_BASE_URL}${ENDPOINTS.OUTSTANDING_PAYMENTS(rentalResponse.data.rentalID)}`,
           { headers }
         );
         if (outstandingResponse.data) {
@@ -101,6 +101,17 @@ const TenantOverview = () => {
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
         <Text style={styles.loadingText}>Loading rental information...</Text>
+      </View>
+    );
+  }
+
+  if (!tenant || !rental) {
+    return (
+      <View style={styles.loadingContainer}>
+        <TouchableOpacity onPress={() => router.back()} style={{ position: 'absolute', top: 20, left: 20 }}>
+          <FontAwesome name="chevron-left" size={18} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.loadingText}>Failed to load tenant information.</Text>
       </View>
     );
   }
