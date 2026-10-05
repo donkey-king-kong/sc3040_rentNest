@@ -8,6 +8,8 @@
 
 This responds to `01_ANALYTICS_AGENT_HANDOFF.md`. It reports what was built, what was tested and how, what was changed in the shared database, and what remains. Nothing here claims approval against `02_QUALITY_TARGETS_FINAL_DRAFT.md`, which is still a draft.
 
+**5 October 2026 update:** this report preserves the original implementation and test evidence below. The current synthetic-demo history policy supersedes its September tracking cutoffs: analytics uses stored event dates for the selected period, empty event periods return zero, and date-based "Tracked since" labels/comparison gates are removed. Undefined percentage changes and missing or invalid days-on-market dates remain unavailable. See `ANALYTICS_API.md` for the current contract.
+
 ## 1. Summary
 
 - **Analytics API:** three endpoints (owner summary, per-listing, platform), plus React Native screens for each. Every metric states whether it is available, what it measures, and why when it is not.
@@ -132,11 +134,7 @@ Full definitions: `docs/ANALYTICS_API.md`.
 | **Platform** | users, listings, user distribution (owners only / tenants only / both / neither), bans and ban rate, flagged items by type, rental counts, acceptance and termination rates, rent recorded and payments with change, rent trend | new users and new listings with change, rental activity, days on market | report resolution rate |
 | **Not built** | | | unique viewers, photo gallery views, conversion funnel, listing removal rate, system health |
 
-**Coverage rule:** for a period starting before tracking, tracked metrics carry `coverage.complete = false` and the app shows "Tracked since 17 Sep 2026". For a period ending before tracking, they are unavailable, never 0.
-
-**When the app's 3-month view becomes complete:**
-- "Tracked since" disappears from **December 2026** (Oct–Dec starts after tracking).
-- "vs previous period" first appears in **March 2027**: Jan–Mar's previous period (from 3 Oct 2026) is the first one fully after tracking started. Longer views take longer.
+**Current demo-history rule (5 October):** all selected periods use recorded event timestamps. Historical counts are not blocked by the September deployment date and no "Tracked since" warning is shown. Relative growth is available when the previous period has a nonzero baseline; no date-based waiting period applies. The original coverage rule was replaced after the user confirmed that the dataset is synthetic school-project history.
 
 ## 6. Differences from the handoff
 

@@ -114,7 +114,7 @@ const OwnerAnalyticsScreen = () => {
 
         {tab === 'Offers' ? (
           <>
-            <Section title="Activity in this period" note="Only counts events since these dates started being recorded. Tap a number for details.">
+            <Section title="Activity in this period" note="Events dated within the selected period. Tap a number for details.">
               <TileRow>
                 <StatTile icon="plus-square" tone="blue" label="New listings" metric={m.newListingCount} />
                 <StatTile icon="paper-plane" tone="green" label="Offers sent" metric={m.offersSentCount} change={m.offersSentChange} />

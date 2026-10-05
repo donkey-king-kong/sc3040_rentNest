@@ -200,13 +200,7 @@ export const formatDay = (iso) => {
   return `${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
 };
 
-// Lifecycle metrics only cover the part of the period after tracking started, so say so
-const basisLabel = (metric) => {
-  if (metric.coverage && metric.coverage.complete === false) {
-    return `Tracked since ${formatDay(metric.coverage.start)}`;
-  }
-  return metric.basis === 'period' ? 'Selected period' : 'Current';
-};
+const basisLabel = (metric) => (metric.basis === 'period' ? 'Selected period' : 'Current');
 
 export const formatChange = (metric) => {
   if (!metric || metric.availability !== 'available') return null;

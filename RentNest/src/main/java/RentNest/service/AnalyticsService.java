@@ -63,9 +63,6 @@ public class AnalyticsService {
     private static final String MONTHS = "months";
     private static final String PERCENTAGE_POINTS = "percentage_points";
 
-    // Used when nothing configures a view-tracking start, e.g. in unit tests
-    static final String DEFAULT_VIEW_TRACKING_START = "2026-09-29T00:00:00+08:00";
-
     // Contracted/actual tenancy length buckets, lower bound inclusive, in months
     private static final int[] TENANCY_BUCKET_BOUNDS = {3, 6, 12, 24};
     private static final String[] TENANCY_BUCKET_LABELS = {"<3 months", "3-6 months", "6-12 months", "12-24 months", ">=24 months"};
@@ -73,35 +70,22 @@ public class AnalyticsService {
     private final AnalyticsQueryRepository queries;
     private final String currency;
     private final ZoneId zone;
-    // Lifecycle timestamps (created, accepted, terminated) are only recorded from this moment on
-    private final Instant trackingStart;
-    // Listing views are only recorded from this moment on, and cannot be backfilled
-    private final Instant viewTrackingStart;
     private final Clock clock;
 
     @Autowired
     public AnalyticsService(
             AnalyticsQueryRepository queries,
             @Value("${analytics.currency:SGD}") String currency,
-            @Value("${analytics.time-zone:Asia/Singapore}") String timeZone,
-            @Value("${analytics.lifecycle-tracking-start:2026-09-17T02:26:00+08:00}") String lifecycleTrackingStart,
-            @Value("${analytics.view-tracking-start:" + DEFAULT_VIEW_TRACKING_START + "}") String viewTrackingStart) {
-        this(queries, currency, timeZone, lifecycleTrackingStart, viewTrackingStart, Clock.systemUTC());
+            @Value("${analytics.time-zone:Asia/Singapore}") String timeZone) {
+        this(queries, currency, timeZone, Clock.systemUTC());
     }
 
     AnalyticsService(AnalyticsQueryRepository queries, String currency, String timeZone,
-                     String lifecycleTrackingStart, Clock clock) {
-        this(queries, currency, timeZone, lifecycleTrackingStart, DEFAULT_VIEW_TRACKING_START, clock);
-    }
-
-    AnalyticsService(AnalyticsQueryRepository queries, String currency, String timeZone,
-                     String lifecycleTrackingStart, String viewTrackingStart, Clock clock) {
+                     Clock clock) {
         this.clock = clock;
         this.queries = queries;
         this.currency = currency;
         this.zone = ZoneId.of(timeZone);
-        this.trackingStart = OffsetDateTime.parse(lifecycleTrackingStart).toInstant();
-        this.viewTrackingStart = OffsetDateTime.parse(viewTrackingStart).toInstant();
     }
 
     // ---------- Period ----------
@@ -528,27 +512,16 @@ public class AnalyticsService {
 
     // ---------- Lifecycle timestamps ----------
 
-    /** A count of dated events in the period. Unavailable if tracking started after the period; partial coverage is flagged. */
+    /** A count of recorded events in the period; an empty period is an available zero. */
     private Metric lifecycleCount(AnalyticsPeriod period, String definition, BiFunction<Instant, Instant, Long> countBetween) {
-        if (!trackingStart.isBefore(period.to())) {
-            return Metric.unavailable(COUNT, PERIOD, definition, notTrackedReason());
-        }
-        return Metric.available(countBetween.apply(period.from(), period.to()), COUNT, PERIOD, definition)
-                .withCoverage(coverage(period));
+        return Metric.available(countBetween.apply(period.from(), period.to()), COUNT, PERIOD, definition);
     }
 
-    /** Percentage change against the previous period of the same length. Both periods must be fully tracked. */
+    /** Percentage change against the recorded events in the previous period of the same length. */
     private Metric percentChange(AnalyticsPeriod period, String definition, BiFunction<Instant, Instant, Long> countBetween) {
         Instant previousFrom = previousFrom(period);
-        if (previousFrom.isBefore(trackingStart)) {
-            return Metric.unavailable(PERCENT, PERIOD, definition,
-                    "Needs this period and the previous one to be fully tracked; tracking started on " + formatDate(trackingStart) + ".");
-        }
-        Metric change = relativeChange(countBetween.apply(period.from(), period.to()),
+        return relativeChange(countBetween.apply(period.from(), period.to()),
                 countBetween.apply(previousFrom, period.from()), definition);
-        return Metric.AVAILABLE.equals(change.availability())
-                ? change.withCoverage(new Metric.Coverage(previousFrom, period.to(), true))
-                : change;
     }
 
     private void putLifecycleCounts(Map<String, Metric> metrics, List<RentalRow> rentals, AnalyticsPeriod period) {
@@ -560,27 +533,14 @@ public class AnalyticsService {
                 (from, to) -> countInRange(rentals, RentalRow::terminatedAt, from, to)));
     }
 
-    /**
-     * A recorded view count for the period. Views cannot be backfilled, so a period that ends
-     * before tracking started reports unavailable rather than a misleading zero, and a period
-     * that starts before it is flagged as only partly covered.
-     */
+    /** Count recorded views by their event timestamps, independently of when the feature was introduced. */
     private Metric viewCount(AnalyticsPeriod period, String definition, BiFunction<Instant, Instant, Long> countBetween) {
-        if (!viewTrackingStart.isBefore(period.to())) {
-            return Metric.unavailable(COUNT, PERIOD, definition,
-                    "Not tracked for this period: views are recorded from " + formatDate(viewTrackingStart) + " onwards.");
-        }
-        return Metric.available(countBetween.apply(period.from(), period.to()), COUNT, PERIOD, definition)
-                .withCoverage(new Metric.Coverage(max(period.from(), viewTrackingStart), period.to(),
-                        !period.from().isBefore(viewTrackingStart)));
+        return Metric.available(countBetween.apply(period.from(), period.to()), COUNT, PERIOD, definition);
     }
 
     private Metric averageDaysOnMarket(List<RentalRow> rentals, AnalyticsPeriod period, Instant asOf) {
         String definition = "Average days from publication to the first accepted rental offer per listing, "
                 + "where that first acceptance falls in the selected period. Listings with missing or invalid dates are excluded.";
-        if (!trackingStart.isBefore(period.to())) {
-            return Metric.unavailable("days", PERIOD, definition, notTrackedReason());
-        }
         Map<Long, List<RentalRow>> byListing = new LinkedHashMap<>();
         rentals.forEach(rental -> byListing.computeIfAbsent(rental.listingId(), id -> new ArrayList<>()).add(rental));
         List<BigDecimal> days = new ArrayList<>();
@@ -595,8 +555,7 @@ public class AnalyticsService {
                     "No first accepted offers with valid publication and acceptance dates in this period.");
         }
         BigDecimal sum = days.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-        return Metric.available(sum.divide(BigDecimal.valueOf(days.size()), 1, RoundingMode.HALF_UP), "days", PERIOD, definition)
-                .withCoverage(coverage(period));
+        return Metric.available(sum.divide(BigDecimal.valueOf(days.size()), 1, RoundingMode.HALF_UP), "days", PERIOD, definition);
     }
 
     private Metric listingDaysOnMarket(Date publishedAt, List<RentalRow> rentals, Instant asOf) {
@@ -630,18 +589,6 @@ public class AnalyticsService {
 
     private static boolean hasUndatedAcceptance(List<RentalRow> rentals) {
         return rentals.stream().anyMatch(rental -> ACCEPTED_STATUSES.contains(normalise(rental.status())) && rental.acceptedAt() == null);
-    }
-
-    private Metric.Coverage coverage(AnalyticsPeriod period) {
-        return new Metric.Coverage(max(period.from(), trackingStart), period.to(), !period.from().isBefore(trackingStart));
-    }
-
-    private String notTrackedReason() {
-        return "Not tracked for this period: these dates are recorded from " + formatDate(trackingStart) + " onwards.";
-    }
-
-    private String formatDate(Instant instant) {
-        return DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH).format(instant.atZone(zone));
     }
 
     private static boolean inRange(Date date, Instant from, Instant to) {

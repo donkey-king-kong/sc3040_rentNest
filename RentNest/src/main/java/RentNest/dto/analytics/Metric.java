@@ -8,8 +8,8 @@ import java.time.Instant;
  * A single analytics value. A measured zero is "available" with value 0;
  * a metric that cannot be calculated is "unavailable" with a null value and a reason.
  *
- * Metrics built on lifecycle timestamps also carry {@code coverage}: those dates are only recorded
- * from the moment tracking started, so a period reaching back before then is only partly covered.
+ * The optional {@code coverage} field is retained for response compatibility. Current analytics
+ * use recorded event timestamps throughout the selected period and do not emit coverage cutoffs.
  */
 public record Metric(
         String availability,
@@ -25,7 +25,7 @@ public record Metric(
     public static final String SNAPSHOT = "snapshot";
     public static final String PERIOD = "period";
 
-    /** The part of the requested period the data actually covers. {@code complete} is false when tracking began mid-period. */
+    /** Optional legacy metadata describing a covered interval. */
     public record Coverage(Instant start, Instant end, boolean complete) {
     }
 

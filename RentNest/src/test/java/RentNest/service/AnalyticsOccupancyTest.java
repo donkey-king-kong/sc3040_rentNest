@@ -33,7 +33,7 @@ class AnalyticsOccupancyTest {
         Listings listing = mock(Listings.class);
         when(listing.getListingID()).thenReturn(1L);
         when(q.findListingOwnedBy(1L, 42L)).thenReturn(Optional.of(listing));
-        return new AnalyticsService(q, "SGD", "Asia/Singapore", "2026-09-17T02:26:00+08:00",
+        return new AnalyticsService(q, "SGD", "Asia/Singapore",
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
     private User owner() {

@@ -112,14 +112,14 @@ describe('StatTile', () => {
     expect(text).not.toContain('Not available');
   });
 
-  it('says when a metric only covers part of the period', () => {
+  it('labels demo-history metrics by the selected period even with legacy coverage metadata', () => {
     const metric = {
       ...available(3, 'count', 'period'),
       coverage: { start: '2026-09-16T18:26:00Z', end: '2026-10-01T00:00:00Z', complete: false },
     };
     const text = renderedText(renderStatic(<StatTile label="Offers sent" metric={metric} />));
-    expect(text.some((item) => item.startsWith('Tracked since '))).toBe(true);
-    expect(text).not.toContain('Selected period');
+    expect(text).toContain('Selected period');
+    expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
   });
 
   it('labels a fully covered period metric normally', () => {
@@ -317,7 +317,7 @@ describe('ListingAnalyticsScreen', () => {
     await act(async () => { tab.props.onPress(); });
   };
 
-  it('renders the real backend response across its tabs', async () => {
+  it('renders dated activity and unavailable date-dependent metrics across its tabs', async () => {
     await AsyncStorage.setItem('token', 'test-token');
     axios.get.mockResolvedValue({ data: listingResponse });
 
@@ -330,18 +330,20 @@ describe('ListingAnalyticsScreen', () => {
     expect(text).toContain('Vacant');
     expect(text).toContain('S$1,500');
     expect(text).toContain('65.6%');
-    // Listing views, unique viewers (both before view tracking) and days on market
-    // must not render as numbers
+    // Empty historical view counts are measured zeros; missing publication dates
+    // still make days on market unavailable.
     expect(text).toContain('Unique viewers');
-    expect(text.filter((item) => item === 'Not available')).toHaveLength(3);
-    // No previous-period data in this response, so no change lines
-    expect(text.some((item) => item.includes('vs previous period'))).toBe(false);
+    expect(text.filter((item) => item === 'Not available')).toHaveLength(1);
+    expect(text.filter((item) => item === '0')).toHaveLength(2);
+    expect(text).toContain('+65.6 pts vs previous period');
+    expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
 
-    // Offers: period counts predate tracking; acceptance rate from all-time records
+    // Offers: an empty period has zero events; all-time accepted records remain.
     await pressTab(tree, 'Offers');
     text = renderedText(tree);
-    expect(text.filter((item) => item === 'Not available')).toHaveLength(2);
-    expect(text).toContain('Not tracked for this period: these dates are recorded from 17 Sep 2026 onwards.');
+    expect(text).not.toContain('Not available');
+    expect(text.filter((item) => item === '0').length).toBeGreaterThanOrEqual(2);
+    expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
     expect(text).toContain('100.0%');
 
     // Occupancy

@@ -10,7 +10,8 @@ import RentNest.service.JwtService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -18,6 +19,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.sql.Timestamp;
 
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,16 +34,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Listing view tracking: the server records views itself, an owner cannot inflate the counts on
  * their own listing, and the analytics report views and unique viewers over the period.
  *
- * Disposable in-memory H2 database, synthetic data only. Tracking "started" at the start of 2025
- * for these tests, so a period around today is fully covered.
+ * Disposable in-memory H2 database, synthetic data only.
  */
 @RentNestIntegrationTest
-@TestPropertySource(properties = "analytics.view-tracking-start=2025-01-01T00:00:00+08:00")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
 class ListingViewTrackingIntegrationTest {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Singapore");
 
     @Autowired private MockMvc mockMvc;
+    @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private JwtService jwtService;
     @Autowired private UserRepository userRepository;
     @Autowired private ListingsRepository listingsRepository;
@@ -146,7 +148,7 @@ class ListingViewTrackingIntegrationTest {
                 .andExpect(jsonPath("$.metrics.listingViews.value").value(3))
                 .andExpect(jsonPath("$.metrics.uniqueListingViewers.availability").value("available"))
                 .andExpect(jsonPath("$.metrics.uniqueListingViewers.value").value(2))
-                .andExpect(jsonPath("$.metrics.listingViews.coverage.complete").value(true));
+                .andExpect(jsonPath("$.metrics.listingViews.coverage").doesNotExist());
     }
 
     @Test
@@ -169,12 +171,30 @@ class ListingViewTrackingIntegrationTest {
     }
 
     @Test
-    void aPeriodEndingBeforeTrackingStartedIsUnavailableNotZero() throws Exception {
+    void anEmptyHistoricalPeriodHasAvailableZeroViews() throws Exception {
         mockMvc.perform(listingAnalytics("2024-01-01T00:00:00+08:00", "2024-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.listingViews.availability").value("unavailable"))
-                .andExpect(jsonPath("$.metrics.listingViews.value").value(nullValue()))
-                .andExpect(jsonPath("$.metrics.uniqueListingViewers.availability").value("unavailable"));
+                .andExpect(jsonPath("$.metrics.listingViews.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.listingViews.value").value(0))
+                .andExpect(jsonPath("$.metrics.uniqueListingViewers.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.uniqueListingViewers.value").value(0));
+    }
+
+    @Test
+    void historicalViewsUseTheirRecordedDatesAndHalfOpenPeriodBoundaries() throws Exception {
+        // The endpoint still uses the server clock. Only this disposable fixture is backdated.
+        saveHistoricalView(viewerOne, "2026-08-01T00:00:00+08:00");
+        saveHistoricalView(viewerOne, "2026-08-15T00:00:00+08:00");
+        saveHistoricalView(viewerTwo, "2026-08-20T00:00:00+08:00");
+        saveHistoricalView(viewerTwo, "2026-07-31T23:59:59+08:00");
+        saveHistoricalView(viewerTwo, "2026-09-01T00:00:00+08:00");
+
+        mockMvc.perform(listingAnalytics("2026-08-01T00:00:00+08:00", "2026-09-01T00:00:00+08:00"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.listingViews.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.listingViews.value").value(3))
+                .andExpect(jsonPath("$.metrics.uniqueListingViewers.value").value(2))
+                .andExpect(jsonPath("$.metrics.listingViews.coverage").doesNotExist());
     }
 
     @Test
@@ -200,6 +220,16 @@ class ListingViewTrackingIntegrationTest {
     }
 
     // ---------- Helpers ----------
+
+    private void saveHistoricalView(User viewer, String at) {
+        ListingView view = new ListingView();
+        view.setListing(listing);
+        view.setViewerUserId(viewer.getUserID());
+        view.setKind(ListingView.KIND_LISTING);
+        ListingView saved = listingViewRepository.save(view);
+        jdbcTemplate.update("UPDATE listing_view SET viewed_at = ? WHERE id = ?",
+                Timestamp.from(OffsetDateTime.parse(at).toInstant()), saved.getId());
+    }
 
     private ResultActions recordView(User viewer) throws Exception {
         return mockMvc.perform(post("/api/listings/" + listing.getListingID() + "/views")

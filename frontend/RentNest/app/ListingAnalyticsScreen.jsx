@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Image, ScrollView, Pressable, Modal, StyleSheet } from 'react-native';
+import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { FontAwesome } from 'react-native-vector-icons';
 import { ENDPOINTS } from '../config/api';
@@ -18,7 +18,6 @@ import {
   formatValue,
   formatDay,
   useAnalytics,
-  useOwnedListings,
 } from '../components/analytics/AnalyticsKit';
 
 const TABS = ['Overview', 'Offers', 'Payments', 'Occupancy'];
@@ -28,8 +27,6 @@ const ListingAnalyticsScreen = () => {
   const { listingId } = useLocalSearchParams();
   const [period, setPeriod] = useState(DEFAULT_PERIOD);
   const [tab, setTab] = useState(TABS[0]);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const ownedListings = useOwnedListings();
   const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_LISTING(listingId), period);
 
   const header = (
@@ -62,11 +59,6 @@ const ListingAnalyticsScreen = () => {
   const listing = data.listing || {};
   const occupied = m.occupancyStatus?.value === 'occupied';
 
-  const switchProperty = (id) => {
-    setPickerOpen(false);
-    router.setParams({ listingId: String(id) });
-  };
-
   return (
     <>
       {header}
@@ -85,18 +77,6 @@ const ListingAnalyticsScreen = () => {
           </View>
         </View>
       </View>
-
-      {ownedListings.items.length > 1 ? (
-        <Pressable
-          style={styles.changeProperty}
-          onPress={() => setPickerOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Change property"
-        >
-          <Text style={styles.changePropertyText}>Change property</Text>
-          <FontAwesome name="chevron-down" size={12} color={COLORS.ink} />
-        </Pressable>
-      ) : null}
 
         </>}>
 
@@ -130,7 +110,7 @@ const ListingAnalyticsScreen = () => {
 
       {tab === 'Offers' ? (
         <>
-          <Section title="Activity in this period" note="Only counts events since these dates started being recorded.">
+          <Section title="Activity in this period" note="Events dated within the selected period.">
             <TileRow>
               <StatTile icon="paper-plane" tone="green" label="Offers sent" metric={m.offersSentCount} />
               <StatTile icon="check-circle" tone="violet" label="Offers accepted" metric={m.offersAcceptedCount} />
@@ -176,34 +156,6 @@ const ListingAnalyticsScreen = () => {
       ) : null}
 
       </AnalyticsLayout>
-      <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setPickerOpen(false)} accessibilityLabel="Close">
-          {/* Taps inside the sheet must not reach the backdrop, which closes it */}
-          <Pressable style={styles.modalSheet} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Change property</Text>
-            <ScrollView>
-              {ownedListings.items.map((item) => {
-                const current = String(item.listingID) === String(listingId);
-                return (
-                  <Pressable
-                    key={item.listingID}
-                    style={styles.modalRow}
-                    onPress={() => switchProperty(item.listingID)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: current }}
-                  >
-                    <View style={styles.listingText}>
-                      <Text style={[styles.modalRowName, current && styles.modalRowCurrent]}>{item.name}</Text>
-                      <Text style={styles.modalRowDetail}>{[item.type, item.location].filter(Boolean).join(' · ')}</Text>
-                    </View>
-                    {current ? <FontAwesome name="check" size={14} color={COLORS.ink} /> : null}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </>
   );
 };
@@ -265,59 +217,6 @@ const styles = StyleSheet.create({
   },
   statusTextOccupied: {
     color: COLORS.surface,
-  },
-  changeProperty: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: 14,
-  },
-  changePropertyText: {
-    fontSize: 14,
-    color: COLORS.ink,
-    marginRight: 8,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: COLORS.surface,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 20,
-    maxHeight: '70%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.ink,
-    marginBottom: 8,
-  },
-  modalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  modalRowName: {
-    fontSize: 16,
-    color: COLORS.ink,
-  },
-  modalRowCurrent: {
-    fontWeight: '600',
-  },
-  modalRowDetail: {
-    fontSize: 13,
-    color: COLORS.inkSecondary,
-    marginTop: 2,
   },
 });
 

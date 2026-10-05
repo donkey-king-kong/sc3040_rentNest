@@ -51,7 +51,7 @@ class AnalyticsDaysOnMarketTest {
         when(q.findAllRentalRows()).thenReturn(rows);
         when(q.countListingsByOwner(42L)).thenReturn(5L);
         when(q.findRatingSummaryForUser(42L)).thenReturn(new Object[]{null, 0L});
-        return new AnalyticsService(q, "SGD", "Asia/Singapore", "2026-01-01T00:00:00Z", Clock.fixed(NOW, ZoneOffset.UTC));
+        return new AnalyticsService(q, "SGD", "Asia/Singapore", Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     static Stream<Arguments> dateCases() {
@@ -115,5 +115,25 @@ class AnalyticsDaysOnMarketTest {
     @Test void laterAcceptanceDoesNotPullAnOldFirstAcceptanceIntoPeriod() {
         var s = service(PUBLISHED, List.of(row(1, "terminated", PUBLISHED, ACCEPTED), row(1, "active", PUBLISHED, "2026-09-21T00:00:00Z")));
         assertNull(s.ownerSummary(actor(), s.parsePeriod("2026-09-20T00:00:00Z", TO)).metrics().get("averageDaysOnMarket").value());
+    }
+
+    @Test void historicalAveragesUseValidFirstAcceptancesAndExcludeMissingOrInvalidDates() {
+        String published = "2026-08-01T00:00:00Z";
+        String accepted = "2026-08-11T00:00:00Z";
+        var rows = List.of(
+                row(1, "terminated", published, accepted), // 10 days before the former cutoff
+                row(1, "active", published, "2026-08-21T00:00:00Z"), // later acceptance is ignored
+                row(2, "active", null, accepted),
+                row(3, "active", "2026-08-20T00:00:00Z", accepted),
+                row(4, "terminated", published, null),
+                row(4, "active", published, accepted)); // cannot determine this listing's first acceptance
+        var s = service(published, rows);
+        var period = s.parsePeriod("2026-08-01T00:00:00Z", "2026-09-01T00:00:00Z");
+        for (var result : List.of(s.ownerSummary(actor(), period), s.platformSummary(actor(), period))) {
+            var average = result.metrics().get("averageDaysOnMarket");
+            assertEquals("available", average.availability());
+            assertEquals(new BigDecimal("10.0"), average.value());
+            assertNull(average.coverage());
+        }
     }
 }

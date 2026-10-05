@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -26,7 +26,6 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Date;
 
-import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -40,11 +39,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Lifecycle timestamps: the server records them itself through the real endpoints, and analytics built
- * on them respect when tracking started. Disposable in-memory H2 database, synthetic data only.
+ * on them use recorded event dates. Disposable in-memory H2 database, synthetic data only.
  */
 @RentNestIntegrationTest
-// Tracking "started" on 1 Jan 2026 for these tests
-@TestPropertySource(properties = "analytics.lifecycle-tracking-start=2026-01-01T00:00:00+08:00")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
 class LifecycleTimestampsIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
@@ -154,10 +152,10 @@ class LifecycleTimestampsIntegrationTest {
     // ---------- Analytics built on the timestamps ----------
 
     /**
-     * Fixture, all in Singapore time. Tracking started 1 Jan 2026.
+     * Fixture, all in Singapore time, predating the former September 2026 cutoff.
      *   L1  listed 1 Feb   offer 5 Feb   accepted 11 Feb  (10 days on market)
      *   L2  listed 1 Mar   offer 10 Mar  accepted 15 Mar  terminated 25 Mar  (14 days on market)
-     *   L3  listed and offered before tracking (no dates)   accepted 20 Feb  (excluded from days on market)
+     *   L3  missing publication and offer dates   accepted 20 Feb  (excluded from days on market)
      *   L4  listed 10 Jan  offer 20 Mar  still pending
      */
     private void createLifecycleFixture() {
@@ -184,47 +182,91 @@ class LifecycleTimestampsIntegrationTest {
                 .andExpect(jsonPath("$.metrics.terminationsCount.value").value(1))
                 .andExpect(jsonPath("$.metrics.averageDaysOnMarket.value").value(12.0))
                 .andExpect(jsonPath("$.metrics.averageDaysOnMarket.unit").value("days"))
-                .andExpect(jsonPath("$.metrics.offersSentCount.coverage.complete").value(true))
+                .andExpect(jsonPath("$.metrics.offersSentCount.coverage").doesNotExist())
                 .andExpect(jsonPath("$.metrics.listingCount.coverage").doesNotExist());
     }
 
     @Test
-    void periodStartingBeforeTrackingIsMarkedPartlyCovered() throws Exception {
+    void historicalEventsAreCountedWithoutCoverageCutoffs() throws Exception {
         createLifecycleFixture();
 
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), "2025-12-01T00:00:00+08:00", "2026-03-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metrics.offersSentCount.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.offersSentCount.coverage.complete").value(false))
-                .andExpect(jsonPath("$.metrics.offersSentCount.coverage.start").value("2025-12-31T16:00:00Z"));
+                .andExpect(jsonPath("$.metrics.offersSentCount.value").value(1))
+                .andExpect(jsonPath("$.metrics.offersAcceptedCount.value").value(2))
+                .andExpect(jsonPath("$.metrics.averageDaysOnMarket.value").value(10.0))
+                .andExpect(jsonPath("$.metrics.offersSentCount.coverage").doesNotExist());
     }
 
     @Test
-    void periodEndingBeforeTrackingIsUnavailableNotZero() throws Exception {
+    void emptyHistoricalPeriodsHaveZeroCountsButNoCompletedDaysOnMarket() throws Exception {
         createLifecycleFixture();
 
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), "2025-06-01T00:00:00+08:00", "2025-12-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.offersSentCount.availability").value("unavailable"))
-                .andExpect(jsonPath("$.metrics.offersSentCount.value").value(nullValue()))
+                .andExpect(jsonPath("$.metrics.offersSentCount.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.offersSentCount.value").value(0))
+                .andExpect(jsonPath("$.metrics.offersAcceptedCount.value").value(0))
+                .andExpect(jsonPath("$.metrics.terminationsCount.value").value(0))
                 .andExpect(jsonPath("$.metrics.averageDaysOnMarket.availability").value("unavailable"))
-                .andExpect(jsonPath("$.metrics.newListingCount.availability").value("unavailable"));
+                .andExpect(jsonPath("$.metrics.newListingCount.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.newListingCount.value").value(0));
+
+        mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary"), "2025-06-01T00:00:00+08:00", "2025-12-01T00:00:00+08:00"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.newUserCount.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.newUserCount.value").value(0))
+                .andExpect(jsonPath("$.metrics.newListingCount.value").value(0))
+                .andExpect(jsonPath("$.metrics.offersAcceptedCount.value").value(0));
     }
 
     @Test
-    void percentChangeNeedsTheWholePreviousPeriodTracked() throws Exception {
+    void historicalPercentChangeUsesRecordedBaselineAndStillRejectsZeroBaseline() throws Exception {
         createLifecycleFixture();
 
-        // March: previous period (29 Jan to 1 Mar) is tracked. Offers sent: 1 before, 2 now.
+        // March: offers sent in the previous period (29 Jan to 1 Mar): 1 before, 2 now.
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), "2026-03-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.offersSentChange.value").value(100.0));
+                .andExpect(jsonPath("$.metrics.offersSentChange.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.offersSentChange.value").value(100.0))
+                .andExpect(jsonPath("$.metrics.offersSentChange.coverage").doesNotExist());
 
-        // Jan to Mar: the previous period reaches back before tracking started
+        // Jan to Apr: no offers were recorded in the previous period, so its baseline is zero.
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), "2026-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metrics.offersSentChange.availability").value("unavailable"))
-                .andExpect(jsonPath("$.metrics.offersSentChange.reason").isNotEmpty());
+                .andExpect(jsonPath("$.metrics.offersSentChange.reason").value(
+                        "Nothing in the previous period, so a percentage change cannot be calculated."));
+    }
+
+    @Test
+    void percentageChangesRemainAvailableWhenThePeriodCrossesTheFormerSeptemberCutoff() throws Exception {
+        Listings previous = saveListing("Previous", "2026-08-28T00:00:00+08:00");
+        Listings first = saveListing("First", "2026-09-11T00:00:00+08:00");
+        Listings second = saveListing("Second", "2026-09-19T00:00:00+08:00");
+        saveRental(previous, "pending", "2026-08-29T00:00:00+08:00", null, null);
+        saveRental(first, "active", "2026-09-12T00:00:00+08:00", "2026-09-16T00:00:00+08:00", null);
+        saveRental(second, "terminated", "2026-09-20T00:00:00+08:00", "2026-09-22T00:00:00+08:00", "2026-09-23T00:00:00+08:00");
+        saveUser("previous@test.local", User.ROLE_USER, "2026-08-29T00:00:00+08:00");
+        saveUser("first@test.local", User.ROLE_USER, "2026-09-12T00:00:00+08:00");
+        saveUser("second@test.local", User.ROLE_USER, "2026-09-20T00:00:00+08:00");
+
+        String from = "2026-09-10T00:00:00+08:00";
+        String to = "2026-09-24T00:00:00+08:00";
+        mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), from, to))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.offersSentCount.value").value(2))
+                .andExpect(jsonPath("$.metrics.offersSentChange.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.offersSentChange.value").value(100.0))
+                .andExpect(jsonPath("$.metrics.averageDaysOnMarket.value").value(4.0));
+
+        mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary"), from, to))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.newUserCountChange.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.newUserCountChange.value").value(100.0))
+                .andExpect(jsonPath("$.metrics.newListingCountChange.value").value(100.0))
+                .andExpect(jsonPath("$.metrics.averageDaysOnMarket.value").value(4.0));
     }
 
     @Test
@@ -238,7 +280,7 @@ class LifecycleTimestampsIntegrationTest {
                 .andExpect(jsonPath("$.listing.listedAt").value("2026-01-31T16:00:00Z"))
                 .andExpect(jsonPath("$.listing.firstAcceptedAt").value("2026-02-10T16:00:00Z"));
 
-        // Published before tracking: unknown, not zero
+        // Publication date missing: the interval is unknown, not zero.
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/listings/" + listingIdByName("L3")),
                         "2026-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
@@ -296,7 +338,7 @@ class LifecycleTimestampsIntegrationTest {
                 .setCreatedAt(date(createdAt)));
     }
 
-    /** A null createdAt simulates a listing published before tracking started. */
+    /** A null createdAt simulates a listing with a missing publication date. */
     private Listings saveListing(String name, String createdAt) {
         Listings listing = new Listings();
         listing.setOwner(owner);
@@ -311,7 +353,7 @@ class LifecycleTimestampsIntegrationTest {
         return saved;
     }
 
-    /** A null createdAt simulates an offer sent before tracking started. */
+    /** A null createdAt simulates an offer with a missing creation date. */
     private void saveRental(Listings listing, String status, String createdAt, String acceptedAt, String terminatedAt) {
         Rentals rental = new Rentals();
         rental.setListings(listing);

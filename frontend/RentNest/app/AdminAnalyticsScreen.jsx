@@ -88,7 +88,7 @@ const AdminAnalyticsScreen = () => {
 
         {tab === 'Users' ? (
           <>
-            <Section title="Growth in this period" note="Only counts accounts and listings created since these dates started being recorded.">
+            <Section title="Growth in this period" note="Accounts created and listings published during the selected period.">
               <TileRow>
                 <StatTile icon="user-plus" tone="green" label="New users" metric={m.newUserCount} change={m.newUserCountChange} />
                 <StatTile icon="plus-square" tone="blue" label="New listings" metric={m.newListingCount} change={m.newListingCountChange} />

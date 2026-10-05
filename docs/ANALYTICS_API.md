@@ -1,6 +1,6 @@
 # Analytics API — Tier 1
 
-Status: implemented on branch `feature/analytics-tier1`. Tier 1 uses data the app already stored; lifecycle timestamps (Tier 2) were added on 17 Sep 2026. There is still no event tracking.
+Status: implemented on `feature/dashboard-usability-fixes`. Analytics uses stored account, publication, rental, payment and listing-view dates. On 5 October 2026, the school project's synthetic dataset was designated as the demo history; the former September deployment-date cutoffs were removed.
 
 ## Endpoints
 
@@ -21,6 +21,7 @@ Send the JWT as `Authorization: Bearer <token>`, the same as other endpoints.
   - The period must be at most 366 days, and `from` must be before `to`.
 - **Snapshot metrics ignore the period.** They describe the current state at `asOf`. Only metrics with `basis: "period"` are filtered by `from`/`to`.
 - **Monthly buckets** use `analytics.time-zone` (default `Asia/Singapore`).
+- **Demo history uses stored dates without a global tracking cutoff.** An empty event period returns zero; a missing date cannot place an event in a period. Undefined percentage changes and missing or invalid days-on-market dates remain unavailable. The former `analytics.lifecycle-tracking-start` and `analytics.view-tracking-start` settings are no longer used, and responses do not emit cutoff-based `coverage` metadata.
 
 ### Status codes
 
@@ -92,7 +93,7 @@ P‡ = period metric built on recorded listing views (see limitation 11).
 | `tenantsInPeriodCount` / `tenantsInPeriodChange` | count / percent | P | Distinct tenants whose accepted tenancy overlapped the period, and the change vs the previous period. |
 | `newListingCount` | count | P† | Listings the caller published in the period. |
 | `offersSentCount` / `offersAcceptedCount` / `terminationsCount` | count | P† | Offers sent, offers accepted and tenancies terminated in the period. |
-| `offersSentChange` | percent | P† | Offers sent vs the previous period of the same length. Unavailable unless both periods are fully tracked and the previous one had at least one offer. |
+| `offersSentChange` | percent | P† | Offers sent vs the previous period of the same length, using recorded offer dates. Unavailable when the previous period had no offers because relative growth from zero is undefined. |
 | `averageDaysOnMarket` | days | P† | Average elapsed days from publication to the first accepted offer per listing, where that first acceptance is in the selected period. Missing, reversed, future or indeterminate acceptance dates are excluded. |
 
 | Series | Basis | Points |
@@ -158,10 +159,10 @@ The platform summary also returns `recordedRentPaymentTotalChange` and `recorded
 5. **Each listing probably has at most one rental.** `Rentals` → `Listings` is `@OneToOne`, so per-listing offer counts are usually 0 or 1.
 6. **Reviews are about users, not listings.** There is no per-listing rating.
 7. **Admin access uses the `role` column on `users`.** Accounts are `USER` by default; `ADMIN` is granted with SQL (see `docs/db/changes/`). The moderation endpoints (`/api/*/admin/**`, banning, dismissing flags) are admin-only too, while raising a flag stays open to any signed-in user so reporting still works. Legacy account provisioning (`POST /api/users/add`) is admin-only; JSON cannot assign account IDs or roles, and new accounts default to `USER`. Public registration continues through `/auth/signup`; privileged role assignment remains an explicit database-administration operation.
-8. **Lifecycle metrics (marked P†) only count from when tracking started: 17 Sep 2026, 02:26 SGT.** The `created_at`, `accepted_at` and `terminated_at` columns were added then (`docs/db/changes/2026-09-17_add_lifecycle_timestamps.sql`), and older rows were not backfilled. For a period that starts before then, these metrics carry `coverage: {start, end, complete: false}` and the app shows "Tracked since ...". For a period that ends before then, they are unavailable, not zero. The start time is set by `analytics.lifecycle-tracking-start`.
+8. **Lifecycle metrics (marked P†) use each record's event dates.** Creation, acceptance and termination counts are filtered by `created_at`, `accepted_at` and `terminated_at`. Publication dates must precede accepted offers for days on market to be valid. The synthetic demo history has no deployment-date cutoff: periods before September are calculated normally, with zero when no dated events fall in the period. Undated events are excluded from period counts; they are not assigned invented dates by the analytics service. Missing, reversed, future or indeterminate publication/acceptance dates still make days on market unavailable. Any assigned historical demo dates are synthetic, not recovered timestamps.
 9. **The server sets these timestamps, never the client.** Creation times are recorded on insert. Acceptance is recorded the first time a rental becomes `active`, and termination the first time it becomes `terminated`; later saves never overwrite them. The API ignores these fields in requests.
 10. **Timestamps use the same column type as the existing dates** (`timestamp without time zone`, written in the backend's local time zone). All backends should run in Asia/Singapore time, as the existing rental and payment dates already assume.
-11. **Listing views (marked P‡) only count from when view tracking started: 29 Sep 2026.** Views are recorded in `public.listing_view` (`docs/db/changes/2026-09-29_add_listing_view_table.sql`), one row per view, and **cannot be backfilled** — there is no record of earlier views anywhere. A period ending before tracking started reports these as unavailable, not zero; a period starting before it carries `coverage.complete = false`. The start time is set by `analytics.view-tracking-start`.
+11. **Listing views (marked P‡) use the stored `viewed_at` timestamps.** Views are recorded in `public.listing_view` (`docs/db/changes/2026-09-29_add_listing_view_table.sql`), one row per view. Empty periods return zero, including periods before the former September cutoff. This treats the retained synthetic dataset as the demo history; it does not recover real visits that were never recorded.
     - The view is recorded by the server from the token and its own clock: `POST /api/listings/{listingId}/views` reads neither a viewer nor a time from the request. It returns 204 whether or not a row was stored, and the app calls it fire-and-forget so a failure never breaks the listing page.
     - **An owner opening their own listing is not recorded**, so owners cannot inflate their own counts. This means `listingViews` is visits by other people, not total traffic.
     - `uniqueListingViewers` counts distinct signed-in viewers. Listings require a login to open, so in practice every view has an identity; the `userid` column is nullable only so an anonymous view could be counted later.

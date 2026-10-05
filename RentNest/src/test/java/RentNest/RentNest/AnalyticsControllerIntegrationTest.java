@@ -261,13 +261,11 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(jsonPath("$.metrics.rentalRecordCount.value").value(1))
                 .andExpect(jsonPath("$.metrics.averageTenancyMonths.value").value(3.0))
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(1500))
-                // This fixture period ends long before view tracking started, so views are
-                // unavailable rather than a misleading zero. ListingViewTrackingIntegrationTest
-                // covers the counts themselves.
-                .andExpect(jsonPath("$.metrics.listingViews.availability").value("unavailable"))
-                .andExpect(jsonPath("$.metrics.listingViews.value").value(nullValue()))
-                .andExpect(jsonPath("$.metrics.uniqueListingViewers.availability").value("unavailable"))
-                .andExpect(jsonPath("$.metrics.uniqueListingViewers.value").value(nullValue()))
+                // No view events fall in this historical fixture period.
+                .andExpect(jsonPath("$.metrics.listingViews.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.listingViews.value").value(0))
+                .andExpect(jsonPath("$.metrics.uniqueListingViewers.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.uniqueListingViewers.value").value(0))
                 .andExpect(jsonPath("$.metrics.daysOnMarket.availability").value("unavailable"))
                 .andExpect(jsonPath("$.series.monthlyOccupancy.points[0].value").value("vacant"))
                 .andExpect(jsonPath("$.series.monthlyOccupancy.points[1].value").value("occupied"))
