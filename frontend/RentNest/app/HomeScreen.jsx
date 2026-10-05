@@ -227,18 +227,20 @@ export default function HomeScreen() {
             ))}
           </View>
           <Text style={styles.filterLabel}>Property type</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              accessibilityLabel="Property type"
-              selectedValue={form.types[0] || ""}
-              onValueChange={(value) => update("types", value ? [value] : [])}
-              style={styles.picker}
-            >
-              <Picker.Item label="All property types" value="" />
-              <Picker.Item label="HDB" value="HDB" />
-              <Picker.Item label="Condo" value="Condo" />
-              <Picker.Item label="Landed" value="Landed" />
-            </Picker>
+          <View style={styles.pickerRow}>
+            <View style={styles.pickerContainer}>
+              <Picker
+                accessibilityLabel="Property type"
+                selectedValue={form.types[0] || ""}
+                onValueChange={(value) => update("types", value ? [value] : [])}
+                style={styles.picker}
+              >
+                <Picker.Item label="All property types" value="" />
+                <Picker.Item label="HDB" value="HDB" />
+                <Picker.Item label="Condo" value="Condo" />
+                <Picker.Item label="Landed" value="Landed" />
+              </Picker>
+            </View>
             <TouchableOpacity
               style={styles.chip}
               onPress={() => {
@@ -377,9 +379,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
   },
+  pickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginVertical: 8,
+  },
   pickerContainer: {
-    flex: 1,
-    minWidth: 220,
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
@@ -387,7 +393,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: "hidden",
   },
-  picker: { flex: 1, height: 52 },
+  picker: { width: 190, height: 42 },
   button: { backgroundColor: "#182c25", borderRadius: 8, padding: 13 },
   buttonText: { color: "#fff", fontWeight: "bold" },
   filterToggle: {
