@@ -593,8 +593,7 @@ const ChatsScreen2 = () => {
                     },
                 });
                 if (sendRentalResponse.status === 200){
-                    await getConversation();
-                    setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
+                    // refresh is handled in handleSendOffer after modal closes
                 }else{
                     console.log('Creating Rental:', sendRentalResponse.data);
                 }
@@ -866,6 +865,8 @@ const handlePaymentAndAccept = async () => {
         if (!canSendOffer) return;
         await sendRentalOffer();
         closeRentalModal();
+        await getConversation();
+        setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
     };
 
     const renderMessage = () => {
