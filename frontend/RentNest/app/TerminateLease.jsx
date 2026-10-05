@@ -136,7 +136,7 @@ const TerminateLease = () => {
     return (
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>Loading termination lease...</Text>
       </View>
     );
   }
