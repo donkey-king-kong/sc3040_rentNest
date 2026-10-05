@@ -61,7 +61,7 @@ const ListingAnalyticsScreen = () => {
     <>
       {header}
       <AnalyticsLayout compactTabs periodAccent="#16794B"
-        period={period} onPeriodChange={setPeriod} loading={loading} error={error}
+        period={period} onPeriodChange={setPeriod} loading={loading} error={error} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}
         header={<>
       <View style={styles.listingHeader}>
         {listing.listingPicture ? <Image source={{ uri: listing.listingPicture }} style={styles.image} /> : null}
@@ -93,9 +93,10 @@ const ListingAnalyticsScreen = () => {
           </Section>
 
       <Section title="Offers">
-          <MetricRow label="Offers received" metric={m.offersSentCount} />
+          <MetricRow label="Offers sent" metric={m.offersSentCount} />
           <MetricRow label="Offers accepted" metric={m.offersAcceptedCount} />
           <MetricRow label="Tenancies ended" metric={m.terminationsCount} />
+          <MetricRow label="Acceptance rate (all time)" metric={m.acceptanceRate} />
         </Section>
 
       <Section title="Rent">
@@ -104,17 +105,18 @@ const ListingAnalyticsScreen = () => {
             </TileRow>
           </Section>
 
-      <Section title="Monthly rent recorded" note="By rental month, rather than payment date.">
+      <Section title="Monthly rent recorded" note="S$ by rental month">
             <BarChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" />
           </Section>
 
       <Section title="Occupancy">
             <TileRow>
-              <StatTile label="Average tenancy" metric={m.averageTenancyMonths} />
+              <StatTile label="Average tenancy (all time)" metric={m.averageTenancyMonths} />
+              <StatTile label="Tenants hosted (all time)" metric={m.tenantsHostedCount} />
             </TileRow>
           </Section>
 
-      <Section title="Month by month" note="A month counts as occupied when an accepted tenancy covers any part of it.">
+      <Section title="Month by month">
             <OccupancyStrip series={data.series.monthlyOccupancy} />
           </Section>
 

@@ -4,7 +4,7 @@ import { COLORS, PeriodSelector } from './AnalyticsKit';
 
 // Keep navigation above the scrolling panel. Changing tabs resets that panel to the top,
 // while the selected period stays in the screen's state.
-export default function AnalyticsLayout({ header, title, subtitle, tabs = [], tab, onTabChange, period, onPeriodChange, loading, error, children, compactTabs = false, periodAccent, periodBelowTabs = false, showPeriod = true }) {
+export default function AnalyticsLayout({ header, title, subtitle, tabs = [], tab, onTabChange, period, onPeriodChange, loading, error, children, compactTabs = false, periodAccent, periodBelowTabs = false, showPeriod = true, onRefresh, dataPeriod, asOf }) {
   const id = useId();
   const buttons = useRef([]);
   const { width } = useWindowDimensions();
@@ -17,6 +17,9 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
     onTabChange(tabs[next]);
     buttons.current[next]?.focus();
   };
+  const dateFormat = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', year: 'numeric', timeZone: dataPeriod?.timeZone || 'Asia/Singapore' });
+  const rangeText = dataPeriod ? dateFormat.format(new Date(dataPeriod.from)) + ' \u2013 ' + dateFormat.format(new Date(new Date(dataPeriod.to).getTime() - 1)) : null;
+  const refreshButton = onRefresh ? <Pressable accessibilityLabel="Refresh analytics" accessibilityRole="button" accessibilityState={{ disabled: loading }} disabled={loading} onPress={onRefresh} style={styles.refresh}><Text style={styles.refreshText}>Refresh</Text></Pressable> : null;
   return (
     <View style={[styles.screen, compactTabs && styles.adminScreen]}>
       <View style={styles.container}>
@@ -25,7 +28,7 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
             {title ? <Text style={styles.title}>{title}</Text> : null}
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </>}
-          {showPeriod && !periodBelowTabs ? <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} /> : null}
+          {showPeriod && !periodBelowTabs ? <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} trailingAction={refreshButton} /> : null}
           {tabs.length > 0 ? <TabContainer
             {...(compactTabs ? { horizontal: true, showsHorizontalScrollIndicator: false,
               contentContainerStyle: styles.compactTabRow, style: styles.compactTabs } : { style: styles.tabs })}
@@ -43,8 +46,16 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
             ))}
           </TabContainer> : null}
           {showPeriod && periodBelowTabs ? <View style={styles.periodBelowTabs}>
-            <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} />
+            <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} trailingAction={refreshButton} />
           </View> : null}
+          <View style={styles.toolbar}>
+            <View style={{ flex: 1 }}>
+              {showPeriod && rangeText ? <Text style={styles.dateRange}>{rangeText}</Text> : null}
+              {asOf ? <Text style={styles.updatedTime}>Updated {new Intl.DateTimeFormat('en-SG', { hour: '2-digit', minute: '2-digit', timeZone: dataPeriod?.timeZone || 'Asia/Singapore' }).format(new Date(asOf))}</Text> : null}
+              {loading ? <Text style={styles.rangeText} accessibilityLiveRegion="polite">Updating: previous values displayed</Text> : null}
+            </View>
+            {!showPeriod ? refreshButton : null}
+          </View>
         </View>
         <ScrollView key={tab} nativeID={`${id}-panel`}
           {...(web && tabs.length > 0 ? { role: 'tabpanel', 'aria-labelledby': `${id}-tab-${tabs.indexOf(tab)}` } : {})}
@@ -58,6 +69,12 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
 }
 
 const styles = StyleSheet.create({
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
+  dateRange: { fontSize: 14, lineHeight: 20, fontWeight: '500', color: COLORS.ink, fontVariant: ['tabular-nums'] },
+  updatedTime: { fontSize: 12, lineHeight: 18, marginTop: 4, color: COLORS.inkSecondary, fontVariant: ['tabular-nums'] },
+  rangeText: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary },
+  refresh: { minWidth: 80, minHeight: 48, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border, borderRadius: 8 },
+  refreshText: { color: '#16794B', fontWeight: '600' },
   periodBelowTabs: { marginTop: 16 },
   adminScreen: { backgroundColor: COLORS.surface },
   adminHeader: { backgroundColor: '#FFFFFF', paddingTop: 0 },

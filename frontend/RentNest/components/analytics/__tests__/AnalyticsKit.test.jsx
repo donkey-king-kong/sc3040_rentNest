@@ -6,6 +6,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import listingResponse from './fixtures/listing-response.json';
 import { Circle, Path } from 'react-native-svg';
 import {
+  PeriodSelector,
+  chartMaximum,
   BarChart,
   DonutChart,
   MetricRow,
@@ -342,7 +344,7 @@ describe('ListingAnalyticsScreen', () => {
     expect(text.filter((item) => item === '0').length).toBeGreaterThanOrEqual(2);
     expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
     expect(text).not.toContain('Acceptance rate');
-    expect(text).toEqual(expect.arrayContaining(['Offers received', 'Offers accepted', 'Tenancies ended']));
+    expect(text).toEqual(expect.arrayContaining(['Offers sent', 'Offers accepted', 'Tenancies ended']));
 
     // Occupancy
     text = renderedText(tree);
@@ -384,4 +386,23 @@ describe('Admin user presentation', () => {
     expect(renderedText(tree)).toContain('Accounts created in the selected period.');
     expect(renderedText(renderStatic(<MetricRow label="New listings" metric={unavailable('No tracking data')} />))).toEqual(expect.arrayContaining(['Not available', 'No tracking data']));
   });
+});
+
+it('uses readable chart bounds without clipping values', () => {
+  expect(chartMaximum(2400)).toBe(5000);
+  expect(chartMaximum(0)).toBe(1);
+  expect(chartMaximum(100)).toBe(100);
+});
+
+it('opens the mobile period dropdown and closes it after selection', async () => {
+  const onChange = jest.fn();
+  let tree;
+  await act(async () => { tree = create(<PeriodSelector value="12M" onChange={onChange} />); });
+  const control = () => tree.root.findAll(n => n.props.accessibilityLabel === 'Analytics period' && n.props.onPress)[0];
+  expect(control().props.accessibilityState.expanded).toBe(false);
+  await act(async () => control().props.onPress());
+  const option = tree.root.findAll(n => n.props.accessibilityLabel === '3M period' && n.props.onPress)[0];
+  await act(async () => option.props.onPress());
+  expect(onChange).toHaveBeenCalledWith('3M');
+  expect(control().props.accessibilityState.expanded).toBe(false);
 });

@@ -41,29 +41,28 @@ const AdminAnalyticsScreen = () => {
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
   const m = data.metrics;
-  const totalOffers = Number(m.rentalRecordCount?.value);
-  const acceptedOffers = Number(m.acceptedRentalRecordCount?.value);
-  const offersAvailable = m.rentalRecordCount?.availability === 'available'
-    && m.acceptedRentalRecordCount?.availability === 'available'
-    && Number.isFinite(totalOffers) && Number.isFinite(acceptedOffers)
-    && totalOffers >= 0 && acceptedOffers >= 0 && acceptedOffers <= totalOffers;
-  const offerDistribution = offersAvailable ? {
+  const total = m.rentalRecordCount;
+  const accepted = m.acceptedRentalRecordCount;
+  const terminated = m.terminatedRentalRecordCount;
+  const pending = m.pendingRentalRecordCount;
+  const counts = [total, accepted, terminated, pending];
+  const valid = counts.every(metric => metric?.availability === 'available' && metric.value !== null && Number.isInteger(Number(metric.value)) && Number(metric.value) >= 0);
+  const reconciled = valid && Number(accepted.value) >= Number(terminated.value) && Number(total.value) === Number(accepted.value) + Number(pending.value);
+  const offerDistribution = reconciled ? {
     availability: 'available',
     points: [
-      { bucket: 'Accepted', value: acceptedOffers },
-      { bucket: 'Remaining', value: totalOffers - acceptedOffers },
+      { bucket: 'Pending', value: Number(pending.value) },
+      { bucket: 'Active', value: Number(accepted.value) - Number(terminated.value) },
+      { bucket: 'Terminated', value: Number(terminated.value) },
     ],
-  } : {
-    availability: 'unavailable',
-    reason: m.rentalRecordCount?.reason || m.acceptedRentalRecordCount?.reason || 'Offer counts are unavailable.',
-  };
+  } : { availability: 'unavailable', reason: counts.find(metric => metric?.reason)?.reason || 'Rental status counts cannot be reconciled.' };
 
   return (
     <>
       {header}
       <AnalyticsLayout compactTabs periodAccent="#16794B"
         tabs={['Overview', 'Rentals', 'Users', 'Safety']} tab={tab} onTabChange={setTab}
-        period={period} onPeriodChange={setPeriod} loading={loading} error={error}>
+        period={period} onPeriodChange={setPeriod} loading={loading} error={error} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}>
         {tab === 'Overview' ? (
           <>
             <Section title="Overview">
@@ -74,7 +73,7 @@ const AdminAnalyticsScreen = () => {
                 <StatTile label="Listings" metric={m.listingCount} />
               </TileRow>
             </Section>
-            <Section title="Monthly rent recorded" note="By rental month, rather than payment date.">
+            <Section title="Monthly rent recorded" note="S$ by rental month">
               <LineChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" />
             </Section>
           </>
@@ -90,9 +89,10 @@ const AdminAnalyticsScreen = () => {
                 <StatTile label="Avg. days on market" metric={m.averageDaysOnMarket} />
               </TileRow>
             </Section>
-            <Section title="Rentals (all time)" note="Accepted includes active and terminated rentals.">
+            <Section title="Rentals (all time)">
+              <MetricRow label="Total recorded offers (all time)" metric={m.rentalRecordCount} />
               <DonutChart series={offerDistribution} totalLabel="Recorded offers" emptyText="No recorded offers yet" />
-              <MetricRow label="Termination rate" metric={m.terminationRate} />
+              <MetricRow label="Terminated / accepted (all time)" metric={m.terminationRate} />
             </Section>
           </>
         ) : null}
@@ -107,14 +107,14 @@ const AdminAnalyticsScreen = () => {
 
         {tab === 'Safety' ? (
           <>
-            <Section title="Moderation and safety" note="Counts items currently flagged, not the number of reports submitted.">
+            <Section title="Moderation and safety">
               <TileRow>
                 <StatTile label="Flagged listings" metric={m.flaggedListingCount} />
                 <StatTile label="Flagged users" metric={m.flaggedUserCount} />
                 <StatTile label="Flagged reviews" metric={m.flaggedReviewCount} />
                 <StatTile label="Banned users" metric={m.bannedUserCount} />
               </TileRow>
-              <Meter label="User ban rate" metric={m.userBanRate} />
+              <Meter label="Banned / all registered users" metric={m.userBanRate} />
             </Section>
             <Section title="Flagged items by type">
               <DonutChart series={data.series.flaggedItemsByType} totalLabel="Flagged items" emptyText="Nothing is flagged right now" />

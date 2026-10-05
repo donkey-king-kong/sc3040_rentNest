@@ -29,6 +29,10 @@ jest.mock('@react-native-async-storage/async-storage', () => require('@react-nat
 
 const text = tree => tree.root.findAllByType(Text).map(n => [].concat(n.props.children).filter(c => typeof c === 'string' || typeof c === 'number').join(''));
 const press = async (tree, label) => {
+  if (label.endsWith(' period')) {
+    const dropdown = tree.root.findAll(n => n.props.accessibilityLabel === 'Analytics period' && typeof n.props.onPress === 'function')[0];
+    await act(async () => dropdown.props.onPress());
+  }
   const target = tree.root.findAll(n => n.props.accessibilityLabel === label && typeof n.props.onPress === 'function')[0];
   expect(target).toBeDefined();
   await act(async () => target.props.onPress());
@@ -50,7 +54,7 @@ it('owner navigation separates topics, retains the period and still opens proper
   const tree = await render(OwnerAnalyticsScreen);
   expect(text(tree)).toContain('At a glance');
   expect(text(tree)).toContain('Monthly rent recorded');
-  expect(text(tree)).toEqual(expect.arrayContaining(['Offers received', 'Offers accepted', 'Tenancies ended', 'Reviews']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['Offers sent', 'Offers accepted', 'Tenancies ended', 'Reviews']));
   expect(text(tree)).not.toContain('Offers (all time)');
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Offers tab')).toHaveLength(0);
   await press(tree, '30D period');
@@ -62,7 +66,7 @@ it('owner navigation separates topics, retains the period and still opens proper
   expect(text(tree)).toContain('Tenancy length');
   expect(text(tree)).not.toContain('Monthly rent recorded');
   await press(tree, 'Overview tab');
-  expect(text(tree)).toEqual(expect.arrayContaining(['Offers received', 'Offers accepted', 'Tenancies ended']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['Offers sent', 'Offers accepted', 'Tenancies ended']));
   expect(text(tree)).not.toContain('Offers (all time)');
   expect(text(tree)).not.toContain('Activity in this period');
   expect(text(tree)).not.toContain('Tenancy length');
@@ -146,12 +150,14 @@ it('admin rentals divides recorded offers without double counting and removes us
     metrics: { ...listingResponse.metrics,
       rentalRecordCount: { availability: 'available', value: 10, unit: 'count' },
       acceptedRentalRecordCount: { availability: 'available', value: 6, unit: 'count' },
+      pendingRentalRecordCount: { availability: 'available', value: 4, unit: 'count' },
+      terminatedRentalRecordCount: { availability: 'available', value: 3, unit: 'count' },
       terminationRate: { availability: 'available', value: 50, unit: 'percent' },
     },
   }, loading: false });
   const tree = await render(AdminAnalyticsScreen);
   await press(tree, 'Rentals tab');
-  expect(text(tree)).toEqual(expect.arrayContaining(['Recorded offers', '10', 'Accepted', 'Remaining', '6 (60.0%)', '4 (40.0%)', 'Termination rate', '50.0%']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['Recorded offers', '10', 'Pending', 'Active', 'Terminated', '3 (30.0%)', '4 (40.0%)', 'Terminated / accepted (all time)', '50.0%']));
   expect(text(tree)).not.toContain('Acceptance rate');
   await press(tree, 'Users tab');
   expect(text(tree)).toContain('User distribution');
@@ -172,7 +178,7 @@ it('does not fabricate an offer distribution when counts are unavailable', async
 
 it('property analytics shows all sections on one page and retains period selection', async () => {
   const tree = await render(ListingAnalyticsScreen);
-  expect(text(tree)).toEqual(expect.arrayContaining(['Offers received', 'Offers accepted', 'Tenancies ended']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['Offers sent', 'Offers accepted', 'Tenancies ended']));
   expect(text(tree)).not.toContain('Activity in this period');
   expect(text(tree)).not.toContain('Offers and tenancies (all time)');
   expect(tree.root.findAll(node => node.props.accessibilityRole === 'tab')).toHaveLength(0);
@@ -195,4 +201,21 @@ it('owner places the period below tabs and hides it on Properties without losing
   await press(tree, 'Occupancy tab');
   expect(text(tree)).toContain('Period');
   expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '3M');
+});
+
+it.each([OwnerAnalyticsScreen, ListingAnalyticsScreen, AdminAnalyticsScreen])('refreshes analytics without changing its selected period', async Component => {
+  const retry = jest.fn();
+  useAnalytics.mockReturnValue({ data: listingResponse, loading: false, retry });
+  const tree = await render(Component);
+  await press(tree, '3M period');
+  await press(tree, 'Refresh analytics');
+  expect(retry).toHaveBeenCalledTimes(1);
+  expect(useAnalytics.mock.calls.at(-1)[1]).toBe('3M');
+});
+it('does not display a contradictory rental status breakdown', async () => {
+  const metric = value => ({ availability: 'available', value, unit: 'count' });
+  useAnalytics.mockReturnValue({ data: { ...listingResponse, metrics: { rentalRecordCount: metric(10), acceptedRentalRecordCount: metric(6), pendingRentalRecordCount: metric(5), terminatedRentalRecordCount: metric(3) } }, loading: false });
+  const tree = await render(AdminAnalyticsScreen);
+  await press(tree, 'Rentals tab');
+  expect(text(tree)).toContain('Rental status counts cannot be reconciled.');
 });
