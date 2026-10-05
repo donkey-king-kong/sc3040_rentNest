@@ -6,7 +6,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import jwtDecode from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 
 
 const TenantOverview = () => {
@@ -46,28 +46,36 @@ const TenantOverview = () => {
         );
         setRental(rentalResponse.data);
 
-        const paymentsResponse = await axios.get(
-          `${API_BASE_URL}${ENDPOINTS.TENANT_PAYMENTS(listingId, tenantId)}`,
-          { headers }
-        );
-        if (paymentsResponse.data && paymentsResponse.data.payments) {
-          const sortedPayments = paymentsResponse.data.payments.sort((a, b) =>
-            new Date(b.date) - new Date(a.date)
+        try {
+          const paymentsResponse = await axios.get(
+            `${API_BASE_URL}${ENDPOINTS.TENANT_PAYMENTS(listingId, tenantId)}`,
+            { headers }
           );
-          setPayments(sortedPayments);
+          if (paymentsResponse.data && paymentsResponse.data.payments) {
+            const sortedPayments = paymentsResponse.data.payments.sort((a, b) =>
+              new Date(b.date) - new Date(a.date)
+            );
+            setPayments(sortedPayments);
+          }
+        } catch (err) {
+          if (!err.response || err.response.status !== 404) throw err;
         }
 
-        const outstandingResponse = await axios.get(
-          `${API_BASE_URL}${ENDPOINTS.OUTSTANDING_PAYMENTS(rentalResponse.data.rentalID)}`,
-          { headers }
-        );
-        if (outstandingResponse.data) {
-          const outstandingData = typeof outstandingResponse.data === 'string'
-            ? JSON.parse(outstandingResponse.data)
-            : outstandingResponse.data;
-          if (outstandingData['Outstanding Months']) {
-            setOutstandingPayments(outstandingData['Outstanding Months']);
+        try {
+          const outstandingResponse = await axios.get(
+            `${API_BASE_URL}${ENDPOINTS.OUTSTANDING_PAYMENTS(rentalResponse.data.rentalID)}`,
+            { headers }
+          );
+          if (outstandingResponse.data) {
+            const outstandingData = typeof outstandingResponse.data === 'string'
+              ? JSON.parse(outstandingResponse.data)
+              : outstandingResponse.data;
+            if (outstandingData['Outstanding Months']) {
+              setOutstandingPayments(outstandingData['Outstanding Months']);
+            }
           }
+        } catch (err) {
+          if (!err.response || err.response.status !== 404) throw err;
         }
 
         setLoading(false);
