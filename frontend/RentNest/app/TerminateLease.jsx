@@ -1,5 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import MorphingInfinity from '../components/MorphingInfinity';
+import { FontAwesome } from '@expo/vector-icons';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {jwtDecode} from "jwt-decode";
@@ -132,9 +134,10 @@ const TerminateLease = () => {
 
   if (Loading) {
     return (
-        <View style={[styles.screen, styles.content]}>
-          <Text>Loading chat history...</Text>
-        </View>
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
     );
   }
 
@@ -143,7 +146,12 @@ const TerminateLease = () => {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <Text style={styles.title}>Terminate Lease</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <FontAwesome name="chevron-left" size={18} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Terminate Lease</Text>
+      </View>
       <Text style={styles.description}>
         Please fill in the terms as agreed in your rental agreement. The tenant will have to accept the termination for it to proceed.
       </Text>
@@ -200,10 +208,29 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#ffffff',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#555',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  backButton: {
+    marginRight: 12,
+    padding: 4,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginTop: 0,
   },
   description: {
     fontSize: 16,
