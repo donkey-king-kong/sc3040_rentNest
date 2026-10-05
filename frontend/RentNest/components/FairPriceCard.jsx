@@ -1,49 +1,86 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 
 /**
  * AI Fair-Pricing Model card.
  *
- * Shows the estimated fair market rent for a property and three bands around it
- * (Excellent ±5%, Great ±10%, Good ±15%), in the style of a marketplace price
- * guide. When an asking price is known, the card says which band it falls in
- * and the premium or discount versus the fair price.
+ * Shows how a listing's asking rent compares with the fair market rent of similar
+ * units. The verdict is a neutral market gauge (how close to market, and in which
+ * direction), so it reads correctly for both tenants and owners. Supporting detail
+ * (band ranges, method, data citations) sits behind "Why this price?".
  *
  * Props:
  *  - estimate:       FairPriceEstimate object from /api/pricing (may be null)
  *  - loading:        show a spinner while the estimate is being fetched
  *  - askingPrice:    optional; overrides estimate.askingPrice (owner form flow)
- *  - onUseSuggested: optional; shows a "Use fair price" button calling back with the fair price
+ *  - onUseSuggested: optional; shows a "Use fair price" button (owner form). Also switches
+ *                    the advice line from tenant wording to owner wording.
  *  - compact:        optional; tighter layout for embedding inside forms
  *  - aiExplanation:  optional; FairPriceExplanation from /api/pricing/listing/{id}/explanation
  *  - aiExplanationLoading: optional; show a spinner while the AI writes the explanation
  */
+
+// The bands are ordered (closer to market = darker), so they use one blue ramp,
+// validated as an ordinal ramp against the white card. Text stays in ink colours;
+// band colour only appears in swatches and bar fills.
 const TIER_STYLE = {
-  EXCELLENT: { label: 'Excellent price', color: '#1b7f3b', bg: '#e6f4ea', band: '#a8dab5' },
-  GREAT: { label: 'Great price', color: '#1f5fbf', bg: '#e8f0fe', band: '#b3cdf5' },
-  GOOD: { label: 'Good price', color: '#b26a00', bg: '#fff4e5', band: '#f5d7a3' },
-  OUTSIDE_RANGE: { label: 'Outside typical range', color: '#b3261e', bg: '#fdecea', band: '#eee' },
+  EXCELLENT: { label: 'Close to market', band: '#184f95' },
+  GREAT: { label: 'Within typical range', band: '#3987e5' },
+  GOOD: { label: 'Edge of typical range', band: '#86b6ef' },
+  OUTSIDE_RANGE: { label: 'Unusual for this area', band: null },
 };
+const INK = '#0b0b0b';
+const INK_SECONDARY = '#52514e';   // 7.9:1 on white
+const HAIRLINE = '#D8D7D3';
+const SUBTLE = '#F4F3F0';
+const SURFACE = '#FFFFFF';
+const WARNING_INK = '#9a5b00';     // 4.7:1 on the badge background, 5.4:1 on white
 
-const money = (n) => (n == null ? '-' : `$${Number(n).toLocaleString()}`);
+const DATA_SOURCES = {
+  HDB: 'HDB rental approvals, Housing & Development Board, via data.gov.sg (Singapore Open Data Licence)',
+  URA: 'Private residential rental contracts, Urban Redevelopment Authority (URA Data Service)',
+  DEMO: 'Simulated demo transactions. Not real market data',
+};
+const ROOM_SHARE_SOURCE = 'Room share: 2026 median room rents (Hozuko room-rent snapshot) compared with official HDB/URA whole-unit medians for the same period';
 
-const Header = ({ pill }) => (
+const money = (n) => (n == null ? '-' : `$${Math.round(Number(n)).toLocaleString()}`);
+
+const Header = ({ badge }) => (
   <View style={styles.headerRow}>
-    <FontAwesome name="magic" size={16} color="#000" />
+    <FontAwesome name="balance-scale" size={15} color={INK} />
     <Text style={styles.title}>AI Fair Price</Text>
-    {pill}
+    {badge}
   </View>
 );
 
+/** One-line advice that depends on direction, worded for the person looking at the card. */
+const adviceFor = (pct, isOwner) => {
+  if (pct == null) return null;
+  if (Math.abs(pct) < 2) {
+    return isOwner ? 'Your rent is in line with similar rentals nearby.' : 'In line with similar rentals nearby.';
+  }
+  if (pct < 0) {
+    return isOwner
+      ? 'Below similar rentals nearby. You may be able to ask for more.'
+      : 'Below similar rentals nearby. Ask the owner why, for example condition, lease terms or what is included.';
+  }
+  return isOwner
+    ? 'Above similar rentals nearby. Explain what justifies it (renovation, furnishing, view) in your description.'
+    : 'Above similar rentals nearby. Ask what justifies the premium, for example renovation, furnishing or view.';
+};
+
 const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact, aiExplanation, aiExplanationLoading }) => {
+  const [showDetails, setShowDetails] = useState(false);
+  const [aiExpanded, setAiExpanded] = useState(false);
+
   if (loading) {
     return (
       <View style={[styles.card, compact && styles.cardCompact]}>
         <Header />
         <View style={styles.loadingRow}>
-          <ActivityIndicator size="small" color="#000" />
-          <Text style={styles.loadingText}>Analysing comparable rentals...</Text>
+          <ActivityIndicator size="small" color={INK} />
+          <Text style={styles.loadingText}>Comparing with recent rentals nearby…</Text>
         </View>
       </View>
     );
@@ -55,7 +92,7 @@ const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact
     return (
       <View style={[styles.card, compact && styles.cardCompact]}>
         <Header />
-        <Text style={styles.muted}>{estimate.message || 'No estimate available for this property.'}</Text>
+        <Text style={styles.secondary}>{estimate.message || 'No estimate available for this property.'}</Text>
       </View>
     );
   }
@@ -63,118 +100,175 @@ const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact
   const { fairPrice, tiers = [], comparableCount, basis, confidence, periodStart, periodEnd, unitType, unitTypeSource, rentShare } = estimate;
   const roomLabel = unitType === 'MASTER_ROOM' ? 'master room' : unitType === 'COMMON_ROOM' ? 'common room' : null;
   const price = askingPrice != null && askingPrice !== '' && !isNaN(askingPrice) ? Number(askingPrice) : estimate.askingPrice;
+  const hasPrice = price != null && price > 0 && fairPrice > 0;
+  const isOwner = !!onUseSuggested;
 
   // Classify locally so the card stays correct while an owner edits the price.
   let tier = null;
   let pct = null;
-  if (price != null && price > 0 && fairPrice > 0) {
-    const hit = tiers.find((t) => price >= t.low && price <= t.high);
+  if (hasPrice) {
+    const hit = tiers.find((b) => price >= b.low && price <= b.high);
     tier = hit ? hit.name : 'OUTSIDE_RANGE';
     pct = ((price - fairPrice) / fairPrice) * 100;
   }
   const t = tier ? TIER_STYLE[tier] : null;
+  const pctText = pct == null ? null : `${Math.round(Math.abs(pct))}%`;
+  const diff = hasPrice ? Math.abs(price - fairPrice) : 0;
+  const headline = !hasPrice
+    ? `${money(fairPrice)}/mo fair rent`
+    : Math.abs(pct) < 0.5
+      ? 'In line with market'
+      : `${money(diff)} ${pct < 0 ? 'below' : 'above'} market`;
 
-  // Bar spans the widest band plus a margin so an out-of-range price still shows.
+  // The scale spans the widest band plus a margin so an out-of-range price still shows.
   const widest = tiers[tiers.length - 1] || { low: fairPrice, high: fairPrice };
-  const barMin = widest.low * 0.85;
-  const barMax = widest.high * 1.15;
+  const barMin = Math.min(widest.low * 0.85, hasPrice ? price * 0.97 : Infinity);
+  const barMax = Math.max(widest.high * 1.15, hasPrice ? price * 1.03 : -Infinity);
   const toPct = (x) => Math.min(100, Math.max(0, ((x - barMin) / (barMax - barMin)) * 100));
-  // Draw widest band first so narrower bands sit on top.
-  const bands = [...tiers].reverse();
+  // Nested bands drawn as adjacent segments: Edge | Typical | Close | Typical | Edge.
+  const byName = Object.fromEntries(tiers.map((b) => [b.name, b]));
+  const order = ['GOOD', 'GREAT', 'EXCELLENT'].filter((n) => byName[n]);
+  const segments = [];
+  order.forEach((name, i) => {
+    const outer = byName[name];
+    const inner = byName[order[i + 1]];
+    segments.push({ name, from: outer.low, to: inner ? inner.low : outer.high });
+  });
+  for (let i = order.length - 2; i >= 0; i -= 1) {
+    segments.push({ name: order[i], from: byName[order[i + 1]].high, to: byName[order[i]].high });
+  }
+  const closest = byName.EXCELLENT;
+  const scaleLabel = `Price scale. Fair rent ${money(fairPrice)}.`
+    + (hasPrice ? ` Asking ${money(price)}, ${pctText} ${pct < 0 ? 'below' : 'above'} fair rent.` : '')
+    + (closest ? ` Close to market is ${money(closest.low)} to ${money(closest.high)}.` : '');
+
+  const source = DATA_SOURCES[estimate.dataSource] || DATA_SOURCES.URA;
+  const advice = adviceFor(pct, isOwner);
 
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
       <Header
-        pill={t && (
-          <View style={[styles.pill, { backgroundColor: t.bg }]}>
-            <Text style={[styles.pillText, { color: t.color }]}>{t.label}</Text>
+        badge={t && (
+          <View style={styles.badge} accessibilityLabel={`Verdict: ${t.label}`}>
+            {t.band
+              ? <View style={[styles.badgeSwatch, { backgroundColor: t.band }]} />
+              : <FontAwesome name="exclamation-triangle" size={11} color={WARNING_INK} style={styles.badgeIcon} />}
+            <Text style={styles.badgeText}>{t.label}</Text>
           </View>
         )}
       />
 
-      <Text style={styles.fair}>
-        {money(fairPrice)}
-        <Text style={styles.perMonth}> /month fair market rent</Text>
-      </Text>
+      <Text style={styles.headline}>{headline}</Text>
+      {hasPrice && (
+        <Text style={styles.subline}>
+          Asking {money(price)} vs fair rent {money(fairPrice)}{Math.abs(pct) >= 0.5 ? ` (${pctText} ${pct < 0 ? 'below' : 'above'})` : ''}
+        </Text>
+      )}
       {roomLabel && (
-        <Text style={styles.roomNote}>
-          Priced as a {roomLabel}
-          {unitTypeSource === 'AI' ? ' (detected by AI from the listing)' : ' (detected from the listing text)'}
-          {rentShare ? `: about ${Math.round(rentShare * 100)}% of a whole flat's rent.` : '.'}
+        <Text style={styles.secondary}>
+          Priced as a {roomLabel} ({unitTypeSource === 'AI' ? 'detected by AI from the listing' : 'detected from the listing text'})
+          {rentShare ? `, about ${Math.round(rentShare * 100)}% of a whole unit's rent.` : '.'}
         </Text>
       )}
 
-      {/* Nested bands */}
-      <View style={styles.bar}>
-        {bands.map((b) => (
+      <View style={styles.bar} accessible accessibilityLabel={scaleLabel}>
+        <View style={styles.trackLine} />
+        {segments.map((seg, i) => (
           <View
-            key={b.name}
+            key={`${seg.name}-${i}`}
             style={[styles.band, {
-              left: `${toPct(b.low)}%`,
-              width: `${toPct(b.high) - toPct(b.low)}%`,
-              backgroundColor: TIER_STYLE[b.name].band,
-            }]}
+              left: `${toPct(seg.from)}%`,
+              width: `${toPct(seg.to) - toPct(seg.from)}%`,
+              backgroundColor: TIER_STYLE[seg.name].band,
+              borderRightWidth: i < segments.length - 1 ? 2 : 0,
+            }, i === 0 && styles.bandStart, i === segments.length - 1 && styles.bandEnd]}
           />
         ))}
         <View style={[styles.fairMarker, { left: `${toPct(fairPrice)}%` }]} />
-        {price != null && price > 0 && (
-          <View style={[styles.marker, { left: `${toPct(price)}%`, backgroundColor: t ? t.color : '#000' }]} />
+        {hasPrice && <View style={[styles.marker, { left: `${toPct(price)}%` }]} />}
+      </View>
+      <View style={styles.barKey} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        <View style={styles.barKeyItem}>
+          <View style={styles.keyTick} />
+          <Text style={styles.barKeyText}>Fair rent</Text>
+        </View>
+        {hasPrice && (
+          <View style={styles.barKeyItem}>
+            <View style={styles.keyDot} />
+            <Text style={styles.barKeyText}>Asking</Text>
+          </View>
         )}
       </View>
 
-      {/* Band legend */}
-      <View style={styles.legend}>
-        {tiers.map((b) => (
-          <View key={b.name} style={styles.legendRow}>
-            <View style={[styles.legendSwatch, { backgroundColor: TIER_STYLE[b.name].band }]} />
-            <Text style={[styles.legendName, tier === b.name && { color: TIER_STYLE[b.name].color, fontWeight: 'bold' }]}>
-              {TIER_STYLE[b.name].label.replace(' price', '')} (±{b.tolerancePercent}%)
-            </Text>
-            <Text style={styles.legendRange}>{money(b.low)} - {money(b.high)}</Text>
-          </View>
-        ))}
-      </View>
-
-      {t && pct != null && (
-        <Text style={[styles.verdictText, { color: t.color }]}>
-          {Math.abs(pct) < 0.5
-            ? `Asking ${money(price)} matches the fair market rent.`
-            : `Asking ${money(price)} is ${Math.abs(pct).toFixed(0)}% ${pct > 0 ? 'above' : 'below'} the fair market rent.`}
-          {tier === 'OUTSIDE_RANGE' ? '' : ' Consider unit condition, furnishing and view when judging the premium.'}
-        </Text>
-      )}
+      {advice && <Text style={styles.advice}>{advice}</Text>}
 
       {aiExplanationLoading && (
         <View style={styles.aiBox}>
           <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color="#000" />
-            <Text style={styles.loadingText}>AI is reviewing this listing...</Text>
+            <ActivityIndicator size="small" color={INK} />
+            <Text style={styles.loadingText}>AI is reading the listing description…</Text>
           </View>
         </View>
       )}
       {!aiExplanationLoading && aiExplanation && (
-        <View style={styles.aiBox}>
+        <View style={styles.aiBox} accessibilityLiveRegion="polite">
           <Text style={styles.aiTitle}>AI analysis</Text>
-          {aiExplanation.available
-            ? <Text style={styles.aiText}>{aiExplanation.explanation}</Text>
-            : <Text style={styles.muted}>{aiExplanation.message}</Text>}
+          {aiExplanation.available ? (
+            <>
+              <Text style={styles.aiText} numberOfLines={aiExpanded ? undefined : 3}>{aiExplanation.explanation}</Text>
+              <TouchableOpacity
+                onPress={() => setAiExpanded(!aiExpanded)}
+                accessibilityRole="button"
+                hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+              >
+                <Text style={styles.link}>{aiExpanded ? 'Show less' : 'Read more'}</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.secondary}>{aiExplanation.message}</Text>
+          )}
         </View>
       )}
 
-      <Text style={styles.muted}>
-        Based on {comparableCount} comparable {basis || 'transactions'}
-        {periodStart && periodEnd ? ` (${periodStart} to ${periodEnd})` : ''}.
-        {confidence ? ` Confidence: ${confidence.toLowerCase()}.` : ''}
-      </Text>
-      <Text style={styles.source}>
-        Source: {estimate.dataSource === 'DEMO'
-          ? 'Simulated demo transactions (not real market data)'
-          : estimate.dataSource === 'HDB' ? 'HDB rental approvals (data.gov.sg)' : 'URA private rental contracts'}
-      </Text>
+      <TouchableOpacity
+        style={styles.detailsToggle}
+        onPress={() => setShowDetails(!showDetails)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showDetails }}
+      >
+        <Text style={styles.detailsToggleText}>Why this price?</Text>
+        <FontAwesome name={showDetails ? 'chevron-up' : 'chevron-down'} size={12} color={INK_SECONDARY} />
+      </TouchableOpacity>
+
+      {showDetails && (
+        <View style={styles.details}>
+          {tiers.map((b) => (
+            <View key={b.name} style={styles.legendRow}>
+              <View style={[styles.legendSwatch, { backgroundColor: TIER_STYLE[b.name].band }]} />
+              <Text style={[styles.legendName, tier === b.name && styles.legendActive]}>
+                {TIER_STYLE[b.name].label} (±{b.tolerancePercent}%)
+              </Text>
+              <Text style={[styles.legendRange, tier === b.name && styles.legendActive]}>
+                {money(b.low)} – {money(b.high)}
+              </Text>
+            </View>
+          ))}
+          <Text style={styles.detailText}>
+            Fair rent is the typical rent for similar units nearby, adjusted for floor and size, with recent rentals counting more.
+          </Text>
+          <Text style={styles.detailText}>
+            Based on {comparableCount} {basis || 'comparable rentals'}
+            {periodStart && periodEnd ? `, ${periodStart} to ${periodEnd}` : ''}.
+            {confidence ? ` Confidence: ${confidence.toLowerCase()} (${confidence === 'HIGH' ? '15 or more' : confidence === 'MEDIUM' ? '8 to 14' : 'fewer than 8'} comparable rentals).` : ''}
+          </Text>
+          <Text style={styles.source}>Data: {source}.</Text>
+          {roomLabel && <Text style={styles.source}>{ROOM_SHARE_SOURCE}.</Text>}
+        </View>
+      )}
 
       {onUseSuggested && (
-        <TouchableOpacity style={styles.useButton} onPress={() => onUseSuggested(fairPrice)}>
-          <Text style={styles.useButtonText}>Use fair price ({money(fairPrice)})</Text>
+        <TouchableOpacity style={styles.useButton} onPress={() => onUseSuggested(fairPrice)} accessibilityRole="button">
+          <Text style={styles.useButtonText}>Use fair rent ({money(fairPrice)})</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -184,11 +278,11 @@ const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 10,
-    padding: 14,
+    borderColor: HAIRLINE,
+    borderRadius: 12,
+    padding: 16,
     marginVertical: 10,
-    backgroundColor: '#fff',
+    backgroundColor: SURFACE,
   },
   cardCompact: {
     marginVertical: 8,
@@ -197,74 +291,175 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 10,
   },
   title: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
+    color: INK,
     marginLeft: 8,
     flex: 1,
   },
-  pill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
+    backgroundColor: SUBTLE,
   },
-  pillText: {
+  badgeSwatch: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
+  },
+  badgeIcon: {
+    marginRight: 6,
+  },
+  badgeText: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    color: INK,
   },
-  fair: {
+  headline: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: INK,
   },
-  perMonth: {
-    fontSize: 13,
-    fontWeight: 'normal',
-    color: '#555',
-  },
-  roomNote: {
-    fontSize: 12,
-    color: '#555',
+  subline: {
+    fontSize: 14,
+    color: INK_SECONDARY,
     marginTop: 2,
   },
+  secondary: {
+    fontSize: 13,
+    color: INK_SECONDARY,
+    marginTop: 6,
+    lineHeight: 18,
+  },
   bar: {
-    height: 14,
-    backgroundColor: '#f1f1f1',
-    borderRadius: 7,
-    marginTop: 12,
+    height: 12,
+    marginTop: 18,
+  },
+  trackLine: {
+    position: 'absolute',
+    top: 5,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: HAIRLINE,
   },
   band: {
     position: 'absolute',
     top: 0,
-    height: 14,
-    borderRadius: 7,
+    height: 12,
+    borderColor: SURFACE,
+  },
+  bandStart: {
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
+  },
+  bandEnd: {
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
   },
   fairMarker: {
     position: 'absolute',
-    top: -3,
+    top: -4,
     width: 2,
     height: 20,
     marginLeft: -1,
-    backgroundColor: '#000',
+    backgroundColor: INK_SECONDARY,
   },
   marker: {
     position: 'absolute',
-    top: -5,
-    width: 6,
-    height: 24,
-    marginLeft: -3,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: '#fff',
+    top: -3,
+    width: 18,
+    height: 18,
+    marginLeft: -9,
+    borderRadius: 9,
+    borderWidth: 3,
+    borderColor: SURFACE,
+    backgroundColor: INK,
   },
-  legend: {
-    marginTop: 10,
+  barKey: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  barKeyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  keyTick: {
+    width: 2,
+    height: 12,
+    backgroundColor: INK_SECONDARY,
+    marginRight: 6,
+  },
+  keyDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: INK,
+    marginRight: 6,
+  },
+  barKeyText: {
+    fontSize: 12,
+    color: INK_SECONDARY,
+  },
+  advice: {
+    marginTop: 14,
+    fontSize: 14,
+    lineHeight: 20,
+    color: INK,
+  },
+  aiBox: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: SUBTLE,
+  },
+  aiTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: INK,
+    marginBottom: 4,
+  },
+  aiText: {
+    fontSize: 14,
+    color: INK,
+    lineHeight: 20,
+  },
+  link: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: INK,
+    textDecorationLine: 'underline',
+    marginTop: 6,
+  },
+  detailsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: HAIRLINE,
+  },
+  detailsToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: INK,
+  },
+  details: {
+    paddingBottom: 4,
   },
   legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 2,
+    marginVertical: 3,
   },
   legendSwatch: {
     width: 12,
@@ -275,26 +470,27 @@ const styles = StyleSheet.create({
   legendName: {
     flex: 1,
     fontSize: 13,
-    color: '#333',
+    color: INK_SECONDARY,
   },
   legendRange: {
     fontSize: 13,
-    color: '#333',
+    color: INK_SECONDARY,
   },
-  verdictText: {
-    marginTop: 10,
+  legendActive: {
+    color: INK,
+    fontWeight: '700',
+  },
+  detailText: {
     fontSize: 13,
-    fontWeight: '600',
-  },
-  muted: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 8,
+    color: INK_SECONDARY,
+    lineHeight: 18,
+    marginTop: 10,
   },
   source: {
-    fontSize: 11,
-    color: '#888',
-    marginTop: 2,
+    fontSize: 12,
+    color: INK_SECONDARY,
+    lineHeight: 17,
+    marginTop: 8,
   },
   loadingRow: {
     flexDirection: 'row',
@@ -304,35 +500,20 @@ const styles = StyleSheet.create({
   loadingText: {
     marginLeft: 8,
     fontSize: 13,
-    color: '#555',
-  },
-  aiBox: {
-    marginTop: 10,
-    padding: 10,
-    borderRadius: 8,
-    backgroundColor: '#f6f6f6',
-  },
-  aiTitle: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  aiText: {
-    fontSize: 13,
-    color: '#222',
-    lineHeight: 19,
+    color: INK_SECONDARY,
   },
   useButton: {
-    marginTop: 10,
+    marginTop: 12,
+    minHeight: 44,
     borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 8,
-    paddingVertical: 8,
+    borderColor: INK,
+    borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   useButtonText: {
-    fontWeight: 'bold',
-    color: '#000',
+    fontWeight: '600',
+    color: INK,
   },
 });
 

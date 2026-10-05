@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,27 +7,59 @@ import {
   ScrollView,
   Modal,
   TextInput,
+  ActivityIndicator,
   Image,
+  TouchableWithoutFeedback,
+  PanResponder,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
-import {ActivityIndicator} from "react-native"; // Assuming you're using Expo for vector icons
+import MorphingInfinity from '../components/MorphingInfinity';
+
+const notificationBellIcon = require('../assets/images/notificationBell.png');
 
 
 // Rent Payment Screen
 const RentPaymentScreen = () => {
   const router = useRouter();
-  const { listingId, tenantId, refresh } = useLocalSearchParams();
-  const [refreshing, setRefreshing] = useState(false);
+  const { listingId, tenantId } = useLocalSearchParams();
   const [paymentHistory, setPaymentHistory] = useState(null); // State to store listing data
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isPaymentSuccessful, setIsPaymentSuccessful] = useState(false);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [showPaymentUpdated, setShowPaymentUpdated] = useState(false);
   const [loading, setLoading] = useState(true); // New loading state
   const [rentalID, setRentalID] = useState(null);
   const [amt, setAmount] = useState(null);
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv, setCardCvv] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [fieldTouched, setFieldTouched] = useState({});
+  const [selectedPayment, setSelectedPayment] = useState(null);
+  const notificationTimeoutRef = useRef(null);
+  const paymentSheetTouchStartYRef = useRef(null);
+  const closePaymentSheet = () => {
+    setSelectedPayment(null);
+    setIsModalVisible(false);
+  };
+  const paymentSheetPanResponder = useRef(
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) => (
+            gestureState.dy > 8 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
+        ),
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => (
+            gestureState.dy > 18 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx)
+        ),
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dy > 70 || gestureState.vy > 0.7) {
+            closePaymentSheet();
+          }
+        },
+      })
+  ).current;
 
 
 // localhost:8080/api/payment/monthlyPayment
@@ -48,10 +80,10 @@ const RentPaymentScreen = () => {
           'Content-Type': 'application/json'
         },
       });
-      const rentalID = response.data.payments.length > 0 ? response.data.payments[0].rentalID : null;
+      const payments = response.data.payments || [];
+      const rentalID = payments.length > 0 ? payments[0].rentalID : null;
       setRentalID(rentalID);
-      const amt = response.data.payments.length > 0 ? response.data.payments[0].amount : 0; // Default to 0
-      setAmount(amt);
+      setAmount(response.data.rentalPrice || (payments.length > 0 ? payments[0].amount : 0));
       console.log("Payments response", response.status, response.data);
       setPaymentHistory(response.data);
     } catch (error) {
@@ -62,31 +94,124 @@ const RentPaymentScreen = () => {
   };
 
 
-  const getOutstandingMonths = () => {
-    if (!paymentHistory || !paymentHistory.payments.length) return [];
+  const formatCurrency = (value) => {
+    const amount = Number(value) || 0;
+    return `S$${amount.toLocaleString()}`;
+  };
 
-    // Get the latest payment date
-    const lastPaymentDate = new Date(Math.max(...paymentHistory.payments.map(payment => new Date(payment.date))));
-    const currentDate = new Date();
+  const formatMonthYear = (date) => (
+      date.toLocaleString('default', { month: 'long', year: 'numeric' })
+  );
+
+  const getMonthStart = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
+
+  const addMonths = (date, months) => {
+    const nextDate = new Date(date);
+    nextDate.setMonth(nextDate.getMonth() + months);
+    return getMonthStart(nextDate);
+  };
+
+  const getMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+  const formatPaymentDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-SG', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const formatCardNumberInput = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+  };
+
+  const formatExpiryInput = (value) => {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+    if (digits.length <= 2) {
+      return digits;
+    }
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  };
+
+  const markFieldTouched = (field) => {
+    setFieldTouched((previous) => ({ ...previous, [field]: true }));
+  };
+
+  const getOutstandingMonths = () => {
+    const payments = paymentHistory?.payments || [];
+    const acceptedDateValue = paymentHistory?.acceptedAt || paymentHistory?.rentalDate;
+    const acceptedDate = acceptedDateValue ? new Date(acceptedDateValue) : null;
+    const validPaymentDates = payments
+        .map(payment => new Date(payment.date))
+        .filter(date => !Number.isNaN(date.getTime()));
+    const earliestPaymentDate = validPaymentDates.length > 0
+        ? new Date(Math.min(...validPaymentDates.map(date => date.getTime())))
+        : null;
+    const currentMonth = getMonthStart(new Date());
+    const startMonth = acceptedDate && !Number.isNaN(acceptedDate.getTime())
+        ? getMonthStart(acceptedDate)
+        : earliestPaymentDate
+            ? getMonthStart(earliestPaymentDate)
+        : currentMonth;
+    const paidMonthKeys = new Set(
+        validPaymentDates.map(getMonthKey)
+    );
 
     const outstandingMonths = [];
-    let nextPaymentDate = new Date(lastPaymentDate);
-    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1); // Start from the next month
+    let paymentMonth = new Date(startMonth);
 
-    while (nextPaymentDate <= currentDate) {
-      outstandingMonths.push({
-        month: nextPaymentDate.toLocaleString('default', { month: 'long', year: 'numeric' }),
-        amount: amt || 0,
-        paid: false,
-      });
-      nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+    while (paymentMonth <= currentMonth) {
+      if (!paidMonthKeys.has(getMonthKey(paymentMonth))) {
+        outstandingMonths.push({
+          month: formatMonthYear(paymentMonth),
+          amount: paymentHistory?.rentalPrice || amt || 0,
+          paid: false,
+          dueDate: new Date(paymentMonth),
+          status: getMonthKey(paymentMonth) === getMonthKey(currentMonth) ? 'dueNow' : 'overdue',
+        });
+      }
+      paymentMonth = addMonths(paymentMonth, 1);
     }
 
     return outstandingMonths;
   };
 
+  const getLockedFutureMonths = () => {
+    const leaseExpiryDate = paymentHistory?.leaseExpiry ? new Date(paymentHistory.leaseExpiry) : null;
+    if (!leaseExpiryDate || Number.isNaN(leaseExpiryDate.getTime())) return [];
+
+    const lockedMonths = [];
+    const leaseExpiryMonth = getMonthStart(leaseExpiryDate);
+    let nextMonth = addMonths(getMonthStart(new Date()), 1);
+
+    while (nextMonth <= leaseExpiryMonth && lockedMonths.length < 3) {
+      lockedMonths.push({
+        month: formatMonthYear(nextMonth),
+        amount: paymentHistory?.rentalPrice || amt || 0,
+        dueDate: new Date(nextMonth),
+        status: 'locked',
+      });
+      nextMonth = addMonths(nextMonth, 1);
+    }
+
+    return lockedMonths;
+  };
+
   const handlePaymentSubmit = async () => {
+    if (isSubmittingPayment || !isCardFormValid) {
+      setFieldTouched({
+        cardNumber: true,
+        cardExpiry: true,
+        cardCvv: true,
+        cardName: true,
+      });
+      return;
+    }
+
     try {
+      setIsSubmittingPayment(true);
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         console.log('No token found!');
@@ -94,7 +219,11 @@ const RentPaymentScreen = () => {
         return;
       }
 
-      const paymentToSubmit = outstandingMonths[0]; // Payment to submit (assumes we pay for the first outstanding month)
+      const paymentToSubmit = selectedPayment || outstandingMonths[0];
+      if (!paymentToSubmit) {
+        console.error('No outstanding payment selected.');
+        return;
+      }
 
       // Extract month and year
       const [month, year] = paymentToSubmit.month.split(' ');
@@ -135,7 +264,7 @@ const RentPaymentScreen = () => {
 
       const paymentData = {
         rentalID: rentalID,
-        amount: amt,
+        amount: paymentToSubmit.amount,
         date: paymentDate.toISOString(), // Convert to ISO string
       };
 
@@ -148,14 +277,28 @@ const RentPaymentScreen = () => {
       });
 
       if (response.status === 200) {
-        setIsPaymentSuccessful(true);
         await getPaymentHistory(); // Fetch the latest payment history
-        // Optionally refresh payment history or outstanding months here
+        setIsModalVisible(false);
+        setCardNumber('');
+        setCardExpiry('');
+        setCardCvv('');
+        setCardName('');
+        setFieldTouched({});
+        setSelectedPayment(null);
+        setShowPaymentUpdated(true);
+        if (notificationTimeoutRef.current) {
+          clearTimeout(notificationTimeoutRef.current);
+        }
+        notificationTimeoutRef.current = setTimeout(() => {
+          setShowPaymentUpdated(false);
+        }, 2000);
       } else {
         console.error('Payment failed:', response.data);
       }
     } catch (error) {
       console.error('Error processing payment:', error);
+    } finally {
+      setIsSubmittingPayment(false);
     }
   };
 
@@ -167,33 +310,77 @@ const RentPaymentScreen = () => {
     } else {
       setLoading(false); // If listingId or tenantId is null, stop loading
     }
+
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
   }, [listingId, tenantId]);
 
   if (loading) {
     return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0000ff" />
+          <MorphingInfinity size={86} color="#2FA84F" />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
     );
   }
 
 
-  const paidMonths = paymentHistory.payments.map((payment) => {
+  const payments = paymentHistory?.payments || [];
+  const monthlyRent = paymentHistory?.rentalPrice || amt || 0;
+  const outstandingTotal = outstandingMonths.reduce((total, payment) => total + (Number(payment.amount) || 0), 0);
+  const paymentInModal = selectedPayment || outstandingMonths[0];
+  const cardDigits = cardNumber.replace(/\D/g, '');
+  const cardPrefix = Number(cardDigits.slice(0, 4));
+  const isVisa = cardDigits.startsWith('4');
+  const isMastercard =
+      /^(5[1-5])/.test(cardDigits) ||
+      (cardPrefix >= 2221 && cardPrefix <= 2720);
+  const isCardNumberValid = cardDigits.length === 16 && (isVisa || isMastercard);
+  const isExpiryValid = (() => {
+    const match = cardExpiry.match(/^(\d{2})\/(\d{2})$/);
+    if (!match) return false;
+
+    const month = Number(match[1]);
+    const year = 2000 + Number(match[2]);
+    if (month < 1 || month > 12) return false;
+
+    const now = new Date();
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const expiryMonth = new Date(year, month - 1, 1);
+    return expiryMonth >= currentMonth;
+  })();
+  const isCvvValid = /^\d{3}$/.test(cardCvv);
+  const isCardNameValid = /^[A-Za-z][A-Za-z\s'.-]{1,}$/.test(cardName.trim());
+  const isCardFormValid =
+      outstandingMonths.length > 0 &&
+      rentalID !== null &&
+      isCardNumberValid &&
+      isExpiryValid &&
+      isCvvValid &&
+      isCardNameValid;
+  const hasFieldError = (field, isValid) => fieldTouched[field] && !isValid;
+
+  const paidMonths = payments.map((payment) => {
     return {
       paymentID: payment.paymentID,
       rentalID: payment.rentalID,
-      month: new Date(payment.date).toLocaleString('default', { month: 'long', year: 'numeric' }),
-      amount: amt,
+      month: formatMonthYear(new Date(payment.date)),
+      amount: payment.amount || monthlyRent,
       paid: true,
       date: payment.date,
     };
   });
 
   const sortedPaidMonths = paidMonths.sort((a, b) => new Date(b.date) - new Date(a.date));
-  const sortedOutstandingMonths = outstandingMonths.sort((a, b) => new Date(b.month) - new Date(a.month));
+  const sortedOutstandingMonths = outstandingMonths.sort((a, b) => a.dueDate - b.dueDate);
+  const sortedLockedFutureMonths = getLockedFutureMonths().sort((a, b) => a.dueDate - b.dueDate);
+  const displayedOutstandingMonths = [...sortedOutstandingMonths, ...sortedLockedFutureMonths];
 
-  const handlePayButtonPress = () => {
+  const handlePayButtonPress = (payment) => {
+    setSelectedPayment(payment);
     setIsModalVisible(true);
   };
 
@@ -201,163 +388,513 @@ const RentPaymentScreen = () => {
   //   setIsPaymentSuccessful(true);
   // };
 
-  const handleReturnPress = () => {
-    setIsPaymentSuccessful(false);
-    setIsModalVisible(false);
+  const handleReturnPress = closePaymentSheet;
+
+  const handlePaymentSheetTouchStart = (event) => {
+    paymentSheetTouchStartYRef.current = event.nativeEvent.pageY;
+  };
+
+  const handlePaymentSheetTouchEnd = (event) => {
+    const startY = paymentSheetTouchStartYRef.current;
+    paymentSheetTouchStartYRef.current = null;
+
+    if (startY === null) return;
+
+    const dragDistance = event.nativeEvent.pageY - startY;
+    if (dragDistance > 70) {
+      closePaymentSheet();
+    }
   };
 
   return (
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Rent Payment</Text>
+      <View style={styles.screen}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+          >
+            <MaterialIcons name="arrow-back-ios-new" size={22} color="#101820" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Rent Payment</Text>
+        </View>
 
-        {/* Outstanding Payments */}
-        <Text style={styles.sectionTitle}>Outstanding Payments</Text>
-        {sortedOutstandingMonths.length === 0 ? (
-            <Text style={styles.noOutstandingText}>You have no outstanding payments.</Text>
-        ) : (
-            sortedOutstandingMonths.map((payment, index) => (
-                <View key={index} style={styles.paymentBox}>
-                  <Text style={styles.paymentDate}>{payment.month}</Text>
-                  <Text style={styles.paymentAmount}>${amt}</Text>
-                  <TouchableOpacity style={styles.payButton} onPress={handlePayButtonPress}>
-                    <Text style={styles.payButtonText}>Pay</Text>
-                  </TouchableOpacity>
+        <View style={styles.summaryGrid}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Outstanding</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(outstandingTotal)}</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Monthly rent</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(monthlyRent)}</Text>
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>OUTSTANDING PAYMENTS</Text>
+        <View style={styles.outstandingPanel}>
+          <ScrollView
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.panelScrollContent}
+          >
+            {displayedOutstandingMonths.length === 0 ? (
+                <View style={styles.emptyCard}>
+                  <MaterialIcons name="check-circle" size={24} color="#2FA84F" />
+                  <Text style={styles.emptyTitle}>All caught up</Text>
+                  <Text style={styles.noOutstandingText}>You have no outstanding payments.</Text>
                 </View>
-            ))
-        )}
+            ) : (
+                displayedOutstandingMonths.map((payment) => {
+                  const isLocked = payment.status === 'locked';
+                  const isOverdue = payment.status === 'overdue';
+                  const isDueNow = payment.status === 'dueNow';
 
-        {/* Payment History */}
-        <Text style={styles.sectionTitle}>Payment History</Text>
-        {sortedPaidMonths.length === 0 ? (
-            <Text style={styles.noOutstandingText}>You have no payment history.</Text>
-        ) : (
-            sortedPaidMonths.map((payment, index) => (
-                <View key={index} style={styles.paymentRow}>
-                  <Text style={styles.paymentDate}>{payment.month}</Text>
-                  <View style={styles.paymentInfo}>
-                    <Text style={styles.paymentAmount}>${amt}</Text>
-                    <Text style={styles.paymentStatus}></Text>
-                  </View>
-                </View>
-            ))
-        )}
+                  return (
+                    <View
+                        key={payment.month}
+                        style={[
+                          styles.outstandingCard,
+                          isOverdue && styles.overdueOutstandingCard,
+                          isLocked && styles.lockedOutstandingCard,
+                        ]}
+                    >
+                      <View style={styles.outstandingCopy}>
+                        <View style={styles.outstandingHeader}>
+                          <Text style={[styles.outstandingMonth, isLocked && styles.lockedText]}>{payment.month}</Text>
+                          {!isLocked && (
+                              <View style={[styles.dueBadge, isOverdue && styles.overdueBadge]}>
+                                <Text style={styles.dueBadgeText}>{isDueNow ? 'Due Now' : 'Overdue'}</Text>
+                              </View>
+                          )}
+                        </View>
+                        <Text style={[styles.outstandingAmount, isLocked && styles.lockedText]}>
+                          {formatCurrency(payment.amount)}
+                        </Text>
+                      </View>
+                      {!isLocked ? (
+                          <TouchableOpacity style={styles.payNowButton} onPress={() => handlePayButtonPress(payment)}>
+                            <Text style={styles.payNowButtonText}>Pay now</Text>
+                          </TouchableOpacity>
+                      ) : (
+                          <MaterialIcons name="lock-outline" size={22} color="#8E8E8E" />
+                      )}
+                    </View>
+                  );
+                })
+            )}
+          </ScrollView>
+        </View>
 
-        {/* Payment Modal */}
+        <Text style={styles.sectionTitle}>PAYMENT HISTORY</Text>
+        <View style={styles.historyPanel}>
+          <ScrollView
+              nestedScrollEnabled
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.panelScrollContent}
+          >
+            {sortedPaidMonths.length === 0 ? (
+                <Text style={styles.noOutstandingText}>You have no payment history.</Text>
+            ) : (
+                sortedPaidMonths.map((payment, index) => (
+                    <View key={payment.paymentID || `${payment.month}-${index}`} style={styles.historyRow}>
+                      <View style={styles.historyStatusIcon}>
+                        <MaterialIcons name="check" size={20} color="#2FA84F" />
+                      </View>
+                      <View style={styles.historyCopy}>
+                        <Text style={styles.historyMonth}>{payment.month}</Text>
+                        <Text style={styles.historyDate}>{formatPaymentDate(payment.date)}</Text>
+                      </View>
+                      <Text style={styles.historyAmount}>{formatCurrency(payment.amount)}</Text>
+                    </View>
+                ))
+            )}
+          </ScrollView>
+        </View>
+
         <Modal
             visible={isModalVisible}
             transparent={true}
             animationType="slide"
             onRequestClose={handleReturnPress}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <ScrollView contentContainerStyle={styles.modalScroll}>
-                <View style={styles.modalBottom}>
-                  {!isPaymentSuccessful ? (
-                      <>
-                        <Text style={styles.modalTitle}>Card Payment</Text>
-                        <TextInput style={styles.input} placeholder="Card Number" keyboardType="numeric" />
-                        <View style={styles.row}>
-                          <TextInput style={[styles.input, styles.expirationInput]} placeholder="Expiration (MM/YY)" keyboardType="numeric" />
-                          <TextInput style={[styles.input, styles.cvvInput]} placeholder="CVV" keyboardType="numeric" secureTextEntry />
-                        </View>
-                        <TextInput style={styles.input} placeholder="Postal Code" keyboardType="numeric" />
-                        <TextInput style={styles.input} placeholder="Location" />
-                        <TouchableOpacity style={styles.payButton} onPress={handlePaymentSubmit} disabled={outstandingMonths.length === 0}>
-                          <Text style={styles.payButtonText}>Pay ${outstandingMonths.length > 0 ? outstandingMonths[0].amount : 0}</Text>
-                        </TouchableOpacity>
-                      </>
-                  ) : (
-                      <>
-                        <Image source={require('../assets/images/confirmation.png')} style={styles.successImage} />
-                        <Text style={styles.successText}>Payment Successful!</Text>
-                        <TouchableOpacity style={styles.payButton2} onPress={handleReturnPress}>
-                          <Text style={styles.payButtonText}>Return</Text>
-                        </TouchableOpacity>
-                      </>
+          <TouchableWithoutFeedback onPress={handleReturnPress}>
+            <View style={styles.modalOverlay}>
+              <TouchableWithoutFeedback>
+                <View style={styles.modalContent} {...paymentSheetPanResponder.panHandlers}>
+                  <ScrollView
+                      contentContainerStyle={styles.modalScroll}
+                      onTouchStart={handlePaymentSheetTouchStart}
+                      onTouchEnd={handlePaymentSheetTouchEnd}
+                  >
+                    <View style={styles.modalBottom}>
+                      <View style={styles.modalHandleHitArea}>
+                        <View style={styles.modalHandle} />
+                      </View>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Card payment</Text>
+                    <View style={styles.secureBadge}>
+                      <MaterialIcons name="lock-outline" size={16} color="#666" />
+                      <Text style={styles.secureText}>Secure</Text>
+                    </View>
+                  </View>
+                  <View style={styles.modalSummary}>
+                    <View>
+                      <Text style={styles.modalSummaryLabel}>
+                        {paymentInModal ? `${paymentInModal.month} Rent` : 'Monthly rent'}
+                      </Text>
+                      <Text style={styles.modalSummaryAmount}>
+                        {formatCurrency(paymentInModal ? paymentInModal.amount : monthlyRent)}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.cardBrandRow}>
+                    <View style={[styles.cardBrandBadge, styles.visaBadge]}>
+                      <Text style={styles.visaText}>VISA</Text>
+                    </View>
+                    <View style={[styles.cardBrandBadge, styles.mastercardBadge]}>
+                      <View style={styles.mastercardCircles}>
+                        <View style={[styles.mastercardCircle, styles.mastercardRed]} />
+                        <View style={[styles.mastercardCircle, styles.mastercardYellow]} />
+                      </View>
+                      <Text style={styles.mastercardText}>mastercard</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.inputLabel}>CARD NUMBER</Text>
+                  <TextInput
+                      style={[styles.input, hasFieldError('cardNumber', isCardNumberValid) && styles.inputError]}
+                      placeholder="4111 1111 1111 1111"
+                      placeholderTextColor="#8E8E8E"
+                      keyboardType="numeric"
+                      value={cardNumber}
+                      onChangeText={(value) => setCardNumber(formatCardNumberInput(value))}
+                      onBlur={() => markFieldTouched('cardNumber')}
+                      maxLength={19}
+                      editable={!isSubmittingPayment}
+                  />
+                  {hasFieldError('cardNumber', isCardNumberValid) && (
+                      <Text style={styles.errorText}>Enter a valid Visa or Mastercard number.</Text>
                   )}
+                  <View style={styles.row}>
+                    <View style={styles.expirationInput}>
+                      <Text style={styles.inputLabel}>EXPIRY</Text>
+                      <TextInput
+                          style={[styles.input, hasFieldError('cardExpiry', isExpiryValid) && styles.inputError]}
+                          placeholder="MM/YY"
+                          placeholderTextColor="#8E8E8E"
+                          keyboardType="numeric"
+                          value={cardExpiry}
+                          onChangeText={(value) => setCardExpiry(formatExpiryInput(value))}
+                          onBlur={() => markFieldTouched('cardExpiry')}
+                          maxLength={5}
+                          editable={!isSubmittingPayment}
+                      />
+                      {hasFieldError('cardExpiry', isExpiryValid) && (
+                          <Text style={styles.errorText}>Use a valid future date.</Text>
+                      )}
+                    </View>
+                    <View style={styles.cvvInput}>
+                      <Text style={styles.inputLabel}>CVV</Text>
+                      <TextInput
+                          style={[styles.input, hasFieldError('cardCvv', isCvvValid) && styles.inputError]}
+                          placeholder="123"
+                          placeholderTextColor="#8E8E8E"
+                          keyboardType="numeric"
+                          value={cardCvv}
+                          onChangeText={(value) => setCardCvv(value.replace(/\D/g, '').slice(0, 3))}
+                          onBlur={() => markFieldTouched('cardCvv')}
+                          maxLength={3}
+                          secureTextEntry
+                          editable={!isSubmittingPayment}
+                      />
+                      {hasFieldError('cardCvv', isCvvValid) && (
+                          <Text style={styles.errorText}>Enter 3 digits.</Text>
+                      )}
+                    </View>
+                  </View>
+                  <Text style={styles.inputLabel}>NAME ON CARD</Text>
+                  <TextInput
+                      style={[styles.input, hasFieldError('cardName', isCardNameValid) && styles.inputError]}
+                      placeholder="As it appears on your card"
+                      placeholderTextColor="#8E8E8E"
+                      autoCapitalize="words"
+                      value={cardName}
+                      onChangeText={setCardName}
+                      onBlur={() => markFieldTouched('cardName')}
+                      editable={!isSubmittingPayment}
+                  />
+                  {hasFieldError('cardName', isCardNameValid) && (
+                      <Text style={styles.errorText}>Enter the name on your card.</Text>
+                  )}
+                  <TouchableOpacity
+                      style={[styles.payButton, (!isCardFormValid || isSubmittingPayment) && styles.disabledPayButton]}
+                      onPress={handlePaymentSubmit}
+                      disabled={!isCardFormValid || isSubmittingPayment}
+                  >
+                    {isSubmittingPayment ? (
+                        <View style={styles.payButtonContent}>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text style={styles.payButtonText}>Processing...</Text>
+                        </View>
+                    ) : (
+                        <Text style={styles.payButtonText}>Pay {formatCurrency(paymentInModal ? paymentInModal.amount : 0)}</Text>
+                    )}
+                  </TouchableOpacity>
+                  <View style={styles.encryptedRow}>
+                    <MaterialIcons name="verified-user" size={16} color="#666" />
+                    <Text style={styles.encryptedText}>Payments are encrypted and never stored</Text>
+                  </View>
+                    </View>
+                  </ScrollView>
                 </View>
-              </ScrollView>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+        <Modal
+            visible={showPaymentUpdated}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+        >
+          <View style={styles.notificationOverlay} pointerEvents="none">
+            <View style={styles.notificationCard}>
+              <View style={styles.notificationIconBox}>
+                <Image source={notificationBellIcon} style={styles.notificationIcon} />
+              </View>
+              <Text style={styles.notificationText}>Payment Successful</Text>
             </View>
           </View>
         </Modal>
-      </ScrollView>
+      </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 20,
+  screen: {
+    flex: 1,
     backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingTop: 44,
+    paddingBottom: 24,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7F8FA',
+    borderWidth: 1,
+    borderColor: '#E7E7E7',
+    marginRight: 12,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 20,
+    color: '#101820',
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 18,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: '#F7F8FA',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#E7E7E7',
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  summaryValue: {
+    fontSize: 23,
+    lineHeight: 28,
+    color: '#101820',
+    fontWeight: '800',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 8,
+    marginTop: 4,
+    color: '#333',
+    letterSpacing: 0.8,
   },
-  paymentBox: {
+  outstandingPanel: {
+    maxHeight: 270,
+    minHeight: 124,
+    marginBottom: 14,
+  },
+  historyPanel: {
+    flex: 1,
+    minHeight: 170,
+    borderTopWidth: 1,
+    borderTopColor: '#EFEFEF',
+  },
+  panelScrollContent: {
+    paddingBottom: 8,
+  },
+  emptyCard: {
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E7E7E7',
+    padding: 18,
+  },
+  emptyTitle: {
+    marginTop: 8,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#101820',
+  },
+  outstandingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#fff',
-    padding: 10,
-    borderRadius: 10,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#101820',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
   },
-  paymentDate: {
-    fontSize: 16,
+  lockedOutstandingCard: {
+    borderColor: '#E2E2E2',
+    backgroundColor: '#F7F8FA',
   },
-  paymentAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  overdueOutstandingCard: {
+    borderColor: '#E24848',
+  },
+  outstandingCopy: {
+    flex: 1,
+    marginRight: 12,
+  },
+  outstandingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  outstandingMonth: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#101820',
+  },
+  outstandingAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#666',
+  },
+  dueBadge: {
+    backgroundColor: '#101820',
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  overdueBadge: {
+    backgroundColor: '#E24848',
+  },
+  dueBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  lockedText: {
+    color: '#8E8E8E',
+  },
+  payNowButton: {
+    borderWidth: 1,
+    borderColor: '#101820',
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    backgroundColor: '#101820',
+  },
+  payNowButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECECEC',
+  },
+  historyStatusIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EAF7EE',
+    marginRight: 12,
+  },
+  historyCopy: {
+    flex: 1,
+  },
+  historyMonth: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#101820',
+  },
+  historyDate: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+    marginTop: 2,
+  },
+  historyAmount: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#2FA84F',
   },
   payButton: {
-    backgroundColor: 'black',
-    paddingVertical: 10,
-    borderRadius: 5,
-    marginTop: 10,
+    backgroundColor: '#101820',
+    paddingVertical: 15,
+    borderRadius: 12,
+    marginTop: 2,
   },
-  payButton2: {
-      backgroundColor: 'black',
-      paddingVertical: 10,
-      borderRadius: 5,
-      marginTop: 10,
-      width: 120, // Set a specific width (adjust as needed)
-        alignSelf: 'center', // Center the button horizontally
-      },
-
   payButtonText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '800',
     textAlign: 'center',
   },
-  paymentRow: {
+  payButtonContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  paymentInfo: {
-    alignItems: 'flex-end',
-  },
-  paymentStatus: {
-    fontSize: 12,
-    color: '#28a745',
-  },
-  smallText: {
-    fontSize: 12,
-    color: '#666',
+    justifyContent: 'center',
+    gap: 10,
   },
   modalOverlay: {
     flex: 1,
@@ -366,11 +903,13 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#fff',
-    padding: 20,
-    borderTopLeftRadius: 10, // Add rounded corners at the top
-    borderTopRightRadius: 10,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 22,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     width: '100%', // Full width of the screen
-    maxHeight: '60%', // Limit height to keep it manageable
+    maxHeight: '86%',
   },
   modalScroll: {
     paddingBottom: 0,
@@ -378,47 +917,202 @@ const styles = StyleSheet.create({
   modalBottom: {
     paddingBottom: 10,
   },
+  modalHandleHitArea: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 2,
+    paddingBottom: 16,
+  },
+  modalHandle: {
+    width: 48,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#D8D8D8',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
   modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#101820',
+  },
+  secureBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  secureText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  modalSummary: {
+    backgroundColor: '#F7F8FA',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E7E7E7',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginBottom: 18,
+  },
+  modalSummaryLabel: {
+    color: '#666',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  modalSummaryAmount: {
+    color: '#101820',
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '800',
+  },
+  cardBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 16,
+  },
+  cardBrandBadge: {
+    width: 48,
+    height: 30,
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  visaBadge: {
+    backgroundColor: '#1434CB',
+  },
+  visaText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '900',
+    fontStyle: 'italic',
+    letterSpacing: 0.5,
+  },
+  mastercardBadge: {
+    backgroundColor: '#101820',
+  },
+  mastercardCircles: {
+    flexDirection: 'row',
+    marginBottom: -1,
+  },
+  mastercardCircle: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+  },
+  mastercardRed: {
+    backgroundColor: '#EB001B',
+    marginRight: -5,
+  },
+  mastercardYellow: {
+    backgroundColor: '#F79E1B',
+  },
+  mastercardText: {
+    color: '#fff',
+    fontSize: 6,
+    fontWeight: '700',
+  },
+  inputLabel: {
+    color: '#333',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginBottom: 7,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
-    fontSize: 14,
+    borderColor: '#D8D8D8',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginBottom: 14,
+    fontSize: 16,
+    color: '#101820',
+    backgroundColor: '#fff',
+  },
+  inputError: {
+    borderColor: '#D64545',
+    backgroundColor: '#FFF8F8',
+  },
+  errorText: {
+    color: '#D64545',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: -8,
+    marginBottom: 10,
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 12,
   },
-  successImage: {
-    width: 80,
-    height: 80,
-    marginBottom: 20,
-    borderRadius: 50,
-    alignSelf: 'center',
+  expirationInput: {
+    flex: 1,
   },
-  successText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 10,
+  cvvInput: {
+    flex: 1,
   },
-   row: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-    },
-    expirationInput: {
-      flex: 0.7, // Takes 70% of the row space
-      marginRight: 10, // Small gap to the CVV input
-    },
-    cvvInput: {
-      flex: 0.3, // Takes 30% of the row space
-    },
+  disabledPayButton: {
+    backgroundColor: '#999',
+  },
+  encryptedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 14,
+  },
+  encryptedText: {
+    color: '#666',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  notificationOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+  },
+  notificationCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    backgroundColor: 'rgba(45, 45, 45, 0.82)',
+    borderRadius: 28,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    elevation: 8,
+  },
+  notificationIconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(58, 58, 58, 0.72)',
+    marginBottom: 16,
+  },
+  notificationIcon: {
+    width: 34,
+    height: 40,
+    resizeMode: 'contain',
+  },
+  notificationText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+  },
 });
 
 export default RentPaymentScreen;

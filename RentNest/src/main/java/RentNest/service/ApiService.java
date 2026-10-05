@@ -64,8 +64,11 @@ public class ApiService {
     }
 
     public List<School> getSchoolsByListingId(Long listingId, double radiusMeters) {
-        String postalCode = Integer.toString(getPostalByListingId(listingId));
-        return getSchoolsNearPostalCode(postalCode,radiusMeters);
+        double[] listingCoordinates = getCoordinatesForListing(listingId);
+        if (!hasValidCoordinates(listingCoordinates)) {
+            return new ArrayList<>();
+        }
+        return getSchoolsNearCoordinates(listingCoordinates[0], listingCoordinates[1], radiusMeters);
     }
 
     public List<School> getSchoolsNearPostalCode(String postalCode, double radiusMeters) {
@@ -75,9 +78,10 @@ public class ApiService {
             logger.warn("[Coordinates] Skipping nearby schools because postalCode={} could not be resolved", postalCode);
             return new ArrayList<>();
         }
-        double postalLatitude = postalCoordinates[0];
-        double postalLongitude = postalCoordinates[1];
-        
+        return getSchoolsNearCoordinates(postalCoordinates[0], postalCoordinates[1], radiusMeters);
+    }
+
+    public List<School> getSchoolsNearCoordinates(double latitude, double longitude, double radiusMeters) {
         List<School> schools = new ArrayList<>();
 
         // Retrieve all school entries using offset parameter
@@ -98,7 +102,7 @@ public class ApiService {
             school.setLatitude(schoolLatitude);
             double schoolLongitude = schoolCoordinates[1];
             school.setLongitude(schoolLongitude);
-            double distance = calculateDistance(postalLatitude, postalLongitude, schoolLatitude, schoolLongitude);
+            double distance = calculateDistance(latitude, longitude, schoolLatitude, schoolLongitude);
             if (distance <= radiusMeters) {
                 nearbySchools.add(school);
             }
@@ -134,8 +138,11 @@ public class ApiService {
     }
 
     public List<HawkerCentre> getHawkerCentresByListingId(Long listingId, double radiusMeters) {
-        String postalCode = Integer.toString(getPostalByListingId(listingId));
-        return getHawkerCentresNearPostalCode(postalCode,radiusMeters);
+        double[] listingCoordinates = getCoordinatesForListing(listingId);
+        if (!hasValidCoordinates(listingCoordinates)) {
+            return new ArrayList<>();
+        }
+        return getHawkerCentresNearCoordinates(listingCoordinates[0], listingCoordinates[1], radiusMeters);
     }
 
     public List<HawkerCentre> getHawkerCentresNearPostalCode(String postalCode, double radiusMeters) {
@@ -145,9 +152,10 @@ public class ApiService {
             logger.warn("[Coordinates] Skipping nearby hawker centres because postalCode={} could not be resolved", postalCode);
             return new ArrayList<>();
         }
-        double postalLatitude = postalCoordinates[0];
-        double postalLongitude = postalCoordinates[1];
-        
+        return getHawkerCentresNearCoordinates(postalCoordinates[0], postalCoordinates[1], radiusMeters);
+    }
+
+    public List<HawkerCentre> getHawkerCentresNearCoordinates(double latitude, double longitude, double radiusMeters) {
         List<HawkerCentre> hawkerCentres = new ArrayList<>();
 
         // Retrieve all hawker centre entries using offset parameter
@@ -168,7 +176,7 @@ public class ApiService {
                 hawkerCentre.setLatitude(hawkerLatitude);
                 double hawkerLongitude = hawkerCoordinates[1];
                 hawkerCentre.setLongitude(hawkerLongitude);
-                double distance = calculateDistance(postalLatitude, postalLongitude, hawkerLatitude, hawkerLongitude);
+                double distance = calculateDistance(latitude, longitude, hawkerLatitude, hawkerLongitude);
                 if (distance <= radiusMeters) {
                     nearbyHawkerCentres.add(hawkerCentre);
                 }
@@ -221,10 +229,13 @@ public class ApiService {
     private String LTADATAMALL_ACCOUNTKEY;
 
     public List<BusStop> getBusStopsByListingId(Long listingId, double radiusMeters) {
-        String postalCode = Integer.toString(getPostalByListingId(listingId));
-        logger.info("[LTA DataMall] Fetching bus stops for listingId={}, postalCode={}, radiusMeters={}",
-                listingId, postalCode, radiusMeters);
-        return getBusStopsNearPostalCode(postalCode,radiusMeters);
+        double[] listingCoordinates = getCoordinatesForListing(listingId);
+        if (!hasValidCoordinates(listingCoordinates)) {
+            return new ArrayList<>();
+        }
+        logger.info("[LTA DataMall] Fetching bus stops for listingId={}, latitude={}, longitude={}, radiusMeters={}",
+                listingId, listingCoordinates[0], listingCoordinates[1], radiusMeters);
+        return getBusStopsNearCoordinates(listingCoordinates[0], listingCoordinates[1], radiusMeters);
     }
 
     public List<BusStop> getBusStopsNearPostalCode(String postalCode, double radiusMeters) {
@@ -238,7 +249,10 @@ public class ApiService {
         double postalLongitude = postalCoordinates[1];
         logger.info("[LTA DataMall] Postal code {} resolved to latitude={}, longitude={}",
                 postalCode, postalLatitude, postalLongitude);
+        return getBusStopsNearCoordinates(postalLatitude, postalLongitude, radiusMeters);
+    }
 
+    public List<BusStop> getBusStopsNearCoordinates(double latitude, double longitude, double radiusMeters) {
         List<BusStop> busStops = new ArrayList<>();
         int skip = 0;
         boolean hasMoreData = true;
@@ -275,13 +289,13 @@ public class ApiService {
         // Filter bus stops within radius
         List<BusStop> nearbyBusStops = new ArrayList<>();
         for (BusStop busStop : busStops) {
-            double distance = calculateDistance(postalLatitude, postalLongitude, busStop.getLatitude(), busStop.getLongitude());
+            double distance = calculateDistance(latitude, longitude, busStop.getLatitude(), busStop.getLongitude());
             if (distance <= radiusMeters) {
                 nearbyBusStops.add(busStop);
             }
         }
-        logger.info("[LTA DataMall] Nearby bus stops found={} within radiusMeters={} for postalCode={}",
-                nearbyBusStops.size(), radiusMeters, postalCode);
+        logger.info("[LTA DataMall] Nearby bus stops found={} within radiusMeters={} for latitude={}, longitude={}",
+                nearbyBusStops.size(), radiusMeters, latitude, longitude);
         
         return nearbyBusStops;
     }
@@ -333,6 +347,17 @@ public class ApiService {
                     logger.warn("[Coordinates] Postal code {} not found in postal_code_coordinates", normalizedPostalCode);
                     return new double[]{0.0, 0.0};
                 });
+    }
+
+    private double[] getCoordinatesForListing(Long listingId) {
+        Listings listing = listingsRepository.findById(listingId)
+                .orElseThrow(() -> new IllegalArgumentException("Listing not found with id: " + listingId));
+        if (listing.getLatitude() != null && listing.getLongitude() != null) {
+            return new double[]{listing.getLatitude(), listing.getLongitude()};
+        }
+
+        logger.warn("[Coordinates] Listing {} has no saved latitude/longitude; falling back to postal code lookup", listingId);
+        return getCoordinatesFromPostalCode(Integer.toString(listing.getPostal()));
     }
 
     private int countOneMapResults(String jsonResponse) {
@@ -401,117 +426,217 @@ public class ApiService {
     @Value("${URA_ACCESSKEY}")
     private String URA_ACCESSKEY;
 
+    /** data.gov.sg API key, sent as x-api-key; blank means anonymous (lower rate limit). */
+    @Value("${DATAGOVSG_API_KEY:}")
+    private String DATAGOVSG_API_KEY;
+
+    /** Months of history shown in a listing's Price Insights table. */
+    static final int PRICE_INSIGHT_MONTHS = 12;
+    static final double PRIVATE_INSIGHT_RADIUS_M = 500;
+
+    /**
+     * Price Insights for a listing: the median monthly rent of comparable units for
+     * each of the last {@value #PRICE_INSIGHT_MONTHS} months with transactions, newest
+     * first. HDB uses the flat type stated in the listing ("5-room") or implied by its
+     * bedrooms; private property uses URA contracts in the same project, falling back
+     * to the same bedroom count within 500 m. Returns an empty list (never fails) when
+     * data is unavailable.
+     */
     public List<RentalPrices> getPastRentalPricesByListingId(Long listingId) {
-        String noOfRoom = Integer.toString(getBedsByListingId(listingId));
-        List<RentalPrices> rentalPrices;
-        String postalCode = Integer.toString(getPostalByListingId(listingId));
-        String buildingName = getProjectNameFromPostalCode(postalCode);
-        if (getTypeByListingId(listingId).equals("HDB")) {
-            rentalPrices = getHDBRentalContracts(postalCode, noOfRoom).stream()
-                    .map(contract -> new RentalPrices(formatDate(contract.getRentApprovalDate()), contract.getMonthlyRent()))
-                    .collect(Collectors.toList());
-        } else {
-            rentalPrices = getRentalContractsByProject(buildingName, 5, noOfRoom).stream()
-                    .map(contract -> new RentalPrices(formatDate(contract.getLeaseDate()), contract.getRent()))
-                    .collect(Collectors.toList());
-        }
-        return rentalPrices;
-    }
+        try {
+            Listings listing = listingsRepository.findById(listingId).orElse(null);
+            if (listing == null || listing.getPostal() == null) return new ArrayList<>();
+            String postalCode = String.format("%06d", listing.getPostal());
+            List<Object[]> monthAndRent = new ArrayList<>(); // {yyyy-MM, rent}
 
-    private String formatDate(String dateStr) {
-    try {
-        SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM");
-        Date date = inputFormat.parse(dateStr);
-        SimpleDateFormat outputFormat = new SimpleDateFormat("MMM yyyy");
-        return outputFormat.format(date);
-    } catch (ParseException e) {
-        e.printStackTrace();
-        return dateStr;
-        }
-    }   
-
-
-    public List<RentalContract> getRentalContractsNearPostalCode(String postalCode, double radiusMeters, int years, String noOfBedRoom) {
-        // Get x and y coordinates from postal code using OneMap API
-        double[] postalCoordinates = getXYCoordinatesFromPostalCode(postalCode);
-        double postalX = postalCoordinates[0];
-        double postalY = postalCoordinates[1];
-    
-        List<String> refPeriods = getRefPeriodsForPastYears(years);
-        List<RentalContract> allRentalContracts = new ArrayList<>();
-    
-        // Generate Daily Token
-        String tokenUrl = "https://www.ura.gov.sg/uraDataService/insertNewToken.action";
-        HttpHeaders tokenHeaders = new HttpHeaders();
-        tokenHeaders.set("AccessKey", URA_ACCESSKEY);
-        ResponseEntity<String> tokenResponse = restTemplate.exchange(tokenUrl, HttpMethod.GET, new org.springframework.http.HttpEntity<>(tokenHeaders), String.class);
-        String dailyToken = extractToken(tokenResponse.getBody());
-    
-        for (String refPeriod : refPeriods) {
-            // Get Rental Prices
-            String rentalUrl = "https://www.ura.gov.sg/uraDataService/invokeUraDS?service=PMI_Resi_Rental&refPeriod=" + refPeriod;
-            HttpHeaders rentalHeaders = new HttpHeaders();
-            rentalHeaders.set("AccessKey", URA_ACCESSKEY);
-            rentalHeaders.set("Token", dailyToken);
-            ResponseEntity<String> rentalResponse = restTemplate.exchange(rentalUrl, HttpMethod.GET, new HttpEntity<>(rentalHeaders), String.class);
-    
-            List<RentalContract> rentalContracts = parseRentalContracts(rentalResponse.getBody());
-            allRentalContracts.addAll(rentalContracts);
-        }
-    
-        // Filter rental contracts within x and y range
-        List<RentalContract> nearbyRentalContracts = new ArrayList<>();
-        for (RentalContract rentalContract : allRentalContracts) {
-            double propertyX = rentalContract.getX();
-            double propertyY = rentalContract.getY();
-            if (isWithinRange(postalX, postalY, propertyX, propertyY, radiusMeters)) {
-                if (rentalContract.getNoOfBedRoom().equals(noOfBedRoom)) {
-                    nearbyRentalContracts.add(rentalContract);
+            if ("HDB".equalsIgnoreCase(listing.getType())) {
+                String flatType = hdbFlatTypeForListing(
+                        listing.getName(), listing.getDescription(), listing.getBeds(), listing.getSize());
+                List<HDBRentalContract> hdb = getHDBRentalContractsByFlatType(postalCode, flatType);
+                if (hdb.isEmpty() && hasText(listing.getLocation())) {
+                    // Postal code unknown to OneMap: use the street stored on the listing.
+                    hdb = getHDBRentalContractsByStreet(normaliseHdbStreetName(listing.getLocation()), flatType);
+                }
+                for (HDBRentalContract c : hdb) {
+                    monthAndRent.add(new Object[]{c.getRentApprovalDate(), c.getMonthlyRent()});
+                }
+            } else {
+                boolean landed = "Landed".equalsIgnoreCase(listing.getType());
+                String beds = landed ? "NA" : String.valueOf(listing.getBeds());
+                List<RentalContract> contracts = new ArrayList<>();
+                String project = getProjectNameFromPostalCode(postalCode);
+                if (!landed && project != null && !project.isBlank()
+                        && !"Address not found".equals(project) && !"NIL".equalsIgnoreCase(project)) {
+                    contracts = getRentalContractsByProject(project, 1, beds);
+                }
+                if (contracts.size() < 3) {
+                    contracts = getRentalContractsNearPostalCode(postalCode, PRIVATE_INSIGHT_RADIUS_M, 1, beds);
+                }
+                if (contracts.size() < 3 && hasText(listing.getLocation())) {
+                    contracts = getRentalContractsByStreet(listing.getLocation(), 1, beds);
+                }
+                for (RentalContract c : contracts) {
+                    monthAndRent.add(new Object[]{c.getLeaseDate(), c.getRent()});
                 }
             }
+            return monthlyMedians(monthAndRent, PRICE_INSIGHT_MONTHS);
+        } catch (RuntimeException e) {
+            logger.warn("[PriceInsights] Could not load price insights for listingId={}: {}", listingId, e.getMessage());
+            return new ArrayList<>();
         }
-    
-        nearbyRentalContracts.sort((a, b) -> b.getLeaseDate().compareTo(a.getLeaseDate()));
-        return nearbyRentalContracts;
+    }
+
+    private static final java.util.regex.Pattern HDB_FLAT_TYPE_IN_TEXT =
+            java.util.regex.Pattern.compile("\\b([1-5])[- ]?room\\b|\\b(executive|maisonette)\\b");
+
+    /**
+     * HDB flat type for a listing: the type stated in its title or description
+     * ("Tampines HDB 5-Room") when present, otherwise implied by its bedrooms
+     * (HDB counts the living room, so 2 bedrooms is a 3-ROOM flat).
+     */
+    public static String hdbFlatTypeForListing(String name, String description, Integer beds, Integer sizeSqft) {
+        String text = ((name == null ? "" : name) + " " + (description == null ? "" : description)).toLowerCase();
+        java.util.regex.Matcher m = HDB_FLAT_TYPE_IN_TEXT.matcher(text);
+        if (m.find()) {
+            return m.group(1) != null ? m.group(1) + "-ROOM" : "EXECUTIVE";
+        }
+        int b = beds == null ? 3 : beds;
+        if (b <= 1) return "2-ROOM";
+        if (b == 2) return "3-ROOM";
+        if (b == 3) return (sizeSqft != null && sizeSqft >= 1150) ? "5-ROOM" : "4-ROOM";
+        return "EXECUTIVE";
+    }
+
+    /** One row per month (newest first): the median rent, rounded to $10. */
+    public static List<RentalPrices> monthlyMedians(List<Object[]> monthAndRent, int months) {
+        Map<String, List<Integer>> byMonth = new java.util.TreeMap<>(java.util.Comparator.reverseOrder());
+        for (Object[] row : monthAndRent) {
+            String month = (String) row[0];
+            int rent = (Integer) row[1];
+            if (month == null || month.length() < 7 || rent <= 0) continue;
+            byMonth.computeIfAbsent(month.substring(0, 7), k -> new ArrayList<>()).add(rent);
+        }
+        List<RentalPrices> out = new ArrayList<>();
+        for (Map.Entry<String, List<Integer>> e : byMonth.entrySet()) {
+            if (out.size() >= months) break;
+            List<Integer> rents = e.getValue();
+            rents.sort(null);
+            int n = rents.size();
+            double median = n % 2 == 1 ? rents.get(n / 2) : (rents.get(n / 2 - 1) + rents.get(n / 2)) / 2.0;
+            out.add(new RentalPrices(formatDate(e.getKey()), (int) (Math.round(median / 10.0) * 10)));
+        }
+        return out;
+    }
+
+    private static String formatDate(String dateStr) {
+        try {
+            SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM");
+            Date date = inputFormat.parse(dateStr);
+            SimpleDateFormat outputFormat = new SimpleDateFormat("MMM yyyy");
+            return outputFormat.format(date);
+        } catch (ParseException e) {
+            return dateStr;
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // URA private residential rental contracts (PMI_Resi_Rental)
+    // ---------------------------------------------------------------------
+
+    private static final String URA_TOKEN_URL = "https://eservice.ura.gov.sg/uraDataService/insertNewToken/v1";
+    private static final String URA_RENTAL_URL = "https://eservice.ura.gov.sg/uraDataService/invokeUraDS/v1?service=PMI_Resi_Rental&refPeriod=";
+    /** URA's daily token is reused for most of a day. */
+    private static final long URA_TOKEN_TTL_MILLIS = 12 * 60 * 60 * 1000L;
+    /** The current quarter is still filling up; past quarters never change. */
+    private static final long URA_CURRENT_QUARTER_TTL_MILLIS = 6 * 60 * 60 * 1000L;
+
+    private record CachedQuarter(long fetchedAt, List<RentalContract> contracts) {}
+    private final Map<String, CachedQuarter> uraQuarterCache = new ConcurrentHashMap<>();
+    private volatile String uraToken;
+    private volatile long uraTokenFetchedAt;
+
+    public List<RentalContract> getRentalContractsNearPostalCode(String postalCode, double radiusMeters, int years, String noOfBedRoom) {
+        double[] postal = getXYCoordinatesFromPostalCode(postalCode);
+        if (postal[0] == 0.0 && postal[1] == 0.0) return new ArrayList<>();
+
+        List<RentalContract> nearby = new ArrayList<>();
+        for (RentalContract c : getUraRentalContracts(years)) {
+            if (isWithinRange(postal[0], postal[1], c.getX(), c.getY(), radiusMeters)
+                    && c.getNoOfBedRoom().equals(noOfBedRoom)) {
+                nearby.add(c);
+            }
+        }
+        nearby.sort((a, b) -> b.getLeaseDate().compareTo(a.getLeaseDate()));
+        return nearby;
     }
 
     public List<RentalContract> getRentalContractsByProject(String projectName, int years, String noOfBedRoom) {
-        List<String> refPeriods = getRefPeriodsForPastYears(years);
-        List<RentalContract> allRentalContracts = new ArrayList<>();
-    
-        // Generate Daily Token
-        String tokenUrl = "https://www.ura.gov.sg/uraDataService/insertNewToken.action";
-        HttpHeaders tokenHeaders = new HttpHeaders();
-        tokenHeaders.set("AccessKey", URA_ACCESSKEY);
-        ResponseEntity<String> tokenResponse = restTemplate.exchange(tokenUrl, HttpMethod.GET, new org.springframework.http.HttpEntity<>(tokenHeaders), String.class);
-        String dailyToken = extractToken(tokenResponse.getBody());
-    
-        for (String refPeriod : refPeriods) {
-            // Get Rental Prices
-            String rentalUrl = "https://www.ura.gov.sg/uraDataService/invokeUraDS?service=PMI_Resi_Rental&refPeriod=" + refPeriod;
-            HttpHeaders rentalHeaders = new HttpHeaders();
-            rentalHeaders.set("AccessKey", URA_ACCESSKEY);
-            rentalHeaders.set("Token", dailyToken);
-            ResponseEntity<String> rentalResponse = restTemplate.exchange(rentalUrl, HttpMethod.GET, new HttpEntity<>(rentalHeaders), String.class);
-    
-            List<RentalContract> rentalContracts = parseRentalContracts(rentalResponse.getBody());
-            allRentalContracts.addAll(rentalContracts);
-        }
-    
-        // Filter rental contracts by project name and noOfBedRoom
-        List<RentalContract> filteredRentalContracts = new ArrayList<>();
-        for (RentalContract rentalContract : allRentalContracts) {
-            if (rentalContract.getProject().equalsIgnoreCase(projectName)) {
-                if (rentalContract.getNoOfBedRoom().equals(noOfBedRoom)) {
-                    filteredRentalContracts.add(rentalContract);
-                }
+        List<RentalContract> matches = new ArrayList<>();
+        for (RentalContract c : getUraRentalContracts(years)) {
+            if (c.getProject().equalsIgnoreCase(projectName) && c.getNoOfBedRoom().equals(noOfBedRoom)) {
+                matches.add(c);
             }
         }
-    
-        filteredRentalContracts.sort((a, b) -> b.getLeaseDate().compareTo(a.getLeaseDate()));
-        return filteredRentalContracts;
+        matches.sort((a, b) -> b.getLeaseDate().compareTo(a.getLeaseDate()));
+        return matches;
     }
-    
+
+    /** URA contracts on a street (e.g. "Marine Parade Road"), for the same bedroom count. */
+    public List<RentalContract> getRentalContractsByStreet(String street, int years, String noOfBedRoom) {
+        String target = street.trim().toUpperCase();
+        List<RentalContract> matches = new ArrayList<>();
+        for (RentalContract c : getUraRentalContracts(years)) {
+            if (target.equals(c.getStreet()) && c.getNoOfBedRoom().equals(noOfBedRoom)) {
+                matches.add(c);
+            }
+        }
+        matches.sort((a, b) -> b.getLeaseDate().compareTo(a.getLeaseDate()));
+        return matches;
+    }
+
+    private static boolean hasText(String s) {
+        return s != null && !s.isBlank();
+    }
+
+    /** All URA rental contracts for the past {@code years}, one cached download per quarter. */
+    private List<RentalContract> getUraRentalContracts(int years) {
+        List<String> refPeriods = getRefPeriodsForPastYears(years);
+        String currentQuarter = refPeriods.get(0);
+        List<RentalContract> all = new ArrayList<>();
+        for (String refPeriod : refPeriods) {
+            CachedQuarter cached = uraQuarterCache.get(refPeriod);
+            boolean stale = cached == null || (refPeriod.equals(currentQuarter)
+                    && System.currentTimeMillis() - cached.fetchedAt() > URA_CURRENT_QUARTER_TTL_MILLIS);
+            if (stale) {
+                HttpHeaders headers = new HttpHeaders();
+                headers.set("AccessKey", URA_ACCESSKEY);
+                headers.set("Token", getUraToken());
+                ResponseEntity<String> response = restTemplate.exchange(URA_RENTAL_URL + refPeriod, HttpMethod.GET,
+                        new HttpEntity<>(headers), String.class);
+                cached = new CachedQuarter(System.currentTimeMillis(), parseRentalContracts(response.getBody()));
+                uraQuarterCache.put(refPeriod, cached);
+            }
+            all.addAll(cached.contracts());
+        }
+        return all;
+    }
+
+    private String getUraToken() {
+        if (uraToken != null && System.currentTimeMillis() - uraTokenFetchedAt < URA_TOKEN_TTL_MILLIS) {
+            return uraToken;
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("AccessKey", URA_ACCESSKEY);
+        ResponseEntity<String> response = restTemplate.exchange(URA_TOKEN_URL, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        String token = extractToken(response.getBody());
+        if (token == null || token.isBlank()) {
+            throw new RuntimeException("URA did not return a token (check URA_ACCESSKEY)");
+        }
+        uraToken = token;
+        uraTokenFetchedAt = System.currentTimeMillis();
+        return token;
+    }
+
     private List<RentalContract> parseRentalContracts(String jsonResponse) {
         List<RentalContract> rentalContracts = new ArrayList<>();
         try {
@@ -522,12 +647,11 @@ public class ApiService {
                     JsonNode rentalArrayNode = propertyNode.path("rental");
                     if (rentalArrayNode.isArray()) {
                         for (JsonNode rentalNode : rentalArrayNode) {
+                            String leaseDate = rentalNode.path("leaseDate").asText();
+                            if (leaseDate.length() < 4) continue;
                             RentalContract rentalContract = new RentalContract();
                             rentalContract.setAreaSqm(rentalNode.path("areaSqm").asText());
-                            String leaseDate = rentalNode.path("leaseDate").asText();
-                            String month = leaseDate.substring(0, 2);
-                            String year = "20" + leaseDate.substring(2);
-                            rentalContract.setLeaseDate(year + "-" + month);
+                            rentalContract.setLeaseDate("20" + leaseDate.substring(2) + "-" + leaseDate.substring(0, 2));
                             rentalContract.setPropertyType(rentalNode.path("propertyType").asText());
                             rentalContract.setDistrict(rentalNode.path("district").asText());
                             rentalContract.setAreaSqft(rentalNode.path("areaSqft").asText());
@@ -536,20 +660,20 @@ public class ApiService {
                             rentalContract.setX(propertyNode.path("x").asDouble());
                             rentalContract.setY(propertyNode.path("y").asDouble());
                             rentalContract.setProject(propertyNode.path("project").asText());
+                            rentalContract.setStreet(propertyNode.path("street").asText().toUpperCase());
                             rentalContracts.add(rentalContract);
                         }
                     }
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.warn("[URA] Could not parse rental contracts: {}", e.getMessage());
         }
         return rentalContracts;
     }
 
     private String extractToken(String response) {
         try {
-            ObjectMapper objectMapper = new ObjectMapper();
             JsonNode rootNode = objectMapper.readTree(response);
             return rootNode.path("Result").asText();
         } catch (Exception e) {
@@ -582,53 +706,67 @@ public class ApiService {
         return distance <= rangeMeters;
     }
 
-    private double[] getXYCoordinatesFromPostalCode(String postalCode) {
-        String geocodeUrl = "https://www.onemap.gov.sg/api/common/elastic/search?searchVal=" + postalCode + "&returnGeom=Y&getAddrDetails=N";
-        ResponseEntity<String> response = restTemplate.exchange(geocodeUrl, HttpMethod.GET, null, String.class);
-        try {
-            JsonNode root = objectMapper.readTree(response.getBody());
-            JsonNode resultsNode = root.path("results");
-            if (resultsNode.isArray() && resultsNode.size() > 0) {
-                double x = resultsNode.get(0).path("X").asDouble();
-                double y = resultsNode.get(0).path("Y").asDouble();
-                return new double[]{x, y};
+    // ---------------------------------------------------------------------
+    // OneMap postal code search
+    // ---------------------------------------------------------------------
+
+    /**
+     * OneMap's search is rate-limited for callers without an account token (a few
+     * requests in quick succession, then HTTP 429), so each postal code is looked up
+     * once and cached; a 429 is retried after a short wait.
+     */
+    private final Map<String, JsonNode> oneMapCache = new ConcurrentHashMap<>();
+    private static final int ONEMAP_MAX_ATTEMPTS = 3;
+    private static final long ONEMAP_RETRY_WAIT_MILLIS = 1500;
+
+    /** First OneMap search result for a postal code (with address details and SVY21 X/Y), or null. */
+    private JsonNode oneMapSearch(String postalCode) {
+        JsonNode cached = oneMapCache.get(postalCode);
+        if (cached != null) return cached;
+
+        String url = "https://www.onemap.gov.sg/api/common/elastic/search?searchVal=" + postalCode + "&returnGeom=Y&getAddrDetails=Y";
+        for (int attempt = 1; attempt <= ONEMAP_MAX_ATTEMPTS; attempt++) {
+            try {
+                ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
+                JsonNode results = objectMapper.readTree(response.getBody()).path("results");
+                if (results.isArray() && results.size() > 0) {
+                    oneMapCache.put(postalCode, results.get(0));
+                    return results.get(0);
+                }
+                return null;
+            } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+                if (attempt == ONEMAP_MAX_ATTEMPTS) {
+                    logger.warn("[OneMap] Rate limited looking up postal code {}", postalCode);
+                    return null;
+                }
+                try {
+                    Thread.sleep(ONEMAP_RETRY_WAIT_MILLIS * attempt);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return null;
+                }
+            } catch (IOException | RestClientException e) {
+                logger.warn("[OneMap] Lookup failed for postal code {}: {}", postalCode, e.getMessage());
+                return null;
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
-        return new double[]{0.0, 0.0};
+        return null;
+    }
+
+    private double[] getXYCoordinatesFromPostalCode(String postalCode) {
+        JsonNode result = oneMapSearch(postalCode);
+        if (result == null) return new double[]{0.0, 0.0};
+        return new double[]{result.path("X").asDouble(), result.path("Y").asDouble()};
     }
 
     private String getAddressFromPostalCode(String postalCode) {
-        String geocodeUrl = "https://www.onemap.gov.sg/api/common/elastic/search?searchVal=" + postalCode + "&returnGeom=N&getAddrDetails=Y";
-        ResponseEntity<String> response = restTemplate.exchange(geocodeUrl, HttpMethod.GET, null, String.class);
-        try {
-            JsonNode root = objectMapper.readTree(response.getBody());
-            JsonNode resultsNode = root.path("results");
-            if (resultsNode.isArray() && resultsNode.size() > 0) {
-                String address = resultsNode.get(0).path("ROAD_NAME").asText();
-                return address;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return "Address not found";
+        JsonNode result = oneMapSearch(postalCode);
+        return result == null ? "Address not found" : result.path("ROAD_NAME").asText();
     }
 
     public String getProjectNameFromPostalCode(String postalCode) {
-        String geocodeUrl = "https://www.onemap.gov.sg/api/common/elastic/search?searchVal=" + postalCode + "&returnGeom=N&getAddrDetails=Y";
-        ResponseEntity<String> response = restTemplate.exchange(geocodeUrl, HttpMethod.GET, null, String.class);
-        try {
-            JsonNode root = objectMapper.readTree(response.getBody());
-            JsonNode resultsNode = root.path("results");
-            if (resultsNode.isArray() && resultsNode.size() > 0) {
-                String address = resultsNode.get(0).path("BUILDING").asText();
-                return address;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return "Address not found";
+        JsonNode result = oneMapSearch(postalCode);
+        return result == null ? "Address not found" : result.path("BUILDING").asText();
     }
 
     public List<HDBRentalContract> getHDBRentalContracts(String postalCode, String noOfRoom) {
@@ -640,13 +778,20 @@ public class ApiService {
      * flat type ("2-ROOM" .. "5-ROOM", "EXECUTIVE").
      */
     public List<HDBRentalContract> getHDBRentalContractsByFlatType(String postalCode, String flattype) {
-        String streetName = normaliseHdbStreetName(getAddressFromPostalCode(postalCode));
+        return getHDBRentalContractsByStreet(normaliseHdbStreetName(getAddressFromPostalCode(postalCode)), flattype);
+    }
+
+    /** HDB rental approvals on a street, written in HDB's abbreviations ("TAMPINES ST 43"). */
+    public List<HDBRentalContract> getHDBRentalContractsByStreet(String streetName, String flattype) {
         String url = "https://data.gov.sg/api/action/datastore_search?resource_id=d_c9f57187485a850908655db0e8cfe651"
                      + "&filters={filter}&limit=1000";
 
         String filter = "{\"street_name\":\"" + streetName + "\", \"flat_type\":\"" + flattype + "\"}";
-        // You can set headers if necessary
         HttpHeaders headers = new HttpHeaders();
+        // Optional data.gov.sg API key: requests without one get a lower rate limit.
+        if (hasText(DATAGOVSG_API_KEY)) {
+            headers.set("x-api-key", DATAGOVSG_API_KEY);
+        }
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class,filter);

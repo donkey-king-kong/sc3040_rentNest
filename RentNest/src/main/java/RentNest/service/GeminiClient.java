@@ -20,7 +20,8 @@ import java.io.IOException;
  * Minimal client for Google Gemini's generateContent REST endpoint, shared by the
  * AI Fair-Pricing Model's LLM features (price explanations, room-type detection).
  *
- * Configured with GEMINI_API_KEY and optionally GEMINI_MODEL; when no key is set,
+ * Uses the same settings as the app's AI chat: llm.api-key and llm.model
+ * (GEMINI_API_KEY / GEMINI_MODEL are accepted as fallbacks). When no key is set,
  * {@link #isConfigured()} is false and callers fall back to non-AI behaviour.
  */
 @Service
@@ -42,9 +43,13 @@ public class GeminiClient {
         static Reply failed(String error) { return new Reply(null, error); }
     }
 
-    public GeminiClient(@Value("${GEMINI_API_KEY:}") String apiKey,
-                        @Value("${GEMINI_MODEL:" + DEFAULT_MODEL + "}") String model) {
-        this.apiKey = apiKey == null ? "" : apiKey.trim();
+    /** Placeholder from application.properties.example, treated as "no key". */
+    static final String KEY_PLACEHOLDER = "YOUR_GEMINI_API_KEY";
+
+    public GeminiClient(@Value("${llm.api-key:${GEMINI_API_KEY:}}") String apiKey,
+                        @Value("${llm.model:${GEMINI_MODEL:" + DEFAULT_MODEL + "}}") String model) {
+        String key = apiKey == null ? "" : apiKey.trim();
+        this.apiKey = KEY_PLACEHOLDER.equals(key) ? "" : key;
         this.model = model == null || model.isBlank() ? DEFAULT_MODEL : model.trim();
     }
 
@@ -63,7 +68,7 @@ public class GeminiClient {
      */
     public Reply generate(String systemPrompt, String userPrompt, int maxOutputTokens, JsonNode responseSchema) {
         if (!isConfigured()) {
-            return Reply.failed("AI is not configured on the server (GEMINI_API_KEY is not set).");
+            return Reply.failed("AI is not configured on the server (llm.api-key is not set).");
         }
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

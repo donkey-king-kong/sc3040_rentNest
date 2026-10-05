@@ -58,7 +58,8 @@ public class FairPricingService {
     static final int REFERENCE_FLOOR = 10;
     static final double FLOOR_ADJ_PER_LEVEL = 0.004;
     static final double FLOOR_ADJ_CLAMP = 0.06;
-    static final int PRIVATE_YEARS = 2;
+    /** URA publishes one large file per quarter for all of Singapore; a year keeps downloads reasonable. */
+    static final int PRIVATE_YEARS = 1;
     static final double PRIVATE_FALLBACK_RADIUS_M = 500;
     static final double LANDED_RADIUS_M = 1000;
     /** Band tolerances in percent, narrowest first. */
@@ -67,9 +68,27 @@ public class FairPricingService {
     static final int FIVE_ROOM_MIN_SQFT = 1150;
     /** Comparable transactions are cached briefly so typing in the listing form does not hammer OneMap. */
     static final long CACHE_TTL_MILLIS = 10 * 60 * 1000L;
-    /** Typical rent of a room as a share of the whole unit's rent (Singapore rule of thumb, not measured data). */
-    static final double MASTER_ROOM_SHARE = 0.45;
-    static final double COMMON_ROOM_SHARE = 0.35;
+    /**
+     * A room's rent as a share of the whole unit's rent, by property type and the whole
+     * unit's bedrooms: {master, common}. Derived June 2026 from national median room
+     * rents (Hozuko room-rent snapshot, Jun 2026: HDB master $1,400 / common $900; condo
+     * $2,170 / $1,300; landed $1,800 / $1,200) divided by official whole-unit medians for
+     * the same period (HDB rental approvals on data.gov.sg, Apr-Jun 2026; URA private
+     * rental contracts, 2026 Q2). Room medians are asking rents, whole-unit medians are
+     * approved/contracted rents.
+     */
+    static final double[][] HDB_ROOM_SHARES = {
+            {0.49, 0.32}, // 3-ROOM (2 bedrooms) or smaller: whole-flat median $2,850
+            {0.41, 0.26}, // 4-ROOM (3 bedrooms): $3,400
+            {0.40, 0.26}, // 5-ROOM / EXECUTIVE: $3,500
+    };
+    static final double[][] CONDO_ROOM_SHARES = {
+            {0.52, 0.31}, // 2 bedrooms or fewer: whole-unit median $4,200
+            {0.41, 0.25}, // 3 bedrooms: $5,300
+            {0.26, 0.16}, // 4+ bedrooms: $8,200
+    };
+    static final double[] LANDED_ROOM_SHARES = {0.22, 0.15}; // whole-house median $8,000
+    static final String ROOM_SHARE_SOURCE = "2026 median room rents (Hozuko) vs official HDB/URA whole-unit medians";
     /** Whole-unit bedrooms assumed for a room listing that does not say (HDB: a 4-ROOM flat). */
     static final int DEFAULT_ROOM_FLAT_BEDROOMS = 3;
 
@@ -121,7 +140,9 @@ public class FairPricingService {
         RoomTypeClassifier.Classification c = roomTypeClassifier == null ? null
                 : roomTypeClassifier.classify(l.getName(), l.getDescription());
         if (c == null || !c.isRoom()) {
-            FairPriceEstimate e = estimate(l.getType(), l.getPostal(), l.getBeds(), l.getSize(), l.getFloor(), l.getPrice());
+            String flatType = "HDB".equalsIgnoreCase(l.getType())
+                    ? hdbFlatTypeForListing(l.getName(), l.getDescription(), l.getBeds(), l.getSize()) : null;
+            FairPriceEstimate e = estimate(l.getType(), l.getPostal(), l.getBeds(), l.getSize(), l.getFloor(), l.getPrice(), 1.0, flatType);
             if (c != null) {
                 e.setUnitType(c.unitType().name());
                 e.setUnitTypeSource(c.source());
@@ -130,10 +151,10 @@ public class FairPricingService {
         }
 
         boolean master = c.unitType() == RoomTypeClassifier.UnitType.MASTER_ROOM;
-        double share = master ? MASTER_ROOM_SHARE : COMMON_ROOM_SHARE;
         int wholeBeds = c.wholeUnitBedrooms() != null ? c.wholeUnitBedrooms() : DEFAULT_ROOM_FLAT_BEDROOMS;
+        double share = roomShare(l.getType(), wholeBeds, master);
         // The listing's own size is the room's, so it is not compared with whole-unit sizes.
-        FairPriceEstimate e = estimate(l.getType(), l.getPostal(), wholeBeds, null, l.getFloor(), l.getPrice(), share);
+        FairPriceEstimate e = estimate(l.getType(), l.getPostal(), wholeBeds, null, l.getFloor(), l.getPrice(), share, null);
         e.setUnitType(c.unitType().name());
         e.setUnitTypeSource(c.source());
         e.setRentShare(share);
@@ -144,14 +165,26 @@ public class FairPricingService {
         return e;
     }
 
-    /** Owner view: estimate for a property described by its attributes (listing may not exist yet). */
-    public FairPriceEstimate estimate(String type, Integer postal, Integer beds, Integer size, Integer floor, Integer askingPrice) {
-        return estimate(type, postal, beds, size, floor, askingPrice, 1.0);
+    /** Share of whole-unit rent for a master or common room, by property type and unit bedrooms. */
+    static double roomShare(String type, int wholeUnitBedrooms, boolean master) {
+        int idx = master ? 0 : 1;
+        if ("Landed".equalsIgnoreCase(type)) return LANDED_ROOM_SHARES[idx];
+        double[][] table = "HDB".equalsIgnoreCase(type) ? HDB_ROOM_SHARES : CONDO_ROOM_SHARES;
+        int row = wholeUnitBedrooms <= 2 ? 0 : wholeUnitBedrooms == 3 ? 1 : 2;
+        return table[row][idx];
     }
 
-    /** @param rentShare fraction of whole-unit rent being priced (1.0 for a whole unit, less for a room) */
+    /** Owner view: estimate for a property described by its attributes (listing may not exist yet). */
+    public FairPriceEstimate estimate(String type, Integer postal, Integer beds, Integer size, Integer floor, Integer askingPrice) {
+        return estimate(type, postal, beds, size, floor, askingPrice, 1.0, null);
+    }
+
+    /**
+     * @param rentShare    fraction of whole-unit rent being priced (1.0 for a whole unit, less for a room)
+     * @param hdbFlatTypeOverride HDB flat type to use instead of deriving it from bedrooms (null to derive)
+     */
     private FairPriceEstimate estimate(String type, Integer postal, Integer beds, Integer size, Integer floor,
-                                       Integer askingPrice, double rentShare) {
+                                       Integer askingPrice, double rentShare, String hdbFlatTypeOverride) {
         if (postal == null || type == null || type.isBlank()) {
             return FairPriceEstimate.unavailable(null, null, "Property type and postal code are required for a price estimate.");
         }
@@ -163,7 +196,7 @@ public class FairPricingService {
                 if (beds == null) {
                     return FairPriceEstimate.unavailable("HDB", null, "Number of bedrooms is required for an HDB estimate.");
                 }
-                String flatType = hdbFlatType(beds, size);
+                String flatType = hdbFlatTypeOverride != null ? hdbFlatTypeOverride : hdbFlatType(beds, size);
                 CacheEntry entry = cached("HDB|" + postalCode + "|" + flatType, () -> {
                     List<HDBRentalContract> contracts = apiService.getHDBRentalContractsByFlatType(postalCode, flatType);
                     String basis = contracts.isEmpty()
@@ -244,6 +277,11 @@ public class FairPricingService {
      * Map a listing's bedroom count to an HDB flat type. HDB counts the living room,
      * so a 3-bedroom flat is a 4-ROOM (or 5-ROOM when large).
      */
+    /** HDB flat type for a listing; see {@link ApiService#hdbFlatTypeForListing}. */
+    public static String hdbFlatTypeForListing(String name, String description, Integer beds, Integer sizeSqft) {
+        return ApiService.hdbFlatTypeForListing(name, description, beds, sizeSqft);
+    }
+
     public static String hdbFlatType(int beds, Integer sizeSqft) {
         if (beds <= 1) return "2-ROOM";
         if (beds == 2) return "3-ROOM";

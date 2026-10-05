@@ -69,11 +69,29 @@ description to Gemini (JSON output with a fixed schema) and gets back:
 - `unitType`: `WHOLE_UNIT`, `MASTER_ROOM` or `COMMON_ROOM`;
 - `wholeUnitBedrooms`: bedrooms in the flat the room is in, if the listing says.
 
-Rooms are priced from the real whole-unit comparables scaled by a room share:
-master room 45%, common room 35% of the whole flat's rent (Singapore rule of
-thumb, not measured data). When the flat size isn't stated, a 3-bedroom flat
-(HDB 4-ROOM) is assumed, and the listing's own floor area is ignored because it
-is the room's. Without a Gemini key, or if the call fails, keyword matching
+Rooms are priced from the real whole-unit comparables scaled by a room share
+that depends on property type and the whole unit's bedrooms (master / common):
+
+| Whole unit | Master | Common |
+|---|---|---|
+| HDB 3-ROOM or smaller | 49% | 32% |
+| HDB 4-ROOM | 41% | 26% |
+| HDB 5-ROOM / Executive | 40% | 26% |
+| Condo, 2 bedrooms or fewer | 52% | 31% |
+| Condo, 3 bedrooms | 41% | 25% |
+| Condo, 4+ bedrooms | 26% | 16% |
+| Landed | 22% | 15% |
+
+Derivation (June 2026): national median room rents from the Hozuko room-rent
+snapshot (Jun 2026, 1,979 listings: HDB master $1,400 / common $900, condo
+$2,170 / $1,300, landed $1,800 / $1,200) divided by official whole-unit medians
+for the same period: HDB rental approvals on data.gov.sg, Apr-Jun 2026 (3-ROOM
+$2,850, 4-ROOM $3,400, 5-ROOM $3,500; 8,670 approvals) and URA private rental
+contracts, 2026 Q2 (2-bed $4,200, 3-bed $5,300, 4-bed $8,200, landed $8,000).
+Room medians are asking rents, whole-unit medians are approved/contracted rents,
+so the shares may slightly overstate what rooms actually let for. When the flat
+size isn't stated, a 3-bedroom unit (HDB 4-ROOM) is assumed, and the listing's
+own floor area is ignored because it is the room's. Without a Gemini key, or if the call fails, keyword matching
 ("master", "common room", "room for rent", "4-room flat" ...) is used instead.
 The response carries `unitType`, `unitTypeSource` ("AI" / "keywords") and
 `rentShare`, and the card shows "Priced as a master room (detected by AI...)".

@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class FairPriceExplanationService {
 
-    static final String NOT_CONFIGURED = "AI explanations are not configured on the server (GEMINI_API_KEY is not set).";
+    static final String NOT_CONFIGURED = "AI explanations are not configured on the server (llm.api-key is not set).";
     static final int MAX_OUTPUT_TOKENS = 2048;
     /** Explanations are cached per listing state so repeated page views cost nothing. */
     static final long CACHE_TTL_MILLIS = 6 * 60 * 60 * 1000L;
@@ -39,7 +39,8 @@ public class FairPriceExplanationService {
             description. The model only accounts for location, flat type, floor and size; \
             it cannot see renovation, furnishing, view, facing, amenities or lease terms.
 
-            Write 2 to 4 short sentences of plain text (no markdown, no bullet points) that:
+            Write 2 to 4 short sentences of plain text (no markdown, no bullet points). Quote percentages \
+            as whole numbers, exactly as given. The sentences should:
             - say how the asking rent compares with the fair market rent, using the numbers given;
             - point out features in the description that could justify a premium, or reasons \
             a discount might exist, and say plainly when the description gives no such reasons;
@@ -114,16 +115,16 @@ public class FairPriceExplanationService {
     public static String buildPrompt(Listings l, FairPriceEstimate e) {
         StringBuilder sb = new StringBuilder();
         sb.append("<pricing_model_output>\n");
-        sb.append("Fair market rent: $").append(e.getFairPrice()).append("/month\n");
-        e.getTiers().forEach(t -> sb.append(t.getName()).append(" band (+/-").append(t.getTolerancePercent())
-                .append("%): $").append(t.getLow()).append(" - $").append(t.getHigh()).append('\n'));
-        sb.append("Asking rent: $").append(e.getAskingPrice()).append("/month\n");
+        sb.append("Fair market rent: ").append(money(e.getFairPrice())).append("/month\n");
+        e.getTiers().forEach(t -> sb.append(tierLabel(t.getName())).append(" band (+/-").append(t.getTolerancePercent())
+                .append("%): ").append(money(t.getLow())).append(" - ").append(money(t.getHigh())).append('\n'));
+        sb.append("Asking rent: ").append(money(e.getAskingPrice())).append("/month\n");
         if (e.getUnitType() != null && !"WHOLE_UNIT".equals(e.getUnitType())) {
             sb.append("Rental unit: ").append(e.getUnitType()).append(" (a single room, not the whole flat; detected by ")
                     .append(e.getUnitTypeSource()).append(")\n");
         }
-        sb.append("Verdict: ").append(e.getTier()).append(" (")
-                .append(String.format("%+.1f", e.getPercentDiffFromFair())).append("% vs fair rent)\n");
+        sb.append("Verdict: ").append(tierLabel(e.getTier())).append(" (")
+                .append(String.format("%+.0f", e.getPercentDiffFromFair())).append("% vs fair rent)\n");
         sb.append("Based on: ").append(e.getComparableCount()).append(" comparable ").append(e.getBasis());
         if (e.getPeriodStart() != null) sb.append(", ").append(e.getPeriodStart()).append(" to ").append(e.getPeriodEnd());
         sb.append('\n');
@@ -143,6 +144,22 @@ public class FairPriceExplanationService {
         if (description.length() > MAX_DESCRIPTION_CHARS) description = description.substring(0, MAX_DESCRIPTION_CHARS) + "...";
         sb.append("<owner_description>\n").append(description.isEmpty() ? "(none provided)" : description).append("\n</owner_description>");
         return sb.toString();
+    }
+
+    /** The user-facing name of a price band, matching the card in the app. */
+    static String tierLabel(FairPriceEstimate.Tier tier) {
+        if (tier == null) return "-";
+        return switch (tier) {
+            case EXCELLENT -> "Close to market";
+            case GREAT -> "Within typical range";
+            case GOOD -> "Edge of typical range";
+            case OUTSIDE_RANGE -> "Unusual for this area";
+            default -> tier.name();
+        };
+    }
+
+    private static String money(Integer amount) {
+        return amount == null ? "-" : String.format("$%,d", amount);
     }
 
     private static String nullToDash(Object o) {

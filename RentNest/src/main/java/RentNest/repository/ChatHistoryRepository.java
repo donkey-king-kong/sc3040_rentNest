@@ -22,10 +22,21 @@ public interface ChatHistoryRepository extends JpaRepository<ChatHistory, Long> 
     List<Long> findDistinctChatPartnerIDsByUserID(Long userID);
 
     // Get chat history between two users sorted by date
-    @Query("SELECT ch FROM ChatHistory ch WHERE " +
+    @Query("SELECT ch FROM ChatHistory ch " +
+            "JOIN FETCH ch.sender " +
+            "JOIN FETCH ch.receiver " +
+            "LEFT JOIN FETCH ch.rental rental " +
+            "LEFT JOIN FETCH rental.listings rentalListing " +
+            "LEFT JOIN FETCH rentalListing.owner " +
+            "LEFT JOIN FETCH rentalListing.tenant " +
+            "LEFT JOIN FETCH ch.request request " +
+            "LEFT JOIN FETCH request.rentals requestRental " +
+            "LEFT JOIN FETCH requestRental.listings requestListing " +
+            "LEFT JOIN FETCH requestListing.owner " +
+            "LEFT JOIN FETCH requestListing.tenant " +
+            "WHERE " +
             "(ch.sender.userID = :userA AND ch.receiver.userID = :userB) OR " +
             "(ch.sender.userID = :userB AND ch.receiver.userID = :userA) " +
             "ORDER BY ch.date ASC")
     List<ChatHistory> findConversationBetweenUsers(Long userA, Long userB);
 }
-

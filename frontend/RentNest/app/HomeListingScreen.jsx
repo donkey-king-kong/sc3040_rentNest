@@ -10,6 +10,7 @@ import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import { jwtDecode } from 'jwt-decode';
 import MorphingInfinity from '../components/MorphingInfinity';
 import FairPriceCard from '../components/FairPriceCard';
+import PriceInsightsChart from '../components/PriceInsightsChart';
 
 const HomeListingScreen = () => {
   console.log('Initializing HomeListingScreen component');
@@ -145,8 +146,12 @@ const HomeListingScreen = () => {
           })
           .finally(() => setFairPriceLoading(false));
 
-        // Keep the loading screen visible until all listing sections have finished loading.
-        await fetchSecondaryListingData(tokenValue);
+        // Show the listing once core details are ready; secondary sections load in the background.
+        setLoading(false);
+        fetchSecondaryListingData(tokenValue, defaultListing.ownerUserID)
+          .catch(error => {
+            console.warn('Secondary listing data failed:', error?.message);
+          });
       } catch (error) {
         console.error('Error in fetchListingData:', error);
         console.error('Error details:', { //Remove when demo
@@ -160,7 +165,7 @@ const HomeListingScreen = () => {
       }
     };
 
-    const fetchSecondaryListingData = async (tokenValue) => {
+    const fetchSecondaryListingData = async (tokenValue, ownerUserID) => {
       const headers = authHeaders(tokenValue);
       const requestConfig = { headers, timeout: 20000 };
       const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -205,7 +210,7 @@ const HomeListingScreen = () => {
           }
 
           if (status !== 'LOADING') {
-            console.warn('Nearby amenities returned unexpected status:', status);
+            console.log('Nearby amenities unavailable:', status);
             applyNearbyAmenities([]);
             return;
           }
@@ -213,7 +218,7 @@ const HomeListingScreen = () => {
           await wait(2000);
         }
 
-        console.warn('Nearby amenities are still loading after timeout');
+        console.log('Nearby amenities are still loading after timeout; showing empty state');
         applyNearbyAmenities([]);
       };
 
@@ -229,17 +234,18 @@ const HomeListingScreen = () => {
             });
             setPriceInsights(Object.values(uniquePrices));
           }),
-        axios.get(`${API_BASE_URL}/api/reviews/${listingId}`, requestConfig)
+        axios.get(`${API_BASE_URL}/api/reviews/byUser/${ownerUserID}`, requestConfig)
           .then(response => {
-            const formattedReviews = (response.data || []).map(review => ({
-              reviewId: review.id,
+            const reviewList = Array.isArray(response.data) ? response.data : [];
+            const formattedReviews = reviewList.map(review => ({
+              reviewId: review.reviewID ?? review.reviewid ?? review.id,
               rating: review.rating,
               title: review.title || 'Review',
               text: review.text,
               user: {
-                userID: review.userId,
-                name: review.userName || 'Anonymous',
-                photoURL: review.userPhotoURL || 'https://via.placeholder.com/50'
+                userID: review.reviewerID ?? review.reviewerId ?? review.userId,
+                name: review.reviewerName || review.userName || 'Anonymous',
+                photoURL: review.reviewerPhotoURL || review.userPhotoURL || 'https://via.placeholder.com/50'
               },
               flagged: review.flagged || false
             }));
@@ -464,17 +470,8 @@ const HomeListingScreen = () => {
          </View>
          {/* Display Price Insights */}
                 <Text style={styles.header1}>Price Insights</Text>
-                <View style={styles.table}>
-                    <View style={styles.row}>
-                        <Text style={styles.cellHeader}>Lease Date</Text>
-                        <Text style={styles.cellHeader}>Rent Price</Text>
-                    </View>
-                    {priceInsights.map((item) => (
-                      <View key={item.leaseDate} style={styles.row}>
-                        <Text style={styles.cell}>{item.leaseDate}</Text>
-                        <Text style={styles.cell}>${item.rentPrice}</Text>
-                      </View>
-                    ))}
+                <View style={styles.priceInsightsContainer}>
+                  <PriceInsightsChart data={priceInsights} askingPrice={listing.price} fairPrice={fairPrice?.available ? fairPrice.fairPrice : null} />
                 </View>
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
@@ -537,6 +534,9 @@ const HomeListingScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  priceInsightsContainer: {
+    marginHorizontal: 0,
+  },
   box: {
     flex: 1,
     backgroundColor: '#fff',
@@ -737,6 +737,19 @@ placesContainer: {
       fontSize: 14,
       color: '#555',
     },
+    noReviewsContainer: {
+      borderWidth: 1,
+      borderColor: '#dcdcdc',
+      borderRadius: 5,
+      paddingVertical: 14,
+      alignItems: 'center',
+      backgroundColor: '#fff',
+    },
+    noReviewsText: {
+      fontSize: 14,
+      color: '#777',
+      fontWeight: '600',
+    },
 container: {
     padding: 15,
   },
@@ -784,8 +797,8 @@ container: {
   header1: {
       fontSize: 16,
       fontWeight: 'bold',
-      marginBottom: 10,
-      paddingHorizontal: 20
+      marginTop: 10,
+      marginBottom: 4,
     },
 ownerBox: {
     borderWidth: 1,

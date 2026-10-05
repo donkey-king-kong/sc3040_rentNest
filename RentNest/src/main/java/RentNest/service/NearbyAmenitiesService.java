@@ -126,7 +126,8 @@ public class NearbyAmenitiesService {
 
     private void precomputeSchools(Long listingId, Listings listing) {
         try {
-            List<NearbyAmenity> amenities = apiService.getSchoolsByListingId(listingId, DEFAULT_RADIUS_METERS).stream()
+            List<NearbyAmenity> amenities = apiService.getSchoolsNearCoordinates(
+                            listing.getLatitude(), listing.getLongitude(), DEFAULT_RADIUS_METERS).stream()
                     .map(school -> new NearbyAmenity(
                             school.getPostalCode(),
                             school.getSchoolName(),
@@ -144,7 +145,8 @@ public class NearbyAmenitiesService {
 
     private void precomputeHawkerCentres(Long listingId, Listings listing) {
         try {
-            List<NearbyAmenity> amenities = apiService.getHawkerCentresByListingId(listingId, DEFAULT_RADIUS_METERS).stream()
+            List<NearbyAmenity> amenities = apiService.getHawkerCentresNearCoordinates(
+                            listing.getLatitude(), listing.getLongitude(), DEFAULT_RADIUS_METERS).stream()
                     .map(hawkerCentre -> new NearbyAmenity(
                             hawkerCentre.getLocationOfCentre(),
                             hawkerCentre.getNameOfCentre(),
@@ -162,7 +164,8 @@ public class NearbyAmenitiesService {
 
     private void precomputeBusStops(Long listingId, Listings listing) {
         try {
-            List<NearbyAmenity> amenities = apiService.getBusStopsByListingId(listingId, DEFAULT_RADIUS_METERS).stream()
+            List<NearbyAmenity> amenities = apiService.getBusStopsNearCoordinates(
+                            listing.getLatitude(), listing.getLongitude(), DEFAULT_RADIUS_METERS).stream()
                     .map(busStop -> new NearbyAmenity(
                             busStop.getBusStopCode(),
                             busStop.getDescription(),

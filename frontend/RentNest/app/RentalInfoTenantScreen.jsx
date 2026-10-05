@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import chatIcon from "../assets/images/chaticon.jpg";
 import { FontAwesome } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { useLocalSearchParams, useRouter } from "expo-router";
+import MorphingInfinity from '../components/MorphingInfinity';
 
 
 const RentalInfoTenant = () => {
@@ -15,6 +16,9 @@ const RentalInfoTenant = () => {
   const [listing, setListing] = useState(null); // State to store listing data
   const [rentals, setRentals] = useState(null); // State to store rentals data
   const [loading, setLoading] = useState(true); // Track loading state
+  const [isRouteLoading, setIsRouteLoading] = useState(false);
+  const navigateTimeoutRef = useRef(null);
+  const resetTimeoutRef = useRef(null);
 
   // Fetch listing details
   const getListingID = async () => {
@@ -81,12 +85,29 @@ const RentalInfoTenant = () => {
   useEffect(() => {
     getListingID();
     getRentalsID();
+
+    return () => {
+      if (navigateTimeoutRef.current) {
+        clearTimeout(navigateTimeoutRef.current);
+      }
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
+      }
+    };
   }, [refresh]);
+
+  const navigateWithLoading = (route) => {
+    setIsRouteLoading(true);
+    navigateTimeoutRef.current = setTimeout(() => {
+      router.push(route);
+      resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
+    }, 180);
+  };
 
   // Function to navigate to RentPayment screen
   const handleRentPayment = () => {
     if (listing && listing.listingID) {
-      router.push({ pathname: '/RentPayment', params: { listingId: listing.listingID, tenantId } });
+      navigateWithLoading({ pathname: '/RentPayment', params: { listingId: listing.listingID, tenantId } });
     } else {
       console.error('Listing ID is missing, cannot navigate to RentPayment');
     }
@@ -96,15 +117,34 @@ const RentalInfoTenant = () => {
   const handleLeaveReview = () => {
     if (listing && listing.ownerId) {
       console.log('Attempting to navigate with:', { ownerId: listing.ownerId, listingId, tenantId });
-      router.push({ pathname: '/LeaveReview', params: { ownerId: listing.ownerId, listingId, tenantId } });
+      router.push({ pathname: '/LeaveReview', params: { ownerId: listing.ownerId, listingId, tenantId, revieweeName: listing.ownerName, revieweeRole: 'Owner' } });
     } else {
       console.error('Listing information is missing, cannot navigate to LeaveReview');
     }
   };
 
+  if (loading || isRouteLoading) {
+    return (
+        <View style={styles.loadingContainer}>
+          <MorphingInfinity size={86} color="#2FA84F" />
+          <Text style={styles.loadingText}>
+            {isRouteLoading ? 'Loading rent payment...' : 'Loading rental info...'}
+          </Text>
+        </View>
+    );
+  }
+
   return (
       <ScrollView style={styles.container}>
-        <View style={styles.row}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Go back to inbox"
+          >
+            <FontAwesome name="angle-left" size={30} color="#101820" />
+          </TouchableOpacity>
           <Text style={styles.title}>Rental Info</Text>
           {/* Chat Button */}
           <TouchableOpacity
@@ -158,19 +198,11 @@ const RentalInfoTenant = () => {
                 <Text style={styles.arrow}>›</Text>
               </TouchableOpacity>
 
-              {loading ? (
-                  <Text>Loading listing information...</Text>
-              ) : (
-                  listing ? (
-                      <TouchableOpacity style={styles.transparentButton} onPress={handleLeaveReview}>
-                        <FontAwesome name="star" size={24} color="#666" style={styles.icon} />
-                        <Text style={styles.buttonText}>Leave Review</Text>
-                        <Text style={styles.arrow}>›</Text>
-                      </TouchableOpacity>
-                  ) : (
-                      <Text>Error loading listing data</Text>
-                  )
-              )}
+              <TouchableOpacity style={styles.transparentButton} onPress={handleLeaveReview}>
+                <FontAwesome name="star" size={24} color="#666" style={styles.icon} />
+                <Text style={styles.buttonText}>Leave Review</Text>
+                <Text style={styles.arrow}>›</Text>
+              </TouchableOpacity>
             </>
         ) : (
             <Text>Loading...</Text>
@@ -185,10 +217,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingHorizontal: 20,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    flex: 1,
     textAlign: 'left',
   },
   image: {

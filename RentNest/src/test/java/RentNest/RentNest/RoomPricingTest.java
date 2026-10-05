@@ -71,15 +71,15 @@ public class RoomPricingTest {
 
         FairPriceEstimate e = service.estimateForListing(listing);
 
-        // Default whole flat for a room is 3 bedrooms (4-ROOM); median $2900 x 45% = $1305 -> $1310.
+        // Default whole flat for a room is 3 bedrooms (4-ROOM); median $2900 x 41% = $1189 -> $1190.
         verify(apiService).getHDBRentalContractsByFlatType("600131", "4-ROOM");
         assertTrue(e.isAvailable());
-        assertEquals(1310, e.getFairPrice());
+        assertEquals(1190, e.getFairPrice());
         assertEquals("MASTER_ROOM", e.getUnitType());
         assertEquals("AI", e.getUnitTypeSource());
-        assertEquals(0.45, e.getRentShare());
-        assertEquals("EXCELLENT", e.getTier().name());
-        assertTrue(e.getBasis().startsWith("master rooms, priced at 45% of 4-ROOM HDB flats"));
+        assertEquals(0.41, e.getRentShare());
+        assertEquals("GREAT", e.getTier().name()); // $1,300 is 9% above $1,190
+        assertTrue(e.getBasis().startsWith("master rooms, priced at 41% of 4-ROOM HDB flats"));
     }
 
     @Test
@@ -89,8 +89,8 @@ public class RoomPricingTest {
         FairPriceEstimate e = service.estimateForListing(listing);
 
         verify(apiService).getHDBRentalContractsByFlatType("600131", "3-ROOM");
-        assertEquals(1020, e.getFairPrice()); // $2900 x 35% = $1015 -> $1020
-        assertEquals(0.35, e.getRentShare());
+        assertEquals(930, e.getFairPrice()); // 3-ROOM share 32%: $2900 x 32% = $928 -> $930
+        assertEquals(0.32, e.getRentShare());
     }
 
     @Test
@@ -117,5 +117,21 @@ public class RoomPricingTest {
         assertEquals(UnitType.COMMON_ROOM, c.classify("Cosy common room near MRT", "In a 4-room flat").unitType());
         assertEquals(3, c.classify("Cosy common room near MRT", "In a 4-room flat").wholeUnitBedrooms());
         assertEquals(UnitType.WHOLE_UNIT, c.classify("Spacious 3-bedroom HDB", "Whole unit, 3 bedrooms").unitType());
+    }
+
+    @Test
+    public void testRoomSharesDependOnUnitSizeAndType() {
+        RoomTypeClassifier stub = classifier;
+        when(stub.classify(any(), any())).thenReturn(new Classification(UnitType.MASTER_ROOM, 2, "AI"));
+        assertEquals(0.49, service.estimateForListing(listing).getRentShare()); // HDB 3-ROOM master
+
+        listing.setType("Condominium");
+        when(apiService.getProjectNameFromPostalCode(anyString())).thenReturn("NIL");
+        when(stub.classify(any(), any())).thenReturn(new Classification(UnitType.COMMON_ROOM, 3, "AI"));
+        assertEquals(0.25, service.estimateForListing(listing).getRentShare()); // condo 3-bed common
+
+        listing.setType("Landed");
+        when(stub.classify(any(), any())).thenReturn(new Classification(UnitType.MASTER_ROOM, null, "AI"));
+        assertEquals(0.22, service.estimateForListing(listing).getRentShare()); // landed master
     }
 }

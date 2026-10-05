@@ -258,10 +258,14 @@ const EditProfileScreen = () => {
           </Pressable>
 
           <View style={styles.buttonContainer}>
+            {(() => {
+              const hasChanges = name.trim() !== (user.name || '').trim() || contact.trim() !== (user.contact || '').trim();
+              const isDisabled = isSaving || !hasChanges;
+              return (
             <TouchableOpacity
-              style={[styles.button, isSaving && styles.savingButton]}
+              style={[styles.button, isDisabled && styles.disabledButton]}
               onPress={handleUpdateDetails}
-              disabled={isSaving}
+              disabled={isDisabled}
             >
               {isSaving ? (
                 <View style={styles.savingContent}>
@@ -272,6 +276,8 @@ const EditProfileScreen = () => {
                 <Text style={styles.buttonText}>Update Profile</Text>
               )}
             </TouchableOpacity>
+              );
+            })()}
           </View>
         </ScrollView>
       )}
@@ -407,6 +413,11 @@ const styles = StyleSheet.create({
   },
   savingButton: {
     opacity: 0.82,
+  },
+  disabledButton: {
+    backgroundColor: '#AAAAAA',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   savingContent: {
     flexDirection: 'row',

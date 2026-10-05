@@ -210,7 +210,7 @@ public class FairPricingServiceTest {
     @Test
     public void testCondoFallsBackToRadiusWhenProjectHasTooFewComparables() {
         when(apiService.getProjectNameFromPostalCode("140085")).thenReturn("QUEENS");
-        when(apiService.getRentalContractsByProject("QUEENS", 2, "1")).thenReturn(List.of());
+        when(apiService.getRentalContractsByProject("QUEENS", 1, "1")).thenReturn(List.of());
         List<RentalContract> nearby = new ArrayList<>();
         for (int r : new int[]{2100, 2200, 2300}) {
             RentalContract c = new RentalContract();
@@ -219,7 +219,7 @@ public class FairPricingServiceTest {
             c.setLeaseDate("2024-03");
             nearby.add(c);
         }
-        when(apiService.getRentalContractsNearPostalCode(eq("140085"), anyDouble(), eq(2), eq("1"))).thenReturn(nearby);
+        when(apiService.getRentalContractsNearPostalCode(eq("140085"), anyDouble(), eq(1), eq("1"))).thenReturn(nearby);
 
         FairPriceEstimate e = service.estimate("Condo", 140085, 1, 420, 12, 2200);
 

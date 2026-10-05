@@ -72,11 +72,11 @@ public class FairPriceExplanationServiceTest {
     public void testPromptContainsModelOutputListingAndDescription() {
         String prompt = FairPriceExplanationService.buildPrompt(listing, estimate);
 
-        assertTrue(prompt.contains("Fair market rent: $2880/month"));
-        assertTrue(prompt.contains("Asking rent: $3150/month"));
-        assertTrue(prompt.contains("Verdict: GREAT (+9.4% vs fair rent)"));
+        assertTrue(prompt.contains("Fair market rent: $2,880/month"));
+        assertTrue(prompt.contains("Asking rent: $3,150/month"));
+        assertTrue(prompt.contains("Verdict: Within typical range (+9% vs fair rent)"));
         assertTrue(prompt.contains("702 comparable 3-ROOM HDB flats along TAMPINES ST 21"));
-        assertTrue(prompt.contains("GOOD band (+/-15%): $2450 - $3310"));
+        assertTrue(prompt.contains("Edge of typical range band (+/-15%): $2,450 - $3,310"));
         assertTrue(prompt.contains("Bedrooms: 2, bathrooms: 2"));
         assertTrue(prompt.contains("<owner_description>\nFully renovated in 2025"));
     }
@@ -105,7 +105,7 @@ public class FairPriceExplanationServiceTest {
 
         assertTrue(result.isPresent());
         assertFalse(result.get().isAvailable());
-        assertTrue(result.get().getMessage().contains("GEMINI_API_KEY"));
+        assertTrue(result.get().getMessage().contains("llm.api-key"));
         verifyNoInteractions(fairPricingService);
     }
 
