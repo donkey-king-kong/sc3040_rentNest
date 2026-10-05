@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { jwtDecode } from 'jwt-decode';
 import MorphingInfinity from '../components/MorphingInfinity';
+import PriceInsightsChart from '../components/PriceInsightsChart';
 
 const HomeListingScreen = () => {
   console.log('Initializing HomeListingScreen component');
@@ -430,17 +431,8 @@ const HomeListingScreen = () => {
          </View>
          {/* Display Price Insights */}
                 <Text style={styles.header1}>Price Insights</Text>
-                <View style={styles.table}>
-                    <View style={styles.row}>
-                        <Text style={styles.cellHeader}>Lease Date</Text>
-                        <Text style={styles.cellHeader}>Rent Price</Text>
-                    </View>
-                    {priceInsights.map((item) => (
-                      <View key={item.leaseDate} style={styles.row}>
-                        <Text style={styles.cell}>{item.leaseDate}</Text>
-                        <Text style={styles.cell}>${item.rentPrice}</Text>
-                      </View>
-                    ))}
+                <View style={styles.priceInsightsContainer}>
+                  <PriceInsightsChart data={priceInsights} askingPrice={listing.price} />
                 </View>
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
@@ -503,6 +495,9 @@ const HomeListingScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  priceInsightsContainer: {
+    marginHorizontal: 20,
+  },
   box: {
     flex: 1,
     backgroundColor: '#fff',
