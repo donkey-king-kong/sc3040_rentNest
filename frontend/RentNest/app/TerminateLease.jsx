@@ -174,7 +174,7 @@ const TerminateLease = () => {
             <View style={styles.summaryRow}>
               <Text style={styles.summaryKey}>Refund amount</Text>
               <Text style={[styles.summaryValue, styles.summaryRefundAmount]}>
-                ${amount || '0'}
+                ${Number(amount || 0).toLocaleString()}
               </Text>
             </View>
           )}
