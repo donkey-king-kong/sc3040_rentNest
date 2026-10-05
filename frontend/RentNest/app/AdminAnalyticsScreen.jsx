@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { FontAwesome } from 'react-native-vector-icons';
+import { AdminLoadingState } from '../components/AdminUI';
 import { Stack, useRouter } from 'expo-router';
-import AnalyticsLayout from '../components/analytics/AnalyticsLayout';
+import AnalyticsLayout, { ActivitySection, RefreshControl } from '../components/analytics/AnalyticsLayout';
 import { ENDPOINTS } from '../config/api';
 import {
   DEFAULT_PERIOD,
@@ -25,7 +27,13 @@ const AdminAnalyticsScreen = () => {
   const header = (
     <>
       <Stack.Screen options={{ title: 'Platform analytics' }} />
-<AdminHeader title="Platform analytics" onBack={() => router.replace('/AdminScreen')} backLabel="Back to admin" />
+      <View style={styles.header}>
+        <Pressable style={styles.backButton} onPress={() => router.replace('/AdminScreen')}
+          accessibilityRole="button" accessibilityLabel="Back to admin">
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </Pressable>
+        <Text style={styles.headerTitle}>Platform analytics</Text>
+      </View>
     </>
   );
 
@@ -41,6 +49,11 @@ const AdminAnalyticsScreen = () => {
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
   const m = data.metrics;
+  const userDistribution = data.series.userDistribution;
+  const displayedUserDistribution = userDistribution ? {
+    ...userDistribution,
+    points: (userDistribution.points || []).filter(point => ['Owners only', 'Tenants only'].includes(point.bucket)),
+  } : userDistribution;
   const total = m.rentalRecordCount;
   const accepted = m.acceptedRentalRecordCount;
   const terminated = m.terminatedRentalRecordCount;
@@ -60,61 +73,46 @@ const AdminAnalyticsScreen = () => {
   return (
     <>
       {header}
-      <AnalyticsLayout compactTabs periodAccent="#16794B"
-        tabs={['Overview', 'Rentals', 'Users', 'Safety']} tab={tab} onTabChange={setTab}
+      <AnalyticsLayout compactTabs showPeriod={false} showRefresh={tab === 'Safety'} periodAccent="#16794B"
+        tabs={['Overview', 'Safety']} tab={tab} onTabChange={setTab}
         period={period} onPeriodChange={setPeriod} loading={loading} error={error} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}>
-        {tab === 'Overview' ? (
-          <>
-            <Section title="Overview">
-              <TileRow>
-                <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
-                <StatTile featured label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
-                <StatTile label="Registered users" metric={m.registeredUserCount} />
-                <StatTile label="Listings" metric={m.listingCount} />
-              </TileRow>
+        {tab === 'Overview' ? <>
+          <Section title="Overview" action={<RefreshControl onRefresh={retry} loading={loading} asOf={data.asOf} />}><TileRow>
+            <StatTile label="Registered users" scope="Now" metric={m.registeredUserCount} />
+            <StatTile label="Listings" scope="Now" metric={m.listingCount} />
+          </TileRow></Section>
+          <Section title="User distribution"><DonutChart series={displayedUserDistribution} totalLabel="Owners / tenants only" emptyText="No owners-only or tenants-only accounts" /></Section>
+          <Section title="Rentals (all time)">
+            <MetricRow label="Total recorded offers" scope="All time" metric={m.rentalRecordCount} />
+            <DonutChart series={offerDistribution} totalLabel="Recorded offers" emptyText="No recorded offers yet" />
+            <MetricRow label="Terminated / accepted" scope="All time" metric={m.terminationRate} />
+          </Section>
+          <ActivitySection period={period} onPeriodChange={setPeriod} loading={loading} dataPeriod={data.period}>
+            <Section title="Rent recorded"><TileRow>
+              <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} />
+              <StatTile label="Payments recorded" metric={m.recordedRentPaymentCount} />
+            </TileRow></Section>
+            <Section title="Monthly rent recorded"><LineChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" /></Section>
+            <Section title="Rental activity">
+            <TileRow>
+              <StatTile label="Offers sent" metric={m.offersSentCount} />
+              <StatTile label="Offers accepted" metric={m.offersAcceptedCount} />
+              <StatTile label="Terminations" metric={m.terminationsCount} />
+              <StatTile label="Avg. days on market" metric={m.averageDaysOnMarket} />
+            </TileRow>
             </Section>
-            <Section title="Monthly rent recorded" note="S$ by rental month">
-              <LineChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" />
-            </Section>
-          </>
-        ) : null}
-
-        {tab === 'Rentals' ? (
-          <>
-            <Section title="Rental activity in this period">
-              <TileRow>
-                <StatTile label="Offers sent" metric={m.offersSentCount} />
-                <StatTile label="Offers accepted" metric={m.offersAcceptedCount} />
-                <StatTile label="Terminations" metric={m.terminationsCount} />
-                <StatTile label="Avg. days on market" metric={m.averageDaysOnMarket} />
-              </TileRow>
-            </Section>
-            <Section title="Rentals (all time)">
-              <MetricRow label="Total recorded offers (all time)" metric={m.rentalRecordCount} />
-              <DonutChart series={offerDistribution} totalLabel="Recorded offers" emptyText="No recorded offers yet" />
-              <MetricRow label="Terminated / accepted (all time)" metric={m.terminationRate} />
-            </Section>
-          </>
-        ) : null}
-
-        {tab === 'Users' ? (
-          <>
-            <Section title="User distribution">
-              <DonutChart series={data.series.userDistribution} emptyText="No users yet" />
-            </Section>
-          </>
-        ) : null}
-
+          </ActivitySection>
+        </> : null}
         {tab === 'Safety' ? (
           <>
             <Section title="Moderation and safety">
               <TileRow>
-                <StatTile label="Flagged listings" metric={m.flaggedListingCount} />
-                <StatTile label="Flagged users" metric={m.flaggedUserCount} />
-                <StatTile label="Flagged reviews" metric={m.flaggedReviewCount} />
-                <StatTile label="Banned users" metric={m.bannedUserCount} />
+                <StatTile label="Flagged listings" scope="Now" metric={m.flaggedListingCount} />
+                <StatTile label="Flagged users" scope="Now" metric={m.flaggedUserCount} />
+                <StatTile label="Flagged reviews" scope="Now" metric={m.flaggedReviewCount} />
+                <StatTile label="Banned users" scope="Now" metric={m.bannedUserCount} />
               </TileRow>
-              <Meter label="Banned / all registered users" metric={m.userBanRate} />
+              <Meter label="Banned / all users" scope="Now" metric={m.userBanRate} />
             </Section>
             <Section title="Flagged items by type">
               <DonutChart series={data.series.flaggedItemsByType} totalLabel="Flagged items" emptyText="Nothing is flagged right now" />
@@ -126,5 +124,11 @@ const AdminAnalyticsScreen = () => {
   );
 };
 
+
+const styles = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#FFFFFF', width: '100%', maxWidth: 1120, alignSelf: 'center' },
+  backButton: { width: 44, height: 44, flexShrink: 0, borderRadius: 22, borderWidth: 1, borderColor: '#EAECF0', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  headerTitle: { flex: 1, marginLeft: 8, fontSize: 24, fontWeight: '700', textAlign: 'left', color: '#101820' },
+});
 
 export default AdminAnalyticsScreen;

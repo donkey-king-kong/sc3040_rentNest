@@ -1,17 +1,16 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { FontAwesome } from 'react-native-vector-icons';
-import AnalyticsLayout from '../components/analytics/AnalyticsLayout';
+import AnalyticsLayout, { ActivitySection, RefreshControl } from '../components/analytics/AnalyticsLayout';
 import { ENDPOINTS } from '../config/api';
 import {
   COLORS,
-  BarChart,
-  DEFAULT_PERIOD,
+  CountBarChart,
+  resolvePeriodKey,
   ErrorState,
   LineChart,
   LoadingState,
-  Meter,
   MetricRow,
   Section,
   StatTile,
@@ -23,7 +22,8 @@ import {
 const OwnerAnalyticsScreen = () => {
   const router = useRouter();
   const [tab, setTab] = useState('Overview');
-  const [period, setPeriod] = useState(DEFAULT_PERIOD);
+  const { period: initialPeriod } = useLocalSearchParams();
+  const [period, setPeriod] = useState(() => resolvePeriodKey(initialPeriod));
   const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_SUMMARY, period);
   const [refreshKey, setRefreshKey] = useState(0);
   const listings = useOwnedListings(refreshKey);
@@ -38,8 +38,7 @@ const OwnerAnalyticsScreen = () => {
           accessibilityRole="button" accessibilityLabel="Back to profile">
           <FontAwesome name="chevron-left" size={18} color="#101820" />
         </Pressable>
-        <Text style={styles.headerTitle}>Analytics overview</Text>
-        <View style={styles.headerSpacer} />
+        <Text style={styles.headerTitle}>Analytics</Text>
       </View>
     </>
   );
@@ -56,69 +55,64 @@ const OwnerAnalyticsScreen = () => {
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
   const m = data.metrics;
+  const vacantListings = m.listingCount?.availability === 'available' && m.activeTenancyCount?.availability === 'available' && m.listingCount.value >= m.activeTenancyCount.value
+    ? { ...m.listingCount, value: m.listingCount.value - m.activeTenancyCount.value, definition: 'Current listings minus currently occupied listings.' }
+    : { availability: 'unavailable', unit: 'count', reason: 'Current listing counts cannot be reconciled.' };
 
   return (
     <>
       {header}
-      <AnalyticsLayout compactTabs periodAccent="#16794B" periodBelowTabs showPeriod={tab !== 'Properties'}
-        tabs={['Overview', 'Occupancy', 'Properties']} tab={tab} onTabChange={setTab}
+      <AnalyticsLayout compactTabs periodAccent="#16794B" showPeriod={false} showRefresh={false}
+        tabs={['Overview', 'Properties']} tab={tab} onTabChange={setTab}
         period={period} onPeriodChange={setPeriod} loading={loading} error={error} onRefresh={refresh} dataPeriod={data.period} asOf={data.asOf}>
-        {tab === 'Overview' ? (
-          <>
-            <Section title="At a glance">
-              <TileRow>
-                <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
-                <StatTile featured label="Listings" metric={m.listingCount} />
-                <StatTile label="Active tenancies" metric={m.activeTenancyCount} />
-                <StatTile label="Avg. days on market" metric={m.averageDaysOnMarket} />
-              </TileRow>
-            </Section>
-            <Section title="Monthly rent recorded" note="S$ by rental month">
-              <MetricRow label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
-              <LineChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" />
-            </Section>
-          <Section title="Offers">
-            <MetricRow label="Offers sent" metric={m.offersSentCount} change={m.offersSentChange} />
-            <MetricRow label="Offers accepted" metric={m.offersAcceptedCount} />
-            <MetricRow label="Tenancies ended" metric={m.terminationsCount} />
+        {tab === 'Overview' ? <>
+          <Section title="Overview" action={
+            <RefreshControl onRefresh={refresh} loading={loading} asOf={data.asOf} />
+          }>
+            <TileRow>
+              <StatTile label="Listings" scope="Now" metric={m.listingCount} />
+              <StatTile label="Occupied listings" scope="Now" metric={m.activeTenancyCount} />
+              <StatTile label="Vacant listings" scope="Now" metric={vacantListings} />
+              <StatTile label="Occupancy rate" scope="Now" metric={m.occupancyRate} />
+            </TileRow>
+            <TileRow>
+              <StatTile label="Tenants hosted" scope="All time" metric={m.tenantsHostedCount} />
+              <StatTile label="Average tenancy" scope="All time" metric={m.averageTenancyMonths} />
+              <StatTile label="Owner rating" scope="All time" metric={m.ownerAverageRating} />
+              <StatTile label="Reviews" scope="All time" metric={m.ownerReviewCount} />
+            </TileRow>
           </Section>
-            <Section title="Reviews">
+          <Section title="Tenancy length">
+            <CountBarChart series={data.series.tenancyDurationDistribution} emptyText="No accepted tenancies yet" />
+          </Section>
+          <ActivitySection period={period} onPeriodChange={setPeriod} loading={loading} dataPeriod={data.period}>
+            <Section title="Rent recorded">
               <TileRow>
-                <StatTile label="Average rating" metric={m.ownerAverageRating} />
-                <StatTile label="Reviews" metric={m.ownerReviewCount} />
+                <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} />
+                <StatTile label="Payments recorded" metric={m.recordedRentPaymentCount} />
               </TileRow>
             </Section>
-          </>
-        ) : null}
-
-
-        {tab === 'Occupancy' ? (
-          <>
-            <Section title="Occupancy and tenants">
+            <Section title="Monthly rent recorded"><LineChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" /></Section>
+            <Section title="Occupancy in period">
               <TileRow>
-                <StatTile label="Listings" metric={m.listingCount} />
-                <StatTile label="Active tenancies" metric={m.activeTenancyCount} />
-                <StatTile label="Tenants hosted (all time)" metric={m.tenantsHostedCount} />
-                <StatTile label="Average tenancy (all time)" metric={m.averageTenancyMonths} />
-                <StatTile label="Avg. occupancy" metric={m.averageOccupancyRate} change={m.averageOccupancyRateChange} />
-                <StatTile label="Tenants in period" metric={m.tenantsInPeriodCount} change={m.tenantsInPeriodChange} />
+                <StatTile label="Avg. occupancy" metric={m.averageOccupancyRate} />
+                <StatTile label="Tenants in period" metric={m.tenantsInPeriodCount} />
               </TileRow>
-              <MetricRow label="Vacant listings right now" metric={m.listingCount?.availability === 'available' && m.activeTenancyCount?.availability === 'available' ? { ...m.listingCount, value: Math.max(0, m.listingCount.value - m.activeTenancyCount.value), definition: 'Current listings minus listings with an active tenancy.' } : undefined} />
-              <Meter label="Occupancy rate right now" metric={m.occupancyRate} />
             </Section>
-            <Section title="Occupancy trend">
-              <LineChart series={data.series.monthlyOccupancyRate} emptyText="No occupancy in this period" maxValue={100} />
+            <Section title="Occupancy trend"><LineChart series={data.series.monthlyOccupancyRate} emptyText="No occupancy in this period" maxValue={100} /></Section>
+            <Section title="Rental activity">
+              <MetricRow label="Offers sent in period" metric={m.offersSentCount} />
+              <MetricRow label="Offers accepted in period" metric={m.offersAcceptedCount} />
+              <MetricRow label="Tenancies ended" metric={m.terminationsCount} />
+              <MetricRow label="Avg. days on market" metric={m.averageDaysOnMarket} />
             </Section>
-            <Section title="Tenancy length">
-              <BarChart series={data.series.tenancyDurationDistribution} emptyText="No accepted tenancies yet" />
-            </Section>
-          </>
-        ) : null}
-
-
+          </ActivitySection>
+        </> : null}
         {tab === 'Properties' ? (
           <>
-            <Section title="By property">
+            <Section title="By property" action={
+              <RefreshControl onRefresh={refresh} loading={loading || listings.loading} asOf={data.asOf} />
+            }>
               {listings.loading ? <Text style={styles.muted}>Loading your listings…</Text> : null}
               {listings.error ? <Text style={styles.inlineError}>{listings.error}</Text> : null}
               {!listings.loading && !listings.error && listings.items.length === 0 ? (
@@ -128,7 +122,7 @@ const OwnerAnalyticsScreen = () => {
                 <Pressable
                   key={listing.listingID}
                   style={styles.listingRow}
-                  onPress={() => router.push({ pathname: '/ListingAnalyticsScreen', params: { listingId: listing.listingID } })}
+                  onPress={() => router.push({ pathname: '/ListingAnalyticsScreen', params: { listingId: listing.listingID, period } })}
                   accessibilityRole="button"
                   accessibilityLabel={`View analytics for ${listing.name}`}
                 >
@@ -149,9 +143,8 @@ const OwnerAnalyticsScreen = () => {
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#FFFFFF', width: '100%', maxWidth: 1120, alignSelf: 'center' },
-  backButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  headerTitle: { flex: 1, fontSize: 24, fontWeight: '700', textAlign: 'center', color: '#101820' },
-  headerSpacer: { width: 44 },
+  backButton: { width: 44, height: 44, flexShrink: 0, borderRadius: 22, borderWidth: 1, borderColor: '#EAECF0', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  headerTitle: { flex: 1, marginLeft: 8, fontSize: 24, fontWeight: '700', textAlign: 'left', color: '#101820' },
   loadingText: { marginTop: 14, fontSize: 16, fontWeight: '600', color: '#101820' },
   inlineError: {
     fontSize: 13,

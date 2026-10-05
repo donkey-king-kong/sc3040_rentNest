@@ -9,6 +9,7 @@ import {
   PeriodSelector,
   chartMaximum,
   BarChart,
+  CountBarChart,
   DonutChart,
   MetricRow,
   LineChart,
@@ -90,16 +91,22 @@ describe('buildPeriod', () => {
     expect(days).toBeLessThanOrEqual(366);
   });
 
-  it('builds a last-30-days period ending at the end of today', () => {
-    const { from, to } = buildLastDays(30);
-    const days = Math.round((new Date(to) - new Date(from)) / 86400000);
-    expect(days).toBe(30);
-    expect(new Date(to).getTime()).toBeGreaterThan(Date.now());
+  it('covers 30 Singapore calendar dates through the current instant', () => {
+    const now = new Date('2026-10-05T18:09:00Z');
+    const { from, to } = buildLastDays(30, now);
+    expect(from).toBe('2026-09-07T00:00:00+08:00');
+    expect(to).toBe('2026-10-06T02:09:00.000+08:00');
+    expect(new Date(to).getTime()).toBe(now.getTime());
+  });
+  it('uses completed months without including future days', () => {
+    const now = new Date('2026-10-05T18:09:00Z');
+    expect(buildPeriod(3, now)).toEqual({ from: '2026-07-01T00:00:00+08:00', to: '2026-10-01T00:00:00+08:00' });
+    expect(buildPeriod(1, new Date('2026-09-30T17:00:00Z'))).toEqual({ from: '2026-09-01T00:00:00+08:00', to: '2026-10-01T00:00:00+08:00' });
+  });
+  it('offers the five simple preset choices', () => {
+    expect(PERIOD_OPTIONS.map(option => option.key)).toEqual(['1M', '2M', '3M', '6M', '12M']);
   });
 
-  it('offers 30 days, 3, 6 and 12 months', () => {
-    expect(PERIOD_OPTIONS.map((option) => option.label)).toEqual(['30D', '3M', '6M', '12M']);
-  });
 });
 
 describe('StatTile', () => {
@@ -116,22 +123,22 @@ describe('StatTile', () => {
     expect(text).not.toContain('Not available');
   });
 
-  it('omits period labels for demo-history metrics with legacy coverage metadata', () => {
+  it('hides redundant period scope without adding legacy coverage explanations', () => {
     const metric = {
       ...available(3, 'count', 'period'),
       coverage: { start: '2026-09-16T18:26:00Z', end: '2026-10-01T00:00:00Z', complete: false },
     };
     const text = renderedText(renderStatic(<StatTile label="Offers sent" metric={metric} />));
-    expect(text).not.toContain('Selected period');
+    expect(text).not.toContain('Period');
     expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
   });
 
-  it('omits period labels for fully covered metrics', () => {
+  it('hides redundant period scope for fully covered metrics', () => {
     const metric = {
       ...available(3, 'count', 'period'),
       coverage: { start: '2026-01-01T00:00:00Z', end: '2026-04-01T00:00:00Z', complete: true },
     };
-    expect(renderedText(renderStatic(<StatTile label="Offers sent" metric={metric} />))).not.toContain('Selected period');
+    expect(renderedText(renderStatic(<StatTile label="Offers sent" metric={metric} />))).not.toContain('Period');
   });
 
   it('shows a change line only when the change could be calculated', () => {
@@ -146,7 +153,7 @@ describe('StatTile', () => {
     const tree = renderStatic(<StatTile label="Listing views" metric={unavailable('Not tracked yet.')} />);
     const text = renderedText(tree);
     expect(text).toContain('Not available');
-    expect(text).toContain('Not tracked yet.');
+    expect(text).not.toContain('Not tracked yet.');
     expect(text).not.toContain('0');
   });
 });
@@ -216,7 +223,7 @@ describe('LineChart', () => {
     let tree;
     await act(async () => { tree = create(<LineChart series={series} emptyText="unused" maxValue={100} />); });
     await measure(tree, 300);
-    expect(renderedText(tree)).toContain('Tap a point to see its value');
+    expect(renderedText(tree)).toContain('%');
 
     const target = tree.root.findAll((node) => node.props.accessibilityLabel === 'Feb 2026: 66.7%' && typeof node.props.onPress === 'function')[0];
     await act(async () => { target.props.onPress(); });
@@ -335,7 +342,7 @@ describe('ListingAnalyticsScreen', () => {
     expect(text).toContain('Unique viewers');
     expect(text.filter((item) => item === 'Not available')).toHaveLength(1);
     expect(text.filter((item) => item === '0').length).toBeGreaterThanOrEqual(2);
-    expect(text).toContain('+65.6 pts vs previous period');
+    expect(text.some(value => value.includes('vs previous period'))).toBe(false);
     expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
 
     // Offers: empty period events remain zero alongside the other sections.
@@ -343,8 +350,9 @@ describe('ListingAnalyticsScreen', () => {
     expect(text.filter((item) => item === 'Not available')).toHaveLength(1);
     expect(text.filter((item) => item === '0').length).toBeGreaterThanOrEqual(2);
     expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
-    expect(text).not.toContain('Acceptance rate');
-    expect(text).toEqual(expect.arrayContaining(['Offers sent', 'Offers accepted', 'Tenancies ended']));
+    expect(text).toContain('Acceptance rate');
+    expect(text).toEqual(expect.arrayContaining(['Offers sent', 'Offers accepted']));
+    expect(text).not.toContain('Tenancies ended');
 
     // Occupancy
     text = renderedText(tree);
@@ -384,7 +392,7 @@ describe('Admin user presentation', () => {
     const target = tree.root.findAll(node => node.props.accessibilityLabel === 'New users: 0' && typeof node.props.onPress === 'function')[0];
     await act(async () => target.props.onPress());
     expect(renderedText(tree)).toContain('Accounts created in the selected period.');
-    expect(renderedText(renderStatic(<MetricRow label="New listings" metric={unavailable('No tracking data')} />))).toEqual(expect.arrayContaining(['Not available', 'No tracking data']));
+    expect(renderedText(renderStatic(<MetricRow label="New listings" metric={unavailable('No tracking data')} />))).toContain('Not available');
   });
 });
 
@@ -394,15 +402,43 @@ it('uses readable chart bounds without clipping values', () => {
   expect(chartMaximum(100)).toBe(100);
 });
 
-it('opens the mobile period dropdown and closes it after selection', async () => {
+it('shows exact tenancy counts including zero buckets and keeps empty and unavailable states truthful', () => {
+  const series = { availability: 'available', basis: 'snapshot', unit: 'count', points: [
+    { bucket: '<3 months', value: 0 }, { bucket: '3-6 months', value: 2 }, { bucket: '>=24 months', value: 1 },
+  ] };
+  const tree = renderStatic(<CountBarChart series={series} emptyText="No accepted tenancies yet" />);
+  expect(renderedText(tree)).toEqual(expect.arrayContaining(['<3 months', '3 to <6 months', '24+ months', '0', '2', '1']));
+  expect(renderedText(tree).some(value => value.includes('%'))).toBe(false);
+  expect(renderedText(renderStatic(<CountBarChart series={{ ...series, points: series.points.map(point => ({ ...point, value: 0 })) }} emptyText="No accepted tenancies yet" />))).toContain('No accepted tenancies yet');
+  expect(renderedText(renderStatic(<CountBarChart series={{ availability: 'unavailable', reason: 'No recorded history' }} />))).toContain('No recorded history');
+});
+
+it('opens the simple dropdown and closes after selecting a preset', async () => {
   const onChange = jest.fn();
   let tree;
   await act(async () => { tree = create(<PeriodSelector value="12M" onChange={onChange} />); });
   const control = () => tree.root.findAll(n => n.props.accessibilityLabel === 'Analytics period' && n.props.onPress)[0];
   expect(control().props.accessibilityState.expanded).toBe(false);
   await act(async () => control().props.onPress());
-  const option = tree.root.findAll(n => n.props.accessibilityLabel === '3M period' && n.props.onPress)[0];
+  expect(renderedText(tree)).toEqual(expect.arrayContaining(['1 month', '2 months', '3 months', '6 months', '1 year']));
+  expect(renderedText(tree)).not.toContain('Custom');
+  const option = tree.root.findAll(n => n.props.accessibilityLabel === '3 months' && n.props.onPress)[0];
   await act(async () => option.props.onPress());
   expect(onChange).toHaveBeenCalledWith('3M');
   expect(control().props.accessibilityState.expanded).toBe(false);
+});
+
+it('keeps calculation details off the dashboard and opens and closes them on demand', async () => {
+  let tree;
+  const metric = { ...available(1, 'count', 'period'), definition: 'Acceptance timestamps within the displayed period.' };
+  await act(async () => { tree = create(<StatTile label="Offers accepted" metric={metric} />); });
+  expect(renderedText(tree)).not.toContain('Period');
+  expect(renderedText(tree)).not.toContain(metric.definition);
+  const card = tree.root.findAll(node => node.props.accessibilityLabel === 'Offers accepted: 1' && node.props.onPress)[0];
+  await act(async () => card.props.onPress());
+  expect(renderedText(tree)).toContain(metric.definition);
+  expect(renderedText(tree)).toContain('Period');
+  const close = tree.root.findAll(node => node.props.accessibilityLabel === 'Close calculation details' && node.props.onPress)[0];
+  await act(async () => close.props.onPress());
+  expect(renderedText(tree)).not.toContain(metric.definition);
 });

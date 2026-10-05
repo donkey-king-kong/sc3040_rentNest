@@ -3,11 +3,11 @@ import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { FontAwesome } from 'react-native-vector-icons';
 import { ENDPOINTS } from '../config/api';
-import AnalyticsLayout from '../components/analytics/AnalyticsLayout';
+import AnalyticsLayout, { ActivitySection } from '../components/analytics/AnalyticsLayout';
 import {
   COLORS,
   BarChart,
-  DEFAULT_PERIOD,
+  resolvePeriodKey,
   ErrorState,
   LoadingState,
   MetricRow,
@@ -23,8 +23,8 @@ import {
 
 const ListingAnalyticsScreen = () => {
   const router = useRouter();
-  const { listingId } = useLocalSearchParams();
-  const [period, setPeriod] = useState(DEFAULT_PERIOD);
+  const { listingId, period: initialPeriod } = useLocalSearchParams();
+  const [period, setPeriod] = useState(() => resolvePeriodKey(initialPeriod));
   const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_LISTING(listingId), period);
 
   const header = (
@@ -37,7 +37,6 @@ const ListingAnalyticsScreen = () => {
           <FontAwesome name="chevron-left" size={18} color="#101820" />
         </Pressable>
         <Text style={styles.headerTitle}>Property analytics</Text>
-        <View style={styles.headerSpacer} />
       </View>
     </>
   );
@@ -60,7 +59,7 @@ const ListingAnalyticsScreen = () => {
   return (
     <>
       {header}
-      <AnalyticsLayout compactTabs periodAccent="#16794B"
+      <AnalyticsLayout compactTabs showPeriod={false} showRefresh={false} periodAccent="#16794B"
         period={period} onPeriodChange={setPeriod} loading={loading} error={error} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}
         header={<>
       <View style={styles.listingHeader}>
@@ -78,60 +77,39 @@ const ListingAnalyticsScreen = () => {
 
         </>}>
 
-      <Section title="At a glance">
-            <TileRow>
-              <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
-              <StatTile featured label="Occupancy in period" metric={m.averageOccupancyRate} change={m.averageOccupancyRateChange} />
-            </TileRow>
-          </Section>
-
-      <Section title="Listing interest">
-            <TileRow>
-              <StatTile label="Listing views" metric={m.listingViews} />
-              <StatTile label="Unique viewers" metric={m.uniqueListingViewers} />
-            </TileRow>
-          </Section>
-
-      <Section title="Offers">
-          <MetricRow label="Offers sent" metric={m.offersSentCount} />
-          <MetricRow label="Offers accepted" metric={m.offersAcceptedCount} />
-          <MetricRow label="Tenancies ended" metric={m.terminationsCount} />
-          <MetricRow label="Acceptance rate (all time)" metric={m.acceptanceRate} />
+      <ActivitySection period={period} onPeriodChange={setPeriod} loading={loading} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}>
+        <Section title="Performance">
+          <TileRow>
+            <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} />
+            <StatTile featured label="Occupancy in period" metric={m.averageOccupancyRate} />
+            <StatTile label="Payments recorded" metric={m.recordedRentPaymentCount} />
+          </TileRow>
         </Section>
-
-      <Section title="Rent">
-            <TileRow>
-              <StatTile label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
-            </TileRow>
-          </Section>
-
-      <Section title="Monthly rent recorded" note="S$ by rental month">
-            <BarChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" />
-          </Section>
-
-      <Section title="Occupancy">
-            <TileRow>
-              <StatTile label="Average tenancy (all time)" metric={m.averageTenancyMonths} />
-              <StatTile label="Tenants hosted (all time)" metric={m.tenantsHostedCount} />
-            </TileRow>
-          </Section>
-
-      <Section title="Month by month">
-            <OccupancyStrip series={data.series.monthlyOccupancy} />
-          </Section>
-
-      <Section title="Time to accepted offer">
-            <TileRow>
-              <StatTile label="Days on market" metric={m.daysOnMarket} />
-              <View style={styles.marketDates}>
-                <Text style={styles.dateLabel}>Published</Text>
-                <Text style={styles.dateValue}>{listing.listedAt ? formatDay(listing.listedAt) : 'Not recorded'}</Text>
-                <Text style={styles.dateLabel}>First offer accepted</Text>
-                <Text style={styles.dateValue}>{listing.firstAcceptedAt ? formatDay(listing.firstAcceptedAt) : 'Not recorded'}</Text>
-              </View>
-            </TileRow>
-          </Section>
-
+        <Section title="Listing interest"><TileRow>
+          <StatTile label="Listing views" metric={m.listingViews} />
+          <StatTile label="Unique viewers" metric={m.uniqueListingViewers} />
+        </TileRow></Section>
+        <Section title="Monthly rent recorded"><BarChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" /></Section>
+        <Section title="Month by month"><OccupancyStrip series={data.series.monthlyOccupancy} /></Section>
+      </ActivitySection>
+      {!loading ? <><Section title="Listing history">
+        <MetricRow label="Offers sent" scope="All time" metric={m.rentalRecordCount} />
+        <MetricRow label="Offers accepted" scope="All time" metric={m.acceptedRentalRecordCount} />
+        <MetricRow label="Acceptance rate" scope="All time" metric={m.acceptanceRate} />
+        <TileRow>
+          <StatTile label="Average tenancy" scope="All time" metric={m.averageTenancyMonths} />
+          <StatTile label="Tenants hosted" scope="All time" metric={m.tenantsHostedCount} />
+        </TileRow>
+      </Section>
+      <Section title="Time to accepted offer"><TileRow>
+        <StatTile label="Days on market" scope="Listing history" metric={m.daysOnMarket} />
+        <View style={styles.marketDates}>
+          <Text style={styles.dateLabel}>Published</Text>
+          <Text style={styles.dateValue}>{listing.listedAt ? formatDay(listing.listedAt) : 'Not recorded'}</Text>
+          <Text style={styles.dateLabel}>First offer accepted</Text>
+          <Text style={styles.dateValue}>{listing.firstAcceptedAt ? formatDay(listing.firstAcceptedAt) : 'Not recorded'}</Text>
+        </View>
+      </TileRow></Section></> : null}
       </AnalyticsLayout>
     </>
   );
@@ -140,8 +118,7 @@ const ListingAnalyticsScreen = () => {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#FFFFFF', width: '100%', maxWidth: 1120, alignSelf: 'center' },
   backButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  headerTitle: { flex: 1, fontSize: 24, fontWeight: '700', textAlign: 'center', color: '#101820' },
-  headerSpacer: { width: 44 },
+  headerTitle: { flex: 1, marginLeft: 8, fontSize: 24, fontWeight: '700', textAlign: 'left', color: '#101820' },
   loadingText: { marginTop: 14, fontSize: 16, fontWeight: '600', color: '#101820' },
   marketDates: { flexGrow: 1, flexBasis: '45%', margin: 5, padding: 12, backgroundColor: COLORS.card, borderRadius: 12 },
   dateLabel: { fontSize: 12, color: COLORS.inkSecondary },

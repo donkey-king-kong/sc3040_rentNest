@@ -183,8 +183,10 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   separator: {
-    height: 1,
-    backgroundColor: '#ccc',
+    height: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ccc',
+    flexShrink: 0,
     marginVertical: 5,
   },
 });

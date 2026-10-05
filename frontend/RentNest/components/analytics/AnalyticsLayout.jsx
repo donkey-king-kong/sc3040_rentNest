@@ -1,10 +1,32 @@
 import React, { useId, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import { COLORS, PeriodSelector } from './AnalyticsKit';
+import { FontAwesome } from 'react-native-vector-icons';
+import MorphingInfinity from '../MorphingInfinity';
+
+export function RefreshControl({ onRefresh, loading, asOf }) {
+  return <View style={styles.refreshGroup}>
+    {loading ? <Text style={styles.updatedTime} accessibilityLiveRegion="polite">Refreshing...</Text> : null}
+    {asOf && !loading ? <Text style={styles.updatedTime}>Updated {new Intl.DateTimeFormat('en-SG', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Singapore' }).format(new Date(asOf))}</Text> : null}
+    <Pressable onPress={onRefresh} disabled={loading} accessibilityRole="button" accessibilityLabel="Refresh analytics" accessibilityState={{ disabled: loading }} style={styles.refresh}><FontAwesome name="refresh" size={16} color="#16794B" /><Text style={styles.refreshText}>Refresh</Text></Pressable>
+  </View>;
+}
+
+export function ActivitySection({ title = 'Activity', period, onPeriodChange, loading, onRefresh, dataPeriod, asOf, children }) {
+  const format = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Singapore' });
+  const dates = dataPeriod && !loading ? format.format(new Date(dataPeriod.from)) + ' \u2013 ' + format.format(new Date(new Date(dataPeriod.to).getTime() - 1)) : null;
+  const refresh = onRefresh ? <RefreshControl onRefresh={onRefresh} loading={loading} asOf={asOf} /> : null;
+  return <View style={styles.activity}>
+    <View style={styles.activityHeading}><Text accessibilityRole="header" style={styles.activityTitle}>{title}</Text>{refresh}</View>
+    <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor="#16794B" />
+    {dates ? <Text style={styles.activityDates}>{dates}</Text> : null}
+    {loading ? <View style={styles.activityLoading} accessibilityLabel="Loading period activity"><MorphingInfinity size={86} color="#2FA84F" /></View> : children}
+  </View>;
+}
 
 // Keep navigation above the scrolling panel. Changing tabs resets that panel to the top,
 // while the selected period stays in the screen's state.
-export default function AnalyticsLayout({ header, title, subtitle, tabs = [], tab, onTabChange, period, onPeriodChange, loading, error, children, compactTabs = false, periodAccent, periodBelowTabs = false, showPeriod = true, onRefresh, dataPeriod, asOf }) {
+export default function AnalyticsLayout({ header, title, subtitle, tabs = [], tab, onTabChange, period, onPeriodChange, loading, error, children, compactTabs = false, periodAccent, periodBelowTabs = false, showPeriod = true, showRefresh = true, onRefresh, dataPeriod, asOf }) {
   const id = useId();
   const buttons = useRef([]);
   const { width } = useWindowDimensions();
@@ -19,7 +41,7 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
   };
   const dateFormat = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', year: 'numeric', timeZone: dataPeriod?.timeZone || 'Asia/Singapore' });
   const rangeText = dataPeriod ? dateFormat.format(new Date(dataPeriod.from)) + ' \u2013 ' + dateFormat.format(new Date(new Date(dataPeriod.to).getTime() - 1)) : null;
-  const refreshButton = onRefresh ? <Pressable accessibilityLabel="Refresh analytics" accessibilityRole="button" accessibilityState={{ disabled: loading }} disabled={loading} onPress={onRefresh} style={styles.refresh}><Text style={styles.refreshText}>Refresh</Text></Pressable> : null;
+  const refreshButton = onRefresh ? <RefreshControl onRefresh={onRefresh} loading={loading} asOf={asOf} /> : null;
   return (
     <View style={[styles.screen, compactTabs && styles.adminScreen]}>
       <View style={styles.container}>
@@ -51,10 +73,8 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
           <View style={styles.toolbar}>
             <View style={{ flex: 1 }}>
               {showPeriod && rangeText ? <Text style={styles.dateRange}>{rangeText}</Text> : null}
-              {asOf ? <Text style={styles.updatedTime}>Updated {new Intl.DateTimeFormat('en-SG', { hour: '2-digit', minute: '2-digit', timeZone: dataPeriod?.timeZone || 'Asia/Singapore' }).format(new Date(asOf))}</Text> : null}
-              {loading ? <Text style={styles.rangeText} accessibilityLiveRegion="polite">Updating: previous values displayed</Text> : null}
             </View>
-            {!showPeriod ? refreshButton : null}
+            {!showPeriod && showRefresh ? refreshButton : null}
           </View>
         </View>
         <ScrollView key={tab} nativeID={`${id}-panel`}
@@ -69,18 +89,24 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
 }
 
 const styles = StyleSheet.create({
+  activity: { paddingTop: 24, marginBottom: 24 },
+  activityHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 16 },
+  activityTitle: { fontSize: 20, fontWeight: '600', color: COLORS.ink, flexShrink: 1 },
+  refreshGroup: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
+  activityDates: { fontSize: 14, lineHeight: 20, fontWeight: '500', color: COLORS.ink, marginBottom: 20, fontVariant: ['tabular-nums'] },
+  activityLoading: { minHeight: 140, alignItems: 'center', justifyContent: 'center' },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
   dateRange: { fontSize: 14, lineHeight: 20, fontWeight: '500', color: COLORS.ink, fontVariant: ['tabular-nums'] },
-  updatedTime: { fontSize: 12, lineHeight: 18, marginTop: 4, color: COLORS.inkSecondary, fontVariant: ['tabular-nums'] },
+  updatedTime: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary, fontVariant: ['tabular-nums'] },
   rangeText: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary },
-  refresh: { minWidth: 80, minHeight: 48, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: COLORS.border, borderRadius: 8 },
+  refresh: { minWidth: 80, minHeight: 48, flexShrink: 0, flexDirection: 'row', gap: 6, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },
   refreshText: { color: '#16794B', fontWeight: '600' },
   periodBelowTabs: { marginTop: 16 },
   adminScreen: { backgroundColor: COLORS.surface },
   adminHeader: { backgroundColor: '#FFFFFF', paddingTop: 0 },
   screen: { flex: 1, backgroundColor: COLORS.surface },
   container: { flex: 1, width: '100%', maxWidth: 1120, alignSelf: 'center' },
-  header: { padding: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  header: { padding: 20, paddingBottom: 12 },
   title: { fontSize: 24, fontWeight: 'bold', color: COLORS.ink },
   subtitle: { fontSize: 14, color: COLORS.inkSecondary, marginTop: 4, marginBottom: 16 },
   compactTabs: { flexGrow: 0 },

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, useWindowDimensions, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { FontAwesome } from 'react-native-vector-icons';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -41,33 +41,33 @@ export const toOffsetIso = (date) => {
     + `${sign}${pad(Math.trunc(offset / 60))}:${pad(offset % 60)}`;
 };
 
-// Whole calendar months ending with the current month; 12 months always fits the 366-day limit
-export const buildPeriod = (months) => {
-  const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  return { from: toOffsetIso(from), to: toOffsetIso(to) };
-};
+// Singapore calendar dates, independent of the phone's time zone.
+const singaporeDate = now => new Date(now.getTime() + 8 * 60 * 60 * 1000);
+const singaporeMidnight = date => date.toISOString().slice(0, 10) + 'T00:00:00+08:00';
+const singaporeInstant = now => singaporeDate(now).toISOString().replace('Z', '+08:00');
 
-// The last `days` days, ending at the end of today
-export const buildLastDays = (days) => {
-  const now = new Date();
-  const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-  const from = new Date(to.getFullYear(), to.getMonth(), to.getDate() - days);
-  return { from: toOffsetIso(from), to: toOffsetIso(to) };
+// Completed calendar months; the current partial month is excluded.
+export const buildPeriod = (months, now = new Date()) => {
+  const today = singaporeDate(now);
+  const year = today.getUTCFullYear();
+  const month = today.getUTCMonth();
+  return { from: singaporeMidnight(new Date(Date.UTC(year, month - months, 1))), to: singaporeMidnight(new Date(Date.UTC(year, month, 1))) };
 };
-
+export const buildLastDays = (days, now = new Date()) => {
+  const today = singaporeDate(now);
+  const from = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - days + 1));
+  return { from: singaporeMidnight(from), to: singaporeInstant(now) };
+};
 export const PERIOD_OPTIONS = [
-  { key: '30D', label: '30D', build: () => buildLastDays(30) },
-  { key: '3M', label: '3M', build: () => buildPeriod(3) },
-  { key: '6M', label: '6M', build: () => buildPeriod(6) },
-  { key: '12M', label: '12M', build: () => buildPeriod(12) },
+  { key: '1M', label: '1 month', build: () => buildPeriod(1) },
+  { key: '2M', label: '2 months', build: () => buildPeriod(2) },
+  { key: '3M', label: '3 months', build: () => buildPeriod(3) },
+  { key: '6M', label: '6 months', build: () => buildPeriod(6) },
+  { key: '12M', label: '1 year', build: () => buildPeriod(12) },
 ];
-
-export const DEFAULT_PERIOD = '12M';
-
-const periodFor = (key) => (PERIOD_OPTIONS.find((option) => option.key === key)
-  || PERIOD_OPTIONS.find((option) => option.key === DEFAULT_PERIOD)).build();
+export const DEFAULT_PERIOD = '1M';
+export const resolvePeriodKey = key => PERIOD_OPTIONS.some(option => option.key === key) ? key : DEFAULT_PERIOD;
+const periodFor = key => PERIOD_OPTIONS.find(option => option.key === resolvePeriodKey(key)).build();
 
 // ---------- Data ----------
 
@@ -84,7 +84,7 @@ const describeError = (error) => {
 export const getAuthToken = () => AsyncStorage.getItem('token');
 
 /**
- * Loads an analytics endpoint for a period key from PERIOD_OPTIONS (e.g. '30D', '12M').
+ * Loads an analytics endpoint for a period key from PERIOD_OPTIONS (e.g. '1M', '12M').
  * Keeps the previous data visible while a new period loads.
  */
 export function useAnalytics(path, periodKey) {
@@ -200,9 +200,12 @@ export const formatChange = (metric) => {
 
 // ---------- Layout ----------
 
-export const Section = ({ title, note, children }) => (
+export const Section = ({ title, note, action, children }) => (
   <View style={styles.section}>
-    <Text style={styles.sectionTitle}>{title}</Text>
+    {action ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+      <Text style={[styles.sectionTitle, { flexShrink: 1, marginBottom: 0 }]}>{title}</Text>
+      {action}
+    </View> : <Text style={styles.sectionTitle}>{title}</Text>}
     {note ? <Text style={styles.sectionNote}>{note}</Text> : null}
     {children}
   </View>
@@ -212,20 +215,23 @@ export const TileRow = ({ children }) => <View style={styles.tileRow}>{children}
 
 export const PeriodSelector = ({ value, onChange, loading, accentColor, trailingAction }) => {
   const [open, setOpen] = useState(false);
-  const labels = { '30D': 'Last 30 days', '3M': '3 calendar months', '6M': '6 calendar months', '12M': '12 calendar months' };
-  return <View style={{ marginBottom: 14 }}>
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-      <Text style={styles.periodLabel}>Period</Text>
-      <Pressable onPress={() => setOpen(shown => !shown)} accessibilityRole="button" accessibilityLabel="Analytics period" accessibilityState={{ expanded: open }} style={{ flex: 1, minHeight: 48, paddingHorizontal: 14, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ color: accentColor || COLORS.ink, flexShrink: 1, marginRight: 8 }}>{labels[value]}</Text>
-        <FontAwesome name={open ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.inkSecondary} />
+  const selected = resolvePeriodKey(value);
+  const label = PERIOD_OPTIONS.find(option => option.key === selected).label;
+  const color = accentColor || '#16794B';
+  const toggle = () => setOpen(shown => !shown);
+  return <View style={styles.periodContainer}>
+    <View style={styles.periodControlRow}>
+      <Text style={styles.periodCaption}>Period</Text>
+      <Pressable onPress={toggle} accessibilityRole="button" accessibilityLabel="Analytics period" accessibilityState={{ expanded: open }} style={styles.periodTrigger}>
+        <Text style={[styles.periodSelectedLabel, { flex: 1 }]}>{label}</Text>
+        {loading ? <ActivityIndicator size="small" color={color} accessibilityLabel="Updating analytics" /> : <FontAwesome name={open ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.inkSecondary} />}
       </Pressable>
-      {loading ? <ActivityIndicator size="small" color={accentColor || COLORS.ink} accessibilityLabel="Updating analytics" /> : null}
       {trailingAction}
     </View>
-    {open ? <View style={{ marginTop: 8, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8 }}>
-      {PERIOD_OPTIONS.map(option => <Pressable key={option.key} onPress={() => { onChange(option.key); setOpen(false); }} accessibilityRole="button" accessibilityLabel={option.key + ' period'} accessibilityState={{ selected: value === option.key }} style={{ minHeight: 48, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: value === option.key ? COLORS.card : COLORS.surface }}>
-        <Text style={{ color: value === option.key ? accentColor || COLORS.ink : COLORS.inkSecondary }}>{labels[option.key]}</Text>
+    {open ? <View style={styles.periodMenu}>
+      {PERIOD_OPTIONS.map(option => <Pressable key={option.key} onPress={() => { if (selected !== option.key) onChange(option.key); setOpen(false); }} accessibilityRole="button" accessibilityLabel={option.label} accessibilityState={{ selected: selected === option.key }} style={[styles.periodOption, selected === option.key && styles.periodOptionSelected]}>
+        <Text style={[styles.periodOptionTitle, { flex: 1 }]}>{option.label}</Text>
+        {selected === option.key ? <FontAwesome name="check" size={16} color={color} /> : null}
       </Pressable>)}
     </View> : null}
   </View>;
@@ -256,7 +262,31 @@ export const ErrorState = ({ message, onRetry, actionLabel = 'Try again' }) => (
  * `change` is an optional percent-change metric, shown underneath only when it could be calculated.
  * `featured` gives the main overview figures more visual emphasis.
  */
-export const StatTile = ({ label, metric, change, featured = false }) => {
+const scopeFor = (metric, scope) => scope || (metric?.basis === 'period' ? 'Period' : null);
+const visibleScopeFor = (metric, scope) => {
+  const label = scopeFor(metric, scope);
+  return ['Now', 'All time', 'Period'].includes(label) ? null : label;
+};
+export const MetricDetails = ({ label, metric, scope, visible, onClose, hideValue = false }) => (
+  <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <View style={styles.detailsBackdrop}>
+      <View style={styles.detailsPanel} accessibilityViewIsModal>
+        <View style={styles.detailsHeader}>
+          <Text accessibilityRole="header" style={styles.detailsTitle}>{label}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close calculation details" onPress={onClose} style={styles.detailsClose}><FontAwesome name="times" size={20} color={COLORS.ink} /></Pressable>
+        </View>
+        <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+          {scopeFor(metric, scope) ? <Text style={styles.scope}>{scopeFor(metric, scope)}</Text> : null}
+          {!hideValue ? <Text style={styles.detailsValue}>{metric?.availability === 'available' ? formatValue(metric.value, metric.unit) : 'Not available'}</Text> : null}
+          <Text style={styles.detailsBody}>{metric?.definition || 'Calculation details are not recorded.'}</Text>
+          {metric?.reason ? <Text style={styles.detailsBody}>{metric.reason}</Text> : null}
+        </ScrollView>
+      </View>
+    </View>
+  </Modal>
+);
+
+export const StatTile = ({ label, metric, change, featured = false, scope }) => {
   const [showDefinition, setShowDefinition] = useState(false);
   const { width } = useWindowDimensions();
   if (!metric) return null;
@@ -274,14 +304,14 @@ export const StatTile = ({ label, metric, change, featured = false }) => {
       <View style={styles.tileHeader}>
         <Text style={styles.tileLabel}>{label}</Text><FontAwesome name="info-circle" size={16} color={COLORS.inkSecondary} />
       </View>
+      {visibleScopeFor(metric, scope) ? <Text style={styles.scope}>{visibleScopeFor(metric, scope)}</Text> : null}
       {available ? (
         <Text style={[styles.tileValue, featured && styles.featuredValue]}>{formatValue(metric.value, metric.unit)}</Text>
       ) : (
         <Text style={styles.tileUnavailable}>Not available</Text>
       )}
       {available && formatChange(change) ? <Text style={styles.tileChange}>{formatChange(change)}</Text> : null}
-      {!available && metric.reason ? <Text style={styles.tileReason}>{metric.reason}</Text> : null}
-      {showDefinition ? <Text style={styles.tileDefinition}>{metric.definition}</Text> : null}
+      {showDefinition ? <MetricDetails label={label} metric={metric} scope={scope} visible onClose={() => setShowDefinition(false)} /> : null}
     </Pressable>
   );
 };
@@ -289,7 +319,7 @@ export const StatTile = ({ label, metric, change, featured = false }) => {
 // ---------- Meter ----------
 
 /** A percentage against 100%, on a track from the same hue. */
-export const Meter = ({ label, metric }) => {
+export const Meter = ({ label, metric, scope }) => {
   const [showDefinition, setShowDefinition] = useState(false);
   if (!metric) return null;
   const available = metric.availability === 'available';
@@ -303,16 +333,16 @@ export const Meter = ({ label, metric }) => {
       accessibilityLabel={`${label}: ${available ? `${metric.value} percent` : 'not available'}`}
     >
       <View style={styles.meterHeader}>
-        <Text style={styles.meterLabel}>{label}</Text>
+        <Text style={styles.meterLabel}>{label}</Text><FontAwesome name="info-circle" size={16} color={COLORS.inkSecondary} />
         <Text style={available ? styles.meterValue : styles.tileUnavailable}>
           {available ? formatValue(metric.value, metric.unit) : 'Not available'}
         </Text>
       </View>
+      {visibleScopeFor(metric, scope) ? <Text style={styles.scope}>{visibleScopeFor(metric, scope)}</Text> : null}
       <View style={[styles.meterTrack, !available && styles.meterTrackUnavailable]}>
         {available ? <View style={[styles.meterFill, { width: `${percent}%` }]} /> : null}
       </View>
-      {!available && metric.reason ? <Text style={styles.tileReason}>{metric.reason}</Text> : null}
-      {showDefinition ? <Text style={styles.tileDefinition}>{metric.definition}</Text> : null}
+      {showDefinition ? <MetricDetails label={label} metric={metric} scope={scope || 'Now'} visible onClose={() => setShowDefinition(false)} /> : null}
     </Pressable>
   );
 };
@@ -320,6 +350,23 @@ export const Meter = ({ label, metric }) => {
 // ---------- Shared chart pieces ----------
 
 const showLabel = (index, count) => count <= 6 || index % 2 === 0;
+
+const ChartReadout = ({ series, children }) => {
+  const [visible, setVisible] = useState(false);
+  const scope = series.basis === 'period' ? 'Period' : 'All time';
+  return <>
+    <View style={styles.chartHeading}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.chartReadout}>{children}</Text>
+        {scope === 'Period' ? <Text style={styles.scope}>{scope}</Text> : null}
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Chart calculation details" onPress={() => setVisible(true)} style={styles.detailsClose}>
+        <FontAwesome name="info-circle" size={18} color={COLORS.inkSecondary} />
+      </Pressable>
+    </View>
+    {visible ? <MetricDetails label="Chart calculation" metric={series} scope={scope} hideValue visible onClose={() => setVisible(false)} /> : null}
+  </>;
+};
 
 const SeriesUnavailable = ({ series }) => (
   <View style={styles.chartCard}>
@@ -353,11 +400,11 @@ export const BarChart = ({ series, emptyText, maxValue }) => {
 
   return (
     <View style={styles.chartCard}>
-      <Text style={styles.chartReadout}>
+      <ChartReadout series={series}>
         {selectedPoint
           ? `${fullBucket(selectedPoint.bucket)}: ${formatValue(selectedPoint.value, series.unit)}`
-          : dataMax === 0 ? emptyText : 'Tap a bar to see its value'}
-      </Text>
+          : dataMax === 0 ? emptyText : series.unit === 'SGD' ? 'S' + String.fromCharCode(36) : series.unit === 'percent' ? '%' : series.unit}
+      </ChartReadout>
 
       <View style={styles.plotRow}>
         <ChartAxis max={max} unit={series.unit} height={PLOT_HEIGHT} />
@@ -401,6 +448,28 @@ export const BarChart = ({ series, emptyText, maxValue }) => {
 
 // ---------- Line chart ----------
 
+export const CountBarChart = ({ series, emptyText }) => {
+  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
+  const points = series.points || [];
+  if (points.some(point => point.value === null || !Number.isInteger(Number(point.value)) || Number(point.value) < 0)) {
+    return <SeriesUnavailable series={{ reason: 'Tenancy counts are not valid.' }} />;
+  }
+  const max = Math.max(0, ...points.map(point => Number(point.value)));
+  const labelFor = label => ({ '3-6 months': '3 to <6 months', '6-12 months': '6 to <12 months', '12-24 months': '12 to <24 months', '>=24 months': '24+ months' }[label] || label);
+  return <View style={styles.chartCard}>
+    <ChartReadout series={series}>{max === 0 ? emptyText : 'Tenancies'}</ChartReadout>
+    {points.map(point => <View key={point.bucket} style={styles.countBarRow} accessible accessibilityLabel={`${labelFor(point.bucket)}: ${formatValue(point.value, 'count')} tenancies`}>
+      <View style={styles.countBarHeading}>
+        <Text style={styles.countBarLabel}>{labelFor(point.bucket)}</Text>
+        <Text style={styles.countBarValue}>{formatValue(point.value, 'count')}</Text>
+      </View>
+      <View style={styles.countBarTrack}>
+        <View style={[styles.countBarFill, { width: `${max === 0 ? 0 : Number(point.value) / max * 100}%` }]} />
+      </View>
+    </View>)}
+  </View>;
+};
+
 const LINE_HEIGHT = 150;
 const LINE_INSET = 8; // keeps the end markers inside the plot
 
@@ -427,11 +496,11 @@ export const LineChart = ({ series, emptyText, maxValue }) => {
 
   return (
     <View style={styles.chartCard}>
-      <Text style={styles.chartReadout}>
+      <ChartReadout series={series}>
         {selectedPoint
           ? `${fullBucket(selectedPoint.bucket)}: ${formatValue(selectedPoint.value, series.unit)}`
-          : dataMax === 0 ? emptyText : 'Tap a point to see its value'}
-      </Text>
+          : dataMax === 0 ? emptyText : series.unit === 'SGD' ? 'S' + String.fromCharCode(36) : series.unit === 'percent' ? '%' : series.unit}
+      </ChartReadout>
 
       <View style={styles.plotRow}>
         <ChartAxis max={max} unit={series.unit} height={LINE_HEIGHT} inset={LINE_INSET} />
@@ -565,7 +634,7 @@ export const DonutChart = ({ series, emptyText, totalLabel = 'Total users' }) =>
   );
 };
 
-export const MetricRow = ({ label, metric, change }) => {
+export const MetricRow = ({ label, metric, change, scope }) => {
   const [expanded, setExpanded] = useState(false);
   if (!metric) return null;
   const available = metric.availability === 'available';
@@ -579,9 +648,9 @@ export const MetricRow = ({ label, metric, change }) => {
         <Text style={styles.metricRowLabel}>{label}</Text><FontAwesome name="info-circle" size={16} color={COLORS.inkSecondary} />
         <Text style={styles.metricRowValue}>{available ? formatValue(metric.value, metric.unit) : 'Not available'}</Text>
       </View>
+      {visibleScopeFor(metric, scope) ? <Text style={styles.scope}>{visibleScopeFor(metric, scope)}</Text> : null}
       {comparison ? <Text style={styles.metricRowComparison}>{comparison}</Text> : null}
-      {!available && metric.reason ? <Text style={styles.tileReason}>{metric.reason}</Text> : null}
-      {expanded && metric.definition ? <Text style={styles.tileDefinition}>{metric.definition}</Text> : null}
+      {expanded ? <MetricDetails label={label} metric={metric} scope={scope} visible onClose={() => setExpanded(false)} /> : null}
     </Pressable>
   );
 };
@@ -649,6 +718,30 @@ export const OccupancyStrip = ({ series }) => {
 };
 
 const styles = StyleSheet.create({
+  countBarRow: { marginBottom: 16 },
+  countBarHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
+  countBarLabel: { flex: 1, fontSize: 14, lineHeight: 20, color: COLORS.ink },
+  countBarValue: { fontSize: 16, fontWeight: '600', color: COLORS.ink, fontVariant: ['tabular-nums'] },
+  countBarTrack: { height: 12, backgroundColor: COLORS.seriesTrack, borderRadius: 3, overflow: 'hidden' },
+  countBarFill: { height: '100%', backgroundColor: COLORS.series, borderRadius: 3 },
+  periodContainer: { marginBottom: 14 },
+  periodControlRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  periodTrigger: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: '#C8C7C2', borderRadius: 8, backgroundColor: COLORS.surface },
+  periodCaption: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary },
+  periodSelectedLabel: { fontSize: 16, lineHeight: 22, fontWeight: '600', color: COLORS.ink },
+  periodOption: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 8 },
+  periodMenu: { marginTop: 8, padding: 4, borderWidth: 1, borderColor: '#C8C7C2', borderRadius: 8 },
+  periodOptionSelected: { backgroundColor: '#EAF5EE' },
+  periodOptionTitle: { fontSize: 16, lineHeight: 22, fontWeight: '500', color: COLORS.ink },
+  chartHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  scope: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary, marginTop: 4 },
+  detailsBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
+  detailsPanel: { maxHeight: '80%', backgroundColor: COLORS.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 24, paddingBottom: 32 },
+  detailsHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  detailsTitle: { flex: 1, fontSize: 20, fontWeight: '600', color: COLORS.ink },
+  detailsClose: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
+  detailsValue: { fontSize: 28, fontWeight: '600', marginVertical: 12, color: COLORS.ink, fontVariant: ['tabular-nums'] },
+  detailsBody: { fontSize: 16, lineHeight: 24, marginTop: 12, color: COLORS.inkSecondary },
   donut: { width: 180, height: 180, alignSelf: 'center', marginVertical: 8 },
   donutCentre: { position: 'absolute', top: 0, bottom: 0, left: 30, right: 30, alignItems: 'center', justifyContent: 'center' },
   donutTotal: { fontSize: 26, fontWeight: '700', color: COLORS.ink },
@@ -680,7 +773,7 @@ const styles = StyleSheet.create({
   },
   tileLabel: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 14, lineHeight: 20,
     color: COLORS.inkSecondary,
   },
   featuredTile: { backgroundColor: '#FAFAFA', borderColor: '#D8D8D8' },
@@ -689,7 +782,7 @@ const styles = StyleSheet.create({
     flexBasis: '22%',
   },
   tileValue: {
-    fontSize: 24, fontWeight: '600', color: COLORS.ink, marginTop: 10,
+    fontVariant: ['tabular-nums'], fontSize: 24, fontWeight: '600', color: COLORS.ink, marginTop: 10,
   },
   tileUnavailable: {
     fontSize: 15,
