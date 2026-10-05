@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -112,7 +113,12 @@ const EditListingScreen = () => {
             style={styles.container}
         >
             <ScrollView contentContainerStyle={styles.scrollContainer}>
-                <Text style={styles.heading}>Edit Listing</Text>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                        <FontAwesome name="chevron-left" size={18} color="#000" />
+                    </TouchableOpacity>
+                    <Text style={styles.heading}>Edit Listing</Text>
+                </View>
 
                 {/* Name */}
                 <Text style={styles.label}>Name</Text>
@@ -285,10 +291,18 @@ const styles = StyleSheet.create({
     scrollContainer: {
         padding: 20,
     },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    backButton: {
+        marginRight: 12,
+        padding: 4,
+    },
     heading: {
         fontSize: 24,
         fontWeight: 'bold',
-        marginBottom: 20,
     },
     label: {
         fontSize: 16,
