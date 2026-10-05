@@ -314,12 +314,8 @@ describe('ListingAnalyticsScreen', () => {
   // The first full-screen render loads many React Native modules
   jest.setTimeout(30000);
 
-  const pressTab = async (tree, name) => {
-    const tab = tree.root.findAll((node) => node.props.accessibilityLabel === `${name} tab` && typeof node.props.onPress === 'function')[0];
-    await act(async () => { tab.props.onPress(); });
-  };
 
-  it('renders dated activity and unavailable date-dependent metrics across its tabs', async () => {
+  it('renders activity, payments, occupancy and date-dependent metrics on one page', async () => {
     await AsyncStorage.setItem('token', 'test-token');
     axios.get.mockResolvedValue({ data: listingResponse });
 
@@ -336,20 +332,19 @@ describe('ListingAnalyticsScreen', () => {
     // still make days on market unavailable.
     expect(text).toContain('Unique viewers');
     expect(text.filter((item) => item === 'Not available')).toHaveLength(1);
-    expect(text.filter((item) => item === '0')).toHaveLength(2);
+    expect(text.filter((item) => item === '0').length).toBeGreaterThanOrEqual(2);
     expect(text).toContain('+65.6 pts vs previous period');
     expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
 
-    // Offers: an empty period has zero events; all-time accepted records remain.
-    await pressTab(tree, 'Offers');
+    // Offers: empty period events remain zero alongside the other sections.
     text = renderedText(tree);
-    expect(text).not.toContain('Not available');
+    expect(text.filter((item) => item === 'Not available')).toHaveLength(1);
     expect(text.filter((item) => item === '0').length).toBeGreaterThanOrEqual(2);
     expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
-    expect(text).toContain('100.0%');
+    expect(text).not.toContain('Acceptance rate');
+    expect(text).toEqual(expect.arrayContaining(['Offers received', 'Offers accepted', 'Tenancies ended']));
 
     // Occupancy
-    await pressTab(tree, 'Occupancy');
     text = renderedText(tree);
     expect(text).toContain('Occupied 2 of 3 months');
     expect(text).toContain('3.0 mo');

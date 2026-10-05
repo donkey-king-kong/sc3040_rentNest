@@ -12,6 +12,7 @@ import {
   LineChart,
   LoadingState,
   Meter,
+  MetricRow,
   Section,
   StatTile,
   TileRow,
@@ -57,8 +58,8 @@ const OwnerAnalyticsScreen = () => {
   return (
     <>
       {header}
-      <AnalyticsLayout compactTabs periodAccent="#16794B"
-        tabs={['Overview', 'Rent', 'Occupancy', 'Offers', 'Properties']} tab={tab} onTabChange={setTab}
+      <AnalyticsLayout compactTabs periodAccent="#16794B" periodBelowTabs showPeriod={tab !== 'Properties'}
+        tabs={['Overview', 'Occupancy', 'Properties']} tab={tab} onTabChange={setTab}
         period={period} onPeriodChange={setPeriod} loading={loading} error={error}>
         {tab === 'Overview' ? (
           <>
@@ -70,6 +71,15 @@ const OwnerAnalyticsScreen = () => {
                 <StatTile label="Avg. days on market" metric={m.averageDaysOnMarket} />
               </TileRow>
             </Section>
+            <Section title="Monthly rent recorded" note="By rental month, rather than payment date.">
+              <MetricRow label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
+              <LineChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" />
+            </Section>
+          <Section title="Offers">
+            <MetricRow label="Offers received" metric={m.offersSentCount} change={m.offersSentChange} />
+            <MetricRow label="Offers accepted" metric={m.offersAcceptedCount} />
+            <MetricRow label="Tenancies ended" metric={m.terminationsCount} />
+          </Section>
             <Section title="Reviews" note="Reviews are about you as an owner, not about a specific property.">
               <TileRow>
                 <StatTile label="Average rating" metric={m.ownerAverageRating} />
@@ -79,19 +89,6 @@ const OwnerAnalyticsScreen = () => {
           </>
         ) : null}
 
-        {tab === 'Rent' ? (
-          <>
-            <Section title="Rent">
-              <TileRow>
-                <StatTile label="Rent recorded" metric={m.recordedRentPaymentTotal} change={m.recordedRentPaymentTotalChange} />
-                <StatTile label="Payments recorded" metric={m.recordedRentPaymentCount} change={m.recordedRentPaymentCountChange} />
-              </TileRow>
-            </Section>
-            <Section title="Monthly rent recorded" note="By rental month, rather than payment date.">
-              <BarChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" />
-            </Section>
-          </>
-        ) : null}
 
         {tab === 'Occupancy' ? (
           <>
@@ -109,33 +106,12 @@ const OwnerAnalyticsScreen = () => {
             <Section title="Occupancy trend" note="Share of each month your listings were occupied. Uses the listings you own now.">
               <LineChart series={data.series.monthlyOccupancyRate} emptyText="No occupancy in this period" maxValue={100} />
             </Section>
-          </>
-        ) : null}
-
-        {tab === 'Offers' ? (
-          <>
-            <Section title="Activity in this period" note="Events dated within the selected period. Tap a number for details.">
-              <TileRow>
-                <StatTile label="New listings" metric={m.newListingCount} />
-                <StatTile label="Offers sent" metric={m.offersSentCount} change={m.offersSentChange} />
-                <StatTile label="Offers accepted" metric={m.offersAcceptedCount} />
-                <StatTile label="Terminations" metric={m.terminationsCount} />
-              </TileRow>
-            </Section>
-            <Section title="Offers (all time)">
-              <TileRow>
-                <StatTile label="Offers sent" metric={m.rentalRecordCount} />
-                <StatTile label="Accepted" metric={m.acceptedRentalRecordCount} />
-                <StatTile label="Pending" metric={m.pendingRentalRecordCount} />
-                <StatTile label="Terminated" metric={m.terminatedRentalRecordCount} />
-              </TileRow>
-              <Meter label="Acceptance rate" metric={m.acceptanceRate} />
-            </Section>
             <Section title="Tenancy length" note="Terminated tenancies use their termination date; active ones use the lease expiry.">
               <BarChart series={data.series.tenancyDurationDistribution} emptyText="No accepted tenancies yet" />
             </Section>
           </>
         ) : null}
+
 
         {tab === 'Properties' ? (
           <>

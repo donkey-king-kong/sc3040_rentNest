@@ -49,18 +49,27 @@ beforeEach(() => {
 it('owner navigation separates topics, retains the period and still opens property analytics', async () => {
   const tree = await render(OwnerAnalyticsScreen);
   expect(text(tree)).toContain('At a glance');
-  expect(text(tree)).not.toContain('Monthly rent recorded');
-  await press(tree, '30D period');
-  await press(tree, 'Rent tab');
   expect(text(tree)).toContain('Monthly rent recorded');
-  expect(text(tree)).not.toContain('Reviews');
+  expect(text(tree)).toEqual(expect.arrayContaining(['Offers received', 'Offers accepted', 'Tenancies ended', 'Reviews']));
+  expect(text(tree)).not.toContain('Offers (all time)');
+  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Offers tab')).toHaveLength(0);
+  await press(tree, '30D period');
+  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Rent tab')).toHaveLength(0);
+  expect(text(tree)).toContain('Payments recorded');
   expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '30D');
   await press(tree, 'Occupancy tab');
   expect(text(tree)).toContain('Occupancy trend');
-  expect(text(tree)).not.toContain('Monthly rent recorded');
-  await press(tree, 'Offers tab');
-  expect(text(tree)).toContain('Offers (all time)');
   expect(text(tree)).toContain('Tenancy length');
+  expect(text(tree)).not.toContain('Monthly rent recorded');
+  await press(tree, 'Overview tab');
+  expect(text(tree)).toEqual(expect.arrayContaining(['Offers received', 'Offers accepted', 'Tenancies ended']));
+  expect(text(tree)).not.toContain('Offers (all time)');
+  expect(text(tree)).not.toContain('Activity in this period');
+  expect(text(tree)).not.toContain('Tenancy length');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '30D');
+  await press(tree, '3M period');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '3M');
+  await press(tree, '30D period');
   await press(tree, 'Properties tab');
   expect(text(tree)).toContain('By property');
   expect(text(tree)).not.toContain('Offers (all time)');
@@ -98,9 +107,8 @@ it('shows a completed days-on-market interval with both dates while retaining vi
   const tree = await render(ListingAnalyticsScreen);
   expect(text(tree)).toEqual(expect.arrayContaining(['10.0 days', 'Published', 'First offer accepted', 'Listing views', 'Unique viewers']));
   expect(text(tree).some(t => t.includes('Sep 2026'))).toBe(true);
-  await press(tree, 'Payments tab');
   expect(text(tree)).toContain('Payments recorded');
-  expect(text(tree)).not.toContain('Time to accepted offer');
+  expect(text(tree)).toContain('Time to accepted offer');
 });
 
  it('owner analytics returns to the previous screen or falls back to profile', async () => {
@@ -160,4 +168,31 @@ it('does not fabricate an offer distribution when counts are unavailable', async
   await press(tree, 'Rentals tab');
   expect(text(tree)).toContain('Offer history unavailable');
   expect(text(tree)).not.toContain('Recorded offers');
+});
+
+it('property analytics shows all sections on one page and retains period selection', async () => {
+  const tree = await render(ListingAnalyticsScreen);
+  expect(text(tree)).toEqual(expect.arrayContaining(['Offers received', 'Offers accepted', 'Tenancies ended']));
+  expect(text(tree)).not.toContain('Activity in this period');
+  expect(text(tree)).not.toContain('Offers and tenancies (all time)');
+  expect(tree.root.findAll(node => node.props.accessibilityRole === 'tab')).toHaveLength(0);
+  expect(text(tree)).toEqual(expect.arrayContaining(['Listing interest', 'Monthly rent recorded', 'Month by month', 'Time to accepted offer']));
+  expect(text(tree)).not.toContain('Acceptance rate');
+  await press(tree, '30D period');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/listing/2', '30D');
+  await press(tree, '3M period');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/listing/2', '3M');
+});
+
+it('owner places the period below tabs and hides it on Properties without losing the selection', async () => {
+  const tree = await render(OwnerAnalyticsScreen);
+  const labels = text(tree);
+  expect(labels.indexOf('Period')).toBeGreaterThan(labels.indexOf('Properties'));
+  await press(tree, '3M period');
+  await press(tree, 'Properties tab');
+  expect(text(tree)).not.toContain('Period');
+  expect(tree.root.findAll(node => node.props.accessibilityLabel === '3M period')).toHaveLength(0);
+  await press(tree, 'Occupancy tab');
+  expect(text(tree)).toContain('Period');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '3M');
 });

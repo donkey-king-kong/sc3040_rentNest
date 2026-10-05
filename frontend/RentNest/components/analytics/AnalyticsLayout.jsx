@@ -4,7 +4,7 @@ import { COLORS, PeriodSelector } from './AnalyticsKit';
 
 // Keep navigation above the scrolling panel. Changing tabs resets that panel to the top,
 // while the selected period stays in the screen's state.
-export default function AnalyticsLayout({ header, title, subtitle, tabs, tab, onTabChange, period, onPeriodChange, loading, error, children, compactTabs = false, periodAccent }) {
+export default function AnalyticsLayout({ header, title, subtitle, tabs = [], tab, onTabChange, period, onPeriodChange, loading, error, children, compactTabs = false, periodAccent, periodBelowTabs = false, showPeriod = true }) {
   const id = useId();
   const buttons = useRef([]);
   const { width } = useWindowDimensions();
@@ -25,8 +25,8 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs, tab, on
             {title ? <Text style={styles.title}>{title}</Text> : null}
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </>}
-          <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} />
-          <TabContainer
+          {showPeriod && !periodBelowTabs ? <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} /> : null}
+          {tabs.length > 0 ? <TabContainer
             {...(compactTabs ? { horizontal: true, showsHorizontalScrollIndicator: false,
               contentContainerStyle: styles.compactTabRow, style: styles.compactTabs } : { style: styles.tabs })}
             accessibilityRole="tablist" accessibilityLabel="Analytics sections">
@@ -41,10 +41,13 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs, tab, on
                 <Text style={compactTabs ? [styles.tabText, name === tab && styles.compactSelectedText] : [styles.tabText, name === tab && styles.selectedText]}>{name}</Text>
               </Pressable>
             ))}
-          </TabContainer>
+          </TabContainer> : null}
+          {showPeriod && periodBelowTabs ? <View style={styles.periodBelowTabs}>
+            <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} />
+          </View> : null}
         </View>
         <ScrollView key={tab} nativeID={`${id}-panel`}
-          {...(web ? { role: 'tabpanel', 'aria-labelledby': `${id}-tab-${tabs.indexOf(tab)}` } : {})}
+          {...(web && tabs.length > 0 ? { role: 'tabpanel', 'aria-labelledby': `${id}-tab-${tabs.indexOf(tab)}` } : {})}
           style={styles.panel} contentContainerStyle={styles.content}>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {children}
@@ -55,6 +58,7 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs, tab, on
 }
 
 const styles = StyleSheet.create({
+  periodBelowTabs: { marginTop: 16 },
   adminScreen: { backgroundColor: COLORS.surface },
   adminHeader: { backgroundColor: '#FFFFFF', paddingTop: 0 },
   screen: { flex: 1, backgroundColor: COLORS.surface },
