@@ -11,7 +11,6 @@ import MorphingInfinity from '../components/MorphingInfinity';
 
 const emptyForm = { query: '', minPrice: '', maxPrice: '', minBeds: '', types: [] };
 
-const aiLabel = (stage, value) => aiLabels[stage]?.[value] || null;
 const historyKey = token => `recommendation-views:${jwtDecode(token).sub}`;
 async function readHistory(token) {
   try {
