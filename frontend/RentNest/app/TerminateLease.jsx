@@ -149,7 +149,10 @@ const TerminateLease = () => {
             style={styles.amountInput}
             keyboardType="numeric"
             value={amount}
-            onChangeText={setAmount}
+            onChangeText={(text) => {
+              const match = text.match(/^\d*(\.\d{0,2})?/);
+              setAmount(match ? match[0] : '');
+            }}
             editable={selectedOption === 'refund'}
             placeholder="0"
             placeholderTextColor="#aaa"
