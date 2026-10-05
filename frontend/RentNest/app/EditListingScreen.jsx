@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
+import MorphingInfinity from '../components/MorphingInfinity';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -10,6 +11,7 @@ const EditListingScreen = () => {
     const router = useRouter();
     const { listingId } = useLocalSearchParams();
     const [modalVisible, setModalVisible] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [listing, setListing] = useState({
         ownerUserID: 1,
         tenantUserID: 2,
@@ -49,6 +51,8 @@ const EditListingScreen = () => {
                 console.error('Error fetching listing data:', error);
                 Alert.alert('Error', 'Failed to load listing data');
                 router.back();
+            } finally {
+                setLoading(false);
             }
         };
 
@@ -107,8 +111,17 @@ const EditListingScreen = () => {
         router.push({ pathname: '/RentalInfoOwnerScreen', params: { listingId } });
     };
 
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <MorphingInfinity size={86} color="#2FA84F" />
+                <Text style={styles.loadingText}>Loading listing...</Text>
+            </View>
+        );
+    }
+
     return (
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
         >
@@ -253,8 +266,8 @@ const EditListingScreen = () => {
                     style={styles.input}
                     placeholder="Enter image URL"
                     placeholderTextColor="#999"
-                    value={listing.imageUrl}
-                    onChangeText={(value) => handleInputChange('imageUrl', value)}
+                    value={listing.listingpicture || ''}
+                    onChangeText={(value) => handleInputChange('listingpicture', value)}
                 />
 
                 {/* Update Listing Button */}
@@ -287,6 +300,17 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#fff',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#555',
     },
     scrollContainer: {
         padding: 20,
