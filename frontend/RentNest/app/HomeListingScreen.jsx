@@ -245,7 +245,7 @@ const HomeListingScreen = () => {
 
   const handleConfirm = async () => {
     try {
-      await axios.put(`${API_BASE_URL}api/listings/setFlag/${listingId}/true`, {
+      await axios.put(`${API_BASE_URL}/api/listings/setFlag/${listingId}/true`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
