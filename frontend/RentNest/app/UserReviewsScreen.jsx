@@ -117,7 +117,7 @@ const UserReviewsScreen = () => {
                         // }
 
                         return {
-                            id: review.reviewID,
+                            id: review.reviewID || review.reviewid || review.id,
                             userId: review.userID || review.userId,
                             reviewerId: review.reviewerID || review.reviewerId,
                             reviewer: review.reviewerName,
@@ -182,8 +182,7 @@ const UserReviewsScreen = () => {
         router.push({
             pathname: '/LeaveReview',
             params: {
-                ownerId: review.userId || userId,
-                tenantId: currentUserId,
+                revieweeId: review.userId || userId,
                 revieweeName,
                 revieweeRole,
                 revieweePhotoURL,
@@ -233,8 +232,7 @@ const UserReviewsScreen = () => {
         router.push({
             pathname: '/LeaveReview',
             params: {
-                ownerId: userId,
-                tenantId: currentUserId,
+                revieweeId: userId,
                 revieweeName,
                 revieweeRole,
                 revieweePhotoURL,

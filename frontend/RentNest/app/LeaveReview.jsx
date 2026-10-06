@@ -7,19 +7,43 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MorphingInfinity from '../components/MorphingInfinity';
+import { jwtDecode } from 'jwt-decode';
 
 import errorImage from '../assets/images/error.png';
 const notificationBellIcon = require('../assets/images/notificationBell.png');
 
+const normalizeId = (value) => {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const parsedValue = Number.parseInt(rawValue, 10);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+};
+
+const getReviewId = (review) => review?.reviewID || review?.reviewId || review?.reviewid || review?.id;
+
 const LeaveReview = () => {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { ownerId, listingId, tenantId, revieweeName, ownerName, tenantName, revieweeRole, role, revieweePhotoURL } = useLocalSearchParams();
+  const {
+    revieweeId,
+    reviewerId: routeReviewerId,
+    ownerId,
+    listingId,
+    tenantId,
+    revieweeName,
+    ownerName,
+    tenantName,
+    revieweeRole,
+    role,
+    revieweePhotoURL
+  } = useLocalSearchParams();
+  const reviewedUserId = normalizeId(revieweeId) || normalizeId(ownerId);
+  const fallbackReviewerId = normalizeId(routeReviewerId) || normalizeId(tenantId);
 
   // Add debug logging for route params
-  console.log('Route Params:', { ownerId, listingId, tenantId });
+  console.log('Route Params:', { revieweeId, routeReviewerId, ownerId, listingId, tenantId });
 
   const [token, setToken] = useState(null);  // New state for storing token
+  const [reviewerId, setReviewerId] = useState(fallbackReviewerId);
   const [rating, setRating] = useState(0);
   const [reviewTitle, setReviewTitle] = useState('');
   const [reviewText, setReviewText] = useState('');
@@ -37,10 +61,11 @@ const LeaveReview = () => {
 
   useEffect(() => {
     // Validate required parameters
-    if (!ownerId || !tenantId) {
+    if (!reviewedUserId) {
       setModalMessage("Missing required parameters. Please try again.");
       setIsError(true);
       setModalVisible(true);
+      setLoading(false);
       return;
     }
 
@@ -51,35 +76,62 @@ const LeaveReview = () => {
         if (retrievedToken) {
           setToken(retrievedToken);
           console.log('Token retrieved successfully');
+
+          try {
+            const decoded = jwtDecode(retrievedToken);
+            const response = await axios.get(`${API_BASE_URL}/api/users/${decoded.sub}`, {
+              headers: {
+                'Authorization': `Bearer ${retrievedToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+              }
+            });
+
+            const authenticatedReviewerId = normalizeId(response.data?.userID || response.data?.userId);
+            if (authenticatedReviewerId) {
+              setReviewerId(authenticatedReviewerId);
+              await AsyncStorage.setItem('userId', authenticatedReviewerId.toString());
+            }
+          } catch (profileError) {
+            console.error("Error resolving authenticated reviewer:", profileError);
+            if (!fallbackReviewerId) {
+              setModalMessage("Could not identify the logged-in reviewer. Please try again.");
+              setIsError(true);
+              setModalVisible(true);
+              setLoading(false);
+            }
+          }
         } else {
           console.log('No token found in AsyncStorage');
           setModalMessage("Authentication error. Please log in again.");
           setIsError(true);
           setModalVisible(true);
+          setLoading(false);
         }
       } catch (error) {
         console.error("Error retrieving token:", error);
         setModalMessage("Error retrieving authentication. Please log in again.");
         setIsError(true);
         setModalVisible(true);
+        setLoading(false);
       }
     };
 
     fetchToken();
-  }, [ownerId, tenantId]);
+  }, [reviewedUserId, fallbackReviewerId]);
 
   useEffect(() => {
     // Load review data once the token is available and we have required params
-    if (token && ownerId && tenantId) {
-      console.log('Fetching review with token and params:', { ownerId, tenantId });
+    if (token && reviewedUserId && reviewerId) {
+      console.log('Fetching review with token and params:', { reviewedUserId, reviewerId });
       fetchReview();
       fetchRevieweeProfile();
     }
-  }, [token, ownerId, tenantId]);
+  }, [token, reviewedUserId, reviewerId]);
 
   const fetchRevieweeProfile = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/users/id/${ownerId}`, {
+      const response = await axios.get(`${API_BASE_URL}/api/users/id/${reviewedUserId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
@@ -96,9 +148,9 @@ const LeaveReview = () => {
   const fetchReview = async () => {
     try {
       setLoading(true);
-      console.log(`Fetching review from: ${API_BASE_URL}/api/reviews/byOwnerAndTenant?userId=${ownerId}&reviewerId=${tenantId}`);
+      console.log(`Fetching review from: ${API_BASE_URL}/api/reviews/byOwnerAndTenant?userId=${reviewedUserId}&reviewerId=${reviewerId}`);
 
-      const response = await axios.get(`${API_BASE_URL}/api/reviews/byOwnerAndTenant?userId=${ownerId}&reviewerId=${tenantId}`, {
+      const response = await axios.get(`${API_BASE_URL}/api/reviews/byOwnerAndTenant?userId=${reviewedUserId}&reviewerId=${reviewerId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
@@ -111,11 +163,12 @@ const LeaveReview = () => {
       if (response.status === 200 && response.data) {
         // Found a review
         const userReview = response.data;
+        const fetchedReviewId = getReviewId(userReview);
         setRating(userReview.rating);
-        setReviewTitle(userReview.title);
-        setReviewText(userReview.text);
-        setIsEditing(true);
-        setReviewId(userReview.reviewid);
+        setReviewTitle(userReview.title || '');
+        setReviewText(userReview.text || '');
+        setIsEditing(Boolean(fetchedReviewId));
+        setReviewId(fetchedReviewId || null);
         setInitialReview({
           rating: userReview.rating,
           title: userReview.title || '',
@@ -157,8 +210,8 @@ const LeaveReview = () => {
       return;
     }
 
-    if (!ownerId || !tenantId) {
-      setModalMessage("Missing required parameters. Please try again.");
+    if (!reviewedUserId || !reviewerId) {
+      setModalMessage("Missing required review user information. Please try again.");
       setIsError(true);
       setModalVisible(true);
       return;
@@ -174,11 +227,10 @@ const LeaveReview = () => {
     try {
       setIsSubmitting(true);
       const reviewData = {
-        userID: ownerId,
+        userID: reviewedUserId,
         rating,
-        title: reviewTitle,
-        text: reviewText,
-        reviewerID: parseInt(tenantId, 10),
+        title: reviewTitle.trim(),
+        text: reviewText.trim(),
         flagged: false
       };
 
@@ -187,7 +239,7 @@ const LeaveReview = () => {
       let response;
 
       // In handleSubmit function, for updating the review:
-      if (isEditing) {
+      if (isEditing && reviewId) {
         console.log('Attempting to update review with data:', reviewData); // Added log
         response = await axios.put(`${API_BASE_URL}/api/reviews/${reviewId}`, reviewData, {
           headers: {
@@ -210,6 +262,24 @@ const LeaveReview = () => {
       }
 
       if (response.status === 200 || response.status === 201) {
+        let persistedReviewId = getReviewId(response.data);
+
+        if (!persistedReviewId) {
+          const verificationResponse = await axios.get(`${API_BASE_URL}/api/reviews/byOwnerAndTenant?userId=${reviewedUserId}&reviewerId=${reviewerId}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          });
+          persistedReviewId = getReviewId(verificationResponse.data);
+        }
+
+        if (!persistedReviewId) {
+          throw new Error("Review submit returned success, but the saved review could not be verified.");
+        }
+
+        setReviewId(persistedReviewId);
         setModalMessage(isEditing ? "Review Updated" : "Review Submitted");
         setIsError(false);
         setModalVisible(true);
@@ -278,7 +348,7 @@ const LeaveReview = () => {
     const paramValue = Array.isArray(value) ? value[0] : value;
     return paramValue && paramValue !== 'undefined' ? paramValue : undefined;
   };
-  const displayedRevieweeName = getParamValue(revieweeName) || getParamValue(ownerName) || getParamValue(tenantName) || `User ${getParamValue(ownerId) || ''}`.trim();
+  const displayedRevieweeName = getParamValue(revieweeName) || getParamValue(ownerName) || getParamValue(tenantName) || `User ${reviewedUserId || ''}`.trim();
   const displayedRevieweeRole = getParamValue(revieweeRole) || getParamValue(role) || 'User';
   const displayedRevieweePhotoURL = getParamValue(revieweePhotoURL)
       || revieweeProfile?.photoURL
@@ -316,16 +386,7 @@ const LeaveReview = () => {
 
     notificationTimeoutRef.current = setTimeout(() => {
       setModalVisible(false);
-      router.replace({
-        pathname: '/UserReviewsScreen',
-        params: {
-          userId: ownerId,
-          currentUser: tenantId,
-          revieweeName: displayedRevieweeName,
-          revieweeRole: displayedRevieweeRole,
-          revieweePhotoURL: displayedRevieweePhotoURL,
-        },
-      });
+      router.back();
     }, 2000);
 
     return () => {
@@ -333,7 +394,7 @@ const LeaveReview = () => {
         clearTimeout(notificationTimeoutRef.current);
       }
     };
-  }, [modalVisible, isError, router, ownerId, tenantId, displayedRevieweeName, displayedRevieweeRole, displayedRevieweePhotoURL]);
+  }, [modalVisible, isError, router, reviewedUserId, reviewerId, displayedRevieweeName, displayedRevieweeRole, displayedRevieweePhotoURL]);
 
   if (loading) {
     return (
@@ -474,7 +535,7 @@ const LeaveReview = () => {
                         if (modalMessage.includes("Authentication error")) {
                           router.replace('/LoginScreen');
                         } else {
-                          router.push({ pathname: '/RentalInfoTenantScreen', params: { listingId, tenantId, ownerId } });
+                          router.back();
                         }
                       }}
                   >

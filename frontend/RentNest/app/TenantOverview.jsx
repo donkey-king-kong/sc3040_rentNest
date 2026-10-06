@@ -104,9 +104,8 @@ const TenantOverview = () => {
     router.push({
       pathname: '/LeaveReview',
       params: {
-        ownerId: tenant.userID,
+        revieweeId: tenant.userID,
         listingId,
-        tenantId: currentUserId || rental.ownerUserId,
         revieweeName: tenant.name,
         revieweeRole: 'Tenant',
         revieweePhotoURL: tenant.photoURL,

@@ -6,6 +6,7 @@ import RentNest.repository.ReviewsRepository;
 import RentNest.model.User;
 import RentNest.dto.UserDTO;
 import RentNest.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -55,26 +56,44 @@ public class ReviewsService {
     }
 
     // Create
-    public Reviews createReview(ReviewsDTO reviewsDTO) {
-        // Fetch the user by userID from the UserRepository
-        User user = userRepository.findById(reviewsDTO.getUserID())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    @Transactional
+    public ReviewsDTO createReview(ReviewsDTO reviewsDTO, Long authenticatedReviewerId) {
+        if (reviewsDTO.getUserID() == null) {
+            throw new IllegalArgumentException("Reviewed user ID is required.");
+        }
 
-        // Fetch the reviewer by reviewerID from the UserRepository
-        User reviewer = userRepository.findById(reviewsDTO.getReviewerID())
-                .orElseThrow(() -> new RuntimeException("Reviewer not found"));
+        if (authenticatedReviewerId == null) {
+            throw new SecurityException("Authentication required.");
+        }
+
+        if (reviewsDTO.getUserID().equals(authenticatedReviewerId)) {
+            throw new IllegalArgumentException("Users cannot review themselves.");
+        }
+
+        reviewsRepository.findByUser_UserIDAndReviewer_UserID(
+                reviewsDTO.getUserID(),
+                authenticatedReviewerId
+        ).ifPresent(existingReview -> {
+            throw new IllegalArgumentException("Review already exists for this user pair. Use update instead.");
+        });
+
+        User user = userRepository.findById(reviewsDTO.getUserID())
+                .orElseThrow(() -> new IllegalArgumentException("Reviewed user not found"));
+
+        User reviewer = userRepository.findById(authenticatedReviewerId)
+                .orElseThrow(() -> new IllegalArgumentException("Reviewer not found"));
 
         // Create a new review entity
         Reviews reviews = new Reviews();
         reviews.setTitle(reviewsDTO.getTitle());
         reviews.setText(reviewsDTO.getText());
         reviews.setRating(reviewsDTO.getRating());
-        reviews.setFlagged(reviewsDTO.isFlagged());
-        reviews.setUser(user);       // Set the fetched User entity (owner)
-        reviews.setReviewer(reviewer); // Set the fetched Reviewer entity (tenant)
+        reviews.setFlagged(false);
+        reviews.setUser(user);
+        reviews.setReviewer(reviewer);
 
         // Save the review and return it
-        return reviewsRepository.save(reviews);
+        return toReviewsDTO(reviewsRepository.saveAndFlush(reviews));
     }
 //    example:
 //{
