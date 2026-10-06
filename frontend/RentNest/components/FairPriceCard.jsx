@@ -46,13 +46,31 @@ const ROOM_SHARE_SOURCE = 'Room share: 2026 median room rents (Hozuko room-rent 
 
 const money = (n) => (n == null ? '-' : `$${Math.round(Number(n)).toLocaleString()}`);
 
-const Header = ({ badge }) => (
-  <View style={styles.headerRow}>
-    <FontAwesome name="balance-scale" size={15} color={INK} />
-    <Text style={styles.title}>AI Fair Price</Text>
-    {badge}
-  </View>
-);
+/** Card header; tapping it collapses or expands the card when onToggle is given. */
+const Header = ({ badge, open, onToggle }) => {
+  const content = (
+    <>
+      <FontAwesome name="balance-scale" size={15} color={INK} />
+      <Text style={styles.title}>AI Fair Price</Text>
+      {badge}
+      {onToggle && (
+        <FontAwesome name={open ? 'chevron-up' : 'chevron-down'} size={13} color={INK_SECONDARY} style={styles.chevron} />
+      )}
+    </>
+  );
+  if (!onToggle) return <View style={styles.headerRow}>{content}</View>;
+  return (
+    <TouchableOpacity
+      style={[styles.headerRow, styles.headerTouchable, !open && styles.headerCollapsed]}
+      onPress={onToggle}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      accessibilityLabel="AI Fair Price"
+    >
+      {content}
+    </TouchableOpacity>
+  );
+};
 
 /** One-line advice that depends on direction, worded for the person looking at the card. */
 const adviceFor = (pct, isOwner) => {
@@ -73,6 +91,7 @@ const adviceFor = (pct, isOwner) => {
 const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact, aiExplanation, aiExplanationLoading }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [aiExpanded, setAiExpanded] = useState(false);
+  const [open, setOpen] = useState(true);
 
   if (loading) {
     return (
@@ -148,6 +167,8 @@ const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
       <Header
+        open={open}
+        onToggle={() => setOpen(!open)}
         badge={t && (
           <View style={styles.badge} accessibilityLabel={`Verdict: ${t.label}`}>
             {t.band
@@ -158,6 +179,7 @@ const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact
         )}
       />
 
+      {open && (<>
       <Text style={styles.headline}>{headline}</Text>
       {hasPrice && (
         <Text style={styles.subline}>
@@ -271,6 +293,7 @@ const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact
           <Text style={styles.useButtonText}>Use fair rent ({money(fairPrice)})</Text>
         </TouchableOpacity>
       )}
+      </>)}
     </View>
   );
 };
@@ -292,6 +315,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  headerTouchable: {
+    minHeight: 44,
+    marginTop: -8,
+    marginBottom: 2,
+  },
+  headerCollapsed: {
+    marginBottom: -8,
+  },
+  chevron: {
+    marginLeft: 10,
   },
   title: {
     fontSize: 15,

@@ -62,6 +62,11 @@ public class FairPricingService {
     static final int PRIVATE_YEARS = 1;
     static final double PRIVATE_FALLBACK_RADIUS_M = 500;
     static final double LANDED_RADIUS_M = 1000;
+    /** Wider search before falling back to simulated data. */
+    static final double PRIVATE_WIDE_RADIUS_M = 1500;
+    /** Last real-data step for isolated condos (e.g. among landed estates), before simulated data. */
+    static final double PRIVATE_WIDEST_RADIUS_M = 3000;
+    static final double LANDED_WIDE_RADIUS_M = 2000;
     /** Band tolerances in percent, narrowest first. */
     static final int[] TIER_TOLERANCES = {5, 10, 15};
     /** HDB 4-ROOM and 5-ROOM flats both have 3 bedrooms; use floor area to tell them apart. */
@@ -92,7 +97,8 @@ public class FairPricingService {
     /** Whole-unit bedrooms assumed for a room listing that does not say (HDB: a 4-ROOM flat). */
     static final int DEFAULT_ROOM_FLAT_BEDROOMS = 3;
 
-    private record CacheEntry(long createdAt, List<ComparableTransaction> comps, String basis) {}
+    /** @param broad true when comparables come from a town or wide radius rather than the street/project */
+    private record CacheEntry(long createdAt, List<ComparableTransaction> comps, String basis, boolean broad) {}
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
     static final Tier[] TIER_NAMES = {Tier.EXCELLENT, Tier.GREAT, Tier.GOOD};
 
@@ -142,7 +148,7 @@ public class FairPricingService {
         if (c == null || !c.isRoom()) {
             String flatType = "HDB".equalsIgnoreCase(l.getType())
                     ? hdbFlatTypeForListing(l.getName(), l.getDescription(), l.getBeds(), l.getSize()) : null;
-            FairPriceEstimate e = estimate(l.getType(), l.getPostal(), l.getBeds(), l.getSize(), l.getFloor(), l.getPrice(), 1.0, flatType);
+            FairPriceEstimate e = estimate(l.getType(), l.getPostal(), l.getBeds(), l.getSize(), l.getFloor(), l.getPrice(), 1.0, flatType, l.getLocation());
             if (c != null) {
                 e.setUnitType(c.unitType().name());
                 e.setUnitTypeSource(c.source());
@@ -154,7 +160,7 @@ public class FairPricingService {
         int wholeBeds = c.wholeUnitBedrooms() != null ? c.wholeUnitBedrooms() : DEFAULT_ROOM_FLAT_BEDROOMS;
         double share = roomShare(l.getType(), wholeBeds, master);
         // The listing's own size is the room's, so it is not compared with whole-unit sizes.
-        FairPriceEstimate e = estimate(l.getType(), l.getPostal(), wholeBeds, null, l.getFloor(), l.getPrice(), share, null);
+        FairPriceEstimate e = estimate(l.getType(), l.getPostal(), wholeBeds, null, l.getFloor(), l.getPrice(), share, null, l.getLocation());
         e.setUnitType(c.unitType().name());
         e.setUnitTypeSource(c.source());
         e.setRentShare(share);
@@ -176,15 +182,16 @@ public class FairPricingService {
 
     /** Owner view: estimate for a property described by its attributes (listing may not exist yet). */
     public FairPriceEstimate estimate(String type, Integer postal, Integer beds, Integer size, Integer floor, Integer askingPrice) {
-        return estimate(type, postal, beds, size, floor, askingPrice, 1.0, null);
+        return estimate(type, postal, beds, size, floor, askingPrice, 1.0, null, null);
     }
 
     /**
      * @param rentShare    fraction of whole-unit rent being priced (1.0 for a whole unit, less for a room)
      * @param hdbFlatTypeOverride HDB flat type to use instead of deriving it from bedrooms (null to derive)
+     * @param location     the listing's own street/area text, used when its postal code finds too few rentals
      */
     private FairPriceEstimate estimate(String type, Integer postal, Integer beds, Integer size, Integer floor,
-                                       Integer askingPrice, double rentShare, String hdbFlatTypeOverride) {
+                                       Integer askingPrice, double rentShare, String hdbFlatTypeOverride, String location) {
         if (postal == null || type == null || type.isBlank()) {
             return FairPriceEstimate.unavailable(null, null, "Property type and postal code are required for a price estimate.");
         }
@@ -197,15 +204,33 @@ public class FairPricingService {
                     return FairPriceEstimate.unavailable("HDB", null, "Number of bedrooms is required for an HDB estimate.");
                 }
                 String flatType = hdbFlatTypeOverride != null ? hdbFlatTypeOverride : hdbFlatType(beds, size);
-                CacheEntry entry = cached("HDB|" + postalCode + "|" + flatType, () -> {
+                CacheEntry entry = cached("HDB|" + postalCode + "|" + flatType + "|" + location, () -> {
+                    // 1. The postal code's street.
                     List<HDBRentalContract> contracts = apiService.getHDBRentalContractsByFlatType(postalCode, flatType);
-                    String basis = contracts.isEmpty()
-                            ? flatType + " HDB flats on the same street"
-                            : flatType + " HDB flats along " + contracts.get(0).getStreetName();
-                    return new CacheEntry(System.currentTimeMillis(), toComparables(contracts), basis);
+                    // 2. The street written on the listing (postal code unknown or not a residential block).
+                    if (contracts.size() < MIN_COMPARABLES && location != null && !location.isBlank()) {
+                        List<HDBRentalContract> byStreet = apiService.getHDBRentalContractsByStreet(
+                                ApiService.normaliseHdbStreetName(location), flatType);
+                        if (byStreet.size() > contracts.size()) contracts = byStreet;
+                    }
+                    if (contracts.size() >= MIN_COMPARABLES) {
+                        return new CacheEntry(System.currentTimeMillis(), toComparables(contracts),
+                                flatType + " HDB flats along " + contracts.get(0).getStreetName(), false);
+                    }
+                    // 3. The whole HDB town named on the listing.
+                    String town = ApiService.hdbTownIn(location);
+                    if (town != null) {
+                        List<HDBRentalContract> byTown = apiService.getHDBRentalContractsByTown(town, flatType);
+                        if (byTown.size() >= MIN_COMPARABLES) {
+                            return new CacheEntry(System.currentTimeMillis(), toComparables(byTown),
+                                    flatType + " HDB flats in " + town + " (town-wide)", true);
+                        }
+                    }
+                    return new CacheEntry(System.currentTimeMillis(), toComparables(contracts),
+                            flatType + " HDB flats on the same street", false);
                 });
                 // HDB dataset has no floor area, so size adjustment is skipped for HDB.
-                return withDemoFallback(computeEstimate(scale(entry.comps(), rentShare), null, floor, askingPrice, "HDB", entry.basis()),
+                return withDemoFallback(broaden(computeEstimate(scale(entry.comps(), rentShare), null, floor, askingPrice, "HDB", entry.basis()), entry),
                         type, flatType, postalCode, null, floor, askingPrice, rentShare);
             }
 
@@ -215,9 +240,10 @@ public class FairPricingService {
                 return FairPriceEstimate.unavailable("URA", null, "Number of bedrooms is required for a private-property estimate.");
             }
 
-            CacheEntry entry = cached("URA|" + postalCode + "|" + noOfBedRoom + "|" + landed, () -> {
+            CacheEntry entry = cached("URA|" + postalCode + "|" + noOfBedRoom + "|" + landed + "|" + location, () -> {
                 List<RentalContract> contracts = new ArrayList<>();
                 String basis;
+                boolean broad = false;
                 if (!landed) {
                     String project = apiService.getProjectNameFromPostalCode(postalCode);
                     boolean hasProject = project != null && !project.isBlank()
@@ -230,13 +256,35 @@ public class FairPricingService {
                         contracts = apiService.getRentalContractsNearPostalCode(postalCode, PRIVATE_FALLBACK_RADIUS_M, PRIVATE_YEARS, noOfBedRoom);
                         basis = noOfBedRoom + "-bedroom private units within " + (int) PRIVATE_FALLBACK_RADIUS_M + "m";
                     }
+                    if (contracts.size() < MIN_COMPARABLES && location != null && !location.isBlank()) {
+                        List<RentalContract> byStreet = apiService.getRentalContractsByStreet(location, PRIVATE_YEARS, noOfBedRoom);
+                        if (byStreet.size() >= MIN_COMPARABLES) {
+                            contracts = byStreet;
+                            basis = noOfBedRoom + "-bedroom private units on " + location.trim().toUpperCase();
+                        }
+                    }
+                    if (contracts.size() < MIN_COMPARABLES) {
+                        contracts = apiService.getRentalContractsNearPostalCode(postalCode, PRIVATE_WIDE_RADIUS_M, PRIVATE_YEARS, noOfBedRoom);
+                        basis = noOfBedRoom + "-bedroom private units within " + (int) PRIVATE_WIDE_RADIUS_M + "m";
+                        broad = true;
+                    }
+                    if (contracts.size() < MIN_COMPARABLES) {
+                        contracts = apiService.getRentalContractsNearPostalCode(postalCode, PRIVATE_WIDEST_RADIUS_M, PRIVATE_YEARS, noOfBedRoom);
+                        basis = noOfBedRoom + "-bedroom private units within " + (int) PRIVATE_WIDEST_RADIUS_M + "m";
+                        broad = true;
+                    }
                 } else {
                     contracts = apiService.getRentalContractsNearPostalCode(postalCode, LANDED_RADIUS_M, PRIVATE_YEARS, noOfBedRoom);
                     basis = "landed properties within " + (int) LANDED_RADIUS_M + "m";
+                    if (contracts.size() < MIN_COMPARABLES) {
+                        contracts = apiService.getRentalContractsNearPostalCode(postalCode, LANDED_WIDE_RADIUS_M, PRIVATE_YEARS, noOfBedRoom);
+                        basis = "landed properties within " + (int) LANDED_WIDE_RADIUS_M + "m";
+                        broad = true;
+                    }
                 }
-                return new CacheEntry(System.currentTimeMillis(), toComparablesFromUra(contracts), basis);
+                return new CacheEntry(System.currentTimeMillis(), toComparablesFromUra(contracts), basis, broad);
             });
-            return withDemoFallback(computeEstimate(scale(entry.comps(), rentShare), size, floor, askingPrice, "URA", entry.basis()),
+            return withDemoFallback(broaden(computeEstimate(scale(entry.comps(), rentShare), size, floor, askingPrice, "URA", entry.basis()), entry),
                     type, noOfBedRoom, postalCode, size, floor, askingPrice, rentShare);
         } catch (RuntimeException e) {
             // External data source failure (network, rate limit, missing API key, malformed response).
@@ -249,6 +297,14 @@ public class FairPricingService {
                     "HDB".equalsIgnoreCase(type) ? "HDB" : "URA", null,
                     "Market data is temporarily unavailable (" + shortError(e) + "). Please try again in a few minutes.");
         }
+    }
+
+    /** A town-wide or wide-radius comparison is less precise than a street/project one: cap confidence at medium. */
+    private static FairPriceEstimate broaden(FairPriceEstimate e, CacheEntry entry) {
+        if (entry.broad() && e.isAvailable() && e.getConfidence() == Confidence.HIGH) {
+            e.setConfidence(Confidence.MEDIUM);
+        }
+        return e;
     }
 
     /** Replace an insufficient-data result with a demo estimate when demo data is enabled. */
