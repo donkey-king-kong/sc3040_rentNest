@@ -285,9 +285,6 @@ const LeaveReview = () => {
         setModalMessage(isEditing ? "Review Updated" : "Review Submitted");
         setIsError(false);
         setModalVisible(true);
-        setRating(0);
-        setReviewTitle('');
-        setReviewText('');
       }
     } catch (error) {
       let errorMessage = "An error occurred. Please try again.";
