@@ -57,6 +57,7 @@ const LeaveReview = () => {
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialReview, setInitialReview] = useState(null);
+  const [reviewTextSelection, setReviewTextSelection] = useState(undefined);
   const notificationTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -167,6 +168,7 @@ const LeaveReview = () => {
         setRating(userReview.rating);
         setReviewTitle(userReview.title || '');
         setReviewText(userReview.text || '');
+        setReviewTextSelection({ start: 0, end: 0 });
         setIsEditing(Boolean(fetchedReviewId));
         setReviewId(fetchedReviewId || null);
         setInitialReview({
@@ -380,6 +382,18 @@ const LeaveReview = () => {
   }, [displayedRevieweePhotoURL]);
 
   useEffect(() => {
+    if (!reviewTextSelection) {
+      return undefined;
+    }
+
+    const timeoutId = setTimeout(() => {
+      setReviewTextSelection(undefined);
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
+  }, [reviewTextSelection]);
+
+  useEffect(() => {
     if (!modalVisible || isError) {
       return undefined;
     }
@@ -479,6 +493,7 @@ const LeaveReview = () => {
                 placeholderTextColor="#AEAEB2"
                 value={reviewText}
                 onChangeText={setReviewText}
+                selection={reviewTextSelection}
                 multiline
                 numberOfLines={4}
                 maxLength={500}
