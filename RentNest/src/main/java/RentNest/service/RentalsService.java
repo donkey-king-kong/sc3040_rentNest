@@ -168,6 +168,13 @@ public class RentalsService {
         Listings listing = listingsRepository.findById(rentalDTO.getListingID())
                 .orElseThrow(() -> new RuntimeException("Listing not found"));
 
+        boolean listingAlreadyRented = rentalsRepository.findByListings_ListingID(rentalDTO.getListingID())
+                .filter(r -> "active".equals(r.getStatus()) || "pending".equals(r.getStatus()))
+                .isPresent();
+        if (listingAlreadyRented) {
+            throw new IllegalArgumentException("Listing already has an active or pending rental.");
+        }
+
         // Fetch the tenant (receiver) by receiverID from UserRepository
         User receiver = userRepository.findById(receiverID)
                 .orElseThrow(() -> new RuntimeException("Receiver not found"));
