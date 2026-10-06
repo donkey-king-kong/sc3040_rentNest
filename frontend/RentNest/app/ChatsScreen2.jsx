@@ -185,7 +185,7 @@ const ChatsScreen2 = () => {
                 router.replace('/LoginScreen');
                 return;
             }
-            const listingResponse = await axios.get(`${API_BASE_URL}/api/listings/user/${currentUser}/listingIDs`, {
+            const listingResponse = await axios.get(`${API_BASE_URL}/api/listings/user/${currentUser}/availableListingIDs`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Accept': 'application/json',
@@ -619,6 +619,10 @@ const ChatsScreen2 = () => {
         try{
             const token = await AsyncStorage.getItem('token');
             console.log("listingid", listing)
+            if (!listing || listing.length === 0) {
+                console.error('No available listings to offer');
+                return;
+            }
             if (!token) {
                 console.log('No token found!');
                 router.replace('/LoginScreen');
@@ -651,7 +655,7 @@ const ChatsScreen2 = () => {
                         'Content-Type': 'application/json'
                     },
                 });
-                if (sendRentalResponse.status === 200){
+                if (sendRentalResponse.status === 200 || sendRentalResponse.status === 201){
                     // refresh is handled in handleSendOffer after modal closes
                 }else{
                     console.log('Creating Rental:', sendRentalResponse.data);
@@ -659,7 +663,7 @@ const ChatsScreen2 = () => {
             }
         }
         catch (error) {
-            console.error('Error sending message:', error);
+            console.error('Error sending rental offer:', error.response?.data || error.message);
         }
     }
 
