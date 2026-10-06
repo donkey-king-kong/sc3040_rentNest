@@ -3,6 +3,7 @@
     import RentNest.model.Listings;
     import RentNest.dto.ListingsDTO;
     import RentNest.service.ListingsService;
+    import RentNest.repository.RentalsRepository;
     import org.springframework.beans.factory.annotation.Autowired;
     import org.springframework.http.HttpStatus;
     import org.springframework.http.ResponseEntity;
@@ -17,10 +18,12 @@
     public class ListingsController {
 
         private final ListingsService listingsService;
+        private final RentalsRepository rentalsRepository;
 
         @Autowired
-        public ListingsController(ListingsService listingsService) {
+        public ListingsController(ListingsService listingsService, RentalsRepository rentalsRepository) {
             this.listingsService = listingsService;
+            this.rentalsRepository = rentalsRepository;
         }
 
         // GET - Retrieve all listings
@@ -133,6 +136,22 @@
             } catch (RuntimeException e) {
                 // Handle general runtime errors more gracefully
                 return new ResponseEntity<>("Error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        @GetMapping("/user/{userID}/availableListingIDs")
+        public ResponseEntity<?> getAvailableListingIDsByUser(@PathVariable Long userID) {
+            try {
+                List<Long> allIDs = listingsService.getListingIDsByUserID(userID);
+                List<Long> availableIDs = allIDs.stream()
+                    .filter(id -> rentalsRepository.findByListings_ListingID(id)
+                        .map(r -> "terminated".equals(r.getStatus()))
+                        .orElse(true))
+                    .collect(java.util.stream.Collectors.toList());
+                return ResponseEntity.ok(availableIDs);
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error: " + e.getMessage());
             }
         }
     }
