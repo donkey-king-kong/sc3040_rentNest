@@ -239,7 +239,7 @@ const HomeListingScreen = () => {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [isReportingListing, setIsReportingListing] = useState(false);
-  const [showListingReported, setShowListingReported] = useState(false);
+  const [listingNotificationMessage, setListingNotificationMessage] = useState('');
   const notificationTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -250,8 +250,43 @@ const HomeListingScreen = () => {
     };
   }, []);
 
-  const handleReportListing = () => {
+  const getReportStorageKey = () => {
+    if (!currentUserID || !listingId) {
+      return null;
+    }
+
+    return `reportedListing:${currentUserID}:${listingId}`;
+  };
+
+  const showListingNotification = (message) => {
+    setListingNotificationMessage(message);
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
+    notificationTimeoutRef.current = setTimeout(() => {
+      setListingNotificationMessage('');
+    }, 2000);
+  };
+
+  const handleReportListing = async () => {
     console.log('Report listing clicked');
+    const reportStorageKey = getReportStorageKey();
+
+    if (!reportStorageKey) {
+      setModalVisible(true);
+      return;
+    }
+
+    try {
+      const alreadyReported = await AsyncStorage.getItem(reportStorageKey);
+      if (alreadyReported === 'true') {
+        showListingNotification('Listing Already Reported');
+        return;
+      }
+    } catch (err) {
+      console.error(`Error checking reported listing status: ${err.message}`);
+    }
+
     setModalVisible(true);
   };
 
@@ -262,6 +297,7 @@ const HomeListingScreen = () => {
 
     try {
       setIsReportingListing(true);
+      const reportStorageKey = getReportStorageKey();
       await axios.put(`${API_BASE_URL}/api/listings/setFlag/${listingId}/true`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -269,14 +305,11 @@ const HomeListingScreen = () => {
           'Content-Type': 'application/json'
         }
       });
-      setModalVisible(false);
-      setShowListingReported(true);
-      if (notificationTimeoutRef.current) {
-        clearTimeout(notificationTimeoutRef.current);
+      if (reportStorageKey) {
+        await AsyncStorage.setItem(reportStorageKey, 'true');
       }
-      notificationTimeoutRef.current = setTimeout(() => {
-        setShowListingReported(false);
-      }, 2000);
+      setModalVisible(false);
+      showListingNotification('Listing Reported');
     } catch (err) {
       console.error(`Error reporting listing: ${err.message}`);
     } finally {
@@ -516,7 +549,7 @@ const HomeListingScreen = () => {
                         </View>
                       </Modal>
                       <Modal
-                        visible={showListingReported}
+                        visible={!!listingNotificationMessage}
                         transparent
                         animationType="fade"
                         statusBarTranslucent
@@ -526,7 +559,7 @@ const HomeListingScreen = () => {
                             <View style={styles.notificationIconBox}>
                               <Image source={notificationBellIcon} style={styles.notificationIcon} />
                             </View>
-                            <Text style={styles.notificationText}>Listing Reported</Text>
+                            <Text style={styles.notificationText}>{listingNotificationMessage}</Text>
                           </View>
                         </View>
                       </Modal>
