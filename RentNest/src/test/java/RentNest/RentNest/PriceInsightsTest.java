@@ -51,4 +51,13 @@ public class PriceInsightsTest {
         assertEquals("EXECUTIVE", ApiService.hdbFlatTypeForListing("Executive maisonette", null, 4, 1500));
         assertEquals("3-ROOM", ApiService.hdbFlatTypeForListing("Cosy flat", "Near MRT", 2, 700));
     }
+
+    @Test
+    public void testHdbTownFromListingLocation() {
+        assertEquals("TOA PAYOH", ApiService.hdbTownIn("Lorong 4 Toa Payoh"));
+        assertEquals("ANG MO KIO", ApiService.hdbTownIn("Ang Mo Kio Avenue 10"));
+        assertEquals("SENGKANG", ApiService.hdbTownIn("Sengkang"));
+        assertNull(ApiService.hdbTownIn("Grange Road"));
+        assertNull(ApiService.hdbTownIn(null));
+    }
 }

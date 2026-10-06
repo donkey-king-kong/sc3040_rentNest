@@ -469,7 +469,6 @@ const HomeListingScreen = () => {
           )}
          </View>
          {/* Display Price Insights */}
-                <Text style={styles.header1}>Price Insights</Text>
                 <View style={styles.priceInsightsContainer}>
                   <PriceInsightsChart data={priceInsights} askingPrice={listing.price} fairPrice={fairPrice?.available ? fairPrice.fairPrice : null} />
                 </View>
@@ -794,12 +793,6 @@ container: {
     flex: 1,
     textAlign: 'center',
   },
-  header1: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      marginTop: 10,
-      marginBottom: 4,
-    },
 ownerBox: {
     borderWidth: 1,
     borderColor: '#000', // Black outline

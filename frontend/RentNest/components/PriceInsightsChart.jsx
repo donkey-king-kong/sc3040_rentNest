@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
 import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
 
 /**
@@ -12,7 +13,7 @@ import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
  *
  * Months are placed on a real time scale, so a month with no transactions shows as a
  * longer segment rather than being squeezed out. Tap a point for its value; the exact
- * numbers are also available in the table view.
+ * numbers are also available in the table view. The whole section collapses from its header.
  */
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -21,13 +22,16 @@ const SURFACE = '#FFFFFF';
 const GRID = '#E6E6E6';
 const TEXT_PRIMARY = '#111111';
 const TEXT_MUTED = '#52514e';
-const REFERENCE = '#9A9A9A';
+const REFERENCE = '#9A9A9A';     // selection rule only
+// Reference lines: told apart by pattern (long dash vs dots) and named in the key below the chart.
+const ASKING_LINE = { stroke: '#3d3d3a', strokeWidth: 2, strokeDasharray: '7 4' };
+const FAIR_LINE = { stroke: '#52514e', strokeWidth: 2, strokeDasharray: '0.1 4', strokeLinecap: 'round' };
 
 const HEIGHT = 200;
 // SVG text defaults to a serif font in browsers; native already uses the system font.
 const FONT = Platform.OS === 'web' ? 'Helvetica, Arial, sans-serif' : undefined;
 const HIT = 32;
-const PAD = { top: 16, right: 56, bottom: 28, left: 52 };
+const PAD = { top: 16, right: 16, bottom: 28, left: 52 };
 
 const money = (n) => `$${Math.round(n).toLocaleString()}`;
 
@@ -55,16 +59,31 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState(null);
   const [showTable, setShowTable] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const points = useMemo(() => data
     .map((d) => ({ label: d.leaseDate, value: Number(d.rentPrice), t: monthIndex(d.leaseDate) }))
     .filter((p) => p.t !== null && p.value > 0)
     .sort((a, b) => a.t - b.t), [data]);
 
+  const header = (
+    <TouchableOpacity
+      style={styles.header}
+      onPress={() => setOpen(!open)}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      accessibilityLabel="Price Insights"
+    >
+      <Text style={styles.title}>Price Insights</Text>
+      <FontAwesome name={open ? 'chevron-up' : 'chevron-down'} size={13} color={TEXT_MUTED} />
+    </TouchableOpacity>
+  );
+
   if (points.length === 0) {
     return (
       <View style={styles.card}>
-        <Text style={styles.muted}>No recent rental transactions found for similar units nearby.</Text>
+        {header}
+        {open && <Text style={styles.muted}>No recent rental transactions found for similar units nearby.</Text>}
       </View>
     );
   }
@@ -93,28 +112,14 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
 
   // Month labels: every other point keeps 12 labels from colliding on a phone.
   const labelEvery = points.length > 6 ? 2 : 1;
-  const last = points[points.length - 1];
   const active = selected !== null ? points[selected] : null;
-  // Right-margin labels (latest value, asking, fair rent), nudged apart so they never overlap.
-  const marginLabels = [
-    { key: 'latest', at: y(last.value), h: 14, lines: [money(last.value)], bold: true },
-    asking && { key: 'asking', at: y(asking), h: 26, lines: ['Asking', money(asking)] },
-    fair && { key: 'fair', at: y(fair), h: 26, lines: ['Fair rent', money(fair)] },
-  ].filter(Boolean).sort((a, b) => a.at - b.at);
-  marginLabels.forEach((m, i) => {
-    m.top = m.at - m.h / 2;
-    if (i > 0) {
-      const prev = marginLabels[i - 1];
-      m.top = Math.max(m.top, prev.top + prev.h + 2);
-    }
-  });
-  const overflow = marginLabels.length ? marginLabels[marginLabels.length - 1].top + marginLabels[marginLabels.length - 1].h - (HEIGHT - 4) : 0;
-  if (overflow > 0) marginLabels.forEach((m) => { m.top -= overflow; });
 
   return (
     <View style={styles.card}>
+      {header}
+      {open && (<>
       <Text style={styles.subtitle}>
-        Median monthly rent of similar units, one point per month with rentals. The fair rent also counts older rentals, with recent ones weighted more.
+        Median monthly rent of similar units, one point per month with rentals.
       </Text>
 
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
@@ -127,8 +132,8 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
               </React.Fragment>
             ))}
 
-            {asking && <Line x1={PAD.left} x2={PAD.left + plotW} y1={y(asking)} y2={y(asking)} stroke={REFERENCE} strokeWidth={1} />}
-            {fair && <Line x1={PAD.left} x2={PAD.left + plotW} y1={y(fair)} y2={y(fair)} stroke={TEXT_MUTED} strokeWidth={1} />}
+            {asking && <Line x1={PAD.left} x2={PAD.left + plotW} y1={y(asking)} y2={y(asking)} {...ASKING_LINE} />}
+            {fair && <Line x1={PAD.left} x2={PAD.left + plotW} y1={y(fair)} y2={y(fair)} {...FAIR_LINE} />}
 
             <Path d={areaPath} fill={INK} fillOpacity={0.08} />
             <Path d={linePath} stroke={INK} strokeWidth={2} fill="none" strokeLinejoin="round" strokeLinecap="round" />
@@ -148,20 +153,6 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
               </React.Fragment>
             ))}
 
-            {/* Direct labels in the right margin: latest month, asking price, fair rent. */}
-            {marginLabels.map((m) => m.lines.map((line, j) => (
-              <SvgText
-                key={`${m.key}-${j}`}
-                x={PAD.left + plotW + 8}
-                y={m.top + 11 + j * 12}
-                fontSize={m.bold ? 11 : 10}
-                fontWeight={m.bold ? 'bold' : 'normal'}
-                fill={m.bold ? TEXT_PRIMARY : TEXT_MUTED}
-                fontFamily={FONT}
-              >
-                {line}
-              </SvgText>
-            )))}
           </Svg>
         )}
         {/* Tap targets larger than the dots, laid over the chart. */}
@@ -175,10 +166,27 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
         ))}
       </View>
 
+      {(asking || fair) && (
+        <View style={styles.key}>
+          {asking && (
+            <View style={styles.keyItem}>
+              <Svg width={28} height={8}><Line x1={0} x2={28} y1={4} y2={4} {...ASKING_LINE} /></Svg>
+              <Text style={styles.keyText}>Asking {money(asking)}</Text>
+            </View>
+          )}
+          {fair && (
+            <View style={styles.keyItem}>
+              <Svg width={28} height={8}><Line x1={2} x2={28} y1={4} y2={4} {...FAIR_LINE} /></Svg>
+              <Text style={styles.keyText}>Fair rent {money(fair)}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
       <Text style={styles.readout}>
         {active
           ? `${active.label}: median ${money(active.value)}`
-          : `Latest (${last.label}): ${money(last.value)} · ${points[0].label} – ${last.label}. Tap a point for details.`}
+          : 'Tap a point for details.'}
       </Text>
 
       <TouchableOpacity onPress={() => setShowTable(!showTable)} accessibilityRole="button" style={styles.toggleHit}>
@@ -198,6 +206,7 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
           ))}
         </View>
       )}
+      </>)}
     </View>
   );
 };
@@ -210,6 +219,34 @@ const styles = StyleSheet.create({
     padding: 16,
     marginVertical: 10,
     backgroundColor: SURFACE,
+  },
+  key: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  keyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 18,
+    marginTop: 4,
+  },
+  keyText: {
+    marginLeft: 8,
+    fontSize: 13,
+    color: TEXT_PRIMARY,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: TEXT_PRIMARY,
   },
   subtitle: {
     fontSize: 12,
