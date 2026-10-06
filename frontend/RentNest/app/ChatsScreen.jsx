@@ -200,7 +200,9 @@ const ChatsScreen = () => {
           <View style={styles.chatContent}>
             <View style={styles.headerContainer}>
               <Text style={styles.senderName}>{chatPartnerName}</Text>
-              <Text style={styles.date}>{new Date(item.date).toLocaleTimeString()}</Text>
+              <Text style={styles.date}>
+                {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
             </View>
             <Text style={styles.message}>{item.message}</Text>
           </View>
