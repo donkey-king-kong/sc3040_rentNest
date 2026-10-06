@@ -171,6 +171,29 @@ class LifecycleTimestampsIntegrationTest {
     }
 
     @Test
+    void adminMonthlyRentalTrendsUseEventDatesAndLeaveMissingAveragesEmpty() throws Exception {
+        createLifecycleFixture();
+        mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary"),
+                        "2026-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[0].value").value(0))
+                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[1].value").value(2))
+                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[2].value").value(1))
+                .andExpect(jsonPath("$.series.monthlyTerminations.points[1].value").value(0))
+                .andExpect(jsonPath("$.series.monthlyTerminations.points[2].value").value(1))
+                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[0].value").value(nullValue()))
+                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[1].value").value(10.0))
+                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[2].value").value(14.0));
+        // Partial months exclude events outside the selected range.
+        mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary"),
+                        "2026-02-12T00:00:00+08:00", "2026-03-25T00:00:00+08:00"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[0].value").value(1))
+                .andExpect(jsonPath("$.series.monthlyTerminations.points[1].value").value(0))
+                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[0].value").value(nullValue()));
+    }
+
+    @Test
     void ownerLifecycleMetricsMatchFixture() throws Exception {
         createLifecycleFixture();
 

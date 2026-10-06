@@ -284,6 +284,10 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(jsonPath("$.metrics.ownerUserCount.value").value(2))
                 .andExpect(jsonPath("$.metrics.tenantUserCount.value").value(2))
                 .andExpect(jsonPath("$.metrics.bannedUserCount.value").value(1))
+                .andExpect(jsonPath("$.metrics.currentTenantUserCount.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.currentTenantUserCount.basis").value("snapshot"))
+                .andExpect(jsonPath("$.metrics.pastTenantUserCount.availability").value("available"))
+                .andExpect(jsonPath("$.metrics.pastTenantUserCount.basis").value("snapshot"))
                 .andExpect(jsonPath("$.metrics.userBanRate.value").value(12.5))
                 .andExpect(jsonPath("$.metrics.flaggedUserCount.value").value(1))
                 .andExpect(jsonPath("$.metrics.flaggedListingCount.value").value(1))
@@ -291,8 +295,12 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(jsonPath("$.metrics.rentalRecordCount.value").value(4))
                 .andExpect(jsonPath("$.metrics.acceptedRentalRecordCount.value").value(2))
                 .andExpect(jsonPath("$.metrics.terminationRate.value").value(50.0))
+                .andExpect(jsonPath("$.metrics.activeRentalRecordCount.value").value(1))
+                .andExpect(jsonPath("$.metrics.activeRentalRecordCount.basis").value("snapshot"))
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentCount.value").value(3))
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(4500))
+                .andExpect(jsonPath("$.metrics.lifetimeRecordedRentPaymentTotal.value").value(6500))
+                .andExpect(jsonPath("$.metrics.lifetimeRecordedRentPaymentTotal.basis").value("snapshot"))
                 .andExpect(jsonPath("$.metrics.reportResolutionRate.availability").value("unavailable"));
     }
 
@@ -402,13 +410,56 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(status().isBadRequest());
         mockMvc.perform(get(url).header("Authorization", token).param("from", FROM).param("to", FROM))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(get(url).header("Authorization", token)
-                        .param("from", "2025-01-01T00:00:00Z").param("to", "2026-01-03T00:00:00Z"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("INVALID_PERIOD"));
+    }
+
+    @Test
+    void multiYearPeriodsAreAccepted() throws Exception {
+        mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary"),
+                        "2024-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.period.from").value("2023-12-31T16:00:00Z"))
+                .andExpect(jsonPath("$.period.to").value("2026-03-31T16:00:00Z"))
+                .andExpect(jsonPath("$.series.monthlyRecordedRentPayments.points.length()").value(27))
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(3500));
     }
 
     // ---------- Fixture helpers ----------
+
+    @Test
+    void lifetimeIncludesOlderPaymentsAndHasNoPreviousPeriod() throws Exception {
+        String oldDate = "2024-12-26T00:00:00+08:00";
+        Rentals rental = rentalsRepository.findAll().stream()
+                .filter(row -> row.getListings().getListingID().equals(listingA2.getListingID()))
+                .findFirst().orElseThrow();
+        payment(rental, 500L, oldDate);
+        paymentRepository.flush();
+        mockMvc.perform(get("/api/analytics/admin/summary")
+                        .header("Authorization", "Bearer " + jwtService.generateToken(admin))
+                        .param("period", "lifetime"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.period.lifetime").value(true))
+                .andExpect(jsonPath("$.period.from").value("2024-12-25T16:00:00Z"))
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(7000))
+                .andExpect(jsonPath("$.metrics.acceptedRentalRecordCount.value").value(2))
+                .andExpect(jsonPath("$.metrics.offersAcceptedCount.value").value(2))
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotalChange.availability").value("unavailable"));
+    }
+
+    @Test
+    void lifetimeKeepsScopeAuthorizationAndRejectsMixedRanges() throws Exception {
+        String token = "Bearer " + jwtService.generateToken(ownerA);
+        mockMvc.perform(get("/api/analytics/admin/summary").header("Authorization", token).param("period", "lifetime"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/analytics/owner/listings/" + listingB1.getListingID())
+                        .header("Authorization", token).param("period", "lifetime"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/analytics/owner/summary").header("Authorization", token)
+                        .param("period", "lifetime").param("from", FROM).param("to", TO))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/analytics/owner/summary").header("Authorization", token).param("period", "lifetime"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(5500));
+    }
 
     private MockHttpServletRequestBuilder asUser(User user, MockHttpServletRequestBuilder request) {
         return asUser(user, request, FROM, TO);

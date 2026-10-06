@@ -18,6 +18,7 @@ import {
   StatTile,
   buildLastDays,
   buildPeriod,
+  formatPeriodRange,
   formatChange,
   formatValue,
   useAnalytics,
@@ -104,7 +105,7 @@ describe('buildPeriod', () => {
     expect(buildPeriod(1, new Date('2026-09-30T17:00:00Z'))).toEqual({ from: '2026-09-01T00:00:00+08:00', to: '2026-10-01T00:00:00+08:00' });
   });
   it('offers the five simple preset choices', () => {
-    expect(PERIOD_OPTIONS.map(option => option.key)).toEqual(['1M', '2M', '3M', '6M', '12M']);
+    expect(PERIOD_OPTIONS.map(option => option.key)).toEqual(['1M', '2M', '3M', '6M', '12M', 'LIFETIME']);
   });
 
 });
@@ -169,6 +170,23 @@ describe('formatChange', () => {
 });
 
 describe('BarChart', () => {
+  it('keeps missing monthly averages as gaps with a clean chart header', async () => {
+    const series = { availability: 'available', unit: 'days', basis: 'period', points: [
+      { bucket: '2026-01', value: 10 }, { bucket: '2026-02', value: null }, { bucket: '2026-03', value: 14 },
+    ] };
+    let tree;
+    await act(async () => { tree = create(<BarChart title="Average days on market" series={series} cleanHeader hidePeriodLabel />); });
+    expect(renderedText(tree)).toContain('Average days on market');
+    expect(renderedText(tree)).not.toContain('days');
+    expect(renderedText(tree)).not.toContain('Period');
+    const gap = tree.root.findAll(node => node.props.accessibilityLabel === 'Feb 2026: —' && node.props.onPress)[0];
+    expect(gap).toBeDefined();
+    expect(gap.findAll(node => Array.isArray(node.props.style)
+      && node.props.style.some(style => typeof style?.height === 'string' && style.height.endsWith('%')))).toHaveLength(0);
+    await act(async () => gap.props.onPress());
+    expect(renderedText(tree)).toContain('Feb 2026: —');
+  });
+
   it('shows the empty message when every bucket is zero', () => {
     const series = {
       availability: 'available', unit: 'SGD', basis: 'period', definition: '', reason: null,
@@ -228,6 +246,47 @@ describe('LineChart', () => {
     const target = tree.root.findAll((node) => node.props.accessibilityLabel === 'Feb 2026: 66.7%' && typeof node.props.onPress === 'function')[0];
     await act(async () => { target.props.onPress(); });
     expect(renderedText(tree)).toContain('Feb 2026: 66.7%');
+  });
+
+  it('draws gaps for missing averages without zero markers or connecting lines', async () => {
+    let tree;
+    const gaps = { ...series, unit: 'days', points: [
+      { bucket: '2026-01', value: 10 }, { bucket: '2026-02', value: null }, { bucket: '2026-03', value: 14 },
+    ] };
+    await act(async () => { tree = create(<LineChart series={gaps} emptyText="No valid dates" />); });
+    await measure(tree, 300);
+    expect(tree.root.findAllByType(Circle)).toHaveLength(2);
+    const line = tree.root.findAllByType(Path)[0];
+    expect(line.props.d).not.toContain('L');
+  });
+
+  it('uses both rental series for the scale and reads both values when tapped', async () => {
+    let tree;
+    const accepted = { ...series, unit: 'count', points: [{ bucket: '2026-01', value: 2 }] };
+    const terminated = { ...accepted, points: [{ bucket: '2026-01', value: 8 }] };
+    await act(async () => { tree = create(<LineChart series={accepted} seriesLabel="Offers accepted"
+      comparisonSeries={terminated} comparisonLabel="Terminations" />); });
+    await measure(tree, 300);
+    expect(tree.root.findAllByType(Circle)).toHaveLength(2);
+    expect(renderedText(tree)).toContain('Terminations');
+    const target = tree.root.findAll(node => node.props.accessibilityLabel === 'Jan 2026: Offers accepted 2; Terminations 8' && node.props.onPress)[0];
+    await act(async () => target.props.onPress());
+    expect(renderedText(tree)).toContain('Jan 2026: Offers accepted 2; Terminations 8');
+  });
+
+  it('uses whole-number count ticks and removes unit captions from clean headers', async () => {
+    let tree;
+    const counts = { ...series, unit: 'count', points: [{ bucket: '2026-01', value: 1 }] };
+    await act(async () => { tree = create(<LineChart title="Rental activity" series={counts} cleanHeader hidePeriodLabel />); });
+    await measure(tree, 300);
+    expect(renderedText(tree)).toEqual(expect.arrayContaining(['Rental activity', '1', '0']));
+    expect(renderedText(tree)).not.toContain('count');
+    expect(renderedText(tree)).not.toContain('Period');
+    expect(renderedText(tree)).not.toContain('0.25');
+    await act(async () => { tree.update(<LineChart title="Average days on market" cleanHeader hidePeriodLabel
+      series={{ ...counts, unit: 'days', points: [{ bucket: '2026-01', value: 10 }] }} />); });
+    expect(renderedText(tree)).not.toContain('days');
+    expect(renderedText(tree)).not.toContain('10.0 days');
   });
 
   it('shows the empty message and an unavailable series truthfully', () => {
@@ -413,6 +472,22 @@ it('shows exact tenancy counts including zero buckets and keeps empty and unavai
   expect(renderedText(renderStatic(<CountBarChart series={{ availability: 'unavailable', reason: 'No recorded history' }} />))).toContain('No recorded history');
 });
 
+it('shows the date range above the selected period and supports lifetime', async () => {
+  const dataPeriod = { from: '2024-12-26T00:00:00+08:00', to: '2026-10-06T12:00:00+08:00', lifetime: true };
+  expect(formatPeriodRange(dataPeriod)).toBe('Dec 26, 2024 \u2013 Oct 6, 2026');
+  expect(formatPeriodRange({ from: '2026-09-01T00:00:00+08:00', to: '2026-10-01T00:00:00+08:00' })).toBe('Sep 1, 2026 \u2013 Sep 30, 2026');
+  const onChange = jest.fn();
+  const tree = renderStatic(<PeriodSelector value="LIFETIME" dataPeriod={dataPeriod} lifetimeLabel="Since published" onChange={onChange} />);
+  expect(renderedText(tree).slice(0, 2)).toEqual(['Dec 26, 2024 \u2013 Oct 6, 2026', 'Since published']);
+  const lifetime = PERIOD_OPTIONS.find(option => option.key === 'LIFETIME');
+  expect(lifetime.build()).toEqual({ period: 'lifetime' });
+  await AsyncStorage.setItem('token', 'test-token');
+  axios.get.mockResolvedValue({ data: { period: dataPeriod } });
+  const Probe = () => { useAnalytics('/api/analytics/admin/summary', 'LIFETIME'); return null; };
+  await act(async () => { create(<Probe />); });
+  expect(axios.get).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ params: { period: 'lifetime' } }));
+});
+
 it('opens the simple dropdown and closes after selecting a preset', async () => {
   const onChange = jest.fn();
   let tree;
@@ -420,11 +495,16 @@ it('opens the simple dropdown and closes after selecting a preset', async () => 
   const control = () => tree.root.findAll(n => n.props.accessibilityLabel === 'Analytics period' && n.props.onPress)[0];
   expect(control().props.accessibilityState.expanded).toBe(false);
   await act(async () => control().props.onPress());
-  expect(renderedText(tree)).toEqual(expect.arrayContaining(['1 month', '2 months', '3 months', '6 months', '1 year']));
+  expect(renderedText(tree)).toEqual(expect.arrayContaining(['1 month', '2 months', '3 months', '6 months', '1 year', 'Lifetime']));
   expect(renderedText(tree)).not.toContain('Custom');
   const option = tree.root.findAll(n => n.props.accessibilityLabel === '3 months' && n.props.onPress)[0];
   await act(async () => option.props.onPress());
   expect(onChange).toHaveBeenCalledWith('3M');
+  expect(control().props.accessibilityState.expanded).toBe(false);
+  await act(async () => control().props.onPress());
+  const lifetime = tree.root.findAll(n => n.props.accessibilityLabel === 'Lifetime' && n.props.onPress)[0];
+  await act(async () => lifetime.props.onPress());
+  expect(onChange).toHaveBeenLastCalledWith('LIFETIME');
   expect(control().props.accessibilityState.expanded).toBe(false);
 });
 

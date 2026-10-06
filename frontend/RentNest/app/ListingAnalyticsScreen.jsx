@@ -77,7 +77,7 @@ const ListingAnalyticsScreen = () => {
 
         </>}>
 
-      <ActivitySection period={period} onPeriodChange={setPeriod} loading={loading} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}>
+      <ActivitySection period={period} onPeriodChange={setPeriod} loading={loading} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf} lifetimeLabel="Since published">
         <Section title="Performance">
           <TileRow>
             <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} />

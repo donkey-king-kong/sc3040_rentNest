@@ -31,9 +31,10 @@ public class AnalyticsController {
     @GetMapping("/owner/summary")
     public ResponseEntity<AnalyticsResponse> ownerSummary(
             @AuthenticationPrincipal User user,
+            @RequestParam(required = false, name = "period") String selection,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
-        AnalyticsPeriod period = analyticsService.parsePeriod(from, to);
+        AnalyticsPeriod period = analyticsService.resolvePeriod(user, null, false, selection, from, to);
         return ResponseEntity.ok(analyticsService.ownerSummary(user, period));
     }
 
@@ -42,9 +43,10 @@ public class AnalyticsController {
     public ResponseEntity<AnalyticsResponse> listingAnalytics(
             @AuthenticationPrincipal User user,
             @PathVariable Long listingId,
+            @RequestParam(required = false, name = "period") String selection,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
-        AnalyticsPeriod period = analyticsService.parsePeriod(from, to);
+        AnalyticsPeriod period = analyticsService.resolvePeriod(user, listingId, false, selection, from, to);
         return ResponseEntity.ok(analyticsService.listingAnalytics(user, listingId, period));
     }
 
@@ -52,9 +54,10 @@ public class AnalyticsController {
     @GetMapping("/admin/summary")
     public ResponseEntity<AnalyticsResponse> platformSummary(
             @AuthenticationPrincipal User user,
+            @RequestParam(required = false, name = "period") String selection,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
-        AnalyticsPeriod period = analyticsService.parsePeriod(from, to);
+        AnalyticsPeriod period = analyticsService.resolvePeriod(user, null, true, selection, from, to);
         return ResponseEntity.ok(analyticsService.platformSummary(user, period));
     }
 

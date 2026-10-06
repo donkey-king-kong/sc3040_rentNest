@@ -35,6 +35,34 @@ public class AnalyticsQueryRepository {
     public record PaymentRow(Date date, Long amount) {
     }
 
+    /** Earliest dated record in the authorized scope, including legacy billing dates. */
+    public Optional<Instant> findEarliestAnalyticsDate(Long ownerId, Long listingId) {
+        String listingFilter = listingId != null ? " WHERE l.listingID = :scopeId"
+                : ownerId != null ? " WHERE l.owner.userID = :scopeId" : "";
+        String rentalFilter = listingFilter.replace("l.", "r.listings.");
+        String paymentFilter = listingFilter.replace("l.", "p.rentals.listings.");
+        String viewFilter = listingFilter.replace("l.listingID", "v.listing.listingID")
+                .replace("l.owner.userID", "v.listing.owner.userID");
+        Long scopeId = listingId != null ? listingId : ownerId;
+        List<String> statements = new java.util.ArrayList<>(List.of(
+                "SELECT MIN(l.createdAt) FROM Listings l" + listingFilter,
+                "SELECT MIN(r.createdAt) FROM Rentals r" + rentalFilter,
+                "SELECT MIN(r.rentalDate) FROM Rentals r" + rentalFilter,
+                "SELECT MIN(r.acceptedAt) FROM Rentals r" + rentalFilter,
+                "SELECT MIN(r.terminatedAt) FROM Rentals r" + rentalFilter,
+                "SELECT MIN(p.date) FROM Payment p" + paymentFilter,
+                "SELECT MIN(v.viewedAt) FROM ListingView v" + viewFilter));
+        if (listingId == null) {
+            statements.add("SELECT MIN(u.createdAt) FROM User u"
+                    + (ownerId != null ? " WHERE u.userID = :scopeId" : ""));
+        }
+        return statements.stream().map(statement -> {
+            TypedQuery<Date> query = entityManager.createQuery(statement, Date.class);
+            if (scopeId != null) query.setParameter("scopeId", scopeId);
+            return query.getSingleResult();
+        }).filter(java.util.Objects::nonNull).map(Date::toInstant).min(Instant::compareTo);
+    }
+
     // ---------- Listings ----------
 
     public long countListingsByOwner(Long ownerId) {
@@ -105,6 +133,12 @@ public class AnalyticsQueryRepository {
     }
 
     // ---------- Payments (always period-bounded) ----------
+
+    /** All recorded rent amounts, independent of the selected reporting period. */
+    public long sumAllRecordedRentPayments() {
+        return entityManager.createQuery("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p", Long.class)
+                .getSingleResult();
+    }
 
     private static final String PAYMENT_ROW_SELECT =
             "SELECT new RentNest.repository.AnalyticsQueryRepository$PaymentRow(p.date, p.amount) FROM Payment p " +

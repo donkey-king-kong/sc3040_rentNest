@@ -51,8 +51,6 @@ import static RentNest.dto.analytics.Metric.SNAPSHOT;
 @Transactional(readOnly = true)
 public class AnalyticsService {
 
-    static final long MAX_PERIOD_DAYS = 366;
-
     private static final String STATUS_PENDING = "pending";
     private static final String STATUS_ACTIVE = "active";
     private static final String STATUS_TERMINATED = "terminated";
@@ -90,6 +88,26 @@ public class AnalyticsService {
 
     // ---------- Period ----------
 
+    public AnalyticsPeriod resolvePeriod(User actor, Long listingId, boolean platform,
+                                         String selection, String from, String to) {
+        if (selection == null) return parsePeriod(from, to);
+        if (!"lifetime".equals(selection) || from != null || to != null) {
+            throw AnalyticsException.invalidPeriod("Use either period=lifetime or a 'from' and 'to' range.");
+        }
+        if (platform) requireAdmin(actor);
+        Listings listing = listingId == null ? null : queries.findListingOwnedBy(listingId, actor.getUserID())
+                .orElseThrow(AnalyticsException::listingNotFound);
+        Instant end = clock.instant();
+        Optional<Instant> earliest = listing != null && listing.getCreatedAt() != null
+                ? Optional.of(listing.getCreatedAt().toInstant())
+                : queries.findEarliestAnalyticsDate(platform ? null : actor.getUserID(), listingId);
+        Instant start = earliest
+                .filter(date -> date.isBefore(end))
+                .orElseGet(() -> end.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant());
+        if (!start.isBefore(end)) start = end.minusNanos(1);
+        return new AnalyticsPeriod(start, end, AnalyticsPeriod.BOUNDARY, zone.getId(), true);
+    }
+
     public AnalyticsPeriod parsePeriod(String from, String to) {
         if (from == null || from.isBlank() || to == null || to.isBlank()) {
             throw AnalyticsException.invalidPeriod("Both 'from' and 'to' are required ISO-8601 date-times with an offset, e.g. 2026-01-01T00:00:00+08:00.");
@@ -98,9 +116,6 @@ public class AnalyticsService {
         Instant toInstant = parseInstant("to", to);
         if (!fromInstant.isBefore(toInstant)) {
             throw AnalyticsException.invalidPeriod("'from' must be before 'to'.");
-        }
-        if (Duration.between(fromInstant, toInstant).compareTo(Duration.ofDays(MAX_PERIOD_DAYS)) > 0) {
-            throw AnalyticsException.invalidPeriod("The period cannot be longer than " + MAX_PERIOD_DAYS + " days.");
         }
         return new AnalyticsPeriod(fromInstant, toInstant, AnalyticsPeriod.BOUNDARY, zone.getId());
     }
@@ -229,11 +244,18 @@ public class AnalyticsService {
 
         Map<String, Metric> metrics = new LinkedHashMap<>();
         metrics.put("registeredUserCount", Metric.available(userCount, COUNT, SNAPSHOT, "All user accounts."));
+        metrics.put("lifetimeRecordedRentPaymentTotal", Metric.available(queries.sumAllRecordedRentPayments(), currency, SNAPSHOT,
+                "Total rent payment amounts recorded across all rentals, regardless of the selected period. Excludes deposits. Refunds are not deducted, so this is recorded rent income rather than net earnings."));
         metrics.put("listingCount", Metric.available(queries.countAllListings(), COUNT, SNAPSHOT, "All listings currently stored."));
         metrics.put("ownerUserCount", Metric.available(queries.countDistinctListingOwners(), COUNT, SNAPSHOT,
                 "Users who own at least one listing. A user can be both an owner and a tenant."));
         metrics.put("tenantUserCount", Metric.available(countDistinctAcceptedTenants(rentals), COUNT, SNAPSHOT,
                 "Users who are the tenant on at least one accepted (active or terminated) rental. A user can be both an owner and a tenant."));
+        TenantCounts tenantCounts = tenantCounts(rentals, asOf);
+        metrics.put("currentTenantUserCount", Metric.available(tenantCounts.current(), COUNT, SNAPSHOT,
+                "Distinct users with at least one active tenancy covering asOf. The start is inclusive and the end is exclusive. A user with both current and past tenancies counts as current."));
+        metrics.put("pastTenantUserCount", Metric.available(tenantCounts.past(), COUNT, SNAPSHOT,
+                "Distinct users with at least one accepted tenancy that has ended, and no current tenancy. Pending offers and future-starting tenancies do not qualify as past tenancies."));
         metrics.put("bannedUserCount", Metric.available(bannedUsers, COUNT, SNAPSHOT, "Users with flag value 2 (banned)."));
         metrics.put("userBanRate", rate(bannedUsers, userCount, SNAPSHOT,
                 "Banned users divided by all users.", "No users, so the ban rate cannot be calculated."));
@@ -267,6 +289,11 @@ public class AnalyticsService {
 
         Map<String, Series> series = new LinkedHashMap<>();
         series.put("monthlyRecordedRentPayments", monthlyPaymentSeries(payments, period));
+        series.put("monthlyOffersAccepted", monthlyLifecycleSeries(rentals, period, RentalRow::acceptedAt,
+                "Offers accepted each month using recorded acceptance dates. Undated accepted offers are excluded from this timeline."));
+        series.put("monthlyTerminations", monthlyLifecycleSeries(rentals, period, RentalRow::terminatedAt,
+                "Tenancies terminated each month using recorded termination dates. Undated terminations are excluded."));
+        series.put("monthlyAverageDaysOnMarket", monthlyDaysOnMarketSeries(rentals, period, asOf));
         series.put("flaggedItemsByType", Series.available(COUNT, SNAPSHOT, "Items currently flagged, by item type.", List.of(
                 new Series.Point("listings", flaggedListings),
                 new Series.Point("users", flaggedUsers),
@@ -305,6 +332,8 @@ public class AnalyticsService {
                 "Rental records with status 'pending' (offer sent, not yet accepted)."));
         metrics.put("acceptedRentalRecordCount", Metric.available(accepted, COUNT, SNAPSHOT,
                 "Rental records with status 'active' or 'terminated'."));
+        metrics.put("activeRentalRecordCount", Metric.available(countStatus(rentals, STATUS_ACTIVE), COUNT, SNAPSHOT,
+                "Rental records currently marked active. Excludes pending and terminated offers. Includes accepted rentals whose tenancy has not started or whose lease has expired without a recorded termination."));
         metrics.put("terminatedRentalRecordCount", Metric.available(countStatus(rentals, STATUS_TERMINATED), COUNT, SNAPSHOT,
                 "Rental records with status 'terminated'."));
         metrics.put("acceptanceRate", rate(accepted, total, SNAPSHOT,
@@ -527,8 +556,11 @@ public class AnalyticsService {
     private void putLifecycleCounts(Map<String, Metric> metrics, List<RentalRow> rentals, AnalyticsPeriod period) {
         metrics.put("offersSentCount", lifecycleCount(period, "Offers sent during the period.",
                 (from, to) -> countInRange(rentals, RentalRow::createdAt, from, to)));
-        metrics.put("offersAcceptedCount", lifecycleCount(period, "Offers accepted during the period.",
-                (from, to) -> countInRange(rentals, RentalRow::acceptedAt, from, to)));
+        metrics.put("offersAcceptedCount", period.lifetime()
+                ? Metric.available(countAccepted(rentals), COUNT, PERIOD,
+                    "All accepted offers, including tenancies that later terminated and older accepted offers without a recorded acceptance date.")
+                : lifecycleCount(period, "Offers with a recorded acceptance date during the period. Older accepted offers without an acceptance date cannot be assigned to a month or year.",
+                    (from, to) -> countInRange(rentals, RentalRow::acceptedAt, from, to)));
         metrics.put("terminationsCount", lifecycleCount(period, "Tenancies terminated during the period.",
                 (from, to) -> countInRange(rentals, RentalRow::terminatedAt, from, to)));
     }
@@ -536,6 +568,32 @@ public class AnalyticsService {
     /** Count recorded views by their event timestamps, independently of when the feature was introduced. */
     private Metric viewCount(AnalyticsPeriod period, String definition, BiFunction<Instant, Instant, Long> countBetween) {
         return Metric.available(countBetween.apply(period.from(), period.to()), COUNT, PERIOD, definition);
+    }
+
+    private Series monthlyLifecycleSeries(List<RentalRow> rentals, AnalyticsPeriod period,
+                                          Function<RentalRow, Date> dateOf, String definition) {
+        List<Series.Point> points = monthsInPeriod(period).stream().map(month -> {
+            Instant from = month.atDay(1).atStartOfDay(zone).toInstant();
+            Instant to = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant();
+            return new Series.Point(month.toString(), countInRange(rentals, dateOf,
+                    from.isBefore(period.from()) ? period.from() : from,
+                    to.isAfter(period.to()) ? period.to() : to));
+        }).toList();
+        return Series.available(COUNT, PERIOD, definition, points);
+    }
+
+    private Series monthlyDaysOnMarketSeries(List<RentalRow> rentals, AnalyticsPeriod period, Instant asOf) {
+        List<Series.Point> points = monthsInPeriod(period).stream().map(month -> {
+            Instant from = month.atDay(1).atStartOfDay(zone).toInstant();
+            Instant to = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant();
+            Metric average = averageDaysOnMarket(rentals, new AnalyticsPeriod(
+                    from.isBefore(period.from()) ? period.from() : from,
+                    to.isAfter(period.to()) ? period.to() : to,
+                    period.boundary(), period.timeZone()), asOf);
+            return new Series.Point(month.toString(), average.value());
+        }).toList();
+        return Series.available("days", PERIOD,
+                "Average publication-to-first-acceptance days, grouped by acceptance month. Missing or invalid dates are excluded. Months without qualifying listings have no value.", points);
     }
 
     private Metric averageDaysOnMarket(List<RentalRow> rentals, AnalyticsPeriod period, Instant asOf) {
@@ -608,6 +666,11 @@ public class AnalyticsService {
 
     private AnalyticsResponse response(String scope, AnalyticsPeriod period, Map<String, Object> listing,
                                        Map<String, Metric> metrics, Map<String, Series> series, Instant asOf) {
+        if (period.lifetime()) {
+            metrics.replaceAll((key, metric) -> key.endsWith("Change")
+                    ? Metric.unavailable(metric.unit(), metric.basis(), metric.definition(),
+                        "Lifetime has no previous period to compare with.") : metric);
+        }
         return new AnalyticsResponse(AnalyticsResponse.SCHEMA_VERSION, scope, asOf, period, listing, metrics, series);
     }
 
@@ -669,6 +732,27 @@ public class AnalyticsService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .count();
+    }
+
+    record TenantCounts(long current, long past) {}
+
+    static TenantCounts tenantCounts(List<RentalRow> rentals, Instant asOf) {
+        Set<Long> current = new java.util.HashSet<>();
+        Set<Long> past = new java.util.HashSet<>();
+        for (RentalRow rental : rentals) {
+            if (rental.tenantUserId() == null || rental.rentalDate() == null || rental.tenancyEnd() == null) continue;
+            Instant start = rental.rentalDate().toInstant();
+            Instant end = rental.tenancyEnd().toInstant();
+            String status = normalise(rental.status());
+            if (!start.isBefore(end)) continue;
+            if (STATUS_ACTIVE.equals(status) && !start.isAfter(asOf) && end.isAfter(asOf)) {
+                current.add(rental.tenantUserId());
+            } else if (ACCEPTED_STATUSES.contains(status) && !end.isAfter(asOf)) {
+                past.add(rental.tenantUserId());
+            }
+        }
+        past.removeAll(current);
+        return new TenantCounts(current.size(), past.size());
     }
 
     private static long countAccepted(List<RentalRow> rentals) {

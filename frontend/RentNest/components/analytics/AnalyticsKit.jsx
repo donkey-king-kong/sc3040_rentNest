@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, useWindowDimensions, ActivityIndicator, Modal, ScrollView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, useWindowDimensions, ActivityIndicator, Modal, ScrollView, Platform } from 'react-native';
 import { FontAwesome } from 'react-native-vector-icons';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -64,8 +64,9 @@ export const PERIOD_OPTIONS = [
   { key: '3M', label: '3 months', build: () => buildPeriod(3) },
   { key: '6M', label: '6 months', build: () => buildPeriod(6) },
   { key: '12M', label: '1 year', build: () => buildPeriod(12) },
+  { key: 'LIFETIME', label: 'Lifetime', build: () => ({ period: 'lifetime' }) },
 ];
-export const DEFAULT_PERIOD = '1M';
+export const DEFAULT_PERIOD = 'LIFETIME';
 export const resolvePeriodKey = key => PERIOD_OPTIONS.some(option => option.key === key) ? key : DEFAULT_PERIOD;
 const periodFor = key => PERIOD_OPTIONS.find(option => option.key === resolvePeriodKey(key)).build();
 
@@ -205,7 +206,7 @@ export const Section = ({ title, note, action, children }) => (
     {action ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
       <Text style={[styles.sectionTitle, { flexShrink: 1, marginBottom: 0 }]}>{title}</Text>
       {action}
-    </View> : <Text style={styles.sectionTitle}>{title}</Text>}
+    </View> : title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
     {note ? <Text style={styles.sectionNote}>{note}</Text> : null}
     {children}
   </View>
@@ -213,24 +214,36 @@ export const Section = ({ title, note, action, children }) => (
 
 export const TileRow = ({ children }) => <View style={styles.tileRow}>{children}</View>;
 
-export const PeriodSelector = ({ value, onChange, loading, accentColor, trailingAction }) => {
+export const formatPeriodRange = period => {
+  if (!period?.from || !period?.to) return null;
+  const format = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: period.timeZone || 'Asia/Singapore' });
+  return `${format.format(new Date(period.from))} \u2013 ${format.format(new Date(new Date(period.to).getTime() - 1))}`;
+};
+
+export const PeriodSelector = ({ value, onChange, loading, accentColor, trailingAction, dataPeriod, lifetimeLabel = 'Lifetime' }) => {
   const [open, setOpen] = useState(false);
   const selected = resolvePeriodKey(value);
-  const label = PERIOD_OPTIONS.find(option => option.key === selected).label;
+  const optionLabel = option => option.key === 'LIFETIME' ? lifetimeLabel : option.label;
+  const label = optionLabel(PERIOD_OPTIONS.find(option => option.key === selected));
+  const dates = selected === 'LIFETIME'
+    ? (!loading && dataPeriod?.lifetime ? formatPeriodRange(dataPeriod) : 'All recorded history')
+    : formatPeriodRange(periodFor(selected));
   const color = accentColor || '#16794B';
   const toggle = () => setOpen(shown => !shown);
   return <View style={styles.periodContainer}>
     <View style={styles.periodControlRow}>
-      <Text style={styles.periodCaption}>Period</Text>
       <Pressable onPress={toggle} accessibilityRole="button" accessibilityLabel="Analytics period" accessibilityState={{ expanded: open }} style={styles.periodTrigger}>
-        <Text style={[styles.periodSelectedLabel, { flex: 1 }]}>{label}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.periodCaption}>{dates}</Text>
+          <Text style={styles.periodSelectedLabel}>{label}</Text>
+        </View>
         {loading ? <ActivityIndicator size="small" color={color} accessibilityLabel="Updating analytics" /> : <FontAwesome name={open ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.inkSecondary} />}
       </Pressable>
       {trailingAction}
     </View>
     {open ? <View style={styles.periodMenu}>
-      {PERIOD_OPTIONS.map(option => <Pressable key={option.key} onPress={() => { if (selected !== option.key) onChange(option.key); setOpen(false); }} accessibilityRole="button" accessibilityLabel={option.label} accessibilityState={{ selected: selected === option.key }} style={[styles.periodOption, selected === option.key && styles.periodOptionSelected]}>
-        <Text style={[styles.periodOptionTitle, { flex: 1 }]}>{option.label}</Text>
+      {PERIOD_OPTIONS.map(option => <Pressable key={option.key} onPress={() => { if (selected !== option.key) onChange(option.key); setOpen(false); }} accessibilityRole="button" accessibilityLabel={optionLabel(option)} accessibilityState={{ selected: selected === option.key }} style={[styles.periodOption, selected === option.key && styles.periodOptionSelected]}>
+        <Text style={[styles.periodOptionTitle, { flex: 1 }]}>{optionLabel(option)}</Text>
         {selected === option.key ? <FontAwesome name="check" size={16} color={color} /> : null}
       </Pressable>)}
     </View> : null}
@@ -351,14 +364,15 @@ export const Meter = ({ label, metric, scope }) => {
 
 const showLabel = (index, count) => count <= 6 || index % 2 === 0;
 
-const ChartReadout = ({ series, children }) => {
+const ChartReadout = ({ series, children, hidePeriodLabel = false, title }) => {
   const [visible, setVisible] = useState(false);
   const scope = series.basis === 'period' ? 'Period' : 'All time';
   return <>
-    <View style={styles.chartHeading}>
+    <View style={[styles.chartHeading, title && { alignItems: 'flex-start' }]}>
       <View style={{ flex: 1 }}>
-        <Text style={styles.chartReadout}>{children}</Text>
-        {scope === 'Period' ? <Text style={styles.scope}>{scope}</Text> : null}
+        {title ? <Text accessibilityRole="header" style={[styles.sectionTitle, { marginBottom: 0 }]}>{title}</Text> : null}
+        {children ? <Text style={styles.chartReadout}>{children}</Text> : null}
+        {!hidePeriodLabel && scope === 'Period' ? <Text style={styles.scope}>{scope}</Text> : null}
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Chart calculation details" onPress={() => setVisible(true)} style={styles.detailsClose}>
         <FontAwesome name="info-circle" size={18} color={COLORS.inkSecondary} />
@@ -368,8 +382,9 @@ const ChartReadout = ({ series, children }) => {
   </>;
 };
 
-const SeriesUnavailable = ({ series }) => (
+const SeriesUnavailable = ({ series, title }) => (
   <View style={styles.chartCard}>
+    {title ? <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text> : null}
     <Text style={styles.tileUnavailable}>Not available</Text>
     {series?.reason ? <Text style={styles.tileReason}>{series.reason}</Text> : null}
   </View>
@@ -384,14 +399,14 @@ export const chartMaximum = value => {
   return (scaled <= 1 ? 1 : scaled <= 2 ? 2 : scaled <= 5 ? 5 : 10) * magnitude;
 };
 const ticks = max => [max, max * 0.75, max * 0.5, max * 0.25, 0];
-const ChartAxis = ({ max, unit, height, inset = 0 }) => <View style={[styles.yAxis, { height, paddingVertical: inset }]}>{ticks(max).map(value => <Text key={value} style={styles.axisText}>{formatValue(Number(value.toFixed(2)), unit)}</Text>)}</View>;
+const ChartAxis = ({ max, unit, height, inset = 0, tickValues = ticks(max) }) => <View style={[styles.yAxis, { height, paddingVertical: inset }]}>{tickValues.map(value => <Text key={value} style={styles.axisText}>{formatValue(Number(value.toFixed(2)), unit)}</Text>)}</View>;
 const PLOT_HEIGHT = 140;
 
 /** Single-series bar chart. Tap a bar to read its value. `maxValue` fixes the scale, e.g. 100 for percentages. */
-export const BarChart = ({ series, emptyText, maxValue }) => {
+export const BarChart = ({ series, emptyText, maxValue, title, cleanHeader = false, hidePeriodLabel = false }) => {
   const [selected, setSelected] = useState(null);
 
-  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
+  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} title={title} />;
 
   const points = series.points || [];
   const dataMax = Math.max(0, ...points.map((point) => Number(point.value) || 0));
@@ -400,14 +415,15 @@ export const BarChart = ({ series, emptyText, maxValue }) => {
 
   return (
     <View style={styles.chartCard}>
-      <ChartReadout series={series}>
+      {title && !cleanHeader ? <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text> : null}
+      <ChartReadout series={series} title={cleanHeader ? title : undefined} hidePeriodLabel={hidePeriodLabel}>
         {selectedPoint
           ? `${fullBucket(selectedPoint.bucket)}: ${formatValue(selectedPoint.value, series.unit)}`
-          : dataMax === 0 ? emptyText : series.unit === 'SGD' ? 'S' + String.fromCharCode(36) : series.unit === 'percent' ? '%' : series.unit}
+          : points.every(point => point.value == null) || (dataMax === 0 && series.unit !== 'days') ? emptyText : cleanHeader ? null : series.unit === 'SGD' ? 'S' + String.fromCharCode(36) : series.unit === 'percent' ? '%' : series.unit}
       </ChartReadout>
 
       <View style={styles.plotRow}>
-        <ChartAxis max={max} unit={series.unit} height={PLOT_HEIGHT} />
+        <ChartAxis max={max} unit={cleanHeader ? undefined : series.unit} height={PLOT_HEIGHT} />
         <View style={[styles.plot, { height: PLOT_HEIGHT }]}>
           {[0, 25, 50, 75].map(top => <View key={top} style={[styles.gridLine, { top: top + '%' }]} />)}
           <View style={styles.columns}>
@@ -448,23 +464,34 @@ export const BarChart = ({ series, emptyText, maxValue }) => {
 
 // ---------- Line chart ----------
 
-export const CountBarChart = ({ series, emptyText }) => {
-  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
+export const CountBarChart = ({ series, emptyText, countLabel = 'Tenancies', valueLabel = 'tenancies', totalMetric, totalLabel = 'Total', showReadout = true, title, scaleToTotal = false }) => {
+  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} title={title} />;
   const points = series.points || [];
-  if (points.some(point => point.value === null || !Number.isInteger(Number(point.value)) || Number(point.value) < 0)) {
-    return <SeriesUnavailable series={{ reason: 'Tenancy counts are not valid.' }} />;
+  if (points.some(point => point.availability !== 'unavailable' && (point.value === null || !Number.isInteger(Number(point.value)) || Number(point.value) < 0))) {
+    return <SeriesUnavailable series={{ reason: 'Counts are not valid.' }} title={title} />;
   }
-  const max = Math.max(0, ...points.map(point => Number(point.value)));
+  const max = Math.max(0, ...points.filter(point => point.availability !== 'unavailable').map(point => Number(point.value)));
+  const validTotal = totalMetric?.availability === 'available' && totalMetric.value !== null
+    && Number.isFinite(Number(totalMetric.value)) && Number(totalMetric.value) >= max;
+  const scale = scaleToTotal && validTotal ? Number(totalMetric.value) : max;
+  const valueText = point => {
+    if (point.availability === 'unavailable') return 'Not available';
+    const count = formatValue(point.value, 'count');
+    return scaleToTotal && validTotal && scale > 0
+      ? `${count} (${(Number(point.value) / scale * 100).toFixed(1)}%)` : count;
+  };
   const labelFor = label => ({ '3-6 months': '3 to <6 months', '6-12 months': '6 to <12 months', '12-24 months': '12 to <24 months', '>=24 months': '24+ months' }[label] || label);
   return <View style={styles.chartCard}>
-    <ChartReadout series={series}>{max === 0 ? emptyText : 'Tenancies'}</ChartReadout>
-    {points.map(point => <View key={point.bucket} style={styles.countBarRow} accessible accessibilityLabel={`${labelFor(point.bucket)}: ${formatValue(point.value, 'count')} tenancies`}>
+    {title ? <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text> : null}
+    {totalMetric ? <View style={{ marginBottom: 20 }}><MetricRow label={totalLabel} metric={totalMetric} /></View> : null}
+    {showReadout ? <ChartReadout series={series}>{max === 0 ? emptyText : countLabel}</ChartReadout> : null}
+    {points.map(point => <View key={point.bucket} style={styles.countBarRow} accessible accessibilityLabel={`${labelFor(point.bucket)}: ${valueText(point)}${valueLabel && point.availability !== 'unavailable' ? ' ' + valueLabel : ''}`}>
       <View style={styles.countBarHeading}>
         <Text style={styles.countBarLabel}>{labelFor(point.bucket)}</Text>
-        <Text style={styles.countBarValue}>{formatValue(point.value, 'count')}</Text>
+        <Text style={styles.countBarValue}>{valueText(point)}</Text>
       </View>
       <View style={styles.countBarTrack}>
-        <View style={[styles.countBarFill, { width: `${max === 0 ? 0 : Number(point.value) / max * 100}%` }]} />
+        <View style={[styles.countBarFill, { width: `${scale === 0 || point.availability === 'unavailable' ? 0 : Number(point.value) / scale * 100}%` }]} />
       </View>
     </View>)}
   </View>;
@@ -474,53 +501,77 @@ const LINE_HEIGHT = 150;
 const LINE_INSET = 8; // keeps the end markers inside the plot
 
 /** Single-series line chart for trends. Tap a point to read it. `maxValue` fixes the scale, e.g. 100 for percentages. */
-export const LineChart = ({ series, emptyText, maxValue }) => {
+export const LineChart = ({ series, emptyText, maxValue, title, seriesLabel, comparisonSeries, comparisonLabel, hidePeriodLabel = false, cleanHeader = false }) => {
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState(null);
 
-  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
+  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} title={title} />;
 
   const points = series.points || [];
-  const values = points.map((point) => Number(point.value) || 0);
-  const dataMax = Math.max(0, ...values);
-  const max = maxValue ?? chartMaximum(dataMax);
+  const values = points.map((point) => point.value == null ? null : Number(point.value));
+  const comparison = comparisonSeries?.availability === 'available' ? comparisonSeries : null;
+  const comparisonValues = points.map(point => {
+    const value = comparison?.points?.find(other => other.bucket === point.bucket)?.value;
+    return value == null ? null : Number(value);
+  });
+  const dataMax = Math.max(0, ...values.filter(Number.isFinite), ...comparisonValues.filter(Number.isFinite));
+  const rawMax = maxValue ?? chartMaximum(dataMax);
+  const max = series.unit === 'count' ? (rawMax <= 4 ? Math.max(1, Math.ceil(rawMax)) : Math.ceil(rawMax / 4) * 4) : rawMax;
+  const axisTicks = series.unit === 'count' && max <= 4
+    ? Array.from({ length: max + 1 }, (_, index) => max - index) : ticks(max);
   const count = points.length;
   const spacing = count > 1 ? (width - LINE_INSET * 2) / (count - 1) : width;
   const xFor = (index) => (count > 1 ? LINE_INSET + index * spacing : width / 2);
   const yFor = (value) => LINE_HEIGHT - LINE_INSET - (value / max) * (LINE_HEIGHT - LINE_INSET * 2);
-  const coords = values.map((value, index) => [xFor(index), yFor(value)]);
+  const coords = values.map((value, index) => Number.isFinite(value) ? [xFor(index), yFor(value)] : null);
+  const comparisonCoords = comparisonValues.map((value, index) => Number.isFinite(value) ? [xFor(index), yFor(value)] : null);
   const baseline = LINE_HEIGHT - LINE_INSET;
-  const linePath = coords.map(([x, y], index) => `${index === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
-  const areaPath = count > 1 ? `${linePath} L${coords[count - 1][0]},${baseline} L${coords[0][0]},${baseline} Z` : '';
+  const pathFor = data => data.map((coord, index) => coord
+    ? `${index === 0 || !data[index - 1] ? 'M' : 'L'}${coord[0]},${coord[1]}` : '').join(' ');
+  const linePath = pathFor(coords);
+  const areaPath = !comparison && count > 1 && coords.every(Boolean)
+    ? `${linePath} L${coords[count - 1][0]},${baseline} L${coords[0][0]},${baseline} Z` : '';
   const selectedPoint = selected !== null ? points[selected] : null;
+  const readPoint = index => `${fullBucket(points[index].bucket)}: ${seriesLabel ? `${seriesLabel} ` : ''}${formatValue(points[index].value, series.unit)}${comparison
+    ? `; ${comparisonLabel} ${formatValue(comparisonValues[index], series.unit)}` : ''}`;
 
   return (
     <View style={styles.chartCard}>
-      <ChartReadout series={series}>
+      {title && !cleanHeader ? <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text> : null}
+      <ChartReadout series={series} hidePeriodLabel={hidePeriodLabel} title={cleanHeader ? title : undefined}>
         {selectedPoint
-          ? `${fullBucket(selectedPoint.bucket)}: ${formatValue(selectedPoint.value, series.unit)}`
-          : dataMax === 0 ? emptyText : series.unit === 'SGD' ? 'S' + String.fromCharCode(36) : series.unit === 'percent' ? '%' : series.unit}
+          ? readPoint(selected)
+          : values.every(value => value === null) || (dataMax === 0 && series.unit !== 'days') ? emptyText : cleanHeader ? null : series.unit === 'SGD' ? 'S' + String.fromCharCode(36) : series.unit === 'percent' ? '%' : series.unit}
       </ChartReadout>
+      {comparison ? <View style={styles.shareLegend}>
+        {[seriesLabel, comparisonLabel].map((label, index) => <View key={label} style={styles.shareLegendRow}>
+          <View style={[styles.legendSwatch, { backgroundColor: index === 0 ? COLORS.series : CATEGORY_COLORS[1] }]} />
+          <Text style={styles.shareLegendLabel}>{label}</Text>
+        </View>)}
+      </View> : null}
 
       <View style={styles.plotRow}>
-        <ChartAxis max={max} unit={series.unit} height={LINE_HEIGHT} inset={LINE_INSET} />
+        <ChartAxis max={max} unit={cleanHeader ? undefined : series.unit} tickValues={axisTicks} height={LINE_HEIGHT} inset={LINE_INSET} />
         <View style={[styles.plot, { height: LINE_HEIGHT }]} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
           {width > 0 ? (
             <Svg width={width} height={LINE_HEIGHT}>
-              {ticks(max).slice(0, -1).map(value => <Line key={value} x1={0} x2={width} y1={yFor(value)} y2={yFor(value)} stroke={COLORS.grid} strokeWidth={1} />)}
+              {axisTicks.slice(0, -1).map(value => <Line key={value} x1={0} x2={width} y1={yFor(value)} y2={yFor(value)} stroke={COLORS.grid} strokeWidth={1} />)}
               <Line x1={0} x2={width} y1={baseline} y2={baseline} stroke={COLORS.inkMuted} strokeWidth={1} />
               {areaPath ? <Path d={areaPath} fill={COLORS.series} fillOpacity={0.06} /> : null}
               {selectedPoint ? (
-                <Line x1={coords[selected][0]} x2={coords[selected][0]} y1={LINE_INSET} y2={baseline}
+                <Line x1={xFor(selected)} x2={xFor(selected)} y1={LINE_INSET} y2={baseline}
                   stroke={COLORS.inkMuted} strokeWidth={1} strokeDasharray="3,3" />
               ) : null}
               {count > 1 ? (
                 <Path d={linePath} stroke={COLORS.series} strokeWidth={2} fill="none" strokeLinejoin="round" strokeLinecap="round" />
               ) : null}
-              {coords.map(([x, y], index) => (
-                <Circle key={points[index].bucket} cx={x} cy={y} r={selected === index ? 6 : 4}
+              {comparison ? <Path d={pathFor(comparisonCoords)} stroke={CATEGORY_COLORS[1]} strokeWidth={2} strokeDasharray="6,4" fill="none" /> : null}
+              {comparisonCoords.map((coord, index) => coord ? <Circle key={points[index].bucket}
+                cx={coord[0]} cy={coord[1]} r={4} fill={CATEGORY_COLORS[1]} stroke={COLORS.card} strokeWidth={2} /> : null)}
+              {coords.map((coord, index) => coord ? (
+                <Circle key={points[index].bucket} cx={coord[0]} cy={coord[1]} r={selected === index ? 6 : 4}
                   fill={COLORS.series} stroke={COLORS.card} strokeWidth={2} />
-              ))}
+              ) : null)}
             </Svg>
           ) : null}
           {/* Hit targets are wider than the markers: one column per point */}
@@ -530,7 +581,7 @@ export const LineChart = ({ series, emptyText, maxValue }) => {
               style={[styles.lineHit, { left: xFor(index) - spacing / 2, width: Math.max(spacing, 24) }]}
               onPress={() => setSelected(selected === index ? null : index)}
               accessibilityRole="button"
-              accessibilityLabel={`${fullBucket(point.bucket)}: ${formatValue(point.value, series.unit)}`}
+              accessibilityLabel={readPoint(index)}
             />
           ))}
         </View>
@@ -591,36 +642,51 @@ export const ShareBar = ({ series, emptyText }) => {
 
 // ---------- Donut chart ----------
 
-export const DonutChart = ({ series, emptyText, totalLabel = 'Total users' }) => {
-  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
+const DistributionChart = ({ series, emptyText, totalLabel = 'Total users', pie = false, totalMetric, metricLabel = 'Total', title }) => {
+  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} title={title} />;
   const points = (series.points || []).map(point => ({ ...point, value: Math.max(0, Number(point.value) || 0) }));
   const total = points.reduce((sum, point) => sum + point.value, 0);
-  const radius = 68;
+  const radius = pie ? 80 : 68;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
   return (
     <View style={styles.chartCard}>
-      <View style={styles.donut} accessible accessibilityLabel={total > 0 ? totalLabel + ': ' + total : emptyText}>
-        <Svg width={180} height={180} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <Circle cx={90} cy={90} r={radius} fill="none" stroke={COLORS.border} strokeWidth={24} />
+      {title ? <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text> : null}
+      {totalMetric ? <View style={{ marginBottom: 20 }}><MetricRow label={metricLabel} metric={totalMetric} /></View> : null}
+      <View style={styles.donut} accessible accessibilityLabel={total > 0 || !emptyText ? totalLabel + ': ' + total : emptyText}>
+        <Svg width={180} height={180}
+          {...(Platform.OS === 'web'
+            ? { 'aria-hidden': true }
+            : { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' })}>
+          <Circle cx={90} cy={90} r={radius} fill={pie ? COLORS.border : 'none'} stroke={pie ? 'none' : COLORS.border} strokeWidth={24} />
           {total > 0 ? points.map((point, index) => {
             const length = point.value / total * circumference;
             const start = offset;
             offset += length;
+            if (pie && point.value > 0) {
+              const color = CATEGORY_COLORS[index % CATEGORY_COLORS.length];
+              if (point.value === total) return <Circle key={point.bucket} cx={90} cy={90} r={radius} fill={color} />;
+              const startAngle = start / radius - Math.PI / 2;
+              const endAngle = offset / radius - Math.PI / 2;
+              const x = angle => 90 + radius * Math.cos(angle);
+              const y = angle => 90 + radius * Math.sin(angle);
+              return <Path key={point.bucket} fill={color}
+                d={`M90 90 L${x(startAngle)} ${y(startAngle)} A${radius} ${radius} 0 ${point.value / total > 0.5 ? 1 : 0} 1 ${x(endAngle)} ${y(endAngle)} Z`} />;
+            }
             return point.value > 0 ? (
               <Circle key={point.bucket} cx={90} cy={90} r={radius} fill="none"
                 stroke={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} strokeWidth={24}
                 strokeDasharray={[length, circumference]} strokeDashoffset={-start}
-                rotation={-90} origin="90,90" />
+                transform="rotate(-90 90 90)" />
             ) : null;
           }) : null}
         </Svg>
-        <View style={styles.donutCentre} pointerEvents="none">
+        {!pie ? <View style={styles.donutCentre} pointerEvents="none">
           <Text style={styles.donutTotal}>{withCommas(total)}</Text>
           <Text style={styles.donutLabel}>{totalLabel}</Text>
-        </View>
+        </View> : null}
       </View>
-      {total === 0 ? <Text style={styles.chartReadout}>{emptyText}</Text> : null}
+      {total === 0 && emptyText ? <Text style={styles.chartReadout}>{emptyText}</Text> : null}
       <View style={styles.shareLegend}>
         {points.map((point, index) => (
           <View key={point.bucket} style={styles.shareLegendRow}>
@@ -633,6 +699,9 @@ export const DonutChart = ({ series, emptyText, totalLabel = 'Total users' }) =>
     </View>
   );
 };
+
+export const DonutChart = props => <DistributionChart {...props} />;
+export const PieChart = props => <DistributionChart {...props} pie />;
 
 export const MetricRow = ({ label, metric, change, scope }) => {
   const [expanded, setExpanded] = useState(false);
@@ -726,9 +795,9 @@ const styles = StyleSheet.create({
   countBarFill: { height: '100%', backgroundColor: COLORS.series, borderRadius: 3 },
   periodContainer: { marginBottom: 14 },
   periodControlRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  periodTrigger: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: '#C8C7C2', borderRadius: 8, backgroundColor: COLORS.surface },
-  periodCaption: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary },
-  periodSelectedLabel: { fontSize: 16, lineHeight: 22, fontWeight: '600', color: COLORS.ink },
+  periodTrigger: { flex: 1, minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#C8C7C2', borderRadius: 8, backgroundColor: COLORS.surface },
+  periodCaption: { fontSize: 14, lineHeight: 20, color: COLORS.inkSecondary, fontVariant: ['tabular-nums'] },
+  periodSelectedLabel: { fontSize: 20, lineHeight: 26, fontWeight: '500', color: COLORS.ink },
   periodOption: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 8 },
   periodMenu: { marginTop: 8, padding: 4, borderWidth: 1, borderColor: '#C8C7C2', borderRadius: 8 },
   periodOptionSelected: { backgroundColor: '#EAF5EE' },

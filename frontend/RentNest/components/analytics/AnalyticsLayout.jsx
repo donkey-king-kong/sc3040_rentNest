@@ -12,14 +12,11 @@ export function RefreshControl({ onRefresh, loading, asOf }) {
   </View>;
 }
 
-export function ActivitySection({ title = 'Activity', period, onPeriodChange, loading, onRefresh, dataPeriod, asOf, children }) {
-  const format = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Singapore' });
-  const dates = dataPeriod && !loading ? format.format(new Date(dataPeriod.from)) + ' \u2013 ' + format.format(new Date(new Date(dataPeriod.to).getTime() - 1)) : null;
+export function ActivitySection({ title = 'Activity', period, onPeriodChange, loading, onRefresh, dataPeriod, asOf, children, lifetimeLabel }) {
   const refresh = onRefresh ? <RefreshControl onRefresh={onRefresh} loading={loading} asOf={asOf} /> : null;
   return <View style={styles.activity}>
     <View style={styles.activityHeading}><Text accessibilityRole="header" style={styles.activityTitle}>{title}</Text>{refresh}</View>
-    <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor="#16794B" />
-    {dates ? <Text style={styles.activityDates}>{dates}</Text> : null}
+    <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor="#16794B" dataPeriod={dataPeriod} lifetimeLabel={lifetimeLabel} />
     {loading ? <View style={styles.activityLoading} accessibilityLabel="Loading period activity"><MorphingInfinity size={86} color="#2FA84F" /></View> : children}
   </View>;
 }
@@ -39,8 +36,6 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
     onTabChange(tabs[next]);
     buttons.current[next]?.focus();
   };
-  const dateFormat = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', year: 'numeric', timeZone: dataPeriod?.timeZone || 'Asia/Singapore' });
-  const rangeText = dataPeriod ? dateFormat.format(new Date(dataPeriod.from)) + ' \u2013 ' + dateFormat.format(new Date(new Date(dataPeriod.to).getTime() - 1)) : null;
   const refreshButton = onRefresh ? <RefreshControl onRefresh={onRefresh} loading={loading} asOf={asOf} /> : null;
   return (
     <View style={[styles.screen, compactTabs && styles.adminScreen]}>
@@ -50,7 +45,7 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
             {title ? <Text style={styles.title}>{title}</Text> : null}
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </>}
-          {showPeriod && !periodBelowTabs ? <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} trailingAction={refreshButton} /> : null}
+          {showPeriod && !periodBelowTabs ? <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} trailingAction={refreshButton} dataPeriod={dataPeriod} /> : null}
           {tabs.length > 0 ? <TabContainer
             {...(compactTabs ? { horizontal: true, showsHorizontalScrollIndicator: false,
               contentContainerStyle: styles.compactTabRow, style: styles.compactTabs } : { style: styles.tabs })}
@@ -68,14 +63,9 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
             ))}
           </TabContainer> : null}
           {showPeriod && periodBelowTabs ? <View style={styles.periodBelowTabs}>
-            <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} trailingAction={refreshButton} />
+            <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} trailingAction={refreshButton} dataPeriod={dataPeriod} />
           </View> : null}
-          <View style={styles.toolbar}>
-            <View style={{ flex: 1 }}>
-              {showPeriod && rangeText ? <Text style={styles.dateRange}>{rangeText}</Text> : null}
-            </View>
-            {!showPeriod && showRefresh ? refreshButton : null}
-          </View>
+          {!showPeriod && showRefresh ? <View style={styles.toolbar}>{refreshButton}</View> : null}
         </View>
         <ScrollView key={tab} nativeID={`${id}-panel`}
           {...(web && tabs.length > 0 ? { role: 'tabpanel', 'aria-labelledby': `${id}-tab-${tabs.indexOf(tab)}` } : {})}
@@ -93,10 +83,8 @@ const styles = StyleSheet.create({
   activityHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 16 },
   activityTitle: { fontSize: 20, fontWeight: '600', color: COLORS.ink, flexShrink: 1 },
   refreshGroup: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
-  activityDates: { fontSize: 14, lineHeight: 20, fontWeight: '500', color: COLORS.ink, marginBottom: 20, fontVariant: ['tabular-nums'] },
   activityLoading: { minHeight: 140, alignItems: 'center', justifyContent: 'center' },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
-  dateRange: { fontSize: 14, lineHeight: 20, fontWeight: '500', color: COLORS.ink, fontVariant: ['tabular-nums'] },
+  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginTop: 8 },
   updatedTime: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary, fontVariant: ['tabular-nums'] },
   rangeText: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary },
   refresh: { minWidth: 80, minHeight: 48, flexShrink: 0, flexDirection: 'row', gap: 6, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },
