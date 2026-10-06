@@ -430,7 +430,6 @@ const HomeListingScreen = () => {
           )}
          </View>
          {/* Display Price Insights */}
-                <Text style={styles.header1}>Price Insights</Text>
                 <View style={styles.priceInsightsContainer}>
                   <PriceInsightsChart data={priceInsights} askingPrice={listing.price} />
                 </View>
@@ -496,7 +495,7 @@ const HomeListingScreen = () => {
 
 const styles = StyleSheet.create({
   priceInsightsContainer: {
-    marginHorizontal: 20,
+    marginHorizontal: 0,
   },
   box: {
     flex: 1,
@@ -755,12 +754,6 @@ container: {
     flex: 1,
     textAlign: 'center',
   },
-  header1: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      marginBottom: 10,
-      paddingHorizontal: 20
-    },
 ownerBox: {
     borderWidth: 1,
     borderColor: '#000', // Black outline

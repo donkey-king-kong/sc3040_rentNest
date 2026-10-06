@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
 import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
 
 /**
@@ -8,10 +9,11 @@ import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
  * Props:
  *  - data:        [{ leaseDate: 'Sep 2026', rentPrice: 3650 }, ...] in any order (API sends newest first)
  *  - askingPrice: optional; drawn as a labelled reference line
+ *  - fairPrice:   optional; the AI fair rent, drawn as a second labelled reference line
  *
  * Months are placed on a real time scale, so a month with no transactions shows as a
  * longer segment rather than being squeezed out. Tap a point for its value; the exact
- * numbers are also available in the table view.
+ * numbers are also available in the table view. The whole section collapses from its header.
  */
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -19,14 +21,17 @@ const INK = '#111111';          // series line and markers
 const SURFACE = '#FFFFFF';
 const GRID = '#E6E6E6';
 const TEXT_PRIMARY = '#111111';
-const TEXT_MUTED = '#6B6B6B';
-const REFERENCE = '#9A9A9A';
+const TEXT_MUTED = '#52514e';
+const REFERENCE = '#9A9A9A';     // selection rule only
+// Reference lines: told apart by pattern (long dash vs dots) and named in the key below the chart.
+const ASKING_LINE = { stroke: '#3d3d3a', strokeWidth: 2, strokeDasharray: '7 4' };
+const FAIR_LINE = { stroke: '#52514e', strokeWidth: 2, strokeDasharray: '0.1 4', strokeLinecap: 'round' };
 
 const HEIGHT = 200;
 // SVG text defaults to a serif font in browsers; native already uses the system font.
 const FONT = Platform.OS === 'web' ? 'Helvetica, Arial, sans-serif' : undefined;
 const HIT = 32;
-const PAD = { top: 16, right: 56, bottom: 28, left: 52 };
+const PAD = { top: 16, right: 16, bottom: 28, left: 52 };
 
 const money = (n) => `$${Math.round(n).toLocaleString()}`;
 
@@ -50,29 +55,48 @@ const niceTicks = (lo, hi, target = 4) => {
   return ticks;
 };
 
-const PriceInsightsChart = ({ data = [], askingPrice }) => {
+const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState(null);
   const [showTable, setShowTable] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const points = useMemo(() => data
     .map((d) => ({ label: d.leaseDate, value: Number(d.rentPrice), t: monthIndex(d.leaseDate) }))
     .filter((p) => p.t !== null && p.value > 0)
     .sort((a, b) => a.t - b.t), [data]);
 
+  const header = (
+    <TouchableOpacity
+      style={styles.header}
+      onPress={() => setOpen(!open)}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      accessibilityLabel="Price Insights"
+    >
+      <Text style={styles.title}>Price Insights</Text>
+      <FontAwesome name={open ? 'chevron-up' : 'chevron-down'} size={13} color={TEXT_MUTED} />
+    </TouchableOpacity>
+  );
+
   if (points.length === 0) {
     return (
       <View style={styles.card}>
-        <Text style={styles.muted}>No recent rental transactions found for similar units nearby.</Text>
+        {header}
+        {open && <Text style={styles.muted}>No recent rental transactions found for similar units nearby.</Text>}
       </View>
     );
   }
 
   const values = points.map((p) => p.value);
   const asking = Number(askingPrice) > 0 ? Number(askingPrice) : null;
-  const lo = Math.min(...values, asking ?? Infinity);
-  const hi = Math.max(...values, asking ?? -Infinity);
-  const ticks = niceTicks(lo, hi);
+  const fair = Number(fairPrice) > 0 ? Number(fairPrice) : null;
+  const refs = [asking, fair].filter((v) => v !== null);
+  const rawLo = Math.min(...values, ...refs);
+  const rawHi = Math.max(...values, ...refs);
+  // Pad the domain so lines never sit on the axis and month-to-month swings are not exaggerated.
+  const pad = Math.max((rawHi - rawLo) * 0.15, 100);
+  const ticks = niceTicks(rawLo - pad, rawHi + pad);
   const yMin = ticks[0];
   const yMax = ticks[ticks.length - 1];
 
@@ -88,17 +112,15 @@ const PriceInsightsChart = ({ data = [], askingPrice }) => {
 
   // Month labels: every other point keeps 12 labels from colliding on a phone.
   const labelEvery = points.length > 6 ? 2 : 1;
-  const last = points[points.length - 1];
   const active = selected !== null ? points[selected] : null;
-  // Keep the latest-value label clear of the asking-price label in the same margin.
-  let latestLabelY = y(last.value) + 4;
-  if (asking && Math.abs(latestLabelY - y(asking)) < 28) {
-    latestLabelY = y(asking) - (latestLabelY <= y(asking) ? 18 : -26);
-  }
 
   return (
     <View style={styles.card}>
-      <Text style={styles.subtitle}>Median monthly rent of similar units, last {points.length} months with rentals</Text>
+      {header}
+      {open && (<>
+      <Text style={styles.subtitle}>
+        Median monthly rent of similar units, one point per month with rentals.
+      </Text>
 
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
         {width > 0 && (
@@ -110,13 +132,8 @@ const PriceInsightsChart = ({ data = [], askingPrice }) => {
               </React.Fragment>
             ))}
 
-            {asking && (
-              <>
-                <Line x1={PAD.left} x2={PAD.left + plotW} y1={y(asking)} y2={y(asking)} stroke={REFERENCE} strokeWidth={1} />
-                <SvgText x={PAD.left + plotW + 8} y={y(asking) - 2} fontSize={10} fill={TEXT_MUTED} fontFamily={FONT}>Asking</SvgText>
-                <SvgText x={PAD.left + plotW + 8} y={y(asking) + 10} fontSize={10} fill={TEXT_MUTED} fontFamily={FONT}>{money(asking)}</SvgText>
-              </>
-            )}
+            {asking && <Line x1={PAD.left} x2={PAD.left + plotW} y1={y(asking)} y2={y(asking)} {...ASKING_LINE} />}
+            {fair && <Line x1={PAD.left} x2={PAD.left + plotW} y1={y(fair)} y2={y(fair)} {...FAIR_LINE} />}
 
             <Path d={areaPath} fill={INK} fillOpacity={0.08} />
             <Path d={linePath} stroke={INK} strokeWidth={2} fill="none" strokeLinejoin="round" strokeLinecap="round" />
@@ -136,10 +153,6 @@ const PriceInsightsChart = ({ data = [], askingPrice }) => {
               </React.Fragment>
             ))}
 
-            {/* Direct label on the latest month only, in the right margin beside the last point. */}
-            <SvgText x={x(last.t) + 8} y={latestLabelY} fontSize={11} fontWeight="bold" fill={TEXT_PRIMARY} fontFamily={FONT}>
-              {money(last.value)}
-            </SvgText>
           </Svg>
         )}
         {/* Tap targets larger than the dots, laid over the chart. */}
@@ -153,13 +166,30 @@ const PriceInsightsChart = ({ data = [], askingPrice }) => {
         ))}
       </View>
 
+      {(asking || fair) && (
+        <View style={styles.key}>
+          {asking && (
+            <View style={styles.keyItem}>
+              <Svg width={28} height={8}><Line x1={0} x2={28} y1={4} y2={4} {...ASKING_LINE} /></Svg>
+              <Text style={styles.keyText}>Asking {money(asking)}</Text>
+            </View>
+          )}
+          {fair && (
+            <View style={styles.keyItem}>
+              <Svg width={28} height={8}><Line x1={2} x2={28} y1={4} y2={4} {...FAIR_LINE} /></Svg>
+              <Text style={styles.keyText}>Fair rent {money(fair)}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
       <Text style={styles.readout}>
         {active
           ? `${active.label}: median ${money(active.value)}`
-          : `Latest (${last.label}): ${money(last.value)} · ${points[0].label} – ${last.label}. Tap a point for details.`}
+          : 'Tap a point for details.'}
       </Text>
 
-      <TouchableOpacity onPress={() => setShowTable(!showTable)}>
+      <TouchableOpacity onPress={() => setShowTable(!showTable)} accessibilityRole="button" style={styles.toggleHit}>
         <Text style={styles.toggle}>{showTable ? 'Hide table' : 'Show table'}</Text>
       </TouchableOpacity>
       {showTable && (
@@ -176,6 +206,7 @@ const PriceInsightsChart = ({ data = [], askingPrice }) => {
           ))}
         </View>
       )}
+      </>)}
     </View>
   );
 };
@@ -183,11 +214,39 @@ const PriceInsightsChart = ({ data = [], askingPrice }) => {
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderColor: '#DDDDDD',
-    borderRadius: 10,
-    padding: 12,
+    borderColor: '#D8D7D3',
+    borderRadius: 12,
+    padding: 16,
     marginVertical: 10,
     backgroundColor: SURFACE,
+  },
+  key: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  keyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 18,
+    marginTop: 4,
+  },
+  keyText: {
+    marginLeft: 8,
+    fontSize: 13,
+    color: TEXT_PRIMARY,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: TEXT_PRIMARY,
   },
   subtitle: {
     fontSize: 12,
@@ -208,10 +267,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: TEXT_PRIMARY,
     textDecorationLine: 'underline',
-    marginTop: 8,
   },
   table: {
     marginTop: 6,
+  },
+  toggleHit: {
+    minHeight: 44,
+    justifyContent: 'center',
   },
   hit: {
     position: 'absolute',

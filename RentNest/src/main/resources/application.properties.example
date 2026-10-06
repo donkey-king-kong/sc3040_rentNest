@@ -14,6 +14,8 @@ security.jwt.expiration-time=3600000
 # External APIs
 LTADATAMALL_ACCOUNTKEY=YOUR_API_KEY
 URA_ACCESSKEY=YOUR_API_KEY
+# Optional: data.gov.sg API key (HDB rental data). Blank works but gets a lower rate limit.
+DATAGOVSG_API_KEY=
 
 # Gemini LLM API for AI chat summary and Ask AI guardrails
 # Put the real key only in application.properties. Do not commit real API keys.

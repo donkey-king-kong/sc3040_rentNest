@@ -426,9 +426,14 @@ public class ApiService {
     @Value("${URA_ACCESSKEY}")
     private String URA_ACCESSKEY;
 
+    /** data.gov.sg API key, sent as x-api-key; blank means anonymous (lower rate limit). */
+    @Value("${DATAGOVSG_API_KEY:}")
+    private String DATAGOVSG_API_KEY;
+
     /** Months of history shown in a listing's Price Insights table. */
     static final int PRICE_INSIGHT_MONTHS = 12;
     static final double PRIVATE_INSIGHT_RADIUS_M = 500;
+    static final double PRIVATE_WIDE_RADIUS_M = 1500;
 
     /**
      * Price Insights for a listing: the median monthly rent of comparable units for
@@ -449,9 +454,14 @@ public class ApiService {
                 String flatType = hdbFlatTypeForListing(
                         listing.getName(), listing.getDescription(), listing.getBeds(), listing.getSize());
                 List<HDBRentalContract> hdb = getHDBRentalContractsByFlatType(postalCode, flatType);
-                if (hdb.isEmpty() && hasText(listing.getLocation())) {
-                    // Postal code unknown to OneMap: use the street stored on the listing.
-                    hdb = getHDBRentalContractsByStreet(normaliseHdbStreetName(listing.getLocation()), flatType);
+                if (hdb.size() < 3 && hasText(listing.getLocation())) {
+                    // Postal code unknown to OneMap or not a residential block: use the street stored on the listing.
+                    List<HDBRentalContract> byStreet = getHDBRentalContractsByStreet(normaliseHdbStreetName(listing.getLocation()), flatType);
+                    if (byStreet.size() > hdb.size()) hdb = byStreet;
+                }
+                String town = hdbTownIn(listing.getLocation());
+                if (hdb.size() < 3 && town != null) {
+                    hdb = getHDBRentalContractsByTown(town, flatType);
                 }
                 for (HDBRentalContract c : hdb) {
                     monthAndRent.add(new Object[]{c.getRentApprovalDate(), c.getMonthlyRent()});
@@ -470,6 +480,12 @@ public class ApiService {
                 }
                 if (contracts.size() < 3 && hasText(listing.getLocation())) {
                     contracts = getRentalContractsByStreet(listing.getLocation(), 1, beds);
+                }
+                if (contracts.size() < 3) {
+                    contracts = getRentalContractsNearPostalCode(postalCode, PRIVATE_WIDE_RADIUS_M, 1, beds);
+                }
+                if (contracts.size() < 3) {
+                    contracts = getRentalContractsNearPostalCode(postalCode, 3000, 1, beds);
                 }
                 for (RentalContract c : contracts) {
                     monthAndRent.add(new Object[]{c.getLeaseDate(), c.getRent()});
@@ -779,18 +795,85 @@ public class ApiService {
 
     /** HDB rental approvals on a street, written in HDB's abbreviations ("TAMPINES ST 43"). */
     public List<HDBRentalContract> getHDBRentalContractsByStreet(String streetName, String flattype) {
-        String url = "https://data.gov.sg/api/action/datastore_search?resource_id=d_c9f57187485a850908655db0e8cfe651"
-                     + "&filters={filter}&limit=1000";
+        return fetchHdbRentals("{\"street_name\":\"" + streetName + "\", \"flat_type\":\"" + flattype + "\"}");
+    }
 
-        String filter = "{\"street_name\":\"" + streetName + "\", \"flat_type\":\"" + flattype + "\"}";
-        // You can set headers if necessary
+    /** HDB rental approvals anywhere in an HDB town ("SENGKANG"), for streets with too few rentals. */
+    public List<HDBRentalContract> getHDBRentalContractsByTown(String town, String flattype) {
+        return fetchHdbRentals("{\"town\":\"" + town + "\", \"flat_type\":\"" + flattype + "\"}");
+    }
+
+    private static final String HDB_RENTALS_URL = "https://data.gov.sg/api/action/datastore_search?resource_id=d_c9f57187485a850908655db0e8cfe651"
+            + "&filters={filter}&sort={sort}&limit=1000";
+    /** HDB results are shared by the fair-price card and Price Insights for a few minutes. */
+    private static final long HDB_CACHE_TTL_MILLIS = 10 * 60 * 1000L;
+    private static final long DATAGOVSG_RETRY_WAIT_MILLIS = 10_000;
+    private record CachedHdb(long fetchedAt, List<HDBRentalContract> contracts) {}
+    private final Map<String, CachedHdb> hdbCache = new ConcurrentHashMap<>();
+
+    /**
+     * Query the HDB rental dataset newest first (the API returns oldest first by default, so a
+     * plain capped query on a busy street would miss recent rentals). Results are cached briefly,
+     * and a rate-limit reply is retried once after data.gov.sg's suggested wait.
+     */
+    private List<HDBRentalContract> fetchHdbRentals(String filter) {
+        CachedHdb hit = hdbCache.get(filter);
+        if (hit != null && System.currentTimeMillis() - hit.fetchedAt() < HDB_CACHE_TTL_MILLIS) {
+            return new ArrayList<>(hit.contracts());
+        }
         HttpHeaders headers = new HttpHeaders();
+        // Optional data.gov.sg API key: requests without one get a lower rate limit.
+        if (hasText(DATAGOVSG_API_KEY)) {
+            headers.set("x-api-key", DATAGOVSG_API_KEY);
+        }
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class,filter);
-        List<HDBRentalContract> rentalContracts = parseHDBRentalContracts(response.getBody());
-        rentalContracts.sort((a, b) -> b.getRentApprovalDate().compareTo(a.getRentApprovalDate()));
-        return rentalContracts;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            String body;
+            try {
+                body = restTemplate.exchange(HDB_RENTALS_URL, HttpMethod.GET, entity, String.class,
+                        filter, "rent_approval_date desc").getBody();
+            } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+                body = "TOO_MANY_REQUESTS";
+            }
+            if (body != null && body.contains("TOO_MANY_REQUESTS")) {
+                if (attempt == 2) throw new RuntimeException("data.gov.sg rate limit exceeded");
+                logger.info("[data.gov.sg] Rate limited; retrying in {} ms", DATAGOVSG_RETRY_WAIT_MILLIS);
+                try {
+                    Thread.sleep(DATAGOVSG_RETRY_WAIT_MILLIS);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while waiting for data.gov.sg");
+                }
+                continue;
+            }
+            List<HDBRentalContract> contracts = parseHDBRentalContracts(body);
+            contracts.sort((x, y) -> y.getRentApprovalDate().compareTo(x.getRentApprovalDate()));
+            hdbCache.put(filter, new CachedHdb(System.currentTimeMillis(), contracts));
+            return new ArrayList<>(contracts);
+        }
+        return new ArrayList<>();
+    }
+
+    /** HDB town names as used in the rental dataset. */
+    private static final String[] HDB_TOWNS = {
+        "ANG MO KIO", "BEDOK", "BISHAN", "BUKIT BATOK", "BUKIT MERAH", "BUKIT PANJANG", "BUKIT TIMAH",
+        "CHOA CHU KANG", "CLEMENTI", "GEYLANG", "HOUGANG", "JURONG EAST", "JURONG WEST", "KALLANG/WHAMPOA",
+        "MARINE PARADE", "PASIR RIS", "PUNGGOL", "QUEENSTOWN", "SEMBAWANG", "SENGKANG", "SERANGOON",
+        "TAMPINES", "TOA PAYOH", "WOODLANDS", "YISHUN", "CENTRAL"
+    };
+
+    /** The HDB town named in a free-text location ("Sengkang", "Lorong 4 Toa Payoh"), or null. */
+    public static String hdbTownIn(String location) {
+        if (location == null) return null;
+        String text = location.toUpperCase();
+        for (String town : HDB_TOWNS) {
+            if (town.equals("CENTRAL")) continue;
+            if (text.contains(town) || (town.equals("KALLANG/WHAMPOA") && (text.contains("KALLANG") || text.contains("WHAMPOA")))) {
+                return town;
+            }
+        }
+        return null;
     }
 
     private static final String[][] HDB_STREET_ABBREVIATIONS = {
