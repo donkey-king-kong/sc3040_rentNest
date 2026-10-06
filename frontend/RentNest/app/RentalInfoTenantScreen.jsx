@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import chatIcon from "../assets/images/chaticon.jpg";
 import { FontAwesome } from '@expo/vector-icons';
@@ -16,9 +16,6 @@ const RentalInfoTenant = () => {
   const [listing, setListing] = useState(null); // State to store listing data
   const [rentals, setRentals] = useState(null); // State to store rentals data
   const [loading, setLoading] = useState(true); // Track loading state
-  const [isRouteLoading, setIsRouteLoading] = useState(false);
-  const navigateTimeoutRef = useRef(null);
-  const resetTimeoutRef = useRef(null);
 
   // Fetch listing details
   const getListingID = async () => {
@@ -85,29 +82,12 @@ const RentalInfoTenant = () => {
   useEffect(() => {
     getListingID();
     getRentalsID();
-
-    return () => {
-      if (navigateTimeoutRef.current) {
-        clearTimeout(navigateTimeoutRef.current);
-      }
-      if (resetTimeoutRef.current) {
-        clearTimeout(resetTimeoutRef.current);
-      }
-    };
   }, [refresh]);
-
-  const navigateWithLoading = (route) => {
-    setIsRouteLoading(true);
-    navigateTimeoutRef.current = setTimeout(() => {
-      router.push(route);
-      resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
-    }, 180);
-  };
 
   // Function to navigate to RentPayment screen
   const handleRentPayment = () => {
     if (listing && listing.listingID) {
-      navigateWithLoading({ pathname: '/RentPayment', params: { listingId: listing.listingID, tenantId } });
+      router.push({ pathname: '/RentPayment', params: { listingId: listing.listingID, tenantId } });
     } else {
       console.error('Listing ID is missing, cannot navigate to RentPayment');
     }
@@ -123,13 +103,11 @@ const RentalInfoTenant = () => {
     }
   };
 
-  if (loading || isRouteLoading) {
+  if (loading) {
     return (
         <View style={styles.loadingContainer}>
           <MorphingInfinity size={86} color="#2FA84F" />
-          <Text style={styles.loadingText}>
-            {isRouteLoading ? 'Loading rent payment...' : 'Loading rental info...'}
-          </Text>
+          <Text style={styles.loadingText}>Loading rental info...</Text>
         </View>
     );
   }

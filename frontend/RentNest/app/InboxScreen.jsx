@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import NavigationBar from '../components/NavigationBar';
@@ -11,11 +11,8 @@ import MorphingInfinity from '../components/MorphingInfinity';
 const InboxScreen = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [isRouteLoading, setIsRouteLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [listings, setListings] = useState([]);
-  const navigateTimeoutRef = useRef(null);
-  const resetTimeoutRef = useRef(null);
   
   const fetchListings = async () => {
     try {
@@ -62,24 +59,7 @@ const InboxScreen = () => {
 
   useEffect(() => {
     fetchListings();
-
-    return () => {
-      if (navigateTimeoutRef.current) {
-        clearTimeout(navigateTimeoutRef.current);
-      }
-      if (resetTimeoutRef.current) {
-        clearTimeout(resetTimeoutRef.current);
-      }
-    };
   }, []);
-
-  const navigateWithLoading = (route) => {
-    setIsRouteLoading(true);
-    navigateTimeoutRef.current = setTimeout(() => {
-      router.push(route);
-      resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
-    }, 180);
-  };
 
   // Filter listings for the current user
   const userListings = listings.filter(listing =>
@@ -108,12 +88,12 @@ const InboxScreen = () => {
         style={styles.listingContainer}
         onPress={() => {
           if (isOwner) {
-            navigateWithLoading({
+            router.push({
               pathname: '/RentalInfoOwnerScreen',
               params: { listingId: item.listingID },
             });
           } else if (isTenant) {
-            navigateWithLoading({
+            router.push({
               pathname: '/RentalInfoTenantScreen',
               params: { listingId: item.listingID, tenantId: item.tenantId },
             });
@@ -138,13 +118,11 @@ const InboxScreen = () => {
     );
   };
 
-  if (isLoading || isRouteLoading) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>
-          {isRouteLoading ? 'Loading rental info...' : 'Loading inbox...'}
-        </Text>
+        <Text style={styles.loadingText}>Loading inbox...</Text>
       </View>
     );
   }
