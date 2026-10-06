@@ -142,13 +142,14 @@
         @GetMapping("/user/{userID}/availableListingIDs")
         public ResponseEntity<?> getAvailableListingIDsByUser(@PathVariable Long userID) {
             try {
-                List<Long> allIDs = listingsService.getListingIDsByUserID(userID);
-                List<Long> availableIDs = allIDs.stream()
-                    .filter(id -> rentalsRepository.findByListings_ListingID(id)
+                List<ListingsDTO> availableListings = listingsService.getListingsByUserID(userID)
+                    .stream()
+                    .filter(dto -> dto.getOwnerUserID() != null && dto.getOwnerUserID().equals(userID))
+                    .filter(dto -> rentalsRepository.findByListings_ListingID(dto.getListingID())
                         .map(r -> "terminated".equals(r.getStatus()))
                         .orElse(true))
                     .collect(java.util.stream.Collectors.toList());
-                return ResponseEntity.ok(availableIDs);
+                return ResponseEntity.ok(availableListings);
             } catch (Exception e) {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error: " + e.getMessage());
