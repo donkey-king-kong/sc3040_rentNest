@@ -16,6 +16,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import MorphingInfinity from '../components/MorphingInfinity';
 
+const FALLBACK_IMAGE = 'https://onecms-res.cloudinary.com/image/upload/s--9axR4bQB--/f_auto,q_auto/c_fill,g_auto,h_676,w_1200/singapore-home-renovation-contractors-hdb.jpg?itok=tx9GFgAG';
+
+const ListingImage = ({ uri, style }) => {
+    const [src, setSrc] = useState(uri);
+    return (
+        <Image
+            source={{ uri: src }}
+            style={style}
+            onError={() => setSrc(FALLBACK_IMAGE)}
+        />
+    );
+};
+
 const HomeScreen = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [listings, setListings] = useState([]);
@@ -156,14 +169,7 @@ const HomeScreen = () => {
                 })
               }
           >
-        <Image
-            source={{ uri: item.image }}
-            style={styles.image}
-            onError={(e) => {
-                console.log('Image failed to load:', item.image);
-            }}
-            defaultSource={{ uri: 'https://onecms-res.cloudinary.com/image/upload/s--9axR4bQB--/f_auto,q_auto/c_fill,g_auto,h_676,w_1200/singapore-home-renovation-contractors-hdb.jpg?itok=tx9GFgAG' }}
-        />
+        <ListingImage uri={item.image} style={styles.image} />
         <View style={styles.infoContainer}>
           <View style={styles.detailsContainer}>
             <View style={styles.textContainer}>
