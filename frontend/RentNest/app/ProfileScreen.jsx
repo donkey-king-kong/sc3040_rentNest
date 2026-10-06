@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import MorphingInfinity from '../components/MorphingInfinity';
 
 const ProfileScreen = () => {
   const router = useRouter();
@@ -17,10 +18,12 @@ const ProfileScreen = () => {
     contact: 'Loading...',
     photoURL: 'https://t3.ftcdn.net/jpg/06/33/54/78/360_F_633547842_AugYzexTpMJ9z1YcpTKUBoqBF0CUCk10.jpg',
   });
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
+        setIsProfileLoading(true);
         const token = await AsyncStorage.getItem('token');
         if (!token) {
           router.replace('/LandingScreen');
@@ -54,6 +57,8 @@ const ProfileScreen = () => {
       } catch (error) {
         console.error('Error fetching user data:', error);
         router.replace('/LandingScreen');
+      } finally {
+        setIsProfileLoading(false);
       }
     };
 
@@ -75,6 +80,15 @@ const ProfileScreen = () => {
       console.error('Error during logout:', error);
     }
   };
+
+  if (isProfileLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -117,6 +131,18 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
   },
   title: {
     fontSize: 24,
