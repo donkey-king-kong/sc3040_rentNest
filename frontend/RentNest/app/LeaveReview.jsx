@@ -290,12 +290,16 @@ const LeaveReview = () => {
     } catch (error) {
       let errorMessage = "An error occurred. Please try again.";
       if (error.response) {
+        const responseMessage = typeof error.response.data === 'string'
+            ? error.response.data
+            : error.response.data?.message;
+
         if (error.response.status === 404) {
-          errorMessage = "Review not found. Please try again.";
+          errorMessage = isEditing ? "Review not found. Please try again." : "Review was not saved. Please try again.";
         } else if (error.response.status === 400) {
-          errorMessage = "Invalid data. Please check your input.";
+          errorMessage = responseMessage || "Invalid data. Please check your input.";
         } else {
-          errorMessage = `Error: ${error.response.data.message || errorMessage}`;
+          errorMessage = responseMessage || errorMessage;
         }
       } else if (error.request) {
         console.error('Error request:', error.request);
