@@ -268,6 +268,21 @@ const HomeListingScreen = () => {
     }, 2000);
   };
 
+  const syncListingReportStatus = async (reportStorageKey) => {
+    if (!reportStorageKey || !token) {
+      return;
+    }
+
+    const response = await axios.get(`${API_BASE_URL}/api/listings/${listingId}`, {
+      headers: authHeaders(token)
+    });
+    const isListingFlagged = response.data?.flagged === true || Number(response.data?.flagged) === 1;
+
+    if (!isListingFlagged) {
+      await AsyncStorage.removeItem(reportStorageKey);
+    }
+  };
+
   const handleReportListing = async () => {
     console.log('Report listing clicked');
     const reportStorageKey = getReportStorageKey();
@@ -278,6 +293,7 @@ const HomeListingScreen = () => {
     }
 
     try {
+      await syncListingReportStatus(reportStorageKey);
       const alreadyReported = await AsyncStorage.getItem(reportStorageKey);
       if (alreadyReported === 'true') {
         showListingNotification('Listing Already Reported');
