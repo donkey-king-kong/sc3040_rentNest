@@ -101,7 +101,17 @@ const TenantOverview = () => {
   };
 
   const handleLeaveReview = () => {
-    router.push({ pathname: '/LeaveReview', params: { ownerId: rental.ownerUserId, listingId, tenantId: tenant.userID } });
+    router.push({
+      pathname: '/LeaveReview',
+      params: {
+        ownerId: tenant.userID,
+        listingId,
+        tenantId: currentUserId || rental.ownerUserId,
+        revieweeName: tenant.name,
+        revieweeRole: 'Tenant',
+        revieweePhotoURL: tenant.photoURL,
+      },
+    });
   };
 
   if (loading) {
