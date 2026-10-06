@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from "react";
+import { Animated, Platform, StyleSheet, View } from "react-native";
 
-const MorphingInfinity = ({ size = 72, color = '#2FA84F' }) => {
+const MorphingInfinity = ({ size = 72, color = "#2FA84F" }) => {
   const progress = useRef(new Animated.Value(0)).current;
   const ringSize = size * 0.46;
   const strokeWidth = Math.max(4, size * 0.08);
@@ -14,7 +14,7 @@ const MorphingInfinity = ({ size = 72, color = '#2FA84F' }) => {
       Animated.timing(progress, {
         toValue: 1,
         duration: 1400,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== "web",
       }).start(({ finished }) => {
         if (finished && isMounted) {
           runAnimation();
@@ -102,15 +102,15 @@ const MorphingInfinity = ({ size = 72, color = '#2FA84F' }) => {
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   ring: {
-    position: 'absolute',
+    position: "absolute",
     opacity: 0.82,
   },
   orb: {
-    position: 'absolute',
+    position: "absolute",
   },
 });
 

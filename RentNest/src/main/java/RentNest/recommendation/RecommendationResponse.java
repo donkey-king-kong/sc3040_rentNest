@@ -23,5 +23,13 @@ public record RecommendationResponse(String mode, Filters filters, List<String> 
     public record Item(Long listingID, String name, String location, String type,
                        Integer price, Integer beds, Integer bathroom, Integer size,
                        String listingpicture, int score, List<String> reasons, String summary,
-                       String summarySource, String marketNote, boolean demo) {}
+                   String summarySource, String marketNote, boolean demo, String description) {
+        public Item(Long listingID, String name, String location, String type,
+                Integer price, Integer beds, Integer bathroom, Integer size,
+                String listingpicture, int score, List<String> reasons, String summary,
+                String summarySource, String marketNote, boolean demo) {
+            this(listingID, name, location, type, price, beds, bathroom, size, listingpicture,
+                score, reasons, summary, summarySource, marketNote, demo, null);
+        }
+        }
 }

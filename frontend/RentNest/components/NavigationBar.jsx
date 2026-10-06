@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter, usePathname } from 'expo-router';
-import FontAwesome from 'react-native-vector-icons/FontAwesome';
+import React from "react";
+import { View, TouchableOpacity, StyleSheet } from "react-native";
+import { useRouter, usePathname } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 
 const NavigationBar = () => {
   const router = useRouter();
@@ -9,25 +9,28 @@ const NavigationBar = () => {
 
   const getIconStyle = (route) => ({
     ...styles.icon,
-    color: pathname.includes(route) ? '#000' : '#888',
+    color: pathname.includes(route) ? "#000" : "#888",
   });
 
   return (
     <View style={styles.navbar}>
-      <TouchableOpacity onPress={() => router.push('/HomeScreen')}>
-        <FontAwesome name="search" style={getIconStyle('HomeScreen')} />
+      <TouchableOpacity onPress={() => router.push("/HomeScreen")}>
+        <Feather name="search" style={getIconStyle("HomeScreen")} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push('/InboxScreen')}>
-        <FontAwesome name="inbox" style={getIconStyle('InboxScreen')} />
+      <TouchableOpacity onPress={() => router.push("/InboxScreen")}>
+        <Feather name="inbox" style={getIconStyle("InboxScreen")} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push('/CreateListingScreen')}>
-        <FontAwesome name="plus-circle" style={getIconStyle('CreateListingScreen')} />
+      <TouchableOpacity onPress={() => router.push("/CreateListingScreen")}>
+        <Feather
+          name="plus-circle"
+          style={getIconStyle("CreateListingScreen")}
+        />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push('/ChatsScreen')}>
-        <FontAwesome name="comments" style={getIconStyle('ChatsScreen')} />
+      <TouchableOpacity onPress={() => router.push("/ChatsScreen")}>
+        <Feather name="message-circle" style={getIconStyle("ChatsScreen")} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push('/ProfileScreen')}>
-        <FontAwesome name="user" style={getIconStyle('ProfileScreen')} />
+      <TouchableOpacity onPress={() => router.push("/ProfileScreen")}>
+        <Feather name="user" style={getIconStyle("ProfileScreen")} />
       </TouchableOpacity>
     </View>
   );
@@ -35,16 +38,16 @@ const NavigationBar = () => {
 
 const styles = StyleSheet.create({
   navbar: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     paddingVertical: 15, // Increased padding for a bigger footer
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopWidth: 1,
-    borderTopColor: '#ccc',
+    borderTopColor: "#ccc",
   },
   icon: {
     fontSize: 25, // Icon size
-    color: '#888', // Default color (dimmed)
+    color: "#888", // Default color (dimmed)
   },
 });
 

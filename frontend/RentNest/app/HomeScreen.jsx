@@ -47,7 +47,7 @@ export default function HomeScreen() {
   const activeRequest = useRef(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [sort, setSort] = useState("recommended");
 
@@ -96,6 +96,11 @@ export default function HomeScreen() {
           },
         );
         if (!controller.signal.aborted) {
+          if (!response.data || !Array.isArray(response.data.recommendations)) {
+            throw new Error(
+              "The server returned an invalid response. Please retry.",
+            );
+          }
           applied.current = filters;
           setResult(response.data);
         }
@@ -165,6 +170,20 @@ export default function HomeScreen() {
     items.sort((a, b) => a.price - b.price || a.listingID - b.listingID);
   const update = (key, value) =>
     setForm((previous) => ({ ...previous, [key]: value }));
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View
+          accessibilityLabel="Loading recommendations"
+          style={styles.loadingScreen}
+        >
+          <MorphingInfinity size={86} color="#2FA84F" />
+        </View>
+        <NavigationBar />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -265,7 +284,7 @@ export default function HomeScreen() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.chip} onPress={clearHistory}>
-          <Text>Clear viewing history</Text>
+          <Text>Reset Recommendations</Text>
         </TouchableOpacity>
       </View>
       {error ? (
@@ -278,16 +297,9 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
-      {loading ? (
-        <View
-          accessibilityLabel="Loading recommendations"
-          style={styles.loader}
-        >
-          <MorphingInfinity size={86} color="#2FA84F" />
-        </View>
-      ) : null}
-      {!loading && !error && result && (
+      {result ? (
         <FlatList
+          style={styles.list}
           data={items}
           keyExtractor={(item) => String(item.listingID)}
           contentContainerStyle={{ paddingBottom: 20 }}
@@ -339,20 +351,17 @@ export default function HomeScreen() {
                 <Text style={styles.heading}>
                   {item.name || "Rental property"}
                 </Text>
-                {item.demo && (
+                {item.demo ? (
                   <Text style={styles.muted}>
                     Sample listing · illustrative stock photo
                   </Text>
-                )}
-                <Text>{item.summary}</Text>
-                {item.marketNote ? (
-                  <Text style={styles.market}>{item.marketNote}</Text>
                 ) : null}
+                <Text>{item.description || "Description unavailable."}</Text>
               </View>
             </TouchableOpacity>
           )}
         />
-      )}
+      ) : null}
       <NavigationBar />
     </View>
   );
@@ -413,11 +422,12 @@ const styles = StyleSheet.create({
   chip: { padding: 9, borderWidth: 1, borderColor: "#aaa", borderRadius: 8 },
   selected: { backgroundColor: "#d8eee0", borderColor: "#205c43" },
   market: { color: "#205c43", fontSize: 13, marginTop: 4, marginBottom: 2 },
-  loader: {
+  loadingScreen: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 24,
   },
+  list: { flex: 1 },
   card: {
     backgroundColor: "#fff",
     borderWidth: 1,

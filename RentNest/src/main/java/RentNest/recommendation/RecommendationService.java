@@ -177,7 +177,7 @@ public class RecommendationService {
             enriched.add(new Item(item.listingID(), item.name(), item.location(), item.type(),
                     item.price(), item.beds(), item.bathroom(), item.size(), item.listingpicture(),
                     item.score(), List.copyOf(reasons), summary.text(), summary.source(),
-                    market.note(item.price()), item.demo()));
+                    market.note(item.price()), item.demo(), listing.getDescription()));
         }
         return List.copyOf(enriched);
     }
