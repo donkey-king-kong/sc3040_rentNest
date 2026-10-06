@@ -70,7 +70,11 @@ const HomeScreen = () => {
         ownerName: listing.ownerName
       }));
 
+      console.log("Raw API response sample:", JSON.stringify(response.data[0], null, 2));
+      console.log("Total listings from API:", response.data.length);
       console.log("Transformed listings!");
+      console.log("Transformed count:", transformedListings.length);
+      console.log("Transformed sample:", JSON.stringify(transformedListings[0], null, 2));
       setListings(transformedListings);
       
     } catch (error) {
@@ -152,7 +156,14 @@ const HomeScreen = () => {
                 })
               }
           >
-        <Image source={{ uri: item.image }} style={styles.image} />
+        <Image
+            source={{ uri: item.image }}
+            style={styles.image}
+            onError={(e) => {
+                console.log('Image failed to load:', item.image);
+            }}
+            defaultSource={{ uri: 'https://onecms-res.cloudinary.com/image/upload/s--9axR4bQB--/f_auto,q_auto/c_fill,g_auto,h_676,w_1200/singapore-home-renovation-contractors-hdb.jpg?itok=tx9GFgAG' }}
+        />
         <View style={styles.infoContainer}>
           <View style={styles.detailsContainer}>
             <View style={styles.textContainer}>
