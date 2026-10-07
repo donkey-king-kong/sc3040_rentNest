@@ -363,12 +363,13 @@ export const Meter = ({ label, metric, scope }) => {
 // ---------- Shared chart pieces ----------
 
 const showLabel = (index, count) => count <= 6 || index % 2 === 0;
+const showTrendLabel = (index, points, everyMonth) => everyMonth || showLabel(index, points.length);
 
-const ChartReadout = ({ series, children, hidePeriodLabel = false, title }) => {
+const ChartReadout = ({ series, children, hidePeriodLabel = false, title, compact = false }) => {
   const [visible, setVisible] = useState(false);
   const scope = series.basis === 'period' ? 'Period' : 'All time';
   return <>
-    <View style={[styles.chartHeading, title && { alignItems: 'flex-start' }]}>
+    <View style={[styles.chartHeading, title && { alignItems: 'flex-start' }, compact && { marginBottom: 4 }]}>
       <View style={{ flex: 1 }}>
         {title ? <Text accessibilityRole="header" style={[styles.sectionTitle, { marginBottom: 0 }]}>{title}</Text> : null}
         {children ? <Text style={styles.chartReadout}>{children}</Text> : null}
@@ -402,9 +403,26 @@ const ticks = max => [max, max * 0.75, max * 0.5, max * 0.25, 0];
 const ChartAxis = ({ max, unit, height, inset = 0, tickValues = ticks(max) }) => <View style={[styles.yAxis, { height, paddingVertical: inset }]}>{tickValues.map(value => <Text key={value} style={styles.axisText}>{formatValue(Number(value.toFixed(2)), unit)}</Text>)}</View>;
 const PLOT_HEIGHT = 140;
 
+const PointTooltip = ({ text, x, y, plotWidth, plotHeight }) => {
+  const [height, setHeight] = useState(48);
+  const lines = text.replace(': ', '\n').split('; ').join('\n');
+  const longestLine = Math.max(...lines.split('\n').map(line => line.length));
+  const width = Math.min(Math.max(120, longestLine * 7 + 20), 230, plotWidth || 230);
+  const left = Math.max(0, Math.min(x - width / 2, Math.max(0, plotWidth - width)));
+  const above = y - height - 8;
+  const top = above >= 0 ? above : Math.max(0, Math.min(y + 10, plotHeight - height));
+  return <View pointerEvents="none" accessibilityLiveRegion="polite" accessibilityLabel={text}
+    onLayout={event => setHeight(event.nativeEvent.layout.height)}
+    style={[styles.pointTooltip, { width, left, top }]}>
+    <Text style={styles.pointTooltipText}>{lines}</Text>
+  </View>;
+};
+
 /** Single-series bar chart. Tap a bar to read its value. `maxValue` fixes the scale, e.g. 100 for percentages. */
-export const BarChart = ({ series, emptyText, maxValue, title, cleanHeader = false, hidePeriodLabel = false }) => {
+export const BarChart = ({ series, emptyText, maxValue, title, cleanHeader = false, hidePeriodLabel = true, showEveryMonth = false }) => {
   const [selected, setSelected] = useState(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => setSelected(null), [series]);
 
   if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} title={title} />;
 
@@ -415,16 +433,13 @@ export const BarChart = ({ series, emptyText, maxValue, title, cleanHeader = fal
 
   return (
     <View style={styles.chartCard}>
-      {title && !cleanHeader ? <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text> : null}
-      <ChartReadout series={series} title={cleanHeader ? title : undefined} hidePeriodLabel={hidePeriodLabel}>
-        {selectedPoint
-          ? `${fullBucket(selectedPoint.bucket)}: ${formatValue(selectedPoint.value, series.unit)}`
-          : points.every(point => point.value == null) || (dataMax === 0 && series.unit !== 'days') ? emptyText : cleanHeader ? null : series.unit === 'SGD' ? 'S' + String.fromCharCode(36) : series.unit === 'percent' ? '%' : series.unit}
+      <ChartReadout series={series} title={title} hidePeriodLabel={hidePeriodLabel}>
+        {points.every(point => point.value == null) || (dataMax === 0 && series.unit !== 'days') ? emptyText : null}
       </ChartReadout>
 
       <View style={styles.plotRow}>
         <ChartAxis max={max} unit={cleanHeader ? undefined : series.unit} height={PLOT_HEIGHT} />
-        <View style={[styles.plot, { height: PLOT_HEIGHT }]}>
+        <View style={[styles.plot, { height: PLOT_HEIGHT }]} onLayout={event => setWidth(event.nativeEvent.layout.width)}>
           {[0, 25, 50, 75].map(top => <View key={top} style={[styles.gridLine, { top: top + '%' }]} />)}
           <View style={styles.columns}>
             {points.map((point, index) => {
@@ -447,13 +462,17 @@ export const BarChart = ({ series, emptyText, maxValue, title, cleanHeader = fal
             })}
           </View>
           <View style={styles.baseline} />
+          {selectedPoint ? <PointTooltip
+            text={`${fullBucket(selectedPoint.bucket)}: ${formatValue(selectedPoint.value, series.unit)}`}
+            x={(selected + 0.5) * width / points.length}
+            y={PLOT_HEIGHT * (1 - (Number(selectedPoint.value) || 0) / max)} plotWidth={width} plotHeight={PLOT_HEIGHT} /> : null}
         </View>
       </View>
 
       <View style={styles.xLabels}>
         {points.map((point, index) => (
           <Text key={point.bucket} style={styles.xLabel} numberOfLines={1}>
-            {showLabel(index, points.length) ? shortBucket(point.bucket) : ''}
+            {showTrendLabel(index, points, showEveryMonth) ? shortBucket(point.bucket) : ''}
           </Text>
         ))}
       </View>
@@ -501,9 +520,10 @@ const LINE_HEIGHT = 150;
 const LINE_INSET = 8; // keeps the end markers inside the plot
 
 /** Single-series line chart for trends. Tap a point to read it. `maxValue` fixes the scale, e.g. 100 for percentages. */
-export const LineChart = ({ series, emptyText, maxValue, title, seriesLabel, comparisonSeries, comparisonLabel, hidePeriodLabel = false, cleanHeader = false }) => {
+export const LineChart = ({ series, emptyText, maxValue, title, seriesLabel, comparisonSeries, comparisonLabel, hidePeriodLabel = true, cleanHeader = false, showEveryMonth = false }) => {
   const [width, setWidth] = useState(0);
   const [selected, setSelected] = useState(null);
+  useEffect(() => setSelected(null), [series, comparisonSeries]);
 
   if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} title={title} />;
 
@@ -532,21 +552,18 @@ export const LineChart = ({ series, emptyText, maxValue, title, seriesLabel, com
   const areaPath = !comparison && count > 1 && coords.every(Boolean)
     ? `${linePath} L${coords[count - 1][0]},${baseline} L${coords[0][0]},${baseline} Z` : '';
   const selectedPoint = selected !== null ? points[selected] : null;
-  const readPoint = index => `${fullBucket(points[index].bucket)}: ${seriesLabel ? `${seriesLabel} ` : ''}${formatValue(points[index].value, series.unit)}${comparison
-    ? `; ${comparisonLabel} ${formatValue(comparisonValues[index], series.unit)}` : ''}`;
+  const readPoint = index => `${fullBucket(points[index].bucket)}: ${seriesLabel ? `${seriesLabel}: ` : ''}${formatValue(points[index].value, series.unit)}${comparison
+    ? `; ${comparisonLabel}: ${formatValue(comparisonValues[index], series.unit)}` : ''}`;
 
   return (
     <View style={styles.chartCard}>
-      {title && !cleanHeader ? <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text> : null}
-      <ChartReadout series={series} hidePeriodLabel={hidePeriodLabel} title={cleanHeader ? title : undefined}>
-        {selectedPoint
-          ? readPoint(selected)
-          : values.every(value => value === null) || (dataMax === 0 && series.unit !== 'days') ? emptyText : cleanHeader ? null : series.unit === 'SGD' ? 'S' + String.fromCharCode(36) : series.unit === 'percent' ? '%' : series.unit}
+      <ChartReadout series={series} hidePeriodLabel={hidePeriodLabel} title={title} compact={!!comparison}>
+        {values.every(value => value === null) || (dataMax === 0 && series.unit !== 'days') ? emptyText : null}
       </ChartReadout>
-      {comparison ? <View style={styles.shareLegend}>
-        {[seriesLabel, comparisonLabel].map((label, index) => <View key={label} style={styles.shareLegendRow}>
+      {comparison ? <View style={styles.lineLegend}>
+        {[seriesLabel, comparisonLabel].map((label, index) => <View key={label} style={styles.lineLegendRow}>
           <View style={[styles.legendSwatch, { backgroundColor: index === 0 ? COLORS.series : CATEGORY_COLORS[1] }]} />
-          <Text style={styles.shareLegendLabel}>{label}</Text>
+          <Text numberOfLines={1} style={styles.lineLegendLabel}>{label}</Text>
         </View>)}
       </View> : null}
 
@@ -584,6 +601,8 @@ export const LineChart = ({ series, emptyText, maxValue, title, seriesLabel, com
               accessibilityLabel={readPoint(index)}
             />
           ))}
+          {selectedPoint ? <PointTooltip text={readPoint(selected)} x={xFor(selected)}
+            y={yFor(Math.max(values[selected] ?? 0, comparisonValues[selected] ?? 0))} plotWidth={width} plotHeight={LINE_HEIGHT} /> : null}
         </View>
       </View>
 
@@ -591,11 +610,10 @@ export const LineChart = ({ series, emptyText, maxValue, title, seriesLabel, com
         {width > 0 ? points.map((point, index) => (
           <Text key={point.bucket} numberOfLines={1}
             style={[styles.xLabel, styles.lineLabel, { left: xFor(index) - spacing / 2, width: Math.max(spacing, 24) }]}>
-            {showLabel(index, points.length) ? shortBucket(point.bucket) : ''}
+            {showTrendLabel(index, points, showEveryMonth) ? shortBucket(point.bucket) : ''}
           </Text>
         )) : null}
       </View>
-
     </View>
   );
 };
@@ -986,6 +1004,11 @@ const styles = StyleSheet.create({
   plotRow: {
     flexDirection: 'row',
   },
+  pointTooltip: {
+    position: 'absolute', zIndex: 10, padding: 8, borderRadius: 6,
+    backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.ink,
+  },
+  pointTooltipText: { color: '#FFFFFF', fontSize: 13, lineHeight: 20 },
   yAxis: {
     justifyContent: 'space-between',
     marginRight: 6,
@@ -1103,6 +1126,9 @@ const styles = StyleSheet.create({
   shareLegend: {
     marginTop: 12,
   },
+  lineLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 },
+  lineLegendRow: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
+  lineLegendLabel: { fontSize: 13, color: COLORS.ink, flexShrink: 0 },
   shareLegendRow: {
     flexDirection: 'row',
     alignItems: 'center',

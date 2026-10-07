@@ -184,7 +184,7 @@ describe('BarChart', () => {
     expect(gap.findAll(node => Array.isArray(node.props.style)
       && node.props.style.some(style => typeof style?.height === 'string' && style.height.endsWith('%')))).toHaveLength(0);
     await act(async () => gap.props.onPress());
-    expect(renderedText(tree)).toContain('Feb 2026: —');
+    expect(renderedText(tree)).toContain('Feb 2026\n—');
   });
 
   it('shows the empty message when every bucket is zero', () => {
@@ -241,11 +241,29 @@ describe('LineChart', () => {
     let tree;
     await act(async () => { tree = create(<LineChart series={series} emptyText="unused" maxValue={100} />); });
     await measure(tree, 300);
-    expect(renderedText(tree)).toContain('%');
+    expect(renderedText(tree)).not.toContain('%');
 
     const target = tree.root.findAll((node) => node.props.accessibilityLabel === 'Feb 2026: 66.7%' && typeof node.props.onPress === 'function')[0];
     await act(async () => { target.props.onPress(); });
-    expect(renderedText(tree)).toContain('Feb 2026: 66.7%');
+    expect(renderedText(tree)).toContain('Feb 2026\n66.7%');
+  });
+
+  it('anchors tooltips inside the plot edges and toggles them off', async () => {
+    let tree;
+    await act(async () => { tree = create(<LineChart series={series} maxValue={100} />); });
+    await measure(tree, 300);
+    const tap = async label => {
+      const point = tree.root.findAll(node => node.props.accessibilityLabel === label && node.props.onPress)[0];
+      await act(async () => point.props.onPress());
+    };
+    const tooltip = () => tree.root.findAll(node => node.props.pointerEvents === 'none' && node.props.accessibilityLiveRegion === 'polite')[0];
+    await tap('Jan 2026: 33.3%');
+    expect(tooltip().props.style[1].left).toBe(0);
+    await tap('Mar 2026: 66.7%');
+    const bounds = tooltip().props.style[1];
+    expect(bounds.left + bounds.width).toBeLessThanOrEqual(300);
+    await tap('Mar 2026: 66.7%');
+    expect(tooltip()).toBeUndefined();
   });
 
   it('draws gaps for missing averages without zero markers or connecting lines', async () => {
@@ -269,9 +287,9 @@ describe('LineChart', () => {
     await measure(tree, 300);
     expect(tree.root.findAllByType(Circle)).toHaveLength(2);
     expect(renderedText(tree)).toContain('Terminations');
-    const target = tree.root.findAll(node => node.props.accessibilityLabel === 'Jan 2026: Offers accepted 2; Terminations 8' && node.props.onPress)[0];
+    const target = tree.root.findAll(node => node.props.accessibilityLabel === 'Jan 2026: Offers accepted: 2; Terminations: 8' && node.props.onPress)[0];
     await act(async () => target.props.onPress());
-    expect(renderedText(tree)).toContain('Jan 2026: Offers accepted 2; Terminations 8');
+    expect(renderedText(tree)).toContain('Jan 2026\nOffers accepted: 2\nTerminations: 8');
   });
 
   it('uses whole-number count ticks and removes unit captions from clean headers', async () => {

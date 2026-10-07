@@ -270,13 +270,13 @@ it('property analytics shows all sections on one page and retains period selecti
 it('owner places the period below tabs and hides it on Properties without losing the selection', async () => {
   const tree = await render(OwnerAnalyticsScreen);
   const labels = text(tree);
-  expect(labels.indexOf('Period')).toBeGreaterThan(labels.indexOf('Properties'));
+  expect(labels.indexOf('Lifetime')).toBeGreaterThan(labels.indexOf('Properties'));
   await press(tree, '3 months');
   await press(tree, 'Properties tab');
   expect(text(tree)).not.toContain('Period');
   expect(tree.root.findAll(node => node.props.accessibilityLabel === '3 months')).toHaveLength(0);
   await press(tree, 'Overview tab');
-  expect(text(tree)).toContain('Period');
+  expect(text(tree)).toContain('3 months');
   expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '3M');
 });
 

@@ -368,16 +368,14 @@ public class AnalyticsService {
     }
 
     private Series monthlyPaymentSeries(List<PaymentRow> payments, AnalyticsPeriod period) {
-        Map<YearMonth, Long> totals = new LinkedHashMap<>();
-        for (YearMonth month : monthsInPeriod(period)) {
-            totals.put(month, 0L);
-        }
+        Map<String, Long> totals = new LinkedHashMap<>();
+        trendBuckets(period).forEach(bucket -> totals.put(bucket.label(), 0L));
         for (PaymentRow payment : payments) {
-            YearMonth month = YearMonth.from(payment.date().toInstant().atZone(zone));
-            totals.computeIfPresent(month, (key, total) -> total + nullToZero(payment.amount()));
+            String bucket = YearMonth.from(payment.date().toInstant().atZone(zone)).toString();
+            totals.computeIfPresent(bucket, (key, total) -> total + nullToZero(payment.amount()));
         }
         List<Series.Point> points = totals.entrySet().stream()
-                .map(entry -> new Series.Point(entry.getKey().format(DateTimeFormatter.ofPattern("yyyy-MM")), entry.getValue()))
+                .map(entry -> new Series.Point(entry.getKey(), entry.getValue()))
                 .toList();
         return Series.available(currency, PERIOD,
                 "Recorded rent payment totals per calendar month in " + zone.getId() + ". Edge months only include dates inside the period.",
@@ -572,28 +570,29 @@ public class AnalyticsService {
 
     private Series monthlyLifecycleSeries(List<RentalRow> rentals, AnalyticsPeriod period,
                                           Function<RentalRow, Date> dateOf, String definition) {
-        List<Series.Point> points = monthsInPeriod(period).stream().map(month -> {
-            Instant from = month.atDay(1).atStartOfDay(zone).toInstant();
-            Instant to = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant();
-            return new Series.Point(month.toString(), countInRange(rentals, dateOf,
-                    from.isBefore(period.from()) ? period.from() : from,
-                    to.isAfter(period.to()) ? period.to() : to));
+        List<Series.Point> points = trendBuckets(period).stream().map(bucket -> {
+            return new Series.Point(bucket.label(), countInRange(rentals, dateOf, bucket.from(), bucket.to()));
         }).toList();
         return Series.available(COUNT, PERIOD, definition, points);
     }
 
     private Series monthlyDaysOnMarketSeries(List<RentalRow> rentals, AnalyticsPeriod period, Instant asOf) {
-        List<Series.Point> points = monthsInPeriod(period).stream().map(month -> {
-            Instant from = month.atDay(1).atStartOfDay(zone).toInstant();
-            Instant to = month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant();
+        List<Series.Point> points = trendBuckets(period).stream().map(bucket -> {
             Metric average = averageDaysOnMarket(rentals, new AnalyticsPeriod(
-                    from.isBefore(period.from()) ? period.from() : from,
-                    to.isAfter(period.to()) ? period.to() : to,
+                    bucket.from(), bucket.to(),
                     period.boundary(), period.timeZone()), asOf);
-            return new Series.Point(month.toString(), average.value());
+            return new Series.Point(bucket.label(), average.value());
         }).toList();
         return Series.available("days", PERIOD,
                 "Average publication-to-first-acceptance days, grouped by acceptance month. Missing or invalid dates are excluded. Months without qualifying listings have no value.", points);
+    }
+
+    private record TrendBucket(String label, Instant from, Instant to) {}
+
+    private List<TrendBucket> trendBuckets(AnalyticsPeriod period) {
+        return monthsInPeriod(period).stream().map(month -> new TrendBucket(
+                month.toString(), max(month.atDay(1).atStartOfDay(zone).toInstant(), period.from()),
+                min(month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant(), period.to()))).toList();
     }
 
     private Metric averageDaysOnMarket(List<RentalRow> rentals, AnalyticsPeriod period, Instant asOf) {

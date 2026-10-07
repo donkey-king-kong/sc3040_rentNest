@@ -155,12 +155,12 @@ const AdminAnalyticsScreen = () => {
             </TileRow></Section>
             <Section><LineChart title="Monthly rent recorded" series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" /></Section>
             <Section title="Rental activity">
-              <LineChart title="Monthly rental activity" series={data.series.monthlyOffersAccepted} hidePeriodLabel cleanHeader
+              <LineChart title="Monthly rental activity" series={data.series.monthlyOffersAccepted} hidePeriodLabel cleanHeader showEveryMonth
                 seriesLabel="Offers accepted" comparisonSeries={data.series.monthlyTerminations}
                 comparisonLabel="Terminations" emptyText="No dated rental activity in this period" />
             </Section>
             <Section>
-              <BarChart title="Average days on market" series={data.series.monthlyAverageDaysOnMarket} hidePeriodLabel cleanHeader
+              <BarChart title="Average days on market" series={data.series.monthlyAverageDaysOnMarket} hidePeriodLabel cleanHeader showEveryMonth
                 emptyText="No accepted offers with valid dates in this period" />
             </Section>
           </ActivitySection>

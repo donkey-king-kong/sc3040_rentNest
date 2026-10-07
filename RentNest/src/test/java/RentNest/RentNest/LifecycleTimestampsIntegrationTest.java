@@ -209,6 +209,7 @@ class LifecycleTimestampsIntegrationTest {
                 .andExpect(jsonPath("$.metrics.listingCount.coverage").doesNotExist());
     }
 
+
     @Test
     void historicalEventsAreCountedWithoutCoverageCutoffs() throws Exception {
         createLifecycleFixture();
