@@ -20,14 +20,19 @@ import java.io.IOException;
  * Minimal client for Google Gemini's generateContent REST endpoint, shared by the
  * AI Fair-Pricing Model's LLM features (price explanations, room-type detection).
  *
- * Uses the same settings as the app's AI chat: llm.api-key and llm.model
- * (GEMINI_API_KEY / GEMINI_MODEL are accepted as fallbacks). When no key is set,
+ * Uses the app's shared Gemini key (llm.api-key, or GEMINI_API_KEY as a fallback) and
+ * its own model setting, pricing.ai.model, so the AI chat's model is unaffected. When no key is set,
  * {@link #isConfigured()} is false and callers fall back to non-AI behaviour.
  */
 @Service
 public class GeminiClient {
 
-    public static final String DEFAULT_MODEL = "gemini-3.8-flash";
+    /**
+     * A fast "lite" model: room detection and the short price explanation are simple
+     * tasks. Measured Oct 2026: about 1 s per call vs about 10 s for gemini-3.8-flash,
+     * with consistent room-type answers.
+     */
+    public static final String DEFAULT_MODEL = "gemini-3.1-flash-lite";
     static final String GENERATE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -47,7 +52,7 @@ public class GeminiClient {
     static final String KEY_PLACEHOLDER = "YOUR_GEMINI_API_KEY";
 
     public GeminiClient(@Value("${llm.api-key:${GEMINI_API_KEY:}}") String apiKey,
-                        @Value("${llm.model:${GEMINI_MODEL:" + DEFAULT_MODEL + "}}") String model) {
+                        @Value("${pricing.ai.model:" + DEFAULT_MODEL + "}") String model) {
         String key = apiKey == null ? "" : apiKey.trim();
         this.apiKey = KEY_PLACEHOLDER.equals(key) ? "" : key;
         this.model = model == null || model.isBlank() ? DEFAULT_MODEL : model.trim();

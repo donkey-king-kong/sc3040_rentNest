@@ -28,3 +28,7 @@ llm.model=gemini-3.6-flash
 # AI fair pricing: price listings without enough real comparables from simulated
 # transactions (labelled "DEMO" on the card). On by default; set false to use real data only.
 pricing.demo-data.enabled=true
+
+# AI fair pricing model (room detection and price explanation). A fast lite model keeps
+# the card responsive (~1 s per call); set a larger model here if needed.
+pricing.ai.model=gemini-3.1-flash-lite
