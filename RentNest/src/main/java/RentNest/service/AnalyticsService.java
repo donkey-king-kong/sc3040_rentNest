@@ -140,6 +140,8 @@ public class AnalyticsService {
         Map<String, Metric> metrics = new LinkedHashMap<>();
         metrics.put("listingCount", Metric.available(listingCount, COUNT, SNAPSHOT,
                 "Listings you currently own. Not the number created during the period."));
+        metrics.put("totalListingViews", Metric.available(queries.countAllListingViewsByOwner(ownerId), COUNT, SNAPSHOT,
+                "All recorded visits to your current listings since view tracking began. Repeat visits count separately. Your own visits are excluded."));
 
         long activeListings = countOccupiedListings(rentals, asOf);
         metrics.put("activeTenancyCount", Metric.available(activeListings, COUNT, SNAPSHOT,
@@ -178,6 +180,11 @@ public class AnalyticsService {
         series.put("monthlyRecordedRentPayments", monthlyPaymentSeries(payments, period));
         series.put("tenancyDurationDistribution", tenancyDistribution(rentals));
         series.put("monthlyOccupancyRate", monthlyOccupancyRateSeries(rentals, listingCount, period));
+        series.put("monthlyOffersAccepted", monthlyLifecycleSeries(rentals, period, RentalRow::acceptedAt,
+                "Offers accepted each month. Offers without an acceptance date are left out."));
+        series.put("monthlyTerminations", monthlyLifecycleSeries(rentals, period, RentalRow::terminatedAt,
+                "Rentals terminated each month. Rentals without a termination date are left out."));
+        series.put("monthlyAverageDaysOnMarket", monthlyDaysOnMarketSeries(rentals, period, asOf));
 
         return response("owner", period, null, metrics, series, asOf);
     }

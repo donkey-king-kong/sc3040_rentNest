@@ -56,32 +56,34 @@ beforeEach(() => {
 it('owner navigation separates topics and uses the fixed year for property analytics', async () => {
   const tree = await render(OwnerAnalyticsScreen);
   expect(text(tree)).toContain('Overview');
-  expect(text(tree)).toContain('Monthly rent recorded');
-  expect(text(tree)).toEqual(expect.arrayContaining(['Offers sent in period', 'Offers accepted in period', 'Tenancies ended']));
+  expect(text(tree)).toContain('Monthly Rent Recorded');
+  expect(text(tree)).toEqual(expect.arrayContaining(['Monthly Rental Activity', 'Terminations', 'Average Days on Market']));
+  expect(text(tree)).not.toContain('Offers sent');
+  expect(text(tree)).not.toContain('Rental activity');
   expect(text(tree)).not.toContain('Offers (all time)');
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Offers tab')).toHaveLength(0);
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Rent tab')).toHaveLength(0);
-  expect(text(tree)).toContain('Payments recorded');
+  expect(text(tree)).not.toContain('Payments recorded');
   expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '12M');
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Occupancy tab')).toHaveLength(0);
-  expect(text(tree)).toContain('Occupancy trend');
-  expect(text(tree)).toContain('Tenancy length');
+  expect(text(tree)).toContain('Monthly Occupancy');
+  expect(text(tree)).toContain('Tenancy Length');
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Analytics period' && node.props.onPress)).toHaveLength(0);
-  expect(tree.root.findAll(node => node.props.label === 'Tenants hosted')).toHaveLength(1);
+  expect(tree.root.findAll(node => node.props.label === 'Tenants Hosted')).toHaveLength(1);
   const { CountBarChart } = require('../AnalyticsKit');
   expect(tree.root.findAllByType(CountBarChart)).toHaveLength(1);
-  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Tenancy length' && node.props.onPress)).toHaveLength(0);
-  expect(text(tree)).toContain('Monthly rent recorded');
+  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Tenancy Length' && node.props.onPress)).toHaveLength(0);
+  expect(text(tree)).toContain('Monthly Rent Recorded');
   await press(tree, 'Overview tab');
-  expect(text(tree)).toEqual(expect.arrayContaining(['Offers sent in period', 'Offers accepted in period']));
-  expect(text(tree)).toContain('Tenancies ended');
+  expect(text(tree)).toContain('Monthly Rental Activity');
+  expect(text(tree)).toContain('Terminations');
   expect(text(tree)).not.toContain('Offers (all time)');
   expect(text(tree)).not.toContain('Activity in this period');
-  expect(text(tree)).toContain('Tenancy length');
+  expect(text(tree)).toContain('Tenancy Length');
   expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '12M');
   expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '12M');
   await press(tree, 'Properties tab');
-  expect(text(tree)).toContain('By property');
+  expect(text(tree)).toContain('By Property');
   expect(text(tree)).not.toContain('Offers (all time)');
   await press(tree, 'View analytics for A2');
   expect(mockPush).toHaveBeenCalledWith({ pathname: '/ListingAnalyticsScreen', params: { listingId: 2, period: '12M' } });
@@ -96,7 +98,7 @@ it('admin overview includes user status without reports or tabs', async () => {
     lifetimeRecordedRentPaymentTotal: { ...count(6500), unit: 'SGD' }, acceptedRentalRecordCount: count(2), activeRentalRecordCount: count(1),
   } }, loading: false });
   const tree = await render(AdminAnalyticsScreen);
-  expect(text(tree)).toContain('Monthly rent recorded');
+  expect(text(tree)).toContain('Monthly Rent Recorded');
   expect(text(tree)).not.toContain('Moderation and safety');
   expect(text(tree)).not.toContain('Rental activity');
   expect(text(tree)).not.toContain('Past 12 months');
@@ -107,23 +109,23 @@ it('admin overview includes user status without reports or tabs', async () => {
   expect(text(tree)).toContain('Rentals');
   expect(tree.root.findAll(node => node.props.accessibilityRole === 'tab')).toHaveLength(0);
   expect(text(tree)).not.toContain('Reported records');
-  expect(text(tree)).toEqual(expect.arrayContaining(['Allowed to sign in', 'Blocked from signing in']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['Allowed to Sign In', 'Blocked from Signing In']));
   const { DonutChart } = require('../AnalyticsKit');
   expect(tree.root.findAllByType(DonutChart)).toHaveLength(0);
   const { PieChart } = require('../AnalyticsKit');
-  expect(tree.root.findAllByType(PieChart).find(node => node.props.totalLabel === 'Registered users').props.series.points).toEqual([
-    { bucket: 'Allowed to sign in', value: 3 }, { bucket: 'Blocked from signing in', value: 1 },
+  expect(tree.root.findAllByType(PieChart).find(node => node.props.totalLabel === 'Registered Users').props.series.points).toEqual([
+    { bucket: 'Allowed to Sign In', value: 3 }, { bucket: 'Blocked from Signing In', value: 1 },
   ]);
   expect(text(tree)).toEqual(expect.arrayContaining(['1 (25.0%)', '3 (75.0%)']));
   const { StatTile } = require('../AnalyticsKit');
   const overviewTiles = tree.root.findAllByType(StatTile).slice(0, 4);
-  expect(overviewTiles.map(node => node.props.label)).toEqual(['Registered users', 'Listings', 'Total rent collected', 'Active rentals']);
+  expect(overviewTiles.map(node => node.props.label)).toEqual(['Registered Users', 'Listings', 'Total Rent Collected', 'Active Rentals']);
   expect(overviewTiles[2].props.metric.value).toBe(6500);
   expect(overviewTiles[3].props.metric.value).toBe(1);
   expect(tree.root.findAllByType(StatTile).filter(node => ['Unrestricted users', 'Restricted users'].includes(node.props.label))).toHaveLength(0);
-  expect(text(tree)).toEqual(expect.arrayContaining(['Property and tenancy activity', 'User accounts']));
-  const accountChart = tree.root.findAllByType(PieChart).find(node => node.props.title === 'User accounts');
-  expect(accountChart.props.metricLabel).toBe('Total users');
+  expect(text(tree)).toEqual(expect.arrayContaining(['Property and Tenancy Activity', 'User Accounts']));
+  const accountChart = tree.root.findAllByType(PieChart).find(node => node.props.title === 'User Accounts');
+  expect(accountChart.props.metricLabel).toBe('Total Users');
   expect(accountChart.props.totalMetric.value).toBe(4);
   for (const label of ['Total reported', 'Reported listings', 'Reported users', 'Reported reviews']) {
     expect(text(tree)).not.toContain(label);
@@ -147,23 +149,23 @@ it('shows property owners and separate current and past tenants without changing
   const tree = await render(AdminAnalyticsScreen);
   expect(text(tree)).not.toContain('Both');
   expect(text(tree)).not.toContain('Neither');
-  expect(text(tree)).toEqual(expect.arrayContaining(['Property Owners', 'Current tenants', 'Past tenants']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['Property Owners', 'Current Tenants', 'Past Tenants']));
   const { CountBarChart } = require('../AnalyticsKit');
   const chart = tree.root.findAllByType(CountBarChart).find(node => node.props.series.points[0]?.bucket === 'Property Owners');
   expect(chart.props.series.points.map(point => point.value)).toEqual([6, 3, 2]);
-  expect(chart.props.totalLabel).toBe('Total users');
-  expect(chart.props.title).toBe('Property and tenancy activity');
+  expect(chart.props.totalLabel).toBe('Total Users');
+  expect(chart.props.title).toBe('Property and Tenancy Activity');
   expect(chart.props.totalMetric.value).toBe(20);
   expect(chart.props.scaleToTotal).toBeUndefined();
   expect(text(tree)).toEqual(expect.arrayContaining(['6', '3', '2']));
-  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Registered users: 20').length).toBeGreaterThan(0);
+  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Registered Users: 20').length).toBeGreaterThan(0);
 });
 
 it('keeps current and past tenant labels visible when the backend does not return the metrics', async () => {
   const tree = await render(AdminAnalyticsScreen);
   const { CountBarChart } = require('../AnalyticsKit');
   const chart = tree.root.findAllByType(CountBarChart).find(node => node.props.series.points[0]?.bucket === 'Property Owners');
-  expect(text(tree)).toEqual(expect.arrayContaining(['Current tenants', 'Past tenants']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['Current Tenants', 'Past Tenants']));
   expect(chart.props.series.points.slice(1).every(point => point.availability === 'unavailable' && point.value === null)).toBe(true);
 });
 
@@ -221,13 +223,13 @@ it('admin rentals divides recorded offers without double counting and removes us
     },
   }, loading: false });
   const tree = await render(AdminAnalyticsScreen);
-  expect(text(tree)).toEqual(expect.arrayContaining(['Total rental offers', '10', 'Pending', 'Active', 'Terminated', '3 (30.0%)', '4 (40.0%)']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['Total Rental Offers', '10', 'Pending', 'Active', 'Terminated', '3 (30.0%)', '4 (40.0%)']));
   expect(text(tree)).not.toContain('Terminated / accepted');
   const { PieChart, MetricRow } = require('../AnalyticsKit');
-  const offers = tree.root.findAllByType(PieChart).find(node => node.props.totalLabel === 'Recorded offers');
+  const offers = tree.root.findAllByType(PieChart).find(node => node.props.totalLabel === 'Recorded Offers');
   expect(offers.findByType(MetricRow).props.metric.value).toBe(10);
-  expect(text(tree).indexOf('Rentals')).toBeLessThan(text(tree).indexOf('Monthly rent recorded'));
-  expect(text(tree).indexOf('Total rental offers')).toBeLessThan(text(tree).indexOf('Monthly rent recorded'));
+  expect(text(tree).indexOf('Rentals')).toBeLessThan(text(tree).indexOf('Monthly Rent Recorded'));
+  expect(text(tree).indexOf('Total Rental Offers')).toBeLessThan(text(tree).indexOf('Monthly Rent Recorded'));
   expect(text(tree)).not.toContain('Acceptance rate');
   expect(text(tree)).not.toContain('User overview');
   expect(text(tree)).not.toContain('Growth in this period');
@@ -241,7 +243,7 @@ it('does not fabricate an offer distribution when counts are unavailable', async
   } }, loading: false });
   const tree = await render(AdminAnalyticsScreen);
   expect(text(tree)).toContain('Offer history unavailable');
-  expect(text(tree)).not.toContain('Recorded offers');
+  expect(text(tree)).not.toContain('Recorded Offers');
 });
 
 it('property analytics shows all sections with a fixed past-year period', async () => {
@@ -257,15 +259,15 @@ it('property analytics shows all sections with a fixed past-year period', async 
   expect(useAnalytics).toHaveBeenLastCalledWith('/listing/2', '12M');
 });
 
-it('owner shows the past-year heading without a selector', async () => {
+it('owner hides the extra past-year heading and keeps property navigation', async () => {
   const tree = await render(OwnerAnalyticsScreen);
   const labels = text(tree);
-  expect(labels.indexOf('Past 12 months')).toBeGreaterThan(labels.indexOf('Properties'));
+  expect(labels).not.toContain('Past 12 months');
   await press(tree, 'Properties tab');
   expect(text(tree)).not.toContain('Period');
   expect(tree.root.findAll(node => node.props.accessibilityLabel === '3 months')).toHaveLength(0);
   await press(tree, 'Overview tab');
-  expect(text(tree)).toContain('Past 12 months');
+  expect(text(tree)).not.toContain('Past 12 months');
   expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '12M');
 });
 
@@ -285,16 +287,23 @@ it('does not display a contradictory rental status breakdown', async () => {
   expect(text(tree)).toContain('Rental status counts cannot be reconciled.');
 });
 
-it('omits overview offer totals and retains occupied listing calculation details', async () => {
+it('retains rental charts and occupied listing calculation details without activity number cards', async () => {
   const metric = (value, basis) => ({ availability: 'available', value, unit: 'count', basis });
-  useAnalytics.mockReturnValue({ data: { ...listingResponse, metrics: { ...listingResponse.metrics, rentalRecordCount: metric(5, 'snapshot'), acceptedRentalRecordCount: metric(3, 'snapshot'), offersAcceptedCount: metric(1, 'period'), activeTenancyCount: metric(2, 'snapshot') } }, loading: false });
+  useAnalytics.mockReturnValue({ data: { ...listingResponse, metrics: { ...listingResponse.metrics, listingCount: metric(3, 'snapshot'), rentalRecordCount: metric(5, 'snapshot'), acceptedRentalRecordCount: metric(3, 'snapshot'), offersAcceptedCount: metric(1, 'period'), activeTenancyCount: metric(2, 'snapshot') } }, loading: false });
   const tree = await render(OwnerAnalyticsScreen);
-  expect(text(tree)).toEqual(expect.arrayContaining(['Occupied listings', '2']));
+  expect(text(tree)).toContain('Occupied Listings');
+  const { PieChart } = require('../AnalyticsKit');
+  const occupancy = tree.root.findByType(PieChart);
+  expect(occupancy.props.series.points).toEqual([{ bucket: 'Occupied Listings', value: 2 }, { bucket: 'Vacant Listings', value: 1 }]);
+  expect(occupancy.props.totalMetric.value).toBe(3);
   expect(text(tree)).not.toContain('Offers sent');
-  expect(text(tree)).not.toContain('Offers accepted');
+  const { StatTile, BarChart, LineChart } = require('../AnalyticsKit');
+  expect(tree.root.findAllByType(StatTile).some(node => ['Offers Accepted', 'Average Days on Market'].includes(node.props.label))).toBe(false);
+  expect(tree.root.findByType(BarChart).props.title).toBe('Average Days on Market');
+  expect(tree.root.findAllByType(LineChart).some(node => node.props.title === 'Monthly Rental Activity')).toBe(true);
   expect(text(tree)).not.toContain('All time');
   expect(text(tree)).not.toContain('Now');
-  const occupied = tree.root.findAll(node => node.props.accessibilityLabel === 'Occupied listings: 2' && node.props.onPress)[0];
+  const occupied = occupancy.findAll(node => node.props.accessibilityLabel === 'Chart calculation details' && node.props.onPress)[0];
   expect(occupied).toBeDefined();
   await act(async () => occupied.props.onPress());
   expect(text(tree)).not.toContain('Now');
@@ -307,21 +316,30 @@ it('integrates admin safety statistics with activity and a single refresh contro
   const { RefreshControl } = require('../AnalyticsLayout');
   expect(tree.root.findAllByType(RefreshControl)).toHaveLength(1);
   expect(tree.root.findAll(node => node.props.accessibilityRole === 'tab')).toHaveLength(0);
-  expect(text(tree)).toContain('Monthly rent recorded');
+  expect(text(tree)).toContain('Monthly Rent Recorded');
   expect(text(tree)).not.toContain('Reported records');
   expect(text(tree)).not.toContain('User overview');
   await press(tree, 'Refresh analytics');
   expect(retry).toHaveBeenCalledTimes(1);
 });
-it('separates all-time totals from filtered activity and hides stale period figures while loading', async () => {
-  const { ActivitySection } = require('../AnalyticsLayout');
+it('owner hides all metrics during refresh while keeping its header, tabs and refresh control', async () => {
+  const { StatTile, CountBarChart, LineChart, PieChart, BarChart } = require('../AnalyticsKit');
   useAnalytics.mockReturnValue({ data: listingResponse, loading: true, retry: jest.fn() });
   const tree = await render(OwnerAnalyticsScreen);
-  const activity = tree.root.findByType(ActivitySection);
-  expect(activity.findAll(node => node.props.label === 'Offers accepted')).toHaveLength(0);
+  for (const component of [StatTile, CountBarChart, LineChart, PieChart, BarChart]) {
+    expect(tree.root.findAllByType(component)).toHaveLength(0);
+  }
   expect(text(tree)).toContain('Overview');
-  expect(text(tree)).not.toContain('Monthly rent recorded');
-  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Loading period activity').length).toBeGreaterThan(0);
+  expect(text(tree)).not.toContain('Monthly Rent Recorded');
+  expect(text(tree)).toContain('Analytics');
+  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Refreshing analytics').length).toBeGreaterThan(0);
+  expect(tree.root.findAll(node => node.props.accessibilityRole === 'tab' && node.props.onPress)).toHaveLength(2);
+  const refresh = tree.root.findAll(node => node.props.accessibilityLabel === 'Refresh analytics' && node.props.onPress)[0];
+  expect(refresh.props.disabled).toBe(true);
+  useAnalytics.mockReturnValue({ data: listingResponse, loading: false, retry: jest.fn() });
+  await act(async () => tree.update(<OwnerAnalyticsScreen />));
+  expect(text(tree)).toContain('Monthly Rent Recorded');
+  expect(tree.root.findAllByType(StatTile)).toHaveLength(6);
 });
 
 it('opens property analytics using the fixed past-year period', async () => {

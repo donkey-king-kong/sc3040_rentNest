@@ -28,14 +28,14 @@ const ListingAnalyticsScreen = () => {
 
   const header = (
     <>
-      <Stack.Screen options={{ title: 'Property analytics' }} />
+      <Stack.Screen options={{ title: 'Property Analytics' }} />
       <View style={styles.header}>
         <Pressable style={styles.backButton}
           onPress={() => router.canGoBack() ? router.back() : router.replace('/OwnerAnalyticsScreen')}
           accessibilityRole="button" accessibilityLabel="Back to owner analytics">
           <FontAwesome name="chevron-left" size={18} color="#101820" />
         </Pressable>
-        <Text style={styles.headerTitle}>Property analytics</Text>
+        <Text style={styles.headerTitle}>Property Analytics</Text>
       </View>
     </>
   );

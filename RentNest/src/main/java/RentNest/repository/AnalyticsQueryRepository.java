@@ -169,6 +169,16 @@ public class AnalyticsQueryRepository {
 
     // ---------- Listing views (always period-bounded) ----------
 
+    /** All recorded listing visits across the owner's current listings, including repeat visits. */
+    public long countAllListingViewsByOwner(Long ownerId) {
+        return entityManager.createQuery(
+                        "SELECT COUNT(v) FROM ListingView v WHERE v.listing.owner.userID = :ownerId " +
+                        "AND v.kind = :kind AND (v.viewerUserId IS NULL OR v.viewerUserId <> :ownerId)", Long.class)
+                .setParameter("ownerId", ownerId)
+                .setParameter("kind", ListingView.KIND_LISTING)
+                .getSingleResult();
+    }
+
     private static final String LISTING_VIEW_WHERE =
             "FROM ListingView v WHERE v.listing.listingID = :listingId AND v.kind = :kind " +
             "AND v.viewedAt >= :from AND v.viewedAt < :to";

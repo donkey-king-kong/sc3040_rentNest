@@ -61,8 +61,8 @@ const AdminAnalyticsScreen = () => {
     definition: 'Property owners have at least one listing. Current tenants rent today. Past tenants rented before and have no current tenancy. A user can be both an owner and a tenant.',
     points: [
       ['Property Owners', m.ownerUserCount],
-      ['Current tenants', m.currentTenantUserCount],
-      ['Past tenants', m.pastTenantUserCount],
+      ['Current Tenants', m.currentTenantUserCount],
+      ['Past Tenants', m.pastTenantUserCount],
     ].map(([bucket, metric]) => {
       const available = metric?.availability === 'available' && metric.value !== null
         && Number.isInteger(Number(metric.value)) && Number(metric.value) >= 0;
@@ -86,8 +86,8 @@ const AdminAnalyticsScreen = () => {
     availability: 'available',
     definition: 'All registered users, grouped by whether they can sign in. Reported users can still sign in unless blocked.',
     points: [
-      { bucket: 'Allowed to sign in', value: nonBannedUsers.value },
-      { bucket: 'Blocked from signing in', value: Number(bannedUsers.value) },
+      { bucket: 'Allowed to Sign In', value: nonBannedUsers.value },
+      { bucket: 'Blocked from Signing In', value: Number(bannedUsers.value) },
     ],
   } : { availability: 'unavailable', reason: 'User counts are not available.' };
   const total = m.rentalRecordCount;
@@ -113,15 +113,15 @@ const AdminAnalyticsScreen = () => {
       <AnalyticsLayout compactTabs showPeriod={false} showRefresh={false} periodAccent="#16794B"
         period={period} loading={loading} error={error} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}>
           <Section title="Overview" action={<RefreshControl onRefresh={retry} loading={loading} asOf={data.asOf} />}>{!loading && <><TileRow>
-            <StatTile label="Registered users" scope="Now" metric={m.registeredUserCount} />
+            <StatTile label="Registered Users" scope="Now" metric={m.registeredUserCount} />
             <StatTile label="Listings" scope="Now" metric={m.listingCount} />
           </TileRow><TileRow>
-            <StatTile label="Total rent collected" scope="All time" metric={m.lifetimeRecordedRentPaymentTotal || {
+            <StatTile label="Total Rent Collected" scope="All time" metric={m.lifetimeRecordedRentPaymentTotal || {
               availability: 'unavailable', unit: 'SGD', basis: 'snapshot',
               definition: 'Total recorded rent payments across all rentals. Excludes deposits and does not deduct refunds.',
               reason: 'The lifetime payment total could not be loaded.',
             }} />
-            <StatTile label="Active rentals" scope="Now" metric={m.activeRentalRecordCount || {
+            <StatTile label="Active Rentals" scope="Now" metric={m.activeRentalRecordCount || {
               availability: 'unavailable', unit: 'count', basis: 'snapshot',
               reason: 'The active rental count could not be loaded.',
             }} />
@@ -130,27 +130,27 @@ const AdminAnalyticsScreen = () => {
             <AdminLoadingState message={null} backgroundColor="#FFFFFF" />
           </View> : <>
           <Section>
-            <PieChart title="Rentals" series={offerDistribution} totalLabel="Recorded offers" emptyText="No recorded offers yet" totalMetric={m.rentalRecordCount} metricLabel="Total rental offers" />
+            <PieChart title="Rentals" series={offerDistribution} totalLabel="Recorded Offers" emptyText="No recorded offers yet" totalMetric={m.rentalRecordCount} metricLabel="Total Rental Offers" />
           </Section>
           <ActivitySection title={null} loading={loading}>
-            <Section><LineChart title="Monthly rent recorded" series={data.series.monthlyRecordedRentPayments} showEveryMonth emptyText="No rent recorded in this period" /></Section>
+            <Section><LineChart title="Monthly Rent Recorded" series={data.series.monthlyRecordedRentPayments} showEveryMonth emptyText="No rent recorded in this period" /></Section>
             <Section>
-              <LineChart title="Monthly rental activity" series={data.series.monthlyOffersAccepted} hidePeriodLabel cleanHeader showEveryMonth
-                seriesLabel="Offers accepted" comparisonSeries={data.series.monthlyTerminations}
+              <LineChart title="Monthly Rental Activity" series={data.series.monthlyOffersAccepted} hidePeriodLabel cleanHeader showEveryMonth
+                seriesLabel="Offers Accepted" comparisonSeries={data.series.monthlyTerminations}
                 comparisonLabel="Terminations" emptyText="No dated rental activity in this period" />
             </Section>
             <Section>
-              <BarChart title="Average days on market" series={data.series.monthlyAverageDaysOnMarket} hidePeriodLabel cleanHeader showEveryMonth
+              <BarChart title="Average Days on Market" series={data.series.monthlyAverageDaysOnMarket} hidePeriodLabel cleanHeader showEveryMonth
                 emptyText="No accepted offers with valid dates in this period" />
             </Section>
           </ActivitySection>
           <Section>
             <View style={[styles.userCharts, width < 700 && styles.userChartsStacked]}>
               <View style={[styles.userChart, width < 700 && styles.userChartStacked]}>
-                <CountBarChart title="Property and tenancy activity" series={participation} showReadout={false} valueLabel="" totalMetric={registeredUsers} totalLabel="Total users" />
+                <CountBarChart title="Property and Tenancy Activity" series={participation} showReadout={false} valueLabel="" totalMetric={registeredUsers} totalLabel="Total Users" />
               </View>
               <View style={[styles.userChart, width < 700 && styles.userChartStacked]}>
-                <PieChart title="User accounts" series={banDistribution} totalLabel="Registered users" emptyText="No users yet" totalMetric={registeredUsers} metricLabel="Total users" />
+                <PieChart title="User Accounts" series={banDistribution} totalLabel="Registered Users" emptyText="No users yet" totalMetric={registeredUsers} metricLabel="Total Users" />
               </View>
             </View>
           </Section>

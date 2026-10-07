@@ -35,6 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @RentNestIntegrationTest
 class AnalyticsControllerIntegrationTest {
+    @Autowired private RentNest.repository.ListingViewRepository listingViewRepository;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     // Reporting period: Jan-Mar 2026 in Singapore time
     private static final String FROM = "2026-01-01T00:00:00+08:00";
@@ -126,6 +128,36 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metrics.listingCount.value").value(1))
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(1000));
+    }
+
+    @Test
+    void ownerTotalListingViewsIncludesHistoryAndRepeatsAcrossListingsButExcludesOtherOwnersAndSelf() throws Exception {
+        Listings another = listingsRepository.findAll().stream()
+                .filter(listing -> listing.getOwner().getUserID().equals(ownerA.getUserID())
+                        && !listing.getListingID().equals(listingA2.getListingID())).findFirst().orElseThrow();
+        for (Listings listing : java.util.List.of(listingA2, listingA2, another, listingB1)) {
+            RentNest.model.ListingView view = new RentNest.model.ListingView();
+            view.setListing(listing);
+            view.setViewerUserId(emptyOwner.getUserID());
+            view.setKind(RentNest.model.ListingView.KIND_LISTING);
+            listingViewRepository.saveAndFlush(view);
+        }
+        RentNest.model.ListingView selfView = new RentNest.model.ListingView();
+        selfView.setListing(listingA2);
+        selfView.setViewerUserId(ownerA.getUserID());
+        selfView.setKind(RentNest.model.ListingView.KIND_LISTING);
+        listingViewRepository.saveAndFlush(selfView);
+        jdbc.update("UPDATE listing_view SET viewed_at = TIMESTAMP '2024-01-01 00:00:00'");
+        mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.totalListingViews.value").value(3))
+                .andExpect(jsonPath("$.metrics.totalListingViews.basis").value("snapshot"));
+        mockMvc.perform(asUser(ownerB, get("/api/analytics/owner/summary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.totalListingViews.value").value(1));
+        mockMvc.perform(asUser(emptyOwner, get("/api/analytics/owner/summary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.totalListingViews.value").value(0));
     }
 
     @Test

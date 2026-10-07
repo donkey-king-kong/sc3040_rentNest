@@ -504,13 +504,13 @@ it('one admin refresh replaces all overview, rental, user and trend data', async
   expect(tiles.map(node => node.props.metric.value)).toEqual([20, 6, 2000, 2]);
   const pies = tree.root.findAllByType(PieChart);
   expect(pies.find(node => node.props.title === 'Rentals').props.totalMetric.value).toBe(8);
-  expect(pies.find(node => node.props.title === 'User accounts').props.totalMetric.value).toBe(20);
+  expect(pies.find(node => node.props.title === 'User Accounts').props.totalMetric.value).toBe(20);
   const bars = tree.root.findAllByType(CountBarChart);
-  expect(bars.find(node => node.props.title === 'Property and tenancy activity').props.series.points.map(point => point.value)).toEqual([2, 2, 2]);
+  expect(bars.find(node => node.props.title === 'Property and Tenancy Activity').props.series.points.map(point => point.value)).toEqual([2, 2, 2]);
   expect(bars.find(node => node.props.title === 'Reported records')).toBeUndefined();
   const lines = tree.root.findAllByType(LineChart);
-  expect(lines.find(node => node.props.title === 'Monthly rent recorded').props.series).toBe(refreshed.series.monthlyRecordedRentPayments);
-  const activity = lines.find(node => node.props.title === 'Monthly rental activity');
+  expect(lines.find(node => node.props.title === 'Monthly Rent Recorded').props.series).toBe(refreshed.series.monthlyRecordedRentPayments);
+  const activity = lines.find(node => node.props.title === 'Monthly Rental Activity');
   expect(activity.props.series).toBe(refreshed.series.monthlyOffersAccepted);
   expect(activity.props.comparisonSeries).toBe(refreshed.series.monthlyTerminations);
   expect(tree.root.findByType(BarChart).props.series).toBe(refreshed.series.monthlyAverageDaysOnMarket);
@@ -524,7 +524,7 @@ describe('Admin user presentation', () => {
     let tree;
     await act(async () => { tree = create(<Chart title="Rentals" series={{ availability: 'available',
       unit: 'count', basis: 'snapshot', definition, points: [{ bucket: 'Active', value: 2 }] }}
-      totalMetric={available(2)} totalLabel="Total rental offers" showReadout={false} />); });
+      totalMetric={available(2)} totalLabel="Total Rental Offers" showReadout={false} />); });
     expect(tree.root.findByType(MetricRow).props.showInfo).toBe(false);
     const info=tree.root.findAll(node=>node.props.accessibilityLabel==='Chart calculation details' && node.props.onPress);
     expect(info).toHaveLength(1);

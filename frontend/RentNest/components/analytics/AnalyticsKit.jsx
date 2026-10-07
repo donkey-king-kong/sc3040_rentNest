@@ -139,6 +139,7 @@ export function useOwnedListings(refreshKey = 0) {
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
+      setListings(previous => ({ ...previous, loading: true, error: null }));
       try {
         const token = await getAuthToken();
         if (!token) return;
@@ -306,7 +307,7 @@ export const MetricDetails = ({ label, metric, scope, visible, onClose, hideValu
   </Modal>
 );
 
-export const StatTile = ({ label, metric, change, featured = false, scope }) => {
+export const StatTile = ({ label, metric, change, featured = false, scope, supportingText, unavailableText = 'Not available', children }) => {
   const [showDefinition, setShowDefinition] = useState(false);
   const { width } = useWindowDimensions();
   if (!metric) return null;
@@ -317,7 +318,7 @@ export const StatTile = ({ label, metric, change, featured = false, scope }) => 
       style={[styles.tile, width >= 1000 && styles.wideTile, featured && styles.featuredTile]}
       onPress={() => setShowDefinition((shown) => !shown)}
       accessibilityRole="button"
-      accessibilityLabel={`${label}: ${available ? formatValue(metric.value, metric.unit) : 'not available'}`}
+      accessibilityLabel={`${label}: ${available ? formatValue(metric.value, metric.unit) : unavailableText}${supportingText ? '. ' + supportingText : ''}`}
       accessibilityHint="Shows how this metric is calculated"
       accessibilityState={{ expanded: showDefinition }}
     >
@@ -328,8 +329,10 @@ export const StatTile = ({ label, metric, change, featured = false, scope }) => 
       {available ? (
         <Text style={[styles.tileValue, featured && styles.featuredValue]}>{formatValue(metric.value, metric.unit)}</Text>
       ) : (
-        <Text style={styles.tileUnavailable}>Not available</Text>
+        <Text style={styles.tileUnavailable}>{unavailableText}</Text>
       )}
+      {children}
+      {supportingText ? <Text style={styles.tileChange}>{supportingText}</Text> : null}
       {available && formatChange(change) ? <Text style={styles.tileChange}>{formatChange(change)}</Text> : null}
       {showDefinition ? <MetricDetails label={label} metric={metric} scope={scope} visible onClose={() => setShowDefinition(false)} /> : null}
     </Pressable>
@@ -667,7 +670,7 @@ export const ShareBar = ({ series, emptyText }) => {
 
 // ---------- Donut chart ----------
 
-const DistributionChart = ({ series, emptyText, totalLabel = 'Total users', pie = false, totalMetric, metricLabel = 'Total', title }) => {
+const DistributionChart = ({ series, emptyText, totalLabel = 'Total users', pie = false, totalMetric, metricLabel = 'Total', title, children }) => {
   if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} title={title} />;
   const points = (series.points || []).map(point => ({ ...point, value: Math.max(0, Number(point.value) || 0) }));
   const total = points.reduce((sum, point) => sum + point.value, 0);
@@ -678,6 +681,7 @@ const DistributionChart = ({ series, emptyText, totalLabel = 'Total users', pie 
     <View style={styles.chartCard}>
       {title ? <ChartReadout title={title} series={series} hidePeriodLabel compact /> : null}
       {totalMetric ? <View style={{ marginBottom: 20 }}><MetricRow label={metricLabel} metric={totalMetric} showInfo={!title} /></View> : null}
+      {children}
       <View style={styles.donut} accessible accessibilityLabel={total > 0 || !emptyText ? totalLabel + ': ' + total : emptyText}>
         <Svg width={180} height={180}
           {...(Platform.OS === 'web'

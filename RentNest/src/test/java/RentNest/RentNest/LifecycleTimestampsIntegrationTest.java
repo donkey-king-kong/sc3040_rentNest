@@ -205,6 +205,13 @@ class LifecycleTimestampsIntegrationTest {
                 .andExpect(jsonPath("$.metrics.terminationsCount.value").value(1))
                 .andExpect(jsonPath("$.metrics.averageDaysOnMarket.value").value(12.0))
                 .andExpect(jsonPath("$.metrics.averageDaysOnMarket.unit").value("days"))
+                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[0].value").value(0))
+                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[1].value").value(2))
+                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[2].value").value(1))
+                .andExpect(jsonPath("$.series.monthlyTerminations.points[2].value").value(1))
+                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[0].value").value(nullValue()))
+                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[1].value").value(10.0))
+                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[2].value").value(14.0))
                 .andExpect(jsonPath("$.metrics.offersSentCount.coverage").doesNotExist())
                 .andExpect(jsonPath("$.metrics.listingCount.coverage").doesNotExist());
     }
