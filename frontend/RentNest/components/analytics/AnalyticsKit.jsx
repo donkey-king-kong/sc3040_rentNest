@@ -58,12 +58,19 @@ export const buildLastDays = (days, now = new Date()) => {
   const from = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - days + 1));
   return { from: singaporeMidnight(from), to: singaporeInstant(now) };
 };
+export const buildPastYear = (now = new Date()) => {
+  const today = singaporeDate(now);
+  return {
+    from: singaporeMidnight(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 11, 1))),
+    to: singaporeInstant(now),
+  };
+};
 export const PERIOD_OPTIONS = [
   { key: '1M', label: '1 month', build: () => buildPeriod(1) },
   { key: '2M', label: '2 months', build: () => buildPeriod(2) },
   { key: '3M', label: '3 months', build: () => buildPeriod(3) },
   { key: '6M', label: '6 months', build: () => buildPeriod(6) },
-  { key: '12M', label: '1 year', build: () => buildPeriod(12) },
+  { key: '12M', label: '1 year', build: () => buildPastYear() },
   { key: 'LIFETIME', label: 'Lifetime', build: () => ({ period: 'lifetime' }) },
 ];
 export const DEFAULT_PERIOD = 'LIFETIME';
@@ -275,7 +282,7 @@ export const ErrorState = ({ message, onRetry, actionLabel = 'Try again' }) => (
  * `change` is an optional percent-change metric, shown underneath only when it could be calculated.
  * `featured` gives the main overview figures more visual emphasis.
  */
-const scopeFor = (metric, scope) => scope || (metric?.basis === 'period' ? 'Period' : null);
+const scopeFor = (metric, scope) => scope === 'Now' ? null : scope || (metric?.basis === 'period' ? 'Period' : null);
 const visibleScopeFor = (metric, scope) => {
   const label = scopeFor(metric, scope);
   return ['Now', 'All time', 'Period'].includes(label) ? null : label;
@@ -375,11 +382,11 @@ const ChartReadout = ({ series, children, hidePeriodLabel = false, title, compac
         {children ? <Text style={styles.chartReadout}>{children}</Text> : null}
         {!hidePeriodLabel && scope === 'Period' ? <Text style={styles.scope}>{scope}</Text> : null}
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Chart calculation details" onPress={() => setVisible(true)} style={styles.detailsClose}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Chart calculation details" onPress={() => setVisible(true)} hitSlop={12} style={styles.chartInfoButton}>
         <FontAwesome name="info-circle" size={18} color={COLORS.inkSecondary} />
       </Pressable>
     </View>
-    {visible ? <MetricDetails label="Chart calculation" metric={series} scope={scope} hideValue visible onClose={() => setVisible(false)} /> : null}
+    {visible ? <MetricDetails label={title || 'About this chart'} metric={series} hideValue visible onClose={() => setVisible(false)} /> : null}
   </>;
 };
 
@@ -501,8 +508,8 @@ export const CountBarChart = ({ series, emptyText, countLabel = 'Tenancies', val
   };
   const labelFor = label => ({ '3-6 months': '3 to <6 months', '6-12 months': '6 to <12 months', '12-24 months': '12 to <24 months', '>=24 months': '24+ months' }[label] || label);
   return <View style={styles.chartCard}>
-    {title ? <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text> : null}
-    {totalMetric ? <View style={{ marginBottom: 20 }}><MetricRow label={totalLabel} metric={totalMetric} /></View> : null}
+    {title ? <ChartReadout title={title} series={series} hidePeriodLabel compact /> : null}
+    {totalMetric ? <View style={{ marginBottom: 20 }}><MetricRow label={totalLabel} metric={totalMetric} showInfo={!title} /></View> : null}
     {showReadout ? <ChartReadout series={series}>{max === 0 ? emptyText : countLabel}</ChartReadout> : null}
     {points.map(point => <View key={point.bucket} style={styles.countBarRow} accessible accessibilityLabel={`${labelFor(point.bucket)}: ${valueText(point)}${valueLabel && point.availability !== 'unavailable' ? ' ' + valueLabel : ''}`}>
       <View style={styles.countBarHeading}>
@@ -669,8 +676,8 @@ const DistributionChart = ({ series, emptyText, totalLabel = 'Total users', pie 
   let offset = 0;
   return (
     <View style={styles.chartCard}>
-      {title ? <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text> : null}
-      {totalMetric ? <View style={{ marginBottom: 20 }}><MetricRow label={metricLabel} metric={totalMetric} /></View> : null}
+      {title ? <ChartReadout title={title} series={series} hidePeriodLabel compact /> : null}
+      {totalMetric ? <View style={{ marginBottom: 20 }}><MetricRow label={metricLabel} metric={totalMetric} showInfo={!title} /></View> : null}
       <View style={styles.donut} accessible accessibilityLabel={total > 0 || !emptyText ? totalLabel + ': ' + total : emptyText}>
         <Svg width={180} height={180}
           {...(Platform.OS === 'web'
@@ -721,7 +728,7 @@ const DistributionChart = ({ series, emptyText, totalLabel = 'Total users', pie 
 export const DonutChart = props => <DistributionChart {...props} />;
 export const PieChart = props => <DistributionChart {...props} pie />;
 
-export const MetricRow = ({ label, metric, change, scope }) => {
+export const MetricRow = ({ label, metric, change, scope, showInfo = true }) => {
   const [expanded, setExpanded] = useState(false);
   if (!metric) return null;
   const available = metric.availability === 'available';
@@ -732,7 +739,7 @@ export const MetricRow = ({ label, metric, change, scope }) => {
       accessibilityLabel={label + ': ' + (available ? formatValue(metric.value, metric.unit) : 'not available')}
       accessibilityHint="Shows how this metric is calculated">
       <View style={styles.metricRowMain}>
-        <Text style={styles.metricRowLabel}>{label}</Text><FontAwesome name="info-circle" size={16} color={COLORS.inkSecondary} />
+        <Text style={styles.metricRowLabel}>{label}</Text>{showInfo ? <FontAwesome name="info-circle" size={16} color={COLORS.inkSecondary} /> : null}
         <Text style={styles.metricRowValue}>{available ? formatValue(metric.value, metric.unit) : 'Not available'}</Text>
       </View>
       {visibleScopeFor(metric, scope) ? <Text style={styles.scope}>{visibleScopeFor(metric, scope)}</Text> : null}
@@ -821,6 +828,7 @@ const styles = StyleSheet.create({
   periodOptionSelected: { backgroundColor: '#EAF5EE' },
   periodOptionTitle: { fontSize: 16, lineHeight: 22, fontWeight: '500', color: COLORS.ink },
   chartHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  chartInfoButton: { width: 24, height: 24, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   scope: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary, marginTop: 4 },
   detailsBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
   detailsPanel: { maxHeight: '80%', backgroundColor: COLORS.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 24, paddingBottom: 32 },

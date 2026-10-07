@@ -290,9 +290,9 @@ public class AnalyticsService {
         Map<String, Series> series = new LinkedHashMap<>();
         series.put("monthlyRecordedRentPayments", monthlyPaymentSeries(payments, period));
         series.put("monthlyOffersAccepted", monthlyLifecycleSeries(rentals, period, RentalRow::acceptedAt,
-                "Offers accepted each month using recorded acceptance dates. Undated accepted offers are excluded from this timeline."));
+                "Offers accepted each month. Offers without an acceptance date are left out."));
         series.put("monthlyTerminations", monthlyLifecycleSeries(rentals, period, RentalRow::terminatedAt,
-                "Tenancies terminated each month using recorded termination dates. Undated terminations are excluded."));
+                "Rentals terminated each month. Rentals without a termination date are left out."));
         series.put("monthlyAverageDaysOnMarket", monthlyDaysOnMarketSeries(rentals, period, asOf));
         series.put("flaggedItemsByType", Series.available(COUNT, SNAPSHOT, "Items currently flagged, by item type.", List.of(
                 new Series.Point("listings", flaggedListings),
@@ -378,7 +378,7 @@ public class AnalyticsService {
                 .map(entry -> new Series.Point(entry.getKey(), entry.getValue()))
                 .toList();
         return Series.available(currency, PERIOD,
-                "Recorded rent payment totals per calendar month in " + zone.getId() + ". Edge months only include dates inside the period.",
+                "Rent payments grouped by their recorded month. Deposits are excluded and refunds are not deducted.",
                 points);
     }
 
@@ -584,7 +584,7 @@ public class AnalyticsService {
             return new Series.Point(bucket.label(), average.value());
         }).toList();
         return Series.available("days", PERIOD,
-                "Average publication-to-first-acceptance days, grouped by acceptance month. Missing or invalid dates are excluded. Months without qualifying listings have no value.", points);
+                "Average days from publishing a listing to its first accepted offer, grouped by acceptance month. Missing or invalid dates are left out. Months with no qualifying listings are blank.", points);
     }
 
     private record TrendBucket(String label, Instant from, Instant to) {}

@@ -12,11 +12,10 @@ export function RefreshControl({ onRefresh, loading, asOf }) {
   </View>;
 }
 
-export function ActivitySection({ title = 'Activity', period, onPeriodChange, loading, onRefresh, dataPeriod, asOf, children, lifetimeLabel }) {
+export function ActivitySection({ title = 'Past 12 months', loading, onRefresh, asOf, children }) {
   const refresh = onRefresh ? <RefreshControl onRefresh={onRefresh} loading={loading} asOf={asOf} /> : null;
   return <View style={styles.activity}>
-    <View style={styles.activityHeading}><Text accessibilityRole="header" style={styles.activityTitle}>{title}</Text>{refresh}</View>
-    <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor="#16794B" dataPeriod={dataPeriod} lifetimeLabel={lifetimeLabel} />
+    {title || refresh ? <View style={styles.activityHeading}>{title ? <Text accessibilityRole="header" style={styles.activityTitle}>{title}</Text> : null}{refresh}</View> : null}
     {loading ? <View style={styles.activityLoading} accessibilityLabel="Loading period activity"><MorphingInfinity size={86} color="#2FA84F" /></View> : children}
   </View>;
 }

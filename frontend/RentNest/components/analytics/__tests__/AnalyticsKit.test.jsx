@@ -11,12 +11,14 @@ import {
   BarChart,
   CountBarChart,
   DonutChart,
+  PieChart,
   MetricRow,
   LineChart,
   PERIOD_OPTIONS,
   ShareBar,
   StatTile,
   buildLastDays,
+  buildPastYear,
   buildPeriod,
   formatPeriodRange,
   formatChange,
@@ -24,6 +26,8 @@ import {
   useAnalytics,
 } from '../AnalyticsKit';
 import ListingAnalyticsScreen from '../../../app/ListingAnalyticsScreen';
+import AdminAnalyticsScreen from '../../../app/AdminAnalyticsScreen';
+import { AdminLoadingState } from '../../AdminUI';
 
 jest.mock('axios');
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -82,6 +86,13 @@ describe('formatValue', () => {
 });
 
 describe('buildPeriod', () => {
+  it('includes the current Singapore month and previous eleven months through now', () => {
+    const now = new Date('2026-09-30T17:00:00Z');
+    const range = buildPastYear(now);
+    expect(range.from).toBe('2025-11-01T00:00:00+08:00');
+    expect(range.to).toBe('2026-10-01T01:00:00.000+08:00');
+    expect(new Date(range.to).getTime()).toBe(now.getTime());
+  });
   it('covers whole months with an explicit offset and stays within 366 days', () => {
     const { from, to } = buildPeriod(12);
     const isoWithOffset = /^\d{4}-\d{2}-01T00:00:00[+-]\d{2}:\d{2}$/;
@@ -450,7 +461,79 @@ describe('ListingAnalyticsScreen', () => {
   });
 });
 
+it('one admin refresh replaces all overview, rental, user and trend data', async () => {
+  await AsyncStorage.setItem('token', 'test-token');
+  const response = version => {
+    const metric = value => available(value);
+    const trend = value => ({ availability: 'available', basis: 'period', unit: 'count',
+      points: [{ bucket: '2026-09', value }] });
+    return { ...listingResponse, metrics: { ...listingResponse.metrics,
+      registeredUserCount: metric(10 * version), listingCount: metric(3 * version),
+      lifetimeRecordedRentPaymentTotal: available(1000 * version, 'SGD'),
+      activeRentalRecordCount: metric(version), rentalRecordCount: metric(4 * version),
+      acceptedRentalRecordCount: metric(2 * version), pendingRentalRecordCount: metric(2 * version),
+      terminatedRentalRecordCount: metric(version), ownerUserCount: metric(version),
+      currentTenantUserCount: metric(version), pastTenantUserCount: metric(version),
+      bannedUserCount: metric(version), flaggedListingCount: metric(version),
+      flaggedUserCount: metric(version), flaggedReviewCount: metric(version),
+    }, series: { ...listingResponse.series,
+      monthlyRecordedRentPayments: { ...trend(1000 * version), unit: 'SGD' },
+      monthlyOffersAccepted: trend(2 * version), monthlyTerminations: trend(version),
+      monthlyAverageDaysOnMarket: { ...trend(3 * version), unit: 'days' },
+    } };
+  };
+  const initial = response(1);
+  const refreshed = response(2);
+  axios.get.mockResolvedValueOnce({ data: initial });
+  let finishRefresh;
+  axios.get.mockImplementationOnce(() => new Promise(resolve => { finishRefresh = resolve; }));
+  let tree;
+  await act(async () => { tree = create(<AdminAnalyticsScreen />); });
+  const refreshButton = () => tree.root.findAll(node => node.props.accessibilityLabel === 'Refresh analytics' && node.props.onPress)[0];
+  await act(async () => refreshButton().props.onPress());
+  expect(axios.get).toHaveBeenCalledTimes(2);
+  expect(tree.root.findByType(AdminLoadingState).props.message).toBeNull();
+  [StatTile, PieChart, CountBarChart, LineChart, BarChart].forEach(component => {
+    expect(tree.root.findAllByType(component)).toHaveLength(0);
+  });
+  expect(refreshButton().props.disabled).toBe(true);
+  expect(renderedText(tree)).toContain('Platform Analytics');
+  expect(renderedText(tree)).toContain('Overview');
+  await act(async () => finishRefresh({ data: refreshed }));
+  const tiles = tree.root.findAllByType(StatTile);
+  expect(tiles.map(node => node.props.metric.value)).toEqual([20, 6, 2000, 2]);
+  const pies = tree.root.findAllByType(PieChart);
+  expect(pies.find(node => node.props.title === 'Rentals').props.totalMetric.value).toBe(8);
+  expect(pies.find(node => node.props.title === 'User accounts').props.totalMetric.value).toBe(20);
+  const bars = tree.root.findAllByType(CountBarChart);
+  expect(bars.find(node => node.props.title === 'Property and tenancy activity').props.series.points.map(point => point.value)).toEqual([2, 2, 2]);
+  expect(bars.find(node => node.props.title === 'Reported records')).toBeUndefined();
+  const lines = tree.root.findAllByType(LineChart);
+  expect(lines.find(node => node.props.title === 'Monthly rent recorded').props.series).toBe(refreshed.series.monthlyRecordedRentPayments);
+  const activity = lines.find(node => node.props.title === 'Monthly rental activity');
+  expect(activity.props.series).toBe(refreshed.series.monthlyOffersAccepted);
+  expect(activity.props.comparisonSeries).toBe(refreshed.series.monthlyTerminations);
+  expect(tree.root.findByType(BarChart).props.series).toBe(refreshed.series.monthlyAverageDaysOnMarket);
+  expect(refreshButton().props.disabled).toBe(false);
+  await act(async () => tree.unmount());
+});
+
 describe('Admin user presentation', () => {
+  it.each([CountBarChart, PieChart])('places titled chart details in the header and hides the total row icon', async Chart => {
+    const definition = 'Pending offers await a response. Active offers have been accepted.';
+    let tree;
+    await act(async () => { tree = create(<Chart title="Rentals" series={{ availability: 'available',
+      unit: 'count', basis: 'snapshot', definition, points: [{ bucket: 'Active', value: 2 }] }}
+      totalMetric={available(2)} totalLabel="Total rental offers" showReadout={false} />); });
+    expect(tree.root.findByType(MetricRow).props.showInfo).toBe(false);
+    const info=tree.root.findAll(node=>node.props.accessibilityLabel==='Chart calculation details' && node.props.onPress);
+    expect(info).toHaveLength(1);
+    await act(async () => info[0].props.onPress());
+    expect(renderedText(tree)).toContain(definition);
+    expect(renderedText(tree)).not.toContain('Chart calculation');
+    await act(async () => tree.unmount());
+  });
+
   it('shows the donut total and counts and percentages, including zero groups', () => {
     const series = { availability: 'available', points: [{ bucket: 'Owners', value: 2 }, { bucket: 'Tenants', value: 6 }, { bucket: 'Neither', value: 0 }] };
     const tree = renderStatic(<DonutChart series={series} emptyText="No users yet" />);

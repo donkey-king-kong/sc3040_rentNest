@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { FontAwesome } from 'react-native-vector-icons';
@@ -7,7 +7,6 @@ import AnalyticsLayout, { ActivitySection } from '../components/analytics/Analyt
 import {
   COLORS,
   BarChart,
-  resolvePeriodKey,
   ErrorState,
   LoadingState,
   MetricRow,
@@ -23,8 +22,8 @@ import {
 
 const ListingAnalyticsScreen = () => {
   const router = useRouter();
-  const { listingId, period: initialPeriod } = useLocalSearchParams();
-  const [period, setPeriod] = useState(() => resolvePeriodKey(initialPeriod));
+  const { listingId } = useLocalSearchParams();
+  const period = '12M';
   const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_LISTING(listingId), period);
 
   const header = (
@@ -60,7 +59,7 @@ const ListingAnalyticsScreen = () => {
     <>
       {header}
       <AnalyticsLayout compactTabs showPeriod={false} showRefresh={false} periodAccent="#16794B"
-        period={period} onPeriodChange={setPeriod} loading={loading} error={error} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}
+        period={period} loading={loading} error={error} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}
         header={<>
       <View style={styles.listingHeader}>
         {listing.listingPicture ? <Image source={{ uri: listing.listingPicture }} style={styles.image} /> : null}
@@ -77,7 +76,7 @@ const ListingAnalyticsScreen = () => {
 
         </>}>
 
-      <ActivitySection period={period} onPeriodChange={setPeriod} loading={loading} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf} lifetimeLabel="Since published">
+      <ActivitySection loading={loading} onRefresh={retry} asOf={data.asOf}>
         <Section title="Performance">
           <TileRow>
             <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} />

@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { FontAwesome } from 'react-native-vector-icons';
 import AnalyticsLayout, { ActivitySection, RefreshControl } from '../components/analytics/AnalyticsLayout';
 import { ENDPOINTS } from '../config/api';
 import {
   COLORS,
   CountBarChart,
-  resolvePeriodKey,
   ErrorState,
   LineChart,
   LoadingState,
@@ -22,8 +21,7 @@ import {
 const OwnerAnalyticsScreen = () => {
   const router = useRouter();
   const [tab, setTab] = useState('Overview');
-  const { period: initialPeriod } = useLocalSearchParams();
-  const [period, setPeriod] = useState(() => resolvePeriodKey(initialPeriod));
+  const period = '12M';
   const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_SUMMARY, period);
   const [refreshKey, setRefreshKey] = useState(0);
   const listings = useOwnedListings(refreshKey);
@@ -64,7 +62,7 @@ const OwnerAnalyticsScreen = () => {
       {header}
       <AnalyticsLayout compactTabs periodAccent="#16794B" showPeriod={false} showRefresh={false}
         tabs={['Overview', 'Properties']} tab={tab} onTabChange={setTab}
-        period={period} onPeriodChange={setPeriod} loading={loading} error={error} onRefresh={refresh} dataPeriod={data.period} asOf={data.asOf}>
+        period={period} loading={loading} error={error} onRefresh={refresh} dataPeriod={data.period} asOf={data.asOf}>
         {tab === 'Overview' ? <>
           <Section title="Overview" action={
             <RefreshControl onRefresh={refresh} loading={loading} asOf={data.asOf} />
@@ -85,7 +83,7 @@ const OwnerAnalyticsScreen = () => {
           <Section title="Tenancy length">
             <CountBarChart series={data.series.tenancyDurationDistribution} emptyText="No accepted tenancies yet" />
           </Section>
-          <ActivitySection period={period} onPeriodChange={setPeriod} loading={loading} dataPeriod={data.period}>
+          <ActivitySection loading={loading}>
             <Section title="Rent recorded">
               <TileRow>
                 <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} />

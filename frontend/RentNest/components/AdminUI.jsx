@@ -26,7 +26,7 @@ export function AdminLoadingState({ message = 'Loading...', backgroundColor = AD
   return (
     <View style={[styles.loading, { backgroundColor }]}>
       <MorphingInfinity size={86} color={ADMIN_COLORS.green} />
-      <Text style={styles.loadingText}>{message}</Text>
+      {message ? <Text style={styles.loadingText}>{message}</Text> : null}
     </View>
   );
 }
