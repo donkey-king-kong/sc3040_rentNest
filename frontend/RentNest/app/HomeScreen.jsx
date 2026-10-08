@@ -5,7 +5,6 @@ import {
   TextInput,
   StyleSheet,
   FlatList,
-  Image,
   TouchableOpacity,
   Alert
 } from 'react-native';
@@ -15,6 +14,7 @@ import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import MorphingInfinity from '../components/MorphingInfinity';
+import ListingImage from '../components/ListingImage';
 
 const HomeScreen = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,6 +50,11 @@ const HomeScreen = () => {
       });
 
       console.log("Listings fetched!");
+      console.log('[HomeScreen] listing image payloads:', response.data.map(listing => ({
+        listingID: listing.listingID,
+        name: listing.name,
+        listingpicture: listing.listingpicture,
+      })));
 
       const transformedListings = response.data.map(listing => ({
         listingId: listing.listingID,
@@ -57,7 +62,7 @@ const HomeScreen = () => {
         address: listing.location,
         price: listing.price,
         rating: 4.0,
-        image: listing.listingpicture ||'https://onecms-res.cloudinary.com/image/upload/s--9axR4bQB--/f_auto,q_auto/c_fill,g_auto,h_676,w_1200/singapore-home-renovation-contractors-hdb.jpg?itok=tx9GFgAG',
+        image: listing.listingpicture,
         pincode: listing.postal,
         type: listing.type,
         description: listing.description,
@@ -152,7 +157,15 @@ const HomeScreen = () => {
                 })
               }
           >
-        <Image source={{ uri: item.image }} style={styles.image} />
+        <ListingImage
+          uri={item.image}
+          style={styles.image}
+          screen="HomeScreen"
+          listingId={item.listingId}
+          listingName={item.name}
+          width={240}
+          height={160}
+        />
         <View style={styles.infoContainer}>
           <View style={styles.detailsContainer}>
             <View style={styles.textContainer}>
@@ -230,6 +243,10 @@ const HomeScreen = () => {
             data={filteredListings}
             renderItem={renderListing}
             keyExtractor={item => item.listingId.toString()}
+            initialNumToRender={1}
+            maxToRenderPerBatch={1}
+            windowSize={3}
+            removeClippedSubviews
             contentContainerStyle={filteredListings.length === 0 ? { flexGrow: 1 } : styles.listContent}
             ListHeaderComponent={<View style={styles.listHeaderSpacing} />}
             ListEmptyComponent={
