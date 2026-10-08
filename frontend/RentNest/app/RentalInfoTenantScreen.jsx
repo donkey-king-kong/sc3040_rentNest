@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import MorphingInfinity from '../components/MorphingInfinity';
+import ListingImage from '../components/ListingImage';
 
 
 const RentalInfoTenant = () => {
@@ -36,6 +37,11 @@ const RentalInfoTenant = () => {
         },
       });
       console.log("Listings response", response.status, response.data);
+      console.log('[RentalInfoTenantScreen] listing image payload:', {
+        listingId,
+        name: response.data?.name,
+        listingpicture: response.data?.listingpicture,
+      });
       setListing(response.data);
     } catch (error) {
       console.error('Error fetching listing:', error);
@@ -145,7 +151,15 @@ const RentalInfoTenant = () => {
 
         {listing ? (
             <>
-              <Image source={{ uri: listing.listingpicture }} style={styles.image} />
+              <ListingImage
+                uri={listing.listingpicture}
+                style={styles.image}
+                screen="RentalInfoTenantScreen"
+                listingId={listing.listingID}
+                listingName={listing.name}
+                width={600}
+                height={400}
+              />
 
               <View style={styles.row}>
                 <View style={styles.left}>

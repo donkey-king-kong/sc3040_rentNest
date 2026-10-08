@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { jwtDecode } from 'jwt-decode';
 import MorphingInfinity from '../components/MorphingInfinity';
+import ListingImage from '../components/ListingImage';
 
 const notificationBellIcon = require('../assets/images/notificationBell.png');
 
@@ -94,6 +95,11 @@ const HomeListingScreen = () => {
           headers: authHeaders(tokenValue)
         });
         console.log('Listing API response:', listingResponse.data);
+        console.log('[HomeListingScreen] listing image payload:', {
+          listingId,
+          name: listingResponse.data?.name,
+          listingpicture: listingResponse.data?.listingpicture,
+        });
 
         // Apply default values only if the response data is empty or missing properties
         const listingData = listingResponse.data || {};
@@ -109,7 +115,7 @@ const HomeListingScreen = () => {
           beds: listingData.beds || 0,
           baths: listingData.bathroom || 0,
           size: listingData.size || 1, // Prevent division by zero
-          imageURL: listingData.listingpicture || 'https://www.sgluxurycondo.com/wp-content/uploads/2022/11/should-you-buy-a-luxury-condo-buyers-guide-to-luxury-condo-in-singapore-1536x1024.jpg',
+          imageURL: listingData.listingpicture,
           ownerUserID: listingData.ownerId || '',
           ownerName: listingData.ownerName || 'Unknown',
           ownerPhotoURL: listingData.ownerPhotoURL || 'https://thumbs.dreamstime.com/b/tranquil-caucasian-handsome-brunet-man-blue-long-scarf-posing-wrinkled-face-against-background-square-image-236510369.jpg'
@@ -368,7 +374,15 @@ const HomeListingScreen = () => {
   return (
     <ScrollView style={styles.box}>
       <View style={styles.imageWrapper}>
-        <Image source={{ uri: listing.imageURL }} style={styles.image} />
+        <ListingImage
+          uri={listing.imageURL}
+          style={styles.image}
+          screen="HomeListingScreen"
+          listingId={listingId}
+          listingName={listing.name}
+          width={600}
+          height={400}
+        />
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <FontAwesome name="chevron-left" size={18} color="#101820" />
         </TouchableOpacity>

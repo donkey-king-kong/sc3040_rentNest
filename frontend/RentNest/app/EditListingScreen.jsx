@@ -6,6 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { normalizeListingImageUrl } from '../components/ListingImage';
 
 const EditListingScreen = () => {
     const router = useRouter();
@@ -87,9 +88,19 @@ const EditListingScreen = () => {
                 return;
             }
 
+            const requestBody = {
+                ...listing,
+                listingpicture: normalizeListingImageUrl(listing.listingpicture),
+            };
+            console.log('[EditListingScreen] submitting listing image:', {
+                listingId,
+                originalUrl: listing.listingpicture,
+                normalizedUrl: requestBody.listingpicture,
+            });
+
             await axios.put(
                 `${API_BASE_URL}/api/listings/${listingId}`,
-                listing,
+                requestBody,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,

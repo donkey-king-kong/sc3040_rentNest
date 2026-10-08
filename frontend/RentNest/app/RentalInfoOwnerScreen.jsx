@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
 import MorphingInfinity from '../components/MorphingInfinity';
+import ListingImage from '../components/ListingImage';
 
 const RentalInfoOwner = () => {
   const router = useRouter();
@@ -32,6 +33,11 @@ const RentalInfoOwner = () => {
       });
 
       const listingData = response.data;
+      console.log('[RentalInfoOwnerScreen] listing image payload:', {
+        listingId,
+        name: listingData?.name,
+        listingpicture: listingData?.listingpicture,
+      });
       if (!listingData.tenantId) {
         listingData.tenantId = 0;
         listingData.tenantName = 'No Tenant yet...';
@@ -88,7 +94,15 @@ const RentalInfoOwner = () => {
         {/* Image */}
         {listing && (
             <>
-              <Image source={{ uri: listing.listingpicture }} style={styles.image} />
+              <ListingImage
+                uri={listing.listingpicture}
+                style={styles.image}
+                screen="RentalInfoOwnerScreen"
+                listingId={listing.listingID}
+                listingName={listing.name}
+                width={600}
+                height={400}
+              />
 
               {/* Listing name and address */}
               <View style={styles.row}>
