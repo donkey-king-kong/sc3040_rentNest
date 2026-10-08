@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { buildMapHtml, markersFromChildren, zoomFromDelta } from './protomapsHtml';
+import { MAP_ASSETS_URL } from '../config/api';
 
 export default function AppMap({ style, region, children }) {
   const markers = markersFromChildren(children);
@@ -19,7 +20,9 @@ export default function AppMap({ style, region, children }) {
     <View style={style}>
       <WebView
         originWhitelist={['*']}
-        source={{ html, baseUrl: 'https://localhost/' }}
+        // Serving the page from the dev server's origin lets it load the local map assets over
+        // plain http without being blocked as mixed content.
+        source={{ html, baseUrl: MAP_ASSETS_URL ? `${MAP_ASSETS_URL}/` : 'https://localhost/' }}
         javaScriptEnabled
         domStorageEnabled
         // Keep map gestures from being swallowed by the parent ScrollView.

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { buildMapHtml, markersFromChildren, zoomFromDelta } from './protomapsHtml';
 
@@ -14,11 +14,20 @@ export default function AppMap({ style, region, children }) {
     [region?.latitude, region?.longitude, region?.latitudeDelta, markersKey]
   );
 
+  // A blob URL rather than srcDoc: a srcDoc frame reports its origin as "null", which stops
+  // MapLibre's worker from handing pmtiles:// tile requests back to the page, so no tiles load.
+  const [src, setSrc] = useState(null);
+  useEffect(() => {
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    setSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [html]);
+
   return (
     <View style={style}>
       <iframe
         title="Map"
-        srcDoc={html}
+        src={src || undefined}
         style={{ border: 0, width: '100%', height: '100%' }}
       />
     </View>
