@@ -1653,7 +1653,6 @@ const handlePaymentAndAccept = async () => {
                                 {isReportingUser ? (
                                     <View style={styles.reportingContent}>
                                         <ActivityIndicator size="small" color="#FFFFFF" />
-                                        <Text style={styles.reportingButtonText}>Reporting...</Text>
                                     </View>
                                 ) : (
                                     <Text style={styles.whiteButtonText}>Confirm</Text>

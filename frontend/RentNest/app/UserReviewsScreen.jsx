@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import {View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator} from 'react-native';
+import {View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator, Image} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {API_BASE_URL} from "../config/api";
 import MorphingInfinity from '../components/MorphingInfinity';
 import { FontAwesome } from '@expo/vector-icons';
 import ProfileImage from '../components/ProfileImage';
+
+const notificationBellIcon = require('../assets/images/notificationBell.png');
 
 const UserReviewsScreen = () => {
     const router = useRouter();
@@ -389,7 +391,6 @@ const UserReviewsScreen = () => {
                                 {flaggingReviewId ? (
                                     <View style={styles.flaggingContent}>
                                         <ActivityIndicator size="small" color="#FFFFFF" />
-                                        <Text style={styles.confirmYesText}>Flagging...</Text>
                                     </View>
                                 ) : (
                                     <Text style={styles.confirmYesText}>Yes</Text>
@@ -408,7 +409,7 @@ const UserReviewsScreen = () => {
                 <View style={styles.notificationOverlay} pointerEvents="none">
                     <View style={styles.notificationCard}>
                         <View style={styles.notificationIconBox}>
-                            <FontAwesome name="flag" size={22} color="#FFFFFF" />
+                            <Image source={notificationBellIcon} style={styles.notificationIcon} />
                         </View>
                         <Text style={styles.notificationText}>Review Flagged</Text>
                     </View>
@@ -676,36 +677,42 @@ const styles = StyleSheet.create({
     },
     notificationOverlay: {
         flex: 1,
-        justifyContent: 'flex-start',
-        alignItems: 'center',
-        paddingTop: 72,
-        backgroundColor: 'rgba(0, 0, 0, 0.12)',
-    },
-    notificationCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#101820',
-        borderRadius: 22,
-        paddingVertical: 14,
-        paddingHorizontal: 18,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.18,
-        shadowRadius: 16,
-        elevation: 6,
-    },
-    notificationIconBox: {
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        backgroundColor: '#FF3B30',
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        paddingHorizontal: 22,
+        backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    },
+    notificationCard: {
+        width: '100%',
+        maxWidth: 360,
+        alignItems: 'center',
+        backgroundColor: 'rgba(45, 45, 45, 0.82)',
+        borderRadius: 28,
+        paddingVertical: 28,
+        paddingHorizontal: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.24,
+        shadowRadius: 22,
+        elevation: 8,
+    },
+    notificationIconBox: {
+        width: 72,
+        height: 72,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(58, 58, 58, 0.72)',
+        marginBottom: 16,
+    },
+    notificationIcon: {
+        width: 34,
+        height: 40,
+        resizeMode: 'contain',
     },
     notificationText: {
         color: '#FFFFFF',
-        fontSize: 18,
+        fontSize: 22,
         fontWeight: '800',
     },
 });
