@@ -12,6 +12,7 @@ import {
   Pressable,
   ActivityIndicator,
   Modal,
+  Image,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
