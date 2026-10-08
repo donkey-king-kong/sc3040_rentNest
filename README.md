@@ -101,3 +101,6 @@ The app uses a shared Supabase PostgreSQL database. The real connection details 
 - [Hawker Centre API](https://data.gov.sg/api/action/datastore_search?resource_id=d_68a42f09f350881996d83f9cd73ab02f)
 - [Bus Stop API](https://datamall2.mytransport.sg/ltaodataservice/BusStops)
 - [URA Rental Prices API](https://www.ura.gov.sg/uraDataService/invokeUraDS?service=PMI_Resi_Rental&refPeriod=14q1)
+
+## Developer Notes
+- [Listing Image Rendering Troubleshoot](Documentation/troubleshooting/listing-images.md)
