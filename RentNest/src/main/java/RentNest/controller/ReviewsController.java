@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -52,26 +53,37 @@ public class ReviewsController {
         return reviewsService.getAllReviews();
     }
 
-    // Update Review
+    // Update Review (only the review's author or an admin)
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateReview(@PathVariable Long id, @RequestBody ReviewsDTO reviewDTO, Authentication authentication) {
-        try {
-            Reviews updatedReview = reviewsService.updateReview(id, reviewDTO, getAuthenticatedUserId(authentication));
-            return ResponseEntity.ok(updatedReview);
-        } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+    public ResponseEntity<Reviews> updateReview(@PathVariable Long id, @RequestBody ReviewsDTO reviewDTO, @AuthenticationPrincipal User user) {
+        Optional<Reviews> existing = reviewsService.getReviewById(id);
+        if (existing.isEmpty()) {
+            return ResponseEntity.notFound().build();
         }
+        if (user == null || !(user.isAdmin() || existing.get().isWrittenBy(user))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        // Only an admin may change who a review is attributed to
+        Long requestedReviewer = reviewDTO.getReviewerID();
+        if (requestedReviewer != null && !requestedReviewer.equals(existing.get().getReviewerId()) && !user.isAdmin()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        Reviews updatedReview = reviewsService.updateReview(id, reviewDTO, user);
+        return ResponseEntity.ok(updatedReview);
     }
 
-    // Delete Review
+    // Delete Review (only the review's author or an admin)
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteReview(@PathVariable Long id, Authentication authentication) {
-        try {
-            reviewsService.deleteReview(id, getAuthenticatedUserId(authentication));
-            return ResponseEntity.noContent().build();
-        } catch (SecurityException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+    public ResponseEntity<Void> deleteReview(@PathVariable Long id, @AuthenticationPrincipal User user) {
+        Optional<Reviews> review = reviewsService.getReviewById(id);
+        if (review.isEmpty()) {
+            return ResponseEntity.notFound().build();
         }
+        if (user == null || !(user.isAdmin() || review.get().isWrittenBy(user))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        reviewsService.deleteReview(id, user);
+        return ResponseEntity.noContent().build();
     }
 
     // Get Flagged Reviews

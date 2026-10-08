@@ -5,7 +5,6 @@ import RentNest.dto.RentalsDTO;
 import RentNest.model.ChatHistory;
 import RentNest.model.Rentals;
 import RentNest.repository.RentalsRepository;
-import RentNest.dto.ChatHistoryDTO;
 import RentNest.repository.ChatHistoryRepository;
 import RentNest.model.Listings;
 import RentNest.dto.ListingsDTO;
@@ -20,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -89,7 +89,7 @@ public class RentalsService {
         rental.setPaymentHistory(rentalDTO.getPaymentHistory());
         rental.setStatus(rentalDTO.getStatus());
         rental.setListings(listing);
-        setInitialStatusTimestamps(rental);
+        recordStatusChange(rental);
 
         return rentalsRepository.save(rental);
     }
@@ -138,7 +138,8 @@ public class RentalsService {
             existingRental.setRentalDate(updatedRentalDTO.getRentalDate());
             existingRental.setLeaseExpiry(updatedRentalDTO.getLeaseExpiry());
             existingRental.setPaymentHistory(updatedRentalDTO.getPaymentHistory());
-            applyStatusTransition(existingRental, updatedRentalDTO.getStatus());
+            existingRental.setStatus(updatedRentalDTO.getStatus());
+            recordStatusChange(existingRental);
 
             // Fetch the listing by listingID from the ListingsRepository
             Listings listing = listingsRepository.findById(updatedRentalDTO.getListingID())
@@ -194,7 +195,7 @@ public class RentalsService {
         rental.setPaymentHistory(rentalDTO.getPaymentHistory());
         rental.setStatus("pending"); // Set rental status to "pending"
         rental.setListings(listing);
-        setInitialStatusTimestamps(rental);
+        recordStatusChange(rental);
 
         Rentals savedRental = rentalsRepository.save(rental); // Save the rental first and get its ID
 
@@ -249,9 +250,7 @@ public class RentalsService {
         // Change the status from "pending" to "active" to accept the contract
         if ("pending".equals(existingRental.getStatus())) {
             existingRental.setStatus("active");
-            if (existingRental.getAcceptedAt() == null) {
-                existingRental.setAcceptedAt(new Date());
-            }
+            recordStatusChange(existingRental);
         } else {
             throw new RuntimeException("Rental is not in pending status");
         }
@@ -288,6 +287,20 @@ public class RentalsService {
                 .map(this::toRentalsDTO);  // Map to RentalsDTO if found
     }
 
+    /**
+     * Records, from the server clock, the first time a rental becomes active (accepted) or terminated.
+     * Existing times are never overwritten, so repeated updates keep the original moment.
+     */
+    static void recordStatusChange(Rentals rental) {
+        String status = rental.getStatus() == null ? "" : rental.getStatus().trim().toLowerCase(Locale.ROOT);
+        if (status.equals("active") && rental.getAcceptedAt() == null) {
+            rental.setAcceptedAt(new Date());
+        }
+        if (status.equals("terminated") && rental.getTerminatedAt() == null) {
+            rental.setTerminatedAt(new Date());
+        }
+    }
+
     public List<Long> manageTenants(Long listingID) {
         // Fetch the list of tenant IDs based on the ownerID
         List<Long> tenantIDs = rentalsRepository.findTenantUserIDsByListingID(listingID);
@@ -299,25 +312,4 @@ public class RentalsService {
         return tenantIDs;
     }
 
-    private void setInitialStatusTimestamps(Rentals rental) {
-        Date now = new Date();
-        if ("active".equals(rental.getStatus()) && rental.getAcceptedAt() == null) {
-            rental.setAcceptedAt(now);
-        }
-        if ("terminated".equals(rental.getStatus()) && rental.getTerminatedAt() == null) {
-            rental.setTerminatedAt(now);
-        }
-    }
-
-    private void applyStatusTransition(Rentals rental, String newStatus) {
-        String previousStatus = rental.getStatus();
-        rental.setStatus(newStatus);
-
-        if ("active".equals(newStatus) && !"active".equals(previousStatus) && rental.getAcceptedAt() == null) {
-            rental.setAcceptedAt(new Date());
-        }
-        if ("terminated".equals(newStatus) && !"terminated".equals(previousStatus) && rental.getTerminatedAt() == null) {
-            rental.setTerminatedAt(new Date());
-        }
-    }
 }

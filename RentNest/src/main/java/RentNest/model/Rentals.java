@@ -3,7 +3,6 @@ package RentNest.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.util.Date;
 
@@ -27,15 +26,25 @@ public class Rentals {
     private String paymentHistory;
     private String status;
 
-    @CreationTimestamp
+    // Lifecycle timestamps, set by the server only; never accepted from requests
     @Column(name = "created_at", updatable = false)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Date createdAt;
 
     @Column(name = "accepted_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Date acceptedAt;
 
     @Column(name = "terminated_at")
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Date terminatedAt;
+
+    @PrePersist
+    void recordCreation() {
+        if (createdAt == null) {
+            createdAt = new Date();
+        }
+    }
 
     // Getters
     public Long getRentalID() {
@@ -135,6 +144,18 @@ public class Rentals {
         return terminatedAt;
     }
 
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public void setAcceptedAt(Date acceptedAt) {
+        this.acceptedAt = acceptedAt;
+    }
+
+    public void setTerminatedAt(Date terminatedAt) {
+        this.terminatedAt = terminatedAt;
+    }
+
     // Setters
     public void setRentalID(Long rentalID) {
         this.rentalID = rentalID;
@@ -172,15 +193,6 @@ public class Rentals {
         this.status = status;
     }
 
-    public void setCreatedAt(Date createdAt) {
-        this.createdAt = createdAt;
-    }
 
-    public void setAcceptedAt(Date acceptedAt) {
-        this.acceptedAt = acceptedAt;
-    }
 
-    public void setTerminatedAt(Date terminatedAt) {
-        this.terminatedAt = terminatedAt;
-    }
 }

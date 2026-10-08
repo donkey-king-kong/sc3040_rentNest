@@ -115,36 +115,46 @@ public class ReviewsService {
     }
 
     // Update reviews
-    public Reviews updateReview(Long id, ReviewsDTO reviewDTO, Long authenticatedUserId) {
+    public Reviews updateReview(Long id, ReviewsDTO reviewDTO, User authenticatedUser) {
         // Find the existing review by ID
         Reviews existingReview = reviewsRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Review not found with id: " + id));
 
-        assertReviewAuthor(existingReview, authenticatedUserId);
+        assertReviewAuthor(existingReview, authenticatedUser);
+
+        Long requestedReviewer = reviewDTO.getReviewerID();
+        if (requestedReviewer != null && !requestedReviewer.equals(existingReview.getReviewerId())) {
+            if (!authenticatedUser.isAdmin()) {
+                throw new SecurityException("Only an admin can reassign a review.");
+            }
+            User reviewer = userRepository.findById(requestedReviewer)
+                    .orElseThrow(() -> new RuntimeException("Reviewer not found"));
+            existingReview.setReviewer(reviewer);
+        }
 
         // Update fields that can be modified
         existingReview.setRating(reviewDTO.getRating());
         existingReview.setTitle(reviewDTO.getTitle());
         existingReview.setText(reviewDTO.getText());
-        existingReview.setFlagged(reviewDTO.isFlagged());
+        // The flag is not copied from the request: editing a reported review must not clear its report.
+        // Flags change only through the setFlag moderation endpoint.
 
         // Save and return the updated review
         return reviewsRepository.save(existingReview);
     }
 
     // Delete
-    public void deleteReview(Long id, Long authenticatedUserId) {
+    public void deleteReview(Long id, User authenticatedUser) {
         Reviews existingReview = reviewsRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Review not found with id: " + id));
 
-        assertReviewAuthor(existingReview, authenticatedUserId);
+        assertReviewAuthor(existingReview, authenticatedUser);
         reviewsRepository.delete(existingReview);
     }
 
-    private void assertReviewAuthor(Reviews review, Long authenticatedUserId) {
-        if (review.getReviewer() == null || authenticatedUserId == null
-                || !review.getReviewer().getUserID().equals(authenticatedUserId)) {
-            throw new SecurityException("Only the review author can modify this review.");
+    private void assertReviewAuthor(Reviews review, User authenticatedUser) {
+        if (authenticatedUser == null || !(authenticatedUser.isAdmin() || review.isWrittenBy(authenticatedUser))) {
+            throw new SecurityException("Only the review author or an admin can modify this review.");
         }
     }
 

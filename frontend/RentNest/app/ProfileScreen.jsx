@@ -120,6 +120,14 @@ const ProfileScreen = () => {
 
         <View style={styles.separator} />
 
+        <TouchableOpacity style={styles.button} onPress={() => router.push('/OwnerAnalyticsScreen')}>
+          <FontAwesome name="bar-chart" size={20} color="black" style={styles.icon} />
+          <Text style={styles.buttonText}>Analytics</Text>
+          <Text style={styles.arrow}> &gt;</Text>
+        </TouchableOpacity>
+
+        <View style={styles.separator} />
+
         <TouchableOpacity style={styles.button} onPress={handleLogout}>
           <FontAwesome name="sign-out" size={20} color="black" style={styles.icon} />
           <Text style={styles.buttonText}>Logout</Text>
@@ -213,8 +221,10 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   separator: {
-    height: 1,
-    backgroundColor: '#ccc',
+    height: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ccc',
+    flexShrink: 0,
     marginVertical: 5,
   },
 });

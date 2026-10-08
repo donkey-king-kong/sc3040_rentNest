@@ -975,6 +975,16 @@ const handlePaymentAndAccept = async () => {
             const rentalIdExists = first.rentalId != null;
             const requestIdExists = first.requestId != null;
             const isRentalOfferSender = rentalIdExists && Number(first.senderId) === Number(currentUser);
+            const offerStatus = rentalIdExists && Number(first.rentalId) === Number(rental.rentalID)
+                ? String(rental.status || '').trim().toLowerCase()
+                : '';
+            const offerStatusLabel = offerStatus === 'active' ? 'Accepted'
+                : offerStatus === 'terminated' ? 'Terminated'
+                : offerStatus === 'pending' ? (isRentalOfferSender ? 'Pending' : 'New')
+                : 'Status unavailable';
+            const canAcceptOffer = offerStatus === 'pending'
+                && !isRentalOfferSender
+                && Number(currentUser) === Number(rental.tenantUserID);
             const lastMsg = group[group.length - 1];
             const timestamp = new Date(lastMsg.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -999,18 +1009,20 @@ const handlePaymentAndAccept = async () => {
                                             <View
                                                 style={[
                                                     styles.rentalOfferStatusPill,
-                                                    isRentalOfferSender ? styles.rentalOfferStatusPillPending : styles.rentalOfferStatusPillNew,
-                                                    rental.status === 'active' && styles.rentalOfferStatusPillAccepted,
+                                                    offerStatus === 'pending' && (isRentalOfferSender ? styles.rentalOfferStatusPillPending : styles.rentalOfferStatusPillNew),
+                                                    offerStatus === 'active' && styles.rentalOfferStatusPillAccepted,
+                                                    !['pending', 'active'].includes(offerStatus) && styles.rentalOfferStatusPillNeutral,
                                                 ]}
                                             >
                                                 <Text
                                                     style={[
                                                         styles.rentalOfferStatusText,
-                                                        isRentalOfferSender ? styles.rentalOfferStatusTextPending : styles.rentalOfferStatusTextNew,
-                                                        rental.status === 'active' && styles.rentalOfferStatusTextAccepted,
+                                                        offerStatus === 'pending' && (isRentalOfferSender ? styles.rentalOfferStatusTextPending : styles.rentalOfferStatusTextNew),
+                                                        offerStatus === 'active' && styles.rentalOfferStatusTextAccepted,
+                                                        !['pending', 'active'].includes(offerStatus) && styles.rentalOfferStatusTextNeutral,
                                                     ]}
                                                 >
-                                                    {rental.status === 'active' ? 'Accepted' : (isRentalOfferSender ? 'Pending' : 'New')}
+                                                    {offerStatusLabel}
                                                 </Text>
                                             </View>
                                         </View>
@@ -1039,19 +1051,7 @@ const handlePaymentAndAccept = async () => {
                                                 <Text style={styles.rentalOfferDetailValue}>{formatOfferDate(rental.leaseExpiry)}</Text>
                                             </View>
                                         </View>
-                                        {isRentalOfferSender ? (
-                                            <View style={styles.pendingAcceptanceBox}>
-                                                <View style={[styles.pendingStatusDot, rental.status === 'active' && styles.acceptedStatusDot]} />
-                                                <Text style={styles.pendingAcceptanceText}>
-                                                    {rental.status === 'active' ? 'Accepted' : 'Awaiting tenant response'}
-                                                </Text>
-                                            </View>
-                                        ) : rental.status === 'active' ? (
-                                            <View style={styles.pendingAcceptanceBox}>
-                                                <View style={[styles.pendingStatusDot, styles.acceptedStatusDot]} />
-                                                <Text style={styles.pendingAcceptanceText}>Accepted</Text>
-                                            </View>
-                                        ) : (
+                                        {canAcceptOffer ? (
                                             <View style={styles.rentalOfferActionRow}>
                                                 <TouchableOpacity style={styles.pendingRejectBox}>
                                                     <Text style={styles.rejectText}>Decline</Text>
@@ -1059,6 +1059,13 @@ const handlePaymentAndAccept = async () => {
                                                 <TouchableOpacity onPress={togglePaymentModal} style={styles.pendingAcceptBox}>
                                                     <Text style={styles.acceptText}>Accept offer</Text>
                                                 </TouchableOpacity>
+                                            </View>
+                                        ) : (
+                                            <View style={styles.pendingAcceptanceBox}>
+                                                <View style={[styles.pendingStatusDot, offerStatus === 'active' && styles.acceptedStatusDot]} />
+                                                <Text style={styles.pendingAcceptanceText}>
+                                                    {offerStatus === 'pending' ? 'Awaiting tenant response' : offerStatusLabel}
+                                                </Text>
                                             </View>
                                         )}
                                     </View>
@@ -2722,6 +2729,9 @@ const styles = StyleSheet.create({
     rentalOfferStatusPillAccepted: {
         backgroundColor: '#DDF8E5',
     },
+    rentalOfferStatusPillNeutral: {
+        backgroundColor: '#ECECEF',
+    },
     rentalOfferStatusText: {
         fontSize: 13,
         fontWeight: '800',
@@ -2734,6 +2744,9 @@ const styles = StyleSheet.create({
     },
     rentalOfferStatusTextAccepted: {
         color: '#1C8E3A',
+    },
+    rentalOfferStatusTextNeutral: {
+        color: '#606069',
     },
     rentalOfferBody: {
         paddingHorizontal: 16,

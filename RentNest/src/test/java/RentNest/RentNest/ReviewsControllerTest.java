@@ -12,6 +12,7 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -49,7 +50,8 @@ public class ReviewsControllerTest {
         ReviewsDTO createdReview = new ReviewsDTO();
         createdReview.setReviewID(1L);
 
-        User mockUser = createUserWithId(2L);
+        User mockUser = new User();
+        ReflectionTestUtils.setField(mockUser, "userID", 2L);
         Authentication mockAuth = mock(Authentication.class);
         when(mockAuth.getPrincipal()).thenReturn(mockUser);
 
@@ -99,48 +101,110 @@ public class ReviewsControllerTest {
         verify(reviewsService, times(1)).getAllReviews();
     }
 
-    private User createUserWithId(Long id) throws Exception {
-        User user = new User();
-        java.lang.reflect.Field field = User.class.getDeclaredField("userID");
-        field.setAccessible(true);
-        field.set(user, id);
-        return user;
-    }
-
     // Test for updating a review
     @Test
     public void testUpdateReview() throws Exception {
         Long reviewId = 1L;
+        User author = userWithId(5L, User.ROLE_USER);
+        Reviews existing = new Reviews();
+        existing.setReviewer(author);
         ReviewsDTO reviewsDTO = new ReviewsDTO();
         Reviews updatedReview = new Reviews();
+        when(reviewsService.getReviewById(reviewId)).thenReturn(Optional.of(existing));
+        when(reviewsService.updateReview(anyLong(), any(ReviewsDTO.class), any(User.class))).thenReturn(updatedReview);
 
-        User mockUser = createUserWithId(2L);
-        Authentication mockAuth = mock(Authentication.class);
-        when(mockAuth.getPrincipal()).thenReturn(mockUser);
-
-        when(reviewsService.updateReview(anyLong(), any(ReviewsDTO.class), anyLong())).thenReturn(updatedReview);
-
-        ResponseEntity<?> response = reviewsController.updateReview(reviewId, reviewsDTO, mockAuth);
+        ResponseEntity<Reviews> response = reviewsController.updateReview(reviewId, reviewsDTO, author);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(reviewsService, times(1)).updateReview(anyLong(), any(ReviewsDTO.class), anyLong());
+        verify(reviewsService, times(1)).updateReview(anyLong(), any(ReviewsDTO.class), any(User.class));
+    }
+
+    @Test
+    public void testUpdateReviewByReviewedUserIsForbidden() {
+        User reviewedUser = userWithId(6L, User.ROLE_USER);
+        Reviews existing = new Reviews();
+        existing.setReviewer(userWithId(5L, User.ROLE_USER));
+        existing.setUser(reviewedUser);
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.of(existing));
+
+        ResponseEntity<Reviews> response = reviewsController.updateReview(1L, new ReviewsDTO(), reviewedUser);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(reviewsService, never()).updateReview(anyLong(), any(ReviewsDTO.class), any(User.class));
+    }
+
+    @Test
+    public void testAuthorCannotReassignReviewToSomeoneElse() {
+        User author = userWithId(5L, User.ROLE_USER);
+        Reviews existing = new Reviews();
+        existing.setReviewer(author);
+        ReviewsDTO reviewsDTO = new ReviewsDTO();
+        reviewsDTO.setReviewerID(7L);
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.of(existing));
+
+        ResponseEntity<Reviews> response = reviewsController.updateReview(1L, reviewsDTO, author);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(reviewsService, never()).updateReview(anyLong(), any(ReviewsDTO.class), any(User.class));
     }
 
     // Test for deleting a review
     @Test
     public void testDeleteReview() throws Exception {
         Long reviewId = 1L;
+        User author = userWithId(5L, User.ROLE_USER);
+        Reviews review = new Reviews();
+        review.setReviewer(author);
+        review.setUser(userWithId(6L, User.ROLE_USER));
+        when(reviewsService.getReviewById(reviewId)).thenReturn(Optional.of(review));
 
-        User mockUser = createUserWithId(2L);
-        Authentication mockAuth = mock(Authentication.class);
-        when(mockAuth.getPrincipal()).thenReturn(mockUser);
-
-        doNothing().when(reviewsService).deleteReview(anyLong(), anyLong());
-
-        ResponseEntity<?> response = reviewsController.deleteReview(reviewId, mockAuth);
+        ResponseEntity<Void> response = reviewsController.deleteReview(reviewId, author);
 
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(reviewsService, times(1)).deleteReview(anyLong(), anyLong());
+        verify(reviewsService, times(1)).deleteReview(anyLong(), any(User.class));
+    }
+
+    // The person being reviewed must not be able to remove reviews about themselves
+    @Test
+    public void testDeleteReviewByReviewedUserIsForbidden() {
+        User reviewedUser = userWithId(6L, User.ROLE_USER);
+        Reviews review = new Reviews();
+        review.setReviewer(userWithId(5L, User.ROLE_USER));
+        review.setUser(reviewedUser);
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.of(review));
+
+        ResponseEntity<Void> response = reviewsController.deleteReview(1L, reviewedUser);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(reviewsService, never()).deleteReview(anyLong(), any(User.class));
+    }
+
+    @Test
+    public void testDeleteReviewByAdmin() {
+        Reviews review = new Reviews();
+        review.setReviewer(userWithId(5L, User.ROLE_USER));
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.of(review));
+
+        ResponseEntity<Void> response = reviewsController.deleteReview(1L, userWithId(99L, User.ROLE_ADMIN));
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(reviewsService, times(1)).deleteReview(eq(1L), any(User.class));
+    }
+
+    @Test
+    public void testDeleteMissingReviewReturnsNotFound() {
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.empty());
+
+        ResponseEntity<Void> response = reviewsController.deleteReview(1L, userWithId(5L, User.ROLE_USER));
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        verify(reviewsService, never()).deleteReview(anyLong(), any(User.class));
+    }
+
+    private static User userWithId(Long id, String role) {
+        User user = new User().setRole(role);
+        ReflectionTestUtils.setField(user, "userID", id);
+        return user;
     }
 
     // Test for getting flagged reviews
