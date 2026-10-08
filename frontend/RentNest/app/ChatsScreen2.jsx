@@ -281,6 +281,20 @@ const ChatsScreen2 = () => {
                 return;
             }
             const reportStorageKey = getUserReportStorageKey();
+            if (reportStorageKey) {
+                try {
+                    await syncUserReportStatus(reportStorageKey);
+                    const alreadyReported = await AsyncStorage.getItem(reportStorageKey);
+                    if (alreadyReported === 'true') {
+                        setFlagModalVisible(false);
+                        showUserReportNotification('User Already Reported');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error checking reported user status:', error);
+                }
+            }
+
             const flaggedResponse = await axios.put(`${API_BASE_URL}/api/users/setFlag/${partnerUserId}/1`, {}, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -828,25 +842,10 @@ const handlePaymentAndAccept = async () => {
     };
 
     // Toggle flag modal visibility
-    const toggleFlagModal = async () => {
+    const toggleFlagModal = () => {
         if (isFlagModalVisible) {
             setFlagModalVisible(false);
             return;
-        }
-
-        const reportStorageKey = getUserReportStorageKey();
-
-        if (reportStorageKey) {
-            try {
-                await syncUserReportStatus(reportStorageKey);
-                const alreadyReported = await AsyncStorage.getItem(reportStorageKey);
-                if (alreadyReported === 'true') {
-                    showUserReportNotification('User Already Reported');
-                    return;
-                }
-            } catch (error) {
-                console.error('Error checking reported user status:', error);
-            }
         }
 
         setFlagModalVisible(true);
