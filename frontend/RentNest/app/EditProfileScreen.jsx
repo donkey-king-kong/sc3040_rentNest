@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   TextInput,
   TouchableOpacity,
   Alert,
@@ -22,6 +21,7 @@ import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import { FontAwesome } from '@expo/vector-icons';
 import MorphingInfinity from '../components/MorphingInfinity';
+import ProfileImage from '../components/ProfileImage';
 
 const notificationBellIcon = require('../assets/images/notificationBell.png');
 
@@ -209,7 +209,15 @@ const EditProfileScreen = () => {
           </TouchableOpacity>
 
           <View style={styles.profileBox}>
-            <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
+            <ProfileImage
+              uri={user.photoURL}
+              name={user.name}
+              style={styles.profileImage}
+              textStyle={styles.profileImageInitials}
+              screen="EditProfileScreen"
+              userId={user.userID}
+              role="profile"
+            />
           </View>
 
           <Text style={styles.label}>Full Name</Text>
@@ -348,6 +356,9 @@ const styles = StyleSheet.create({
     height: 156,
     borderRadius: 78,
     backgroundColor: '#D8D8D8',
+  },
+  profileImageInitials: {
+    fontSize: 46,
   },
   label: {
     color: '#101820',

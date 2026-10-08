@@ -10,6 +10,7 @@ import { API_BASE_URL } from '../config/api';
 import { jwtDecode } from 'jwt-decode';
 import MorphingInfinity from '../components/MorphingInfinity';
 import ListingImage from '../components/ListingImage';
+import ProfileImage from '../components/ProfileImage';
 
 const notificationBellIcon = require('../assets/images/notificationBell.png');
 
@@ -503,7 +504,15 @@ const HomeListingScreen = () => {
                 <Text style={styles.reviewTitle}>{review.title}</Text>
                 <Text style={styles.reviewText}>{review.text}</Text>
                 <View style={styles.userInfo}>
-                  <Image source={{ uri: review.user.photoURL }} style={styles.userPhoto} />
+                  <ProfileImage
+                    uri={review.user.photoURL}
+                    name={review.user.name}
+                    style={styles.userPhoto}
+                    textStyle={styles.userPhotoInitials}
+                    screen="HomeListingScreen"
+                    userId={review.user.userID}
+                    role="reviewer"
+                  />
                   <Text style={styles.userName}>{review.user.name}</Text>
                 </View>
               </View>
@@ -532,7 +541,15 @@ const HomeListingScreen = () => {
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
                         <View style={styles.ownerInfo}>
-                          <Image source={{ uri: listing.ownerPhotoURL }} style={styles.ownerImage} />
+                          <ProfileImage
+                            uri={listing.ownerPhotoURL}
+                            name={listing.ownerName}
+                            style={styles.ownerImage}
+                            textStyle={styles.ownerImageInitials}
+                            screen="HomeListingScreen"
+                            userId={listing.ownerId}
+                            role="owner"
+                          />
                           <Text style={styles.ownerText}>Posted by: {listing.ownerName}</Text>
                         </View>
                       </View>
@@ -796,6 +813,9 @@ placesContainer: {
       borderRadius: 15,
       marginRight: 5,
     },
+    userPhotoInitials: {
+      fontSize: 11,
+    },
     userName: {
       fontSize: 14,
       color: '#555',
@@ -881,6 +901,9 @@ ownerBox: {
     height: 50,
     borderRadius: 25,
     marginRight: 10,
+  },
+  ownerImageInitials: {
+    fontSize: 18,
   },
   ownerText: {
     fontSize: 16,

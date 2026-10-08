@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import {View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Alert} from 'react-native';
+import {View, Text, StyleSheet, FlatList, TouchableOpacity, Alert} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {API_BASE_URL} from "../config/api";
 import MorphingInfinity from '../components/MorphingInfinity';
 import { FontAwesome } from '@expo/vector-icons';
+import ProfileImage from '../components/ProfileImage';
 
 const UserReviewsScreen = () => {
     const router = useRouter();
@@ -197,7 +198,15 @@ const UserReviewsScreen = () => {
         return (
             <View style={styles.reviewCard}>
                 <View style={styles.reviewerInfo}>
-                    <Image source={{ uri: item.avatar }} style={styles.reviewerAvatar} />
+                    <ProfileImage
+                        uri={item.avatar}
+                        name={item.reviewer}
+                        style={styles.reviewerAvatar}
+                        textStyle={styles.reviewerAvatarInitials}
+                        screen="UserReviewsScreen"
+                        userId={item.reviewerId}
+                        role="reviewer"
+                    />
                     <View>
                         <Text style={styles.reviewerName}>{item.reviewer}</Text>
                     </View>
@@ -355,6 +364,9 @@ const styles = StyleSheet.create({
         height: 40,
         borderRadius: 20,
         marginRight: 10,
+    },
+    reviewerAvatarInitials: {
+        fontSize: 14,
     },
     reviewerName: {
         fontSize: 16,

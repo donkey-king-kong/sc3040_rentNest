@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { FontAwesome } from '@expo/vector-icons';
 import MorphingInfinity from '../components/MorphingInfinity';
+import ProfileImage from '../components/ProfileImage';
 
 const BanUsersScreen2 = () => {
   const router = useRouter();
@@ -128,7 +129,15 @@ const BanUsersScreen2 = () => {
 
       <View style={styles.userBox}>
         <View style={styles.header}>
-          <Image source={{ uri: flaggedUser.photoURL }} style={styles.userImage} />
+          <ProfileImage
+            uri={flaggedUser.photoURL}
+            name={flaggedUser.name}
+            style={styles.userImage}
+            textStyle={styles.userImageInitials}
+            screen="BanUserScreen2"
+            userId={flaggedUser.userID || userid}
+            role="flagged-user"
+          />
           <Text style={styles.userName}>{flaggedUser.name}</Text>
         </View>
         <Text style={styles.email}>Email: {flaggedUser.email}</Text>
@@ -212,6 +221,9 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: 10,
+  },
+  userImageInitials: {
+    fontSize: 14,
   },
   userName: {
     fontSize: 20,

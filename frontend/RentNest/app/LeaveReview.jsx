@@ -8,6 +8,7 @@ import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import MorphingInfinity from '../components/MorphingInfinity';
 import { jwtDecode } from 'jwt-decode';
+import ProfileImage from '../components/ProfileImage';
 
 import errorImage from '../assets/images/error.png';
 const notificationBellIcon = require('../assets/images/notificationBell.png');
@@ -54,7 +55,6 @@ const LeaveReview = () => {
   const [loading, setLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const [revieweeProfile, setRevieweeProfile] = useState(null);
-  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialReview, setInitialReview] = useState(null);
   const [reviewTextSelection, setReviewTextSelection] = useState(undefined);
@@ -358,7 +358,6 @@ const LeaveReview = () => {
       || revieweeProfile?.profilePhotoURL
       || revieweeProfile?.profilePicture
       || revieweeProfile?.avatar;
-  const canShowRevieweePhoto = displayedRevieweePhotoURL && !avatarLoadFailed;
   const hasRequiredFields = rating > 0 && Boolean(reviewTitle.trim()) && Boolean(reviewText.trim());
   const hasReviewChanged = !isEditing || !initialReview
       || rating !== initialReview.rating
@@ -373,10 +372,6 @@ const LeaveReview = () => {
     4: 'Good',
     5: 'Excellent',
   };
-
-  useEffect(() => {
-    setAvatarLoadFailed(false);
-  }, [displayedRevieweePhotoURL]);
 
   useEffect(() => {
     if (!reviewTextSelection) {
@@ -440,17 +435,15 @@ const LeaveReview = () => {
             showsVerticalScrollIndicator={false}
         >
           <View style={styles.revieweeCard}>
-            <View style={styles.avatarCircle}>
-              {canShowRevieweePhoto ? (
-                  <Image
-                      source={{ uri: displayedRevieweePhotoURL }}
-                      style={styles.avatarImage}
-                      onError={() => setAvatarLoadFailed(true)}
-                  />
-              ) : (
-                  <Text style={styles.avatarInitial}>{displayedRevieweeName.charAt(0).toUpperCase()}</Text>
-              )}
-            </View>
+            <ProfileImage
+                uri={displayedRevieweePhotoURL}
+                name={displayedRevieweeName}
+                style={styles.avatarCircle}
+                textStyle={styles.avatarInitial}
+                screen="LeaveReview"
+                userId={reviewedUserId}
+                role={displayedRevieweeRole}
+            />
             <View style={styles.revieweeMeta}>
               <Text style={styles.revieweeName}>{displayedRevieweeName}</Text>
               <View style={styles.roleBadge}>
@@ -645,11 +638,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
-  },
-  avatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
   },
   revieweeMeta: {
     flex: 1,
