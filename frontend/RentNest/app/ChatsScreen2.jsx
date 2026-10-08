@@ -19,10 +19,10 @@ import axios from "axios";
 import {API_BASE_URL} from "../config/api";
 import MorphingInfinity from '../components/MorphingInfinity';
 import AvatarOrb from '../components/AvatarOrb';
+import ProfileImage from '../components/ProfileImage';
 
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
-const profilePic = require('../assets/images/chatProfilePic.jpg');
 const notificationBellIcon = require('../assets/images/notificationBell.png');
 
 const ChatsScreen2 = () => {
@@ -281,6 +281,20 @@ const ChatsScreen2 = () => {
                 return;
             }
             const reportStorageKey = getUserReportStorageKey();
+            if (reportStorageKey) {
+                try {
+                    await syncUserReportStatus(reportStorageKey);
+                    const alreadyReported = await AsyncStorage.getItem(reportStorageKey);
+                    if (alreadyReported === 'true') {
+                        setFlagModalVisible(false);
+                        showUserReportNotification('User Already Reported');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error checking reported user status:', error);
+                }
+            }
+
             const flaggedResponse = await axios.put(`${API_BASE_URL}/api/users/setFlag/${partnerUserId}/1`, {}, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -832,25 +846,10 @@ const handlePaymentAndAccept = async () => {
     };
 
     // Toggle flag modal visibility
-    const toggleFlagModal = async () => {
+    const toggleFlagModal = () => {
         if (isFlagModalVisible) {
             setFlagModalVisible(false);
             return;
-        }
-
-        const reportStorageKey = getUserReportStorageKey();
-
-        if (reportStorageKey) {
-            try {
-                await syncUserReportStatus(reportStorageKey);
-                const alreadyReported = await AsyncStorage.getItem(reportStorageKey);
-                if (alreadyReported === 'true') {
-                    showUserReportNotification('User Already Reported');
-                    return;
-                }
-            } catch (error) {
-                console.error('Error checking reported user status:', error);
-            }
         }
 
         setFlagModalVisible(true);
@@ -886,20 +885,18 @@ const handlePaymentAndAccept = async () => {
     const isAccepted = chat.length > 0 ? isPaymentSuccessfulModalVisible : false;
     const isTerminationAccepted = chat.length>0 ? rental.status === "terminated" : false;
 
-    const getInitials = (name) => {
-        if (!name) return '?';
-        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-    };
-
     const AvatarCircle = ({ photoURL, name, size = 30, style }) => {
         const dim = { width: size, height: size, borderRadius: size / 2 };
-        if (photoURL) {
-            return <Image source={{ uri: photoURL }} style={[dim, style]} />;
-        }
         return (
-            <View style={[dim, styles.avatarCircle, style]}>
-                <Text style={[styles.avatarInitials, { fontSize: size * 0.38 }]}>{getInitials(name)}</Text>
-            </View>
+            <ProfileImage
+                uri={photoURL}
+                name={name}
+                style={[styles.avatarCircle, dim, style]}
+                textStyle={[styles.avatarInitials, { fontSize: size * 0.38 }]}
+                screen="ChatsScreen2"
+                userId={partnerUserId}
+                role="chat-partner"
+            />
         );
     };
 
@@ -1659,7 +1656,6 @@ const handlePaymentAndAccept = async () => {
                                 {isReportingUser ? (
                                     <View style={styles.reportingContent}>
                                         <ActivityIndicator size="small" color="#FFFFFF" />
-                                        <Text style={styles.reportingButtonText}>Reporting...</Text>
                                     </View>
                                 ) : (
                                     <Text style={styles.whiteButtonText}>Confirm</Text>

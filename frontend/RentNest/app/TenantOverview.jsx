@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import MorphingInfinity from '../components/MorphingInfinity';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -7,6 +7,7 @@ import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
+import ProfileImage from '../components/ProfileImage';
 
 
 const TenantOverview = () => {
@@ -144,9 +145,14 @@ const TenantOverview = () => {
 
       {/* White outlined box for tenant overview */}
       <View style={styles.overviewBox}>
-        <Image source={{ uri: tenant.photoURL || 'https://t3.ftcdn.net/jpg/02/43/12/34/360_F_243123463_zTooub557xEWABDLk0jJklDyLSGl2jrr.jpg'
-          }} 
-          style={styles.tenantPhoto} 
+        <ProfileImage
+          uri={tenant.photoURL}
+          name={tenant.name}
+          style={styles.tenantPhoto}
+          textStyle={styles.tenantPhotoInitials}
+          screen="TenantOverview"
+          userId={tenant.userID}
+          role="tenant"
         />
         <View style={styles.overviewDetails}>
           <Text style={styles.tenantName}>{tenant.name || 'Tenant Name'}</Text>
@@ -258,6 +264,9 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     marginRight: 10,
+  },
+  tenantPhotoInitials: {
+    fontSize: 22,
   },
   overviewDetails: {
     flex: 1,

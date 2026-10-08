@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { useLocalSearchParams, useRouter } from "expo-router";
+import ListingImage from '../components/ListingImage';
 
 const RentalInfoViewer = () => {
   const router = useRouter();
@@ -29,6 +30,11 @@ const RentalInfoViewer = () => {
         },
       });
       console.log("Listings response", response.data);
+      console.log('[RentalInfoViewerScreen] listing image payload:', {
+        listingId,
+        name: response.data?.name,
+        listingpicture: response.data?.listingpicture,
+      });
       setListing(response.data); // Store the fetched data in state
 
     } catch (error) {
@@ -60,7 +66,15 @@ const RentalInfoViewer = () => {
 
         {listing ? (
             <>
-              <Image source={{ uri: listing.listingpicture }} style={styles.image} />
+              <ListingImage
+                uri={listing.listingpicture}
+                style={styles.image}
+                screen="RentalInfoViewerScreen"
+                listingId={listing.listingID}
+                listingName={listing.name}
+                width={600}
+                height={400}
+              />
 
               <View style={styles.row}>
                 <View style={styles.left}>
