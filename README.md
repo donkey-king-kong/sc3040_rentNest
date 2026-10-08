@@ -103,4 +103,5 @@ The app uses a shared Supabase PostgreSQL database. The real connection details 
 - [URA Rental Prices API](https://www.ura.gov.sg/uraDataService/invokeUraDS?service=PMI_Resi_Rental&refPeriod=14q1)
 
 ## Developer Notes
-- [Listing Image Rendering Troubleshoot](Documentation/troubleshooting/listing-images.md)
+- [Listing Image Rendering Troubleshoot](Documentation/Troubleshooting/listing-images.md)
+- [Profile Image Handling Troubleshoot](Documentation/Troubleshooting/profile-images.md)
