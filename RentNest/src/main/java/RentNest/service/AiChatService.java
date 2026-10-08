@@ -80,7 +80,9 @@ public class AiChatService {
                 Summarise rental conversations for users who want quick status updates.
 
                 Rules:
-                - Use only facts explicitly stated in the transcript.
+                - Use only facts from the structured rental context and chat transcript.
+                - When mentioning who should act next, use the speaker's display name or Owner/Tenant role from the transcript.
+                - Never refer to speakers as Participant A or Participant B.
                 - Do not speculate about who is owner or tenant based on names.
                 - Do not comment on funny, odd, duplicated, or confusing names.
                 - For short conversations, still summarise the concrete request/question and the concrete reply.
@@ -109,9 +111,12 @@ public class AiChatService {
                 """;
 
         String prompt = """
+                Structured rental context:
+                %s
+
                 Chat transcript:
                 %s
-                """.formatted(formatConversation(conversation));
+                """.formatted(formatConversationMetadata(conversation), formatConversation(conversation));
 
         String summary = callLlm(systemInstruction, prompt);
         return new AiChatSummaryResponseDTO(summary, false);
@@ -196,6 +201,8 @@ public class AiChatService {
 
                 Rules:
                 - Use only facts from the structured rental context and chat transcript.
+                - When mentioning who should act next, use the speaker's display name or Owner/Tenant role from the transcript.
+                - Never refer to speakers as Participant A or Participant B.
                 - Do not speculate about who is owner or tenant based on names.
                 - Do not comment on funny, odd, duplicated, or confusing names.
                 - If the structured rental context and chat transcript do not contain the answer, say that the information was not mentioned in the conversation.
@@ -271,20 +278,38 @@ public class AiChatService {
 
     private String formatConversation(List<ChatHistory> conversation) {
         StringBuilder transcript = new StringBuilder();
-        Long firstSenderId = conversation.get(0).getSenderId();
+        Rentals rental = findConversationRental(conversation);
+        Listings listing = rental != null ? rental.getListings() : null;
+        Long ownerId = listing != null ? listing.getOwnerId() : null;
+        Long tenantId = rental != null && rental.getTenantUserID() != null ? rental.getTenantUserID() : listing != null ? listing.getTenantId() : null;
+
         for (ChatHistory message : conversation) {
-            String sender = message.getSenderName() != null ? message.getSenderName() : "User " + message.getSenderId();
             String text = message.getMessage() != null ? message.getMessage() : "";
-            String participant = firstSenderId != null && firstSenderId.equals(message.getSenderId()) ? "Participant A" : "Participant B";
-            transcript.append(participant)
-                    .append(" (")
-                    .append(sender)
-                    .append(")")
+            String speaker = formatSpeakerLabel(message, ownerId, tenantId);
+
+            transcript.append(speaker)
                     .append(": ")
                     .append(text)
                     .append("\n");
         }
         return transcript.toString();
+    }
+
+    private String formatSpeakerLabel(ChatHistory message, Long ownerId, Long tenantId) {
+        Long senderId = message.getSenderId();
+        String senderName = message.getSenderName() != null && !message.getSenderName().isBlank()
+                ? message.getSenderName()
+                : senderId != null ? "User " + senderId : "Unknown user";
+
+        if (senderId != null && senderId.equals(ownerId)) {
+            return "Owner " + senderName;
+        }
+
+        if (senderId != null && senderId.equals(tenantId)) {
+            return "Tenant " + senderName;
+        }
+
+        return senderName;
     }
 
     private String formatConversationMetadata(List<ChatHistory> conversation) {

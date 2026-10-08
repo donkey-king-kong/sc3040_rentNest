@@ -1,37 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import MorphingInfinity from '../components/MorphingInfinity';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import jwtDecode from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
+import ProfileImage from '../components/ProfileImage';
 
-const dummyTenant = {
-  userID: 96,
-  name: "Jacob Sartorius",
-  contact: 94242718,
-  photoURL: "https://media.istockphoto.com/id/1495088043/vector/user-profile-icon-avatar-or-person-icon-profile-picture-portrait-symbol-default-portrait.jpg?s=612x612&w=0&k=20&c=dhV2p1JwmloBTOaGAtaA3AW1KSnjsdMt7-U_3EZElZ0=",
-}
-
-const dummyRental = {
-  ownerUserId: 38,
-  leaseExpiry: "2025-01-31T00:00:00.000+00:00",
-  rentalPrice: 2900,
-  depositPrice: 5800,
-  rentalID: 50,
-};
-
-const dummyPayments = [
-  {
-    date: '2023-11-01',
-    amount: 2800,
-  },
-  {
-    date: '2023-10-01',
-    amount: 2800,
-  }
-];
 
 const TenantOverview = () => {
   const router = useRouter();
@@ -41,6 +18,7 @@ const TenantOverview = () => {
   const [rental, setRental] = useState(null);
   const [payments, setPayments] = useState([]);
   const [outstandingPayments, setOutstandingPayments] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,81 +34,54 @@ const TenantOverview = () => {
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         };
-        try{
-          const tenantResponse = await axios.get(`${API_BASE_URL}/api/users/id/${tenantId}`, { headers });
-          setTenant(tenantResponse.data);
-        } catch (err) {
-          if (err.response && err.response.status === 404) {
-            console.log(`Tenant with id : ${tenantId} not found. Returned 404, filling with dummy data.`) 
-            setTenant(dummyTenant)
-          }
-        }
+        const decoded = jwtDecode(token);
+        const meResponse = await axios.get(`${API_BASE_URL}/api/users/${decoded.sub}`, { headers });
+        setCurrentUserId(meResponse.data.userID);
 
-        try {
-          const rentalResponse = await axios.get(
-            `${API_BASE_URL}${ENDPOINTS.RENTALS}/listing/${listingId}`, // GET rental by listingID
-            { headers }
-          );
-          setRental(rentalResponse.data);
-        } catch (err) {
-          if (err.response && err.response.status === 404) {
-            console.log('Rental endpoint returned 404:', `${API_BASE_URL}${ENDPOINTS.RENTALS}/listing/${listingId}`);
-            setRental(dummyRental);
-          } else {
-            throw err;
-          }
-        }
+        const tenantResponse = await axios.get(`${API_BASE_URL}/api/users/id/${tenantId}`, { headers });
+        setTenant(tenantResponse.data);
+
+        const rentalResponse = await axios.get(
+          `${API_BASE_URL}${ENDPOINTS.RENTALS}/listing/${listingId}`,
+          { headers }
+        );
+        setRental(rentalResponse.data);
 
         try {
           const paymentsResponse = await axios.get(
-            `${API_BASE_URL}${ENDPOINTS.TENANT_PAYMENTS(listingId, tenantId)}`, 
+            `${API_BASE_URL}${ENDPOINTS.TENANT_PAYMENTS(listingId, tenantId)}`,
             { headers }
           );
           if (paymentsResponse.data && paymentsResponse.data.payments) {
-            const sortedPayments = paymentsResponse.data.payments.sort((a, b) => 
+            const sortedPayments = paymentsResponse.data.payments.sort((a, b) =>
               new Date(b.date) - new Date(a.date)
             );
             setPayments(sortedPayments);
           }
         } catch (err) {
-          if (err.response && err.response.status === 404) {
-            console.log('Payments endpoint returned 404:', `${API_BASE_URL}${ENDPOINTS.TENANT_PAYMENTS(listingId, tenantId)}`);
-            setPayments(dummyPayments);
-          } else {
-            throw err;
-          }
+          if (!err.response || err.response.status !== 404) throw err;
         }
 
         try {
           const outstandingResponse = await axios.get(
-            `${API_BASE_URL}${ENDPOINTS.OUTSTANDING_PAYMENTS(listingId)}`, 
+            `${API_BASE_URL}${ENDPOINTS.OUTSTANDING_PAYMENTS(rentalResponse.data.rentalID)}`,
             { headers }
           );
           if (outstandingResponse.data) {
-            const outstandingData = typeof outstandingResponse.data === 'string' 
-              ? JSON.parse(outstandingResponse.data) 
+            const outstandingData = typeof outstandingResponse.data === 'string'
+              ? JSON.parse(outstandingResponse.data)
               : outstandingResponse.data;
-            
             if (outstandingData['Outstanding Months']) {
               setOutstandingPayments(outstandingData['Outstanding Months']);
             }
           }
         } catch (err) {
-          if (err.response && err.response.status === 404) {
-            console.log('Outstanding payments endpoint returned 404:', `${API_BASE_URL}${ENDPOINTS.OUTSTANDING_PAYMENTS(listingId)}`);
-            setOutstandingPayments([]);
-          } else {
-            throw err;
-          }
+          if (!err.response || err.response.status !== 404) throw err;
         }
 
         setLoading(false);
       } catch (err) {
         console.error('Error fetching data:', err);
-        // Use dummy data for all in case of unexpected errors
-        setRental(dummyRental);
-        setPayments(dummyPayments);
-        setOutstandingPayments([]);
         setLoading(false);
       }
     };
@@ -142,36 +93,74 @@ const TenantOverview = () => {
     router.push({ pathname: '/TerminateLease', params: { rentalId: rental.rentalID } });
   };
 
+  const formatDate = (dateStr) => {
+    const d = new Date(dateStr);
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+  };
+
   const handleLeaveReview = () => {
-    router.push({ pathname: '/LeaveReview', params: { ownerId: rental.ownerUserId, listingId, tenantId: tenant.userID } });
+    router.push({
+      pathname: '/LeaveReview',
+      params: {
+        revieweeId: tenant.userID,
+        listingId,
+        revieweeName: tenant.name,
+        revieweeRole: 'Tenant',
+        revieweePhotoURL: tenant.photoURL,
+      },
+    });
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Loading rental information...</Text>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading tenant information...</Text>
+      </View>
+    );
+  }
+
+  if (!tenant || !rental) {
+    return (
+      <View style={styles.loadingContainer}>
+        <TouchableOpacity onPress={() => router.back()} style={{ position: 'absolute', top: 20, left: 20 }}>
+          <FontAwesome name="chevron-left" size={18} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.loadingText}>Failed to load tenant information.</Text>
       </View>
     );
   }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Tenant Overview</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <FontAwesome name="chevron-left" size={18} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Tenant Overview</Text>
+      </View>
 
       {/* White outlined box for tenant overview */}
       <View style={styles.overviewBox}>
-        <Image source={{ uri: tenant.photoURL || 'https://t3.ftcdn.net/jpg/02/43/12/34/360_F_243123463_zTooub557xEWABDLk0jJklDyLSGl2jrr.jpg'
-          }} 
-          style={styles.tenantPhoto} 
+        <ProfileImage
+          uri={tenant.photoURL}
+          name={tenant.name}
+          style={styles.tenantPhoto}
+          textStyle={styles.tenantPhotoInitials}
+          screen="TenantOverview"
+          userId={tenant.userID}
+          role="tenant"
         />
         <View style={styles.overviewDetails}>
           <Text style={styles.tenantName}>{tenant.name || 'Tenant Name'}</Text>
-          <Text style={styles.leaseExpiry}>Lease Expires on {rental.leaseExpiry}</Text>
+          <Text style={styles.leaseExpiry}>Lease expires on {formatDate(rental.leaseExpiry)}</Text>
           <Text style={styles.rentalPrice}>${rental.rentalPrice} monthly rent</Text>
         </View>
         <TouchableOpacity 
-          onPress={()=>router.push(`/ChatsScreen2?partnerUserId=33&currentUser=42`)} 
+          onPress={() => router.push(`/ChatsScreen2?partnerUserId=${tenantId}&currentUser=${currentUserId}`)}
           style={styles.chatButton}
         >
           <FontAwesome name="comment" size={24} color="black" />
@@ -183,14 +172,14 @@ const TenantOverview = () => {
 
       {/* Outstanding Payments */}
       {outstandingPayments.length > 0 ? (
-        outstandingPayments.map((payment, index) => (
+        [...outstandingPayments].sort((a, b) => new Date(b) - new Date(a)).map((dateStr, index) => (
           <View key={`outstanding-${index}`} style={styles.paymentRow}>
-            <Text style={styles.paymentDate}>{payment.month}</Text>
+            <Text style={styles.paymentDate}>
+              {new Date(dateStr).toLocaleString('default', { month: 'long', year: 'numeric' })}
+            </Text>
             <View style={styles.paymentInfo}>
-              <Text style={styles.paymentAmount}>${payment.amount}</Text>
-              <Text style={[styles.paymentStatus, styles.pendingStatus]}>
-                <Text style={styles.smallText1}>Payment Pending</Text>
-              </Text>
+              <Text style={styles.paymentAmount}>${rental.rentalPrice}</Text>
+              <Text style={styles.smallText1}>Payment Pending</Text>
             </View>
           </View>
         ))
@@ -209,7 +198,7 @@ const TenantOverview = () => {
           <View style={styles.paymentInfo}>
             <Text style={styles.paymentAmount}>${payment.amount}</Text>
             <Text style={styles.paymentStatus}>
-              <Text style={styles.smallText2}>Paid on {payment.date}</Text>
+              <Text style={styles.smallText2}>Paid on {formatDate(payment.date)}</Text>
             </Text>
           </View>
         </View>
@@ -243,10 +232,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff',
   },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#555',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    marginRight: 12,
+    padding: 4,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
   },
   overviewBox: {
     flexDirection: 'row',
@@ -262,6 +264,9 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     marginRight: 10,
+  },
+  tenantPhotoInitials: {
+    fontSize: 22,
   },
   overviewDetails: {
     flex: 1,

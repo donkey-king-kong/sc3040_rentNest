@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import ModerationListState, { moderationLoadError } from '../components/ModerationListState';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
+import ProfileImage from '../components/ProfileImage';
 
 const BanUsersScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -121,7 +122,15 @@ const BanUsersScreen = () => {
         renderItem={({ item }) => (
           <View style={styles.userBox}>
             {/* User Image */}
-            <Image source={{ uri: item.photoURL }} style={styles.userImage} />
+            <ProfileImage
+              uri={item.photoURL}
+              name={item.name}
+              style={styles.userImage}
+              textStyle={styles.userImageInitials}
+              screen="BanUserScreen"
+              userId={item.userid}
+              role="flagged-user"
+            />
             {/* User Name */}
             <Text style={styles.userName}>{item.name}</Text>
             {/* Review Button */}
@@ -168,6 +177,9 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 15,
     marginRight: 15,
+  },
+  userImageInitials: {
+    fontSize: 18,
   },
   userName: {
     fontSize: 18,

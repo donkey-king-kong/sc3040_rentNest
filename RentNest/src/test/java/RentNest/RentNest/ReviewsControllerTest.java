@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -44,15 +45,22 @@ public class ReviewsControllerTest {
 
     // Test for creating a review
     @Test
-    public void testCreateReview() {
+    public void testCreateReview() throws Exception {
         ReviewsDTO reviewsDTO = new ReviewsDTO();
-        Reviews review = new Reviews();
-        when(reviewsService.createReview(any(ReviewsDTO.class))).thenReturn(review);
+        ReviewsDTO createdReview = new ReviewsDTO();
+        createdReview.setReviewID(1L);
 
-        ResponseEntity<Reviews> response = reviewsController.createReview(reviewsDTO);
+        User mockUser = new User();
+        ReflectionTestUtils.setField(mockUser, "userID", 2L);
+        Authentication mockAuth = mock(Authentication.class);
+        when(mockAuth.getPrincipal()).thenReturn(mockUser);
+
+        when(reviewsService.createReview(any(ReviewsDTO.class), anyLong())).thenReturn(createdReview);
+
+        ResponseEntity<?> response = reviewsController.createReview(reviewsDTO, mockAuth);
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        verify(reviewsService, times(1)).createReview(any(ReviewsDTO.class));
+        verify(reviewsService, times(1)).createReview(any(ReviewsDTO.class), anyLong());
     }
 
     // Test for getting a review by ID

@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,9 +28,15 @@ public class ReviewsController {
 
     // Create Review
     @PostMapping
-    public ResponseEntity<Reviews> createReview(@RequestBody ReviewsDTO reviewsDTO) {
-        Reviews createdReview = reviewsService.createReview(reviewsDTO);
-        return new ResponseEntity<>(createdReview, HttpStatus.CREATED);
+    public ResponseEntity<?> createReview(@RequestBody ReviewsDTO reviewsDTO, Authentication authentication) {
+        try {
+            ReviewsDTO createdReview = reviewsService.createReview(reviewsDTO, getAuthenticatedUserId(authentication));
+            return new ResponseEntity<>(createdReview, HttpStatus.CREATED);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
     }
 
     // Get Review by ID
@@ -147,4 +154,11 @@ public class ReviewsController {
         }
     }
 
+    private Long getAuthenticatedUserId(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof User authenticatedUser)) {
+            throw new SecurityException("Authentication required.");
+        }
+
+        return authenticatedUser.getUserID();
+    }
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import NavigationBar from '../components/NavigationBar';
@@ -7,6 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import MorphingInfinity from '../components/MorphingInfinity';
+import ProfileImage from '../components/ProfileImage';
 
 const ProfileScreen = () => {
   const router = useRouter();
@@ -17,10 +19,12 @@ const ProfileScreen = () => {
     contact: 'Loading...',
     photoURL: 'https://t3.ftcdn.net/jpg/06/33/54/78/360_F_633547842_AugYzexTpMJ9z1YcpTKUBoqBF0CUCk10.jpg',
   });
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
+        setIsProfileLoading(true);
         const token = await AsyncStorage.getItem('token');
         if (!token) {
           router.replace('/LandingScreen');
@@ -54,6 +58,8 @@ const ProfileScreen = () => {
       } catch (error) {
         console.error('Error fetching user data:', error);
         router.replace('/LandingScreen');
+      } finally {
+        setIsProfileLoading(false);
       }
     };
 
@@ -76,12 +82,29 @@ const ProfileScreen = () => {
     }
   };
 
+  if (isProfileLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.container}>
         <Text style={styles.title}>Profile</Text>
         <View style={styles.profileBox}>
-          <Image source={{ uri: user.photoURL }} style={styles.profileImage} />
+          <ProfileImage
+            uri={user.photoURL}
+            name={user.name}
+            style={styles.profileImage}
+            textStyle={styles.profileImageInitials}
+            screen="ProfileScreen"
+            userId={user.userID}
+            role="profile"
+          />
           <View style={styles.infoContainer}>
             <Text style={styles.name}>{user.name}</Text>
             <Text style={styles.email}>{user.email}</Text>
@@ -126,6 +149,18 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#fff',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F7F8FA',
+  },
+  loadingText: {
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -146,6 +181,9 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     marginRight: 15,
+  },
+  profileImageInitials: {
+    fontSize: 22,
   },
   infoContainer: {
     flex: 1,

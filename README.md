@@ -134,3 +134,7 @@ Frontend checks, from `frontend/RentNest`:
 npx.cmd expo install --check
 npm.cmd test -- --watchAll=false --runInBand
 ```
+
+## Developer Notes
+- [Listing Image Rendering Troubleshoot](Documentation/Troubleshooting/listing-images.md)
+- [Profile Image Handling Troubleshoot](Documentation/Troubleshooting/profile-images.md)

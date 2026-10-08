@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
+import ProfileImage from '../components/ProfileImage';
 
 const ProcessReviews2 = () => {
   const router = useRouter();
@@ -141,7 +142,15 @@ const ProcessReviews2 = () => {
         <Text style={styles.text}>{review.text}</Text>
         <View style={styles.userContainer}>
           {/* User Image and Name */}
-          <Image source={{ uri: review.user.photoURL }} style={styles.userImage} />
+          <ProfileImage
+            uri={review.user.photoURL}
+            name={review.user.name}
+            style={styles.userImage}
+            textStyle={styles.userImageInitials}
+            screen="ProcessReviewsScreen2"
+            userId={review.user.userID}
+            role="reviewer"
+          />
           <Text style={styles.userName}>{review.user.name}</Text>
         </View>
       </View>
@@ -210,6 +219,9 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: 10,
+  },
+  userImageInitials: {
+    fontSize: 14,
   },
   userName: {
     fontSize: 16,

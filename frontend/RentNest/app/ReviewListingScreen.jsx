@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import ModerationListState, { moderationLoadError } from '../components/ModerationListState';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
+import ProfileImage from '../components/ProfileImage';
 
 const ReviewListingsScreen = () => {
   const [listingsData, setListingsData] = useState(null);
@@ -135,9 +136,14 @@ const ReviewListingsScreen = () => {
 
             {/* Owner Image and Name */}
             <View style={styles.ownerContainer}>
-              <Image 
-                source={{ uri: item.owner.photoURL }} 
-                style={styles.ownerImage} 
+              <ProfileImage
+                uri={item.owner.photoURL}
+                name={item.owner.name}
+                style={styles.ownerImage}
+                textStyle={styles.ownerImageInitials}
+                screen="ReviewListingScreen"
+                userId={item.owner.userID}
+                role="owner"
               />
               <Text style={styles.ownerName}>{item.owner.name}</Text>
             </View>
@@ -209,6 +215,9 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: 10,
+  },
+  ownerImageInitials: {
+    fontSize: 14,
   },
   ownerName: {
     fontSize: 16,
