@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Image, Text } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import OwnerAnalyticsScreen from '../../../app/OwnerAnalyticsScreen';
 import AdminAnalyticsScreen from '../../../app/AdminAnalyticsScreen';
@@ -176,10 +176,17 @@ it('shows a completed days-on-market interval with both dates while retaining vi
     metrics: { ...listingResponse.metrics, daysOnMarket: { availability: 'available', value: 10, unit: 'days', basis: 'snapshot' } },
   }, loading: false });
   const tree = await render(ListingAnalyticsScreen);
-  expect(text(tree)).toEqual(expect.arrayContaining(['10.0 days', 'Published', 'First offer accepted', 'Listing views', 'Unique viewers']));
-  expect(text(tree).some(t => t.includes('Sep 2026'))).toBe(true);
-  expect(text(tree)).toContain('Payments recorded');
-  expect(text(tree)).toContain('Time to accepted offer');
+  expect(text(tree)).toEqual(expect.arrayContaining(['10.0 days', 'Published', 'First Offer Accepted', 'Listing Views', 'Unique Viewers']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['1 Sep 2026', '11 Sep 2026']));
+  const accessibleTimeline = tree.root.findAll(node => node.props.accessibilityLabel ===
+    'Days on Market: 10.0 days. Published: 1 Sep 2026. First Offer Accepted: 11 Sep 2026'
+    && typeof node.props.onPress === 'function');
+  expect(accessibleTimeline.length).toBeGreaterThan(0);
+  await act(async () => accessibleTimeline[0].props.onPress());
+  const { MetricDetails } = require('../AnalyticsKit');
+  expect(tree.root.findByType(MetricDetails).props.label).toBe('Days on Market');
+  expect(text(tree)).toContain('Payments Recorded');
+  expect(text(tree)).toContain('Time to Accepted Offer');
 });
 
  it('owner analytics returns to the previous screen or falls back to profile', async () => {
@@ -203,11 +210,16 @@ it.each(['loaded', 'error'])('property analytics supports back navigation when %
   expect(mockReplace).toHaveBeenCalledWith('/OwnerAnalyticsScreen');
 });
 
-it('property analytics shows the requested loading message before displaying its header', async () => {
+it('keeps the property header and back navigation available during initial loading', async () => {
   useAnalytics.mockReturnValue({ data: null, loading: true });
   const tree = await render(ListingAnalyticsScreen);
-  expect(text(tree)).toContain('Loading analytics...');
-  expect(text(tree)).not.toContain('Property analytics');
+  const { AdminLoadingState } = require('../../AdminUI');
+  expect(text(tree)).toContain('Property Analytics');
+  expect(tree.root.findAllByType(AdminLoadingState)).toHaveLength(1);
+  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Loading property analytics').length).toBeGreaterThan(0);
+  expect(text(tree)).not.toContain('Rent Recorded');
+  await press(tree, 'Back to owner analytics');
+  expect(mockBack).toHaveBeenCalledTimes(1);
   await act(async () => tree.unmount());
 });
 
@@ -246,16 +258,16 @@ it('does not fabricate an offer distribution when counts are unavailable', async
   expect(text(tree)).not.toContain('Recorded Offers');
 });
 
-it('property analytics shows all sections with a fixed past-year period', async () => {
+it('property analytics retains all sections on one page with a fixed past-year period', async () => {
   const tree = await render(ListingAnalyticsScreen);
-  expect(text(tree)).toEqual(expect.arrayContaining(['Offers sent', 'Offers accepted']));
-  expect(text(tree)).not.toContain('Tenancies ended');
-  expect(text(tree)).not.toContain('Activity in this period');
-  expect(text(tree)).not.toContain('Offers and tenancies (all time)');
+  expect(text(tree)).toEqual(expect.arrayContaining([
+    'Overview', 'Payments Recorded', 'Monthly Rent Recorded', 'Monthly Occupancy',
+    'Tenancy History', 'Offers Sent', 'Offers Accepted', 'Acceptance Rate',
+    'Average Tenancy', 'Tenants Hosted', 'Time to Accepted Offer', 'Days on Market',
+  ]));
   expect(tree.root.findAll(node => node.props.accessibilityRole === 'tab')).toHaveLength(0);
-  expect(text(tree)).toEqual(expect.arrayContaining(['Listing interest', 'Monthly rent recorded', 'Month by month', 'Time to accepted offer']));
-  expect(text(tree)).toContain('Acceptance rate');
-  expect(useAnalytics).toHaveBeenLastCalledWith('/listing/2', '12M');
+  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Analytics period' && node.props.onPress)).toHaveLength(0);
+  expect(text(tree)).not.toContain('Change property');
   expect(useAnalytics).toHaveBeenLastCalledWith('/listing/2', '12M');
 });
 
@@ -352,19 +364,25 @@ it('hides property history during refresh and displays the returned history afte
   const retry = jest.fn();
   useAnalytics.mockReturnValue({ data: listingResponse, loading: false, retry });
   const tree = await render(ListingAnalyticsScreen);
-  expect(text(tree)).toContain('Time to accepted offer');
+  expect(text(tree)).toContain('Time to Accepted Offer');
   await press(tree, 'Refresh analytics');
   expect(retry).toHaveBeenCalledTimes(1);
   useAnalytics.mockReturnValue({ data: listingResponse, loading: true, retry });
   await act(async () => tree.update(<ListingAnalyticsScreen />));
-  expect(text(tree)).not.toContain('Listing history');
-  expect(text(tree)).not.toContain('Time to accepted offer');
-  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Loading period activity').length).toBeGreaterThan(0);
+  expect(text(tree)).not.toContain('Tenancy History');
+  expect(text(tree)).not.toContain('Time to Accepted Offer');
+  expect(text(tree)).toEqual(expect.arrayContaining(['Property Analytics', 'A2']));
+  const { StatTile, LineChart } = require('../AnalyticsKit');
+  expect(tree.root.findAllByType(StatTile)).toHaveLength(0);
+  expect(tree.root.findAllByType(LineChart)).toHaveLength(0);
+  const refresh = tree.root.findAll(node => node.props.accessibilityLabel === 'Refresh analytics' && node.props.onPress)[0];
+  expect(refresh.props.disabled).toBe(true);
+  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Refreshing property analytics').length).toBeGreaterThan(0);
   const updated = { ...listingResponse, metrics: { ...listingResponse.metrics, rentalRecordCount: { availability: 'available', value: 7, unit: 'count' } } };
   useAnalytics.mockReturnValue({ data: updated, loading: false, retry });
   await act(async () => tree.update(<ListingAnalyticsScreen />));
-  expect(text(tree)).toContain('Time to accepted offer');
-  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Offers sent: 7').length).toBeGreaterThan(0);
+  expect(text(tree)).toContain('Time to Accepted Offer');
+  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Offers Sent: 7').length).toBeGreaterThan(0);
 });
 
 it.each([OwnerAnalyticsScreen, ListingAnalyticsScreen])('shows Refreshing beside the refresh control while loading and restores the timestamp afterwards', async Component => {
@@ -377,4 +395,119 @@ it.each([OwnerAnalyticsScreen, ListingAnalyticsScreen])('shows Refreshing beside
   await act(async () => tree.update(<Component />));
   expect(text(tree).some(value => value.includes('Updated'))).toBe(true);
   expect(text(tree)).not.toContain('Refreshing...');
+});
+
+
+it('uses period metrics for property performance and all-time metrics for tenancy history', async () => {
+  const count = (value, basis = 'snapshot') => ({ availability: 'available', value, unit: 'count', basis });
+  const metrics = {
+    ...listingResponse.metrics,
+    recordedRentPaymentTotal: { ...count(18450, 'period'), unit: 'SGD' },
+    recordedRentPaymentCount: count(7, 'period'),
+    averageOccupancyRate: { ...count(62.4, 'period'), unit: 'percent' },
+    listingViews: count(186, 'period'), uniqueListingViewers: count(93, 'period'),
+    rentalRecordCount: count(9), acceptedRentalRecordCount: count(6),
+    offersSentCount: count(2, 'period'), offersAcceptedCount: count(1, 'period'),
+    acceptanceRate: { ...count(66.7), unit: 'percent' },
+    averageTenancyMonths: { ...count(14.5), unit: 'months' }, tenantsHostedCount: count(4),
+  };
+  useAnalytics.mockReturnValue({ data: { ...listingResponse, metrics }, loading: false });
+  const tree = await render(ListingAnalyticsScreen);
+  const { StatTile, MetricRow, LineChart } = require('../AnalyticsKit');
+  for (const [label, key] of [
+    ['Rent Recorded', 'recordedRentPaymentTotal'], ['Average Occupancy', 'averageOccupancyRate'],
+    ['Listing Views', 'listingViews'], ['Unique Viewers', 'uniqueListingViewers'],
+  ]) {
+    expect(tree.root.findAllByType(StatTile).find(node => node.props.label === label).props.metric).toBe(metrics[key]);
+  }
+  for (const [label, key] of [
+    ['Payments Recorded', 'recordedRentPaymentCount'], ['Offers Sent', 'rentalRecordCount'],
+    ['Offers Accepted', 'acceptedRentalRecordCount'], ['Acceptance Rate', 'acceptanceRate'],
+    ['Average Tenancy', 'averageTenancyMonths'], ['Tenants Hosted', 'tenantsHostedCount'],
+  ]) {
+    expect(tree.root.findAllByType(MetricRow).find(node => node.props.label === label).props.metric).toBe(metrics[key]);
+  }
+  expect(text(tree)).toEqual(expect.arrayContaining(['S$18,450', '62.4%', '186', '93', '14.5 mo']));
+  expect(tree.root.findByType(LineChart).props.series).toBe(listingResponse.series.monthlyRecordedRentPayments);
+  const ListingOccupancyCalendar = require('../ListingOccupancyCalendar').default;
+  expect(tree.root.findByType(ListingOccupancyCalendar).props.series).toBe(listingResponse.series.monthlyOccupancy);
+  await press(tree, 'Offers Sent: 9');
+  expect(text(tree)).toContain('All time');
+});
+
+it.each([
+  [null, null, 'The publication date was not recorded for this listing.', 2],
+  ['2026-09-01T00:00:00Z', null, 'No rental offer has been accepted yet.', 1],
+])('does not invent days on market when the interval is incomplete', async (listedAt, firstAcceptedAt, reason, missingDates) => {
+  const metric = { ...listingResponse.metrics.daysOnMarket, reason };
+  useAnalytics.mockReturnValue({ data: {
+    ...listingResponse,
+    listing: { ...listingResponse.listing, listedAt, firstAcceptedAt },
+    metrics: { ...listingResponse.metrics, daysOnMarket: metric },
+  }, loading: false });
+  const tree = await render(ListingAnalyticsScreen);
+  expect(text(tree)).toContain('Not available');
+  expect(text(tree)).toContain(reason);
+  expect(text(tree).filter(value => value === 'Not recorded')).toHaveLength(missingDates);
+  expect(text(tree)).toEqual(expect.arrayContaining(['Published', 'First Offer Accepted']));
+  const { StatTile } = require('../AnalyticsKit');
+  expect(tree.root.findAllByType(StatTile).find(node => node.props.label === 'Days on Market').props.metric).toBe(metric);
+});
+
+it('does not label unknown property occupancy as vacant', async () => {
+  useAnalytics.mockReturnValue({ data: {
+    ...listingResponse,
+    metrics: { ...listingResponse.metrics, occupancyStatus: { availability: 'unavailable', value: null } },
+  }, loading: false });
+  const tree = await render(ListingAnalyticsScreen);
+  expect(text(tree)).toContain('Status unavailable');
+});
+
+it('lets a signed-out user reach login from the property screen', async () => {
+  useAnalytics.mockReturnValue({ data: null, loading: false, unauthenticated: true });
+  const tree = await render(ListingAnalyticsScreen);
+  const { ErrorState } = require('../AnalyticsKit');
+  const error = tree.root.findByType(ErrorState);
+  expect(text(tree)).toEqual(expect.arrayContaining(['Property Analytics', 'Please log in to view analytics.', 'Go to login']));
+  expect(error.props.actionLabel).toBe('Go to login');
+  await act(async () => error.props.onRetry());
+  expect(mockReplace).toHaveBeenCalledWith('/LandingScreen');
+});
+
+it('retries failed property analytics requests without losing back navigation', async () => {
+  const retry = jest.fn();
+  useAnalytics.mockReturnValue({ data: null, loading: false, error: 'Unable to load analytics', retry });
+  const tree = await render(ListingAnalyticsScreen);
+  const { ErrorState } = require('../AnalyticsKit');
+  expect(text(tree)).toEqual(expect.arrayContaining(['Property Analytics', 'Unable to load analytics', 'Try again']));
+  await act(async () => tree.root.findByType(ErrorState).props.onRetry());
+  expect(retry).toHaveBeenCalledTimes(1);
+  await press(tree, 'Back to owner analytics');
+  expect(mockBack).toHaveBeenCalledTimes(1);
+});
+
+
+it('preserves property information after a failed photo and retries when its URL changes', async () => {
+  const photoData = url => ({ ...listingResponse, listing: { ...listingResponse.listing, listingPicture: url } });
+  useAnalytics.mockReturnValue({ data: photoData('https://example.test/property.jpg'), loading: false });
+  const tree = await render(ListingAnalyticsScreen);
+  const photo = tree.root.findByType(Image);
+  expect(photo.props.source.uri).toBe('https://example.test/property.jpg');
+  expect(photo.props.accessible).toBe(false);
+  await act(async () => photo.props.onError({ nativeEvent: { error: 'Image not found' } }));
+  expect(tree.root.findAllByType(Image)).toHaveLength(0);
+  expect(text(tree)).toEqual(expect.arrayContaining(['A2', 'HDB', 'Vacant', 'Rent Recorded']));
+  useAnalytics.mockReturnValue({ data: photoData('https://example.test/replacement.jpg'), loading: false });
+  await act(async () => tree.update(<ListingAnalyticsScreen />));
+  expect(tree.root.findByType(Image).props.source.uri).toBe('https://example.test/replacement.jpg');
+});
+
+it('retains accessible publication history when an older response omits days on market', async () => {
+  const { daysOnMarket, ...metrics } = listingResponse.metrics;
+  useAnalytics.mockReturnValue({ data: { ...listingResponse, metrics }, loading: false });
+  const tree = await render(ListingAnalyticsScreen);
+  expect(text(tree)).toEqual(expect.arrayContaining(['Days on Market', 'Not available', 'Listing history is not available.']));
+  expect(tree.root.findAll(node => node.props.accessibilityLabel ===
+    'Days on Market: Not available. Published: Not recorded. First Offer Accepted: Not recorded'
+    && typeof node.props.onPress === 'function').length).toBeGreaterThan(0);
 });

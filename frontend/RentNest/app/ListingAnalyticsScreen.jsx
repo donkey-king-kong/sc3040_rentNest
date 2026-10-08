@@ -1,176 +1,161 @@
-import React from 'react';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Image, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { FontAwesome } from 'react-native-vector-icons';
+import { AdminLoadingState } from '../components/AdminUI';
 import { ENDPOINTS } from '../config/api';
-import AnalyticsLayout, { ActivitySection } from '../components/analytics/AnalyticsLayout';
+import AnalyticsLayout, { RefreshControl } from '../components/analytics/AnalyticsLayout';
+import ListingOccupancyCalendar from '../components/analytics/ListingOccupancyCalendar';
 import {
-  COLORS,
-  BarChart,
-  ErrorState,
-  LoadingState,
-  MetricRow,
-  OccupancyStrip,
-  Section,
-  StatTile,
-  TileRow,
-  formatValue,
-  formatDay,
-  useAnalytics,
+  COLORS, ErrorState, LineChart, MetricRow, Section, StatTile, TileRow,
+  formatDay, formatValue, useAnalytics,
 } from '../components/analytics/AnalyticsKit';
-
 
 const ListingAnalyticsScreen = () => {
   const router = useRouter();
   const { listingId } = useLocalSearchParams();
+  const { width, fontScale } = useWindowDimensions();
   const period = '12M';
   const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_LISTING(listingId), period);
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [data?.listing?.listingPicture]);
 
-  const header = (
-    <>
-      <Stack.Screen options={{ title: 'Property Analytics' }} />
-      <View style={styles.header}>
-        <Pressable style={styles.backButton}
-          onPress={() => router.canGoBack() ? router.back() : router.replace('/OwnerAnalyticsScreen')}
-          accessibilityRole="button" accessibilityLabel="Back to owner analytics">
-          <FontAwesome name="chevron-left" size={18} color="#101820" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Property Analytics</Text>
-      </View>
-    </>
-  );
+  const header = <>
+    <Stack.Screen options={{ title: 'Property Analytics' }} />
+    <View style={styles.header}>
+      <Pressable style={styles.backButton}
+        onPress={() => router.canGoBack() ? router.back() : router.replace('/OwnerAnalyticsScreen')}
+        accessibilityRole="button" accessibilityLabel="Back to owner analytics">
+        <FontAwesome name="chevron-left" size={18} color="#101820" />
+      </Pressable>
+      <Text style={[styles.headerTitle, width < 400 && styles.mobileHeaderTitle]}>Property Analytics</Text>
+    </View>
+  </>;
 
-  if (unauthenticated) {
-    return (
-      <>
-        {header}
-        <ErrorState message={error || 'Please log in to view analytics.'} onRetry={() => router.replace('/LandingScreen')} actionLabel="Go to login" />
-      </>
-    );
-  }
-  if (!data && loading) return <LoadingState message="Loading analytics..." textStyle={styles.loadingText} />;
+  if (unauthenticated) return <>{header}<ErrorState message={error || 'Please log in to view analytics.'}
+    onRetry={() => router.replace('/LandingScreen')} actionLabel="Go to login" /></>;
+  if (!data && loading) return <>{header}<View style={styles.initialLoading} accessibilityLabel="Loading property analytics">
+    <AdminLoadingState message={null} backgroundColor="#FFFFFF" />
+  </View></>;
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
   const m = data.metrics;
   const listing = data.listing || {};
-  const occupied = m.occupancyStatus?.value === 'occupied';
+  const status = m.occupancyStatus?.availability === 'available' ? m.occupancyStatus.value : null;
+  const statusLabel = status === 'occupied' ? 'Occupied' : status === 'vacant' ? 'Vacant' : 'Status unavailable';
+  const tileStyle = width < 360 || fontScale > 1.2 ? styles.singleColumnTile : undefined;
+  const publishedDate = listing.listedAt ? formatDay(listing.listedAt) : 'Not recorded';
+  const acceptedDate = listing.firstAcceptedAt ? formatDay(listing.firstAcceptedAt) : 'Not recorded';
+  const daysOnMarket = m.daysOnMarket || { availability: 'unavailable', unit: 'days', reason: 'Listing history is not available.' };
+  const daysOnMarketLabel = daysOnMarket.availability === 'available'
+    ? formatValue(daysOnMarket.value, daysOnMarket.unit) : 'Not available';
 
-  return (
-    <>
-      {header}
-      <AnalyticsLayout compactTabs showPeriod={false} showRefresh={false} periodAccent="#16794B"
-        period={period} loading={loading} error={error} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}
-        header={<>
+  return <>
+    {header}
+    <AnalyticsLayout compactTabs showHeader={false} showPeriod={false} showRefresh={false}
+      period={period} loading={loading} error={error} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}>
       <View style={styles.listingHeader}>
-        {listing.listingPicture ? <Image source={{ uri: listing.listingPicture }} style={styles.image} /> : null}
+        {listing.listingPicture && !imageFailed ? <Image source={{ uri: listing.listingPicture }} style={styles.image}
+          accessible={false} onError={() => setImageFailed(true)} />
+          : <View style={[styles.image, styles.imagePlaceholder]}><FontAwesome name="home" size={24} color={COLORS.inkMuted} /></View>}
         <View style={styles.listingText}>
-          <Text style={styles.title}>{listing.name}</Text>
+          <Text style={styles.title}>{listing.name || 'Property'}</Text>
           <Text style={styles.subtitle}>{[listing.type, listing.location].filter(Boolean).join(' · ')}</Text>
-          <View style={[styles.statusBadge, occupied ? styles.badgeOccupied : styles.badgeVacant]}>
-            <Text style={[styles.statusText, occupied && styles.statusTextOccupied]}>
-              {formatValue(m.occupancyStatus?.value, 'status')}
-            </Text>
+          <View style={styles.statusBadge}>
+            <FontAwesome name={status === 'occupied' ? 'circle' : status === 'vacant' ? 'circle-o' : 'question-circle'} size={9} color={COLORS.inkSecondary} />
+            <Text style={styles.statusText}>{statusLabel}</Text>
           </View>
         </View>
       </View>
 
-        </>}>
-
-      <ActivitySection loading={loading} onRefresh={retry} asOf={data.asOf}>
-        <Section title="Performance">
+      <Section title="Overview" action={<RefreshControl onRefresh={retry} loading={loading} asOf={data.asOf} />}>
+        <Text style={styles.sectionNote}>Past 12 months</Text>
+        {!loading ? <>
           <TileRow>
-            <StatTile featured label="Rent recorded" metric={m.recordedRentPaymentTotal} />
-            <StatTile featured label="Occupancy in period" metric={m.averageOccupancyRate} />
-            <StatTile label="Payments recorded" metric={m.recordedRentPaymentCount} />
+            <StatTile label="Rent Recorded" metric={m.recordedRentPaymentTotal} style={tileStyle} />
+            <StatTile label="Average Occupancy" metric={m.averageOccupancyRate} style={tileStyle} />
+            <StatTile label="Listing Views" metric={m.listingViews} style={tileStyle} />
+            <StatTile label="Unique Viewers" metric={m.uniqueListingViewers} style={tileStyle} />
+          </TileRow>
+          <MetricRow label="Payments Recorded" metric={m.recordedRentPaymentCount} />
+        </> : null}
+      </Section>
+
+      {loading ? <View style={styles.refreshLoading} accessibilityLabel="Refreshing property analytics">
+        <AdminLoadingState message={null} backgroundColor="#FFFFFF" />
+      </View> : <>
+        <Section>
+          <LineChart title="Monthly Rent Recorded" series={data.series.monthlyRecordedRentPayments}
+            showEveryMonth={width >= 600} emptyText="No rent recorded in the past 12 months" />
+        </Section>
+        <Section><ListingOccupancyCalendar series={data.series.monthlyOccupancy} /></Section>
+
+        <Section title="Tenancy History">
+          <Text style={styles.sectionNote}>All time</Text>
+          <MetricRow label="Offers Sent" scope="All time" metric={m.rentalRecordCount} />
+          <MetricRow label="Offers Accepted" scope="All time" metric={m.acceptedRentalRecordCount} />
+          <MetricRow label="Acceptance Rate" scope="All time" metric={m.acceptanceRate} />
+          <MetricRow label="Average Tenancy" scope="All time" metric={m.averageTenancyMonths} />
+          <MetricRow label="Tenants Hosted" scope="All time" metric={m.tenantsHostedCount} />
+        </Section>
+
+        <Section title="Time to Accepted Offer">
+          <Text style={styles.sectionNote}>From publication to the first accepted offer.</Text>
+          <TileRow>
+            <StatTile label="Days on Market" scope="Listing history" metric={daysOnMarket}
+              accessibilityLabel={`Days on Market: ${daysOnMarketLabel}. Published: ${publishedDate}. First Offer Accepted: ${acceptedDate}`}>
+              {daysOnMarket.availability !== 'available' && daysOnMarket.reason
+                ? <Text style={styles.sectionNote}>{daysOnMarket.reason}</Text> : null}
+              <View style={styles.timeline}>
+                <View style={styles.timelineRow}>
+                  <View style={styles.timelineTrack}><View style={styles.timelineDot} /><View style={styles.timelineLine} /></View>
+                  <View style={styles.timelineText}>
+                    <Text style={styles.dateLabel}>Published</Text>
+                    <Text style={styles.dateValue}>{publishedDate}</Text>
+                  </View>
+                </View>
+                <View style={styles.timelineRow}>
+                  <View style={styles.timelineTrack}><View style={[styles.timelineDot, listing.firstAcceptedAt && styles.timelineDotFilled]} /></View>
+                  <View style={styles.timelineText}>
+                    <Text style={styles.dateLabel}>First Offer Accepted</Text>
+                    <Text style={styles.dateValue}>{acceptedDate}</Text>
+                  </View>
+                </View>
+              </View>
+            </StatTile>
           </TileRow>
         </Section>
-        <Section title="Listing interest"><TileRow>
-          <StatTile label="Listing views" metric={m.listingViews} />
-          <StatTile label="Unique viewers" metric={m.uniqueListingViewers} />
-        </TileRow></Section>
-        <Section title="Monthly rent recorded"><BarChart series={data.series.monthlyRecordedRentPayments} emptyText="No rent recorded in this period" /></Section>
-        <Section title="Month by month"><OccupancyStrip series={data.series.monthlyOccupancy} /></Section>
-      </ActivitySection>
-      {!loading ? <><Section title="Listing history">
-        <MetricRow label="Offers sent" scope="All time" metric={m.rentalRecordCount} />
-        <MetricRow label="Offers accepted" scope="All time" metric={m.acceptedRentalRecordCount} />
-        <MetricRow label="Acceptance rate" scope="All time" metric={m.acceptanceRate} />
-        <TileRow>
-          <StatTile label="Average tenancy" scope="All time" metric={m.averageTenancyMonths} />
-          <StatTile label="Tenants hosted" scope="All time" metric={m.tenantsHostedCount} />
-        </TileRow>
-      </Section>
-      <Section title="Time to accepted offer"><TileRow>
-        <StatTile label="Days on market" scope="Listing history" metric={m.daysOnMarket} />
-        <View style={styles.marketDates}>
-          <Text style={styles.dateLabel}>Published</Text>
-          <Text style={styles.dateValue}>{listing.listedAt ? formatDay(listing.listedAt) : 'Not recorded'}</Text>
-          <Text style={styles.dateLabel}>First offer accepted</Text>
-          <Text style={styles.dateValue}>{listing.firstAcceptedAt ? formatDay(listing.firstAcceptedAt) : 'Not recorded'}</Text>
-        </View>
-      </TileRow></Section></> : null}
-      </AnalyticsLayout>
-    </>
-  );
+      </>}
+    </AnalyticsLayout>
+  </>;
 };
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: '#FFFFFF', width: '100%', maxWidth: 1120, alignSelf: 'center' },
-  backButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  headerTitle: { flex: 1, marginLeft: 8, fontSize: 24, fontWeight: '700', textAlign: 'left', color: '#101820' },
-  loadingText: { marginTop: 14, fontSize: 16, fontWeight: '600', color: '#101820' },
-  marketDates: { flexGrow: 1, flexBasis: '45%', margin: 5, padding: 12, backgroundColor: COLORS.card, borderRadius: 12 },
-  dateLabel: { fontSize: 12, color: COLORS.inkSecondary },
-  dateValue: { fontSize: 15, color: COLORS.ink, fontWeight: '600', marginTop: 2, marginBottom: 10 },
-  listingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  image: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    marginRight: 14,
-    backgroundColor: COLORS.card,
-  },
-  listingText: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: COLORS.ink,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: COLORS.inkSecondary,
-    marginTop: 2,
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    paddingVertical: 3,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  badgeOccupied: {
-    backgroundColor: COLORS.series,
-    borderColor: COLORS.series,
-  },
-  badgeVacant: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.vacantBorder,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.ink,
-  },
-  statusTextOccupied: {
-    color: COLORS.surface,
-  },
+  backButton: { width: 44, height: 44, flexShrink: 0, borderRadius: 22, borderWidth: 1, borderColor: '#EAECF0', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  headerTitle: { flex: 1, marginLeft: 8, fontSize: 24, fontWeight: '700', color: '#101820' },
+  mobileHeaderTitle: { fontSize: 22 },
+  initialLoading: { flex: 1 },
+  refreshLoading: { height: 320 },
+  listingHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: 28 },
+  image: { width: 64, height: 64, borderRadius: 8, backgroundColor: COLORS.card },
+  imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  listingText: { flex: 1, minWidth: 0 },
+  title: { fontSize: 20, lineHeight: 26, fontWeight: '600', color: COLORS.ink },
+  subtitle: { fontSize: 14, lineHeight: 20, color: COLORS.inkSecondary, marginTop: 3 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 8 },
+  statusText: { fontSize: 13, lineHeight: 18, fontWeight: '500', color: COLORS.inkSecondary },
+  sectionNote: { fontSize: 13, lineHeight: 19, color: COLORS.inkSecondary, marginBottom: 8 },
+  singleColumnTile: { flexBasis: '95%' },
+  timeline: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 18, marginTop: 18 },
+  timelineRow: { flexDirection: 'row' },
+  timelineTrack: { width: 22, alignItems: 'center' },
+  timelineDot: { width: 9, height: 9, marginTop: 5, borderRadius: 5, borderWidth: 1.5, borderColor: COLORS.inkSecondary, backgroundColor: COLORS.surface },
+  timelineDotFilled: { backgroundColor: COLORS.inkSecondary },
+  timelineLine: { flex: 1, width: 1, backgroundColor: COLORS.border, marginTop: 3, marginBottom: -2 },
+  timelineText: { flex: 1, paddingLeft: 8, paddingBottom: 18 },
+  dateLabel: { fontSize: 13, lineHeight: 19, color: COLORS.inkSecondary },
+  dateValue: { fontSize: 15, lineHeight: 22, fontWeight: '600', color: COLORS.ink, marginTop: 3 },
 });
 
 export default ListingAnalyticsScreen;

@@ -180,7 +180,7 @@ export const formatValue = (value, unit) => {
   if (isCurrency(unit)) return `${unit} ${withCommas(value)}`;
   if (unit === 'months') return `${Number(value).toFixed(1)} mo`;
   if (unit === 'days') return `${Number(value).toFixed(1)} days`;
-  if (unit === 'rating_out_of_5') return `${Number(value).toFixed(1)} / 5`;
+  if (unit === 'rating_out_of_5') return `${Number(value).toFixed(1)} / 5.0`;
   if (unit === 'status') return String(value).charAt(0).toUpperCase() + String(value).slice(1);
   return typeof value === 'number' ? withCommas(value) : String(value);
 };
@@ -307,7 +307,7 @@ export const MetricDetails = ({ label, metric, scope, visible, onClose, hideValu
   </Modal>
 );
 
-export const StatTile = ({ label, metric, change, featured = false, scope, supportingText, unavailableText = 'Not available', children }) => {
+export const StatTile = ({ label, metric, change, featured = false, scope, supportingText, unavailableText = 'Not available', children, style, accessibilityLabel }) => {
   const [showDefinition, setShowDefinition] = useState(false);
   const { width } = useWindowDimensions();
   if (!metric) return null;
@@ -315,10 +315,10 @@ export const StatTile = ({ label, metric, change, featured = false, scope, suppo
 
   return (
     <Pressable
-      style={[styles.tile, width >= 1000 && styles.wideTile, featured && styles.featuredTile]}
+      style={[styles.tile, width >= 1000 && styles.wideTile, featured && styles.featuredTile, style]}
       onPress={() => setShowDefinition((shown) => !shown)}
       accessibilityRole="button"
-      accessibilityLabel={`${label}: ${available ? formatValue(metric.value, metric.unit) : unavailableText}${supportingText ? '. ' + supportingText : ''}`}
+      accessibilityLabel={accessibilityLabel || `${label}: ${available ? formatValue(metric.value, metric.unit) : unavailableText}${supportingText ? '. ' + supportingText : ''}`}
       accessibilityHint="Shows how this metric is calculated"
       accessibilityState={{ expanded: showDefinition }}
     >

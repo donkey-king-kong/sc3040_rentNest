@@ -78,7 +78,7 @@ describe('formatValue', () => {
     expect(formatValue(3, 'months')).toBe('3.0 mo');
     expect(formatValue(12, 'days')).toBe('12.0 days');
     expect(formatValue(49.2, 'percentage_points')).toBe('49.2 pts');
-    expect(formatValue(4.5, 'rating_out_of_5')).toBe('4.5 / 5');
+    expect(formatValue(4.5, 'rating_out_of_5')).toBe('4.5 / 5.0');
     expect(formatValue(7.5, 'months')).toBe('7.5 mo');
     expect(formatValue(1234567, 'count')).toBe('1,234,567');
     expect(formatValue(null, 'SGD')).toBe('—');
@@ -427,7 +427,7 @@ describe('ListingAnalyticsScreen', () => {
     expect(text).toContain('65.6%');
     // Empty historical view counts are measured zeros; missing publication dates
     // still make days on market unavailable.
-    expect(text).toContain('Unique viewers');
+    expect(text).toContain('Unique Viewers');
     expect(text.filter((item) => item === 'Not available')).toHaveLength(1);
     expect(text.filter((item) => item === '0').length).toBeGreaterThanOrEqual(2);
     expect(text.some(value => value.includes('vs previous period'))).toBe(false);
@@ -438,13 +438,15 @@ describe('ListingAnalyticsScreen', () => {
     expect(text.filter((item) => item === 'Not available')).toHaveLength(1);
     expect(text.filter((item) => item === '0').length).toBeGreaterThanOrEqual(2);
     expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
-    expect(text).toContain('Acceptance rate');
-    expect(text).toEqual(expect.arrayContaining(['Offers sent', 'Offers accepted']));
+    expect(text).toContain('Acceptance Rate');
+    expect(text).toEqual(expect.arrayContaining(['Offers Sent', 'Offers Accepted']));
     expect(text).not.toContain('Tenancies ended');
 
     // Occupancy
     text = renderedText(tree);
-    expect(text).toContain('Occupied 2 of 3 months');
+    expect(text).toContain('Monthly Occupancy');
+    expect(text).toContain('Occupied means a tenancy overlapped at least part of the month.');
+    expect(tree.root.findAll(node => node.props.accessibilityLabel === 'February 2026: Occupied').length).toBeGreaterThan(0);
     expect(text).toContain('3.0 mo');
   });
 

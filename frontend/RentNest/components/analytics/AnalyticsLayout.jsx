@@ -22,7 +22,7 @@ export function ActivitySection({ title = 'Past 12 months', loading, onRefresh, 
 
 // Keep navigation above the scrolling panel. Changing tabs resets that panel to the top,
 // while the selected period stays in the screen's state.
-export default function AnalyticsLayout({ header, title, subtitle, tabs = [], tab, onTabChange, period, onPeriodChange, loading, error, children, compactTabs = false, periodAccent, periodBelowTabs = false, showPeriod = true, showRefresh = true, onRefresh, dataPeriod, asOf }) {
+export default function AnalyticsLayout({ header, title, subtitle, tabs = [], tab, onTabChange, period, onPeriodChange, loading, error, children, compactTabs = false, periodAccent, periodBelowTabs = false, showPeriod = true, showRefresh = true, showHeader = true, onRefresh, dataPeriod, asOf }) {
   const id = useId();
   const buttons = useRef([]);
   const { width } = useWindowDimensions();
@@ -39,7 +39,7 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
   return (
     <View style={[styles.screen, compactTabs && styles.adminScreen]}>
       <View style={styles.container}>
-        <View style={[styles.header, compactTabs && styles.adminHeader]}>
+        {showHeader ? <View style={[styles.header, compactTabs && styles.adminHeader]}>
           {header || <>
             {title ? <Text style={styles.title}>{title}</Text> : null}
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
@@ -65,7 +65,7 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
             <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} trailingAction={refreshButton} dataPeriod={dataPeriod} />
           </View> : null}
           {!showPeriod && showRefresh ? <View style={styles.toolbar}>{refreshButton}</View> : null}
-        </View>
+        </View> : null}
         <ScrollView key={tab} nativeID={`${id}-panel`}
           {...(web && tabs.length > 0 ? { role: 'tabpanel', 'aria-labelledby': `${id}-tab-${tabs.indexOf(tab)}` } : {})}
           style={styles.panel} contentContainerStyle={styles.content}>
