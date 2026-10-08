@@ -12,7 +12,7 @@ import {
   TouchableWithoutFeedback,
   PanResponder,
 } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
@@ -322,7 +322,7 @@ const RentPaymentScreen = () => {
     return (
         <View style={styles.loadingContainer}>
           <MorphingInfinity size={86} color="#2FA84F" />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={styles.loadingText}>Loading rent payment...</Text>
         </View>
     );
   }
@@ -705,6 +705,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E7E7E7',
     marginRight: 12,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    marginRight: 12,
+    padding: 4,
   },
   title: {
     fontSize: 28,

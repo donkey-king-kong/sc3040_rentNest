@@ -3,7 +3,7 @@ import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { useRouter, usePathname } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 
-const NavigationBar = () => {
+const NavigationBar = ({ style }) => {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -13,23 +13,20 @@ const NavigationBar = () => {
   });
 
   return (
-    <View style={styles.navbar}>
-      <TouchableOpacity onPress={() => router.push("/HomeScreen")}>
+    <View style={[styles.navbar, style]}>
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/HomeScreen")}>
         <Feather name="search" style={getIconStyle("HomeScreen")} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push("/InboxScreen")}>
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/InboxScreen")}>
         <Feather name="inbox" style={getIconStyle("InboxScreen")} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push("/CreateListingScreen")}>
-        <Feather
-          name="plus-circle"
-          style={getIconStyle("CreateListingScreen")}
-        />
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/CreateListingScreen")}>
+        <Feather name="plus-circle" style={getIconStyle("CreateListingScreen")} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push("/ChatsScreen")}>
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/ChatsScreen")}>
         <Feather name="message-circle" style={getIconStyle("ChatsScreen")} />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => router.push("/ProfileScreen")}>
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push("/ProfileScreen")}>
         <Feather name="user" style={getIconStyle("ProfileScreen")} />
       </TouchableOpacity>
     </View>
@@ -40,14 +37,24 @@ const styles = StyleSheet.create({
   navbar: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: 15, // Increased padding for a bigger footer
+    alignItems: "center",
+    minHeight: 60,
+    paddingVertical: 8,
     backgroundColor: "#fff",
     borderTopWidth: 1,
     borderTopColor: "#ccc",
   },
+  navItem: {
+    width: 48,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   icon: {
-    fontSize: 25, // Icon size
-    color: "#888", // Default color (dimmed)
+    fontSize: 25,
+    lineHeight: 25,
+    color: "#888",
+    textAlign: "center",
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import chatIcon from "../assets/images/chaticon.jpg";
 import { FontAwesome } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import MorphingInfinity from '../components/MorphingInfinity';
+import ListingImage from '../components/ListingImage';
 
 
 const RentalInfoTenant = () => {
@@ -16,9 +17,6 @@ const RentalInfoTenant = () => {
   const [listing, setListing] = useState(null); // State to store listing data
   const [rentals, setRentals] = useState(null); // State to store rentals data
   const [loading, setLoading] = useState(true); // Track loading state
-  const [isRouteLoading, setIsRouteLoading] = useState(false);
-  const navigateTimeoutRef = useRef(null);
-  const resetTimeoutRef = useRef(null);
 
   // Fetch listing details
   const getListingID = async () => {
@@ -39,6 +37,11 @@ const RentalInfoTenant = () => {
         },
       });
       console.log("Listings response", response.status, response.data);
+      console.log('[RentalInfoTenantScreen] listing image payload:', {
+        listingId,
+        name: response.data?.name,
+        listingpicture: response.data?.listingpicture,
+      });
       setListing(response.data);
     } catch (error) {
       console.error('Error fetching listing:', error);
@@ -85,29 +88,12 @@ const RentalInfoTenant = () => {
   useEffect(() => {
     getListingID();
     getRentalsID();
-
-    return () => {
-      if (navigateTimeoutRef.current) {
-        clearTimeout(navigateTimeoutRef.current);
-      }
-      if (resetTimeoutRef.current) {
-        clearTimeout(resetTimeoutRef.current);
-      }
-    };
   }, [refresh]);
-
-  const navigateWithLoading = (route) => {
-    setIsRouteLoading(true);
-    navigateTimeoutRef.current = setTimeout(() => {
-      router.push(route);
-      resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
-    }, 180);
-  };
 
   // Function to navigate to RentPayment screen
   const handleRentPayment = () => {
     if (listing && listing.listingID) {
-      navigateWithLoading({ pathname: '/RentPayment', params: { listingId: listing.listingID, tenantId } });
+      router.push({ pathname: '/RentPayment', params: { listingId: listing.listingID, tenantId } });
     } else {
       console.error('Listing ID is missing, cannot navigate to RentPayment');
     }
@@ -116,20 +102,26 @@ const RentalInfoTenant = () => {
   // Function to navigate to LeaveReview screen
   const handleLeaveReview = () => {
     if (listing && listing.ownerId) {
-      console.log('Attempting to navigate with:', { ownerId: listing.ownerId, listingId, tenantId });
-      router.push({ pathname: '/LeaveReview', params: { ownerId: listing.ownerId, listingId, tenantId, revieweeName: listing.ownerName, revieweeRole: 'Owner' } });
+      console.log('Attempting to navigate with:', { revieweeId: listing.ownerId, listingId });
+      router.push({
+        pathname: '/LeaveReview',
+        params: {
+          revieweeId: listing.ownerId,
+          listingId,
+          revieweeName: listing.ownerName,
+          revieweeRole: 'Owner'
+        }
+      });
     } else {
       console.error('Listing information is missing, cannot navigate to LeaveReview');
     }
   };
 
-  if (loading || isRouteLoading) {
+  if (loading) {
     return (
         <View style={styles.loadingContainer}>
           <MorphingInfinity size={86} color="#2FA84F" />
-          <Text style={styles.loadingText}>
-            {isRouteLoading ? 'Loading rent payment...' : 'Loading rental info...'}
-          </Text>
+          <Text style={styles.loadingText}>Loading rental info...</Text>
         </View>
     );
   }
@@ -159,7 +151,15 @@ const RentalInfoTenant = () => {
 
         {listing ? (
             <>
-              <Image source={{ uri: listing.listingpicture }} style={styles.image} />
+              <ListingImage
+                uri={listing.listingpicture}
+                style={styles.image}
+                screen="RentalInfoTenantScreen"
+                listingId={listing.listingID}
+                listingName={listing.name}
+                width={600}
+                height={400}
+              />
 
               <View style={styles.row}>
                 <View style={styles.left}>

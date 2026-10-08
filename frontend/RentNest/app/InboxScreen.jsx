@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import NavigationBar from '../components/NavigationBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,15 +7,13 @@ import axios from "axios";
 import { API_BASE_URL } from '../config/api';
 import { jwtDecode } from "jwt-decode";
 import MorphingInfinity from '../components/MorphingInfinity';
+import ListingImage from '../components/ListingImage';
 
 const InboxScreen = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
-  const [isRouteLoading, setIsRouteLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [listings, setListings] = useState([]);
-  const navigateTimeoutRef = useRef(null);
-  const resetTimeoutRef = useRef(null);
   
   const fetchListings = async () => {
     try {
@@ -48,6 +46,11 @@ const InboxScreen = () => {
           "Authorization": `Bearer ${token}`
         }
       });
+      console.log('[InboxScreen] listing image payloads:', listingsResponse.data.map(listing => ({
+        listingID: listing.listingID,
+        name: listing.name,
+        listingpicture: listing.listingpicture,
+      })));
       setListings(listingsResponse.data);
 
       setIsLoading(false);
@@ -62,24 +65,7 @@ const InboxScreen = () => {
 
   useEffect(() => {
     fetchListings();
-
-    return () => {
-      if (navigateTimeoutRef.current) {
-        clearTimeout(navigateTimeoutRef.current);
-      }
-      if (resetTimeoutRef.current) {
-        clearTimeout(resetTimeoutRef.current);
-      }
-    };
   }, []);
-
-  const navigateWithLoading = (route) => {
-    setIsRouteLoading(true);
-    navigateTimeoutRef.current = setTimeout(() => {
-      router.push(route);
-      resetTimeoutRef.current = setTimeout(() => setIsRouteLoading(false), 600);
-    }, 180);
-  };
 
   // Filter listings for the current user
   const userListings = listings.filter(listing =>
@@ -108,12 +94,12 @@ const InboxScreen = () => {
         style={styles.listingContainer}
         onPress={() => {
           if (isOwner) {
-            navigateWithLoading({
+            router.push({
               pathname: '/RentalInfoOwnerScreen',
               params: { listingId: item.listingID },
             });
           } else if (isTenant) {
-            navigateWithLoading({
+            router.push({
               pathname: '/RentalInfoTenantScreen',
               params: { listingId: item.listingID, tenantId: item.tenantId },
             });
@@ -126,7 +112,15 @@ const InboxScreen = () => {
           // }
         }}
       >
-        <Image source={{ uri: item.listingpicture }} style={styles.image} />
+        <ListingImage
+          uri={item.listingpicture}
+          style={styles.image}
+          screen="InboxScreen"
+          listingId={item.listingID}
+          listingName={item.name}
+          width={160}
+          height={160}
+        />
         <View style={styles.detailsContainer}>
           <View style={styles.roleBox}>
             <Text style={styles.roleText}>{roleText}</Text>
@@ -138,13 +132,11 @@ const InboxScreen = () => {
     );
   };
 
-  if (isLoading || isRouteLoading) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>
-          {isRouteLoading ? 'Loading rental info...' : 'Loading...'}
-        </Text>
+        <Text style={styles.loadingText}>Loading inbox...</Text>
       </View>
     );
   }
@@ -157,6 +149,10 @@ const InboxScreen = () => {
           data={userListings}
           renderItem={renderItem}
           keyExtractor={(item) => item.listingID.toString()}
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
+          windowSize={5}
+          removeClippedSubviews
           contentContainerStyle={userListings.length === 0 ? { flexGrow: 1 } : null}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>

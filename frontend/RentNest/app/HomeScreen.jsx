@@ -5,7 +5,6 @@ import {
   TextInput,
   StyleSheet,
   FlatList,
-  Image,
   TouchableOpacity,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
@@ -16,6 +15,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { jwtDecode } from "jwt-decode";
 import { API_BASE_URL, ENDPOINTS } from "../config/api";
 import MorphingInfinity from "../components/MorphingInfinity";
+import ListingImage from "../components/ListingImage";
 import { Feather } from "@expo/vector-icons";
 
 const emptyForm = {
@@ -337,16 +337,15 @@ export default function HomeScreen() {
               style={styles.card}
               onPress={() => openListing(item)}
             >
-              {item.listingpicture ? (
-                <Image
-                  source={{ uri: item.listingpicture }}
-                  style={styles.image}
-                />
-              ) : (
-                <View style={[styles.image, styles.placeholder]}>
-                  <Text>No photo available</Text>
-                </View>
-              )}
+              <ListingImage
+                uri={item.listingpicture}
+                style={styles.image}
+                screen="HomeScreen"
+                listingId={item.listingID}
+                listingName={item.name}
+                width={240}
+                height={160}
+              />
               <View style={{ padding: 14 }}>
                 <Text style={styles.heading}>
                   {item.name || "Rental property"}
