@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {View, Text, StyleSheet, FlatList, TouchableOpacity, Alert} from 'react-native';
+import {View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, ActivityIndicator} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {API_BASE_URL} from "../config/api";
@@ -23,6 +23,9 @@ const UserReviewsScreen = () => {
     const [error, setError] = useState(null);
     const [storedCurrentUserId, setStoredCurrentUserId] = useState(null);
     const [ownReviewId, setOwnReviewId] = useState(null);
+    const [reviewPendingFlag, setReviewPendingFlag] = useState(null);
+    const [flaggingReviewId, setFlaggingReviewId] = useState(null);
+    const [showFlagSuccess, setShowFlagSuccess] = useState(false);
     const currentUserId = (Array.isArray(currentUser) ? currentUser[0] : currentUser) || storedCurrentUserId;
 
     useEffect(() => {
@@ -155,83 +158,93 @@ const UserReviewsScreen = () => {
     const handleFlagReview = (reviewId, currentlyFlagged) => {
         const nextFlagValue = !currentlyFlagged;
 
-        // Alert to confirm flagging or unflagging
-        Alert.alert(
-            currentlyFlagged ? "Unflag Review" : "Flag Review",
-            `Are you sure you want to ${currentlyFlagged ? "unflag" : "flag"} this review? This cannot be undone.`,
-            [
-                {
-                    text: "Cancel",
-                    style: "cancel",
+        setReviewPendingFlag({
+            reviewId,
+            currentlyFlagged,
+            nextFlagValue,
+        });
+    };
+
+    const closeFlagConfirm = () => {
+        if (flaggingReviewId) {
+            return;
+        }
+
+        setReviewPendingFlag(null);
+    };
+
+    const confirmFlagReview = async () => {
+        if (!reviewPendingFlag || flaggingReviewId) {
+            return;
+        }
+
+        const { reviewId, currentlyFlagged, nextFlagValue } = reviewPendingFlag;
+        setFlaggingReviewId(reviewId);
+
+        try {
+            const token = await AsyncStorage.getItem('token');
+            if (!token) {
+                throw new Error("No authentication token found. Please login.");
+            }
+
+            const flagUrl = `${API_BASE_URL}/api/reviews/setFlag/${reviewId}/${nextFlagValue}`;
+            console.log("[UserReviewsScreen] flag review request", {
+                reviewId,
+                currentlyFlagged,
+                nextFlagValue,
+                url: flagUrl,
+            });
+
+            const response = await fetch(flagUrl, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
                 },
-                {
-                    text: "Yes",
-                    onPress: async () => {
-                        try {
-                            const token = await AsyncStorage.getItem('token');
-                            if (!token) {
-                                throw new Error("No authentication token found. Please login.");
-                            }
+            });
 
-                            const flagUrl = `${API_BASE_URL}/api/reviews/setFlag/${reviewId}/${nextFlagValue}`;
-                            console.log("[UserReviewsScreen] flag review request", {
-                                reviewId,
-                                currentlyFlagged,
-                                nextFlagValue,
-                                url: flagUrl,
-                            });
+            const rawBody = await response.text();
+            let responseBody = rawBody;
+            try {
+                responseBody = rawBody ? JSON.parse(rawBody) : null;
+            } catch {
+                // Keep the raw response text for logging if the backend returns non-JSON.
+            }
 
-                            const response = await fetch(flagUrl, {
-                                method: 'PUT',
-                                headers: {
-                                    'Authorization': `Bearer ${token}`,
-                                    'Accept': 'application/json',
-                                    'Content-Type': 'application/json',
-                                },
-                            });
+            console.log("[UserReviewsScreen] flag review response", {
+                reviewId,
+                requestedFlagValue: nextFlagValue,
+                status: response.status,
+                ok: response.ok,
+                responseBody,
+            });
 
-                            const rawBody = await response.text();
-                            let responseBody = rawBody;
-                            try {
-                                responseBody = rawBody ? JSON.parse(rawBody) : null;
-                            } catch {
-                                // Keep the raw response text for logging if the backend returns non-JSON.
-                            }
+            if (!response.ok) {
+                throw new Error(rawBody || `Failed to update review flag. Status code: ${response.status}`);
+            }
 
-                            console.log("[UserReviewsScreen] flag review response", {
-                                reviewId,
-                                requestedFlagValue: nextFlagValue,
-                                status: response.status,
-                                ok: response.ok,
-                                responseBody,
-                            });
+            const persistedFlagValue = responseBody?.flagged ?? nextFlagValue;
 
-                            if (!response.ok) {
-                                throw new Error(rawBody || `Failed to update review flag. Status code: ${response.status}`);
-                            }
-
-                            const persistedFlagValue = responseBody?.flagged ?? nextFlagValue;
-
-                            setReviews((prevReviews) =>
-                                prevReviews.map((review) =>
-                                    review.id === reviewId ? { ...review, flagged: persistedFlagValue } : review
-                                )
-                            );
-                            Alert.alert("Success", `The review has been ${persistedFlagValue ? "flagged" : "unflagged"}.`);
-                        } catch (error) {
-                            console.error("[UserReviewsScreen] flag review failed", {
-                                reviewId,
-                                currentlyFlagged,
-                                nextFlagValue,
-                                error: error.message,
-                            });
-                            Alert.alert("Error", error.message || "Unable to update review flag. Please try again.");
-                        }
-                    },
-                },
-            ],
-            { cancelable: true }
-        );
+            setReviews((prevReviews) =>
+                prevReviews.map((review) =>
+                    review.id === reviewId ? { ...review, flagged: persistedFlagValue } : review
+                )
+            );
+            setReviewPendingFlag(null);
+            setShowFlagSuccess(true);
+            setTimeout(() => setShowFlagSuccess(false), 1500);
+        } catch (error) {
+            console.error("[UserReviewsScreen] flag review failed", {
+                reviewId,
+                currentlyFlagged,
+                nextFlagValue,
+                error: error.message,
+            });
+            Alert.alert("Error", error.message || "Unable to update review flag. Please try again.");
+        } finally {
+            setFlaggingReviewId(null);
+        }
     };
 
     const handleEditReview = (review) => {
@@ -280,13 +293,17 @@ const UserReviewsScreen = () => {
                 <TouchableOpacity
                     style={styles.cardActionButton}
                     onPress={() => isOwnReview ? handleEditReview(item) : handleFlagReview(item.id, item.flagged)}
-                    disabled={!isOwnReview && item.flagged}
+                    disabled={(!isOwnReview && item.flagged) || flaggingReviewId === item.id}
                 >
-                    <FontAwesome
-                        name={isOwnReview ? "pencil" : "flag"}
-                        size={16}
-                        color={!isOwnReview && item.flagged ? "#FF3B30" : "#8E8E93"}
-                    />
+                    {flaggingReviewId === item.id ? (
+                        <ActivityIndicator size="small" color="#8E8E93" />
+                    ) : (
+                        <FontAwesome
+                            name={isOwnReview ? "pencil" : "flag"}
+                            size={16}
+                            color={!isOwnReview && item.flagged ? "#FF3B30" : "#8E8E93"}
+                        />
+                    )}
                 </TouchableOpacity>
             </View>
         );
@@ -341,6 +358,62 @@ const UserReviewsScreen = () => {
                     contentContainerStyle={styles.list}
                 />
             )}
+            <Modal
+                visible={!!reviewPendingFlag}
+                transparent
+                animationType="fade"
+                onRequestClose={closeFlagConfirm}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.confirmModalCard}>
+                        <Text style={styles.confirmTitle}>
+                            {reviewPendingFlag?.currentlyFlagged ? "Unflag Review" : "Flag Review"}
+                        </Text>
+                        <Text style={styles.confirmMessage}>
+                            Are you sure you want to {reviewPendingFlag?.currentlyFlagged ? "unflag" : "flag"} this review?
+                        </Text>
+                        <Text style={styles.confirmWarning}>This cannot be undone.</Text>
+                        <View style={styles.confirmActions}>
+                            <TouchableOpacity
+                                style={styles.confirmCancelButton}
+                                onPress={closeFlagConfirm}
+                                disabled={!!flaggingReviewId}
+                            >
+                                <Text style={styles.confirmCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.confirmYesButton, flaggingReviewId && styles.confirmDisabledButton]}
+                                onPress={confirmFlagReview}
+                                disabled={!!flaggingReviewId}
+                            >
+                                {flaggingReviewId ? (
+                                    <View style={styles.flaggingContent}>
+                                        <ActivityIndicator size="small" color="#FFFFFF" />
+                                        <Text style={styles.confirmYesText}>Flagging...</Text>
+                                    </View>
+                                ) : (
+                                    <Text style={styles.confirmYesText}>Yes</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={showFlagSuccess}
+                transparent
+                animationType="fade"
+                statusBarTranslucent
+            >
+                <View style={styles.notificationOverlay} pointerEvents="none">
+                    <View style={styles.notificationCard}>
+                        <View style={styles.notificationIconBox}>
+                            <FontAwesome name="flag" size={22} color="#FFFFFF" />
+                        </View>
+                        <Text style={styles.notificationText}>Review Flagged</Text>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -519,6 +592,121 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '500',
         color: '#8E8E93',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.55)',
+        justifyContent: 'center',
+        paddingHorizontal: 24,
+    },
+    confirmModalCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 18,
+        paddingHorizontal: 24,
+        paddingTop: 26,
+        paddingBottom: 18,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.18,
+        shadowRadius: 24,
+        elevation: 8,
+    },
+    confirmTitle: {
+        fontSize: 24,
+        fontWeight: '800',
+        color: '#252525',
+        marginBottom: 18,
+    },
+    confirmMessage: {
+        fontSize: 18,
+        lineHeight: 25,
+        color: '#2E2E2E',
+    },
+    confirmWarning: {
+        marginTop: 6,
+        fontSize: 18,
+        lineHeight: 25,
+        color: '#FF3B30',
+        fontWeight: '800',
+    },
+    confirmActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginTop: 28,
+        gap: 12,
+    },
+    confirmCancelButton: {
+        minWidth: 96,
+        minHeight: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 18,
+    },
+    confirmCancelText: {
+        color: '#1E6FAF',
+        fontSize: 16,
+        fontWeight: '700',
+        letterSpacing: 1.4,
+        textTransform: 'uppercase',
+    },
+    confirmYesButton: {
+        minWidth: 96,
+        minHeight: 44,
+        borderRadius: 22,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#101820',
+        paddingHorizontal: 18,
+    },
+    confirmDisabledButton: {
+        opacity: 0.72,
+    },
+    confirmYesText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: '800',
+        letterSpacing: 0.4,
+    },
+    flaggingContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    notificationOverlay: {
+        flex: 1,
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        paddingTop: 72,
+        backgroundColor: 'rgba(0, 0, 0, 0.12)',
+    },
+    notificationCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#101820',
+        borderRadius: 22,
+        paddingVertical: 14,
+        paddingHorizontal: 18,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.18,
+        shadowRadius: 16,
+        elevation: 6,
+    },
+    notificationIconBox: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: '#FF3B30',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: 12,
+    },
+    notificationText: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '800',
     },
 });
 
