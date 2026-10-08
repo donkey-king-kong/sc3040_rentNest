@@ -7,9 +7,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { jwtDecode } from 'jwt-decode';
 import MorphingInfinity from '../components/MorphingInfinity';
+import ProfileImage from '../components/ProfileImage';
 
-// Import icons
-import profilePic from '../assets/images/chatProfilePic.jpg';
 import noActiveChatsImage from '../assets/images/noActiveChats.png';
 
 const ChatsScreen = () => {
@@ -192,15 +191,21 @@ const ChatsScreen = () => {
         }}
       >
         <View style={styles.chatContainer}>
-          <Image 
-            source={{ uri: chatPartnerPhotoURL }}
+          <ProfileImage
+            uri={chatPartnerPhotoURL}
+            name={chatPartnerName}
             style={styles.avatar}
-            defaultSource={profilePic}
+            textStyle={styles.avatarInitials}
+            screen="ChatsScreen"
+            userId={chatPartnerId}
+            role="chat-partner"
           />
           <View style={styles.chatContent}>
             <View style={styles.headerContainer}>
               <Text style={styles.senderName}>{chatPartnerName}</Text>
-              <Text style={styles.date}>{new Date(item.date).toLocaleTimeString()}</Text>
+              <Text style={styles.date}>
+                {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Text>
             </View>
             <Text style={styles.message}>{item.message}</Text>
           </View>
@@ -283,6 +288,9 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     marginRight: 5,
+  },
+  avatarInitials: {
+    fontSize: 18,
   },
   chatContent: {
     flex: 1,

@@ -1,0 +1,2 @@
+ALTER TABLE reviews
+    ALTER COLUMN text TYPE TEXT;

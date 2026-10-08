@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -68,7 +69,8 @@ class AuthenticationControllerTest {
         ResponseEntity<?> response = authenticationController.register(registerUserDto);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals("{message=Invalid user details}", response.getBody());
+        assertTrue(response.getBody() instanceof Map);
+        assertEquals("Invalid user details", ((Map<?, ?>) response.getBody()).get("message"));
         verify(authenticationService, times(1)).signup(registerUserDto);
     }
 

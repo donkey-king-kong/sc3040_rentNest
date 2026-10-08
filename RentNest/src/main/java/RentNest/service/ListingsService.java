@@ -38,6 +38,7 @@ public class ListingsService {
         listingsDTO.setBeds(listings.getBeds());
         listingsDTO.setBathroom(listings.getBathroom());
         listingsDTO.setDescription(listings.getDescription());
+        listingsDTO.setListingpicture(listings.getListingpicture());
         listingsDTO.setFlagged(listings.isFlagged());
         listingsDTO.setOwnerPhotoURL(listings.getOwnerPhotoURL());
         listingsDTO.setOwnerName(listings.getOwnerName());
