@@ -153,6 +153,8 @@ const UserReviewsScreen = () => {
 
 // Function to handle flagging/unflagging a review with user confirmation
     const handleFlagReview = (reviewId, currentlyFlagged) => {
+        const nextFlagValue = !currentlyFlagged;
+
         // Alert to confirm flagging or unflagging
         Alert.alert(
             currentlyFlagged ? "Unflag Review" : "Flag Review",
@@ -164,14 +166,67 @@ const UserReviewsScreen = () => {
                 },
                 {
                     text: "Yes",
-                    onPress: () => {
-                        // Update the flagged state locally if user confirms
-                        setReviews((prevReviews) =>
-                            prevReviews.map((review) =>
-                                review.id === reviewId ? { ...review, flagged: !currentlyFlagged } : review
-                            )
-                        );
-                        Alert.alert("Success", `The review has been ${currentlyFlagged ? "unflagged" : "flagged"}.`);
+                    onPress: async () => {
+                        try {
+                            const token = await AsyncStorage.getItem('token');
+                            if (!token) {
+                                throw new Error("No authentication token found. Please login.");
+                            }
+
+                            const flagUrl = `${API_BASE_URL}/api/reviews/setFlag/${reviewId}/${nextFlagValue}`;
+                            console.log("[UserReviewsScreen] flag review request", {
+                                reviewId,
+                                currentlyFlagged,
+                                nextFlagValue,
+                                url: flagUrl,
+                            });
+
+                            const response = await fetch(flagUrl, {
+                                method: 'PUT',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Accept': 'application/json',
+                                    'Content-Type': 'application/json',
+                                },
+                            });
+
+                            const rawBody = await response.text();
+                            let responseBody = rawBody;
+                            try {
+                                responseBody = rawBody ? JSON.parse(rawBody) : null;
+                            } catch {
+                                // Keep the raw response text for logging if the backend returns non-JSON.
+                            }
+
+                            console.log("[UserReviewsScreen] flag review response", {
+                                reviewId,
+                                requestedFlagValue: nextFlagValue,
+                                status: response.status,
+                                ok: response.ok,
+                                responseBody,
+                            });
+
+                            if (!response.ok) {
+                                throw new Error(rawBody || `Failed to update review flag. Status code: ${response.status}`);
+                            }
+
+                            const persistedFlagValue = responseBody?.flagged ?? nextFlagValue;
+
+                            setReviews((prevReviews) =>
+                                prevReviews.map((review) =>
+                                    review.id === reviewId ? { ...review, flagged: persistedFlagValue } : review
+                                )
+                            );
+                            Alert.alert("Success", `The review has been ${persistedFlagValue ? "flagged" : "unflagged"}.`);
+                        } catch (error) {
+                            console.error("[UserReviewsScreen] flag review failed", {
+                                reviewId,
+                                currentlyFlagged,
+                                nextFlagValue,
+                                error: error.message,
+                            });
+                            Alert.alert("Error", error.message || "Unable to update review flag. Please try again.");
+                        }
                     },
                 },
             ],
