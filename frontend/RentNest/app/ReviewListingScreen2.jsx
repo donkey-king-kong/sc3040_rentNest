@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { FontAwesome } from '@expo/vector-icons';
 import MorphingInfinity from '../components/MorphingInfinity';
+import ProfileImage from '../components/ProfileImage';
 
 const ReviewListingScreen2 = () => {
   const router = useRouter();
@@ -142,9 +143,14 @@ const ReviewListingScreen2 = () => {
         <Text style={styles.address}>{listingData.location}</Text>
 
         <View style={styles.ownerContainer}>
-          <Image 
-            source={{ uri: listingData.owner?.photoURL }} 
-            style={styles.ownerImage} 
+          <ProfileImage
+            uri={listingData.owner?.photoURL}
+            name={listingData.owner?.name}
+            style={styles.ownerImage}
+            textStyle={styles.ownerImageInitials}
+            screen="ReviewListingScreen2"
+            userId={listingData.owner?.userID}
+            role="owner"
           />
           <Text style={styles.ownerName}>{listingData.owner?.name}</Text>
         </View>
@@ -249,6 +255,9 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: 10,
+  },
+  ownerImageInitials: {
+    fontSize: 14,
   },
   ownerName: {
     fontSize: 16,

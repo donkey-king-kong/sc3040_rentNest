@@ -8,6 +8,7 @@ import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import FairPriceCard from '../components/FairPriceCard';
 import useFairPriceEstimate from '../hooks/useFairPriceEstimate';
+import { normalizeListingImageUrl } from '../components/ListingImage';
 
 const CreateListingScreen = () => {
     const router = useRouter();
@@ -122,8 +123,12 @@ const CreateListingScreen = () => {
                 bathroom: Number(listing.bathroom),
                 description: listing.description,
                 flagged: false,
-                listingpicture: listing.listingpicture
+                listingpicture: normalizeListingImageUrl(listing.listingpicture)
             };
+            console.log('[CreateListingScreen] submitting listing image:', {
+                originalUrl: listing.listingpicture,
+                normalizedUrl: requestBody.listingpicture,
+            });
 
             await axios.post(`${API_BASE_URL}/api/listings`, requestBody, {
                 headers: {

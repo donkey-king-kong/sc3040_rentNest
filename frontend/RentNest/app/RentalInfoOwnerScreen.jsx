@@ -1,11 +1,13 @@
 import React, {useEffect, useState} from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
 import MorphingInfinity from '../components/MorphingInfinity';
+import ListingImage from '../components/ListingImage';
+import ProfileImage from '../components/ProfileImage';
 
 const RentalInfoOwner = () => {
   const router = useRouter();
@@ -32,6 +34,11 @@ const RentalInfoOwner = () => {
       });
 
       const listingData = response.data;
+      console.log('[RentalInfoOwnerScreen] listing image payload:', {
+        listingId,
+        name: listingData?.name,
+        listingpicture: listingData?.listingpicture,
+      });
       if (!listingData.tenantId) {
         listingData.tenantId = 0;
         listingData.tenantName = 'No Tenant yet...';
@@ -88,7 +95,15 @@ const RentalInfoOwner = () => {
         {/* Image */}
         {listing && (
             <>
-              <Image source={{ uri: listing.listingpicture }} style={styles.image} />
+              <ListingImage
+                uri={listing.listingpicture}
+                style={styles.image}
+                screen="RentalInfoOwnerScreen"
+                listingId={listing.listingID}
+                listingName={listing.name}
+                width={600}
+                height={400}
+              />
 
               {/* Listing name and address */}
               <View style={styles.row}>
@@ -103,7 +118,15 @@ const RentalInfoOwner = () => {
 
               {/* Owner details */}
               <View style={styles.row}>
-                <Image source={{ uri: listing.ownerPhotoURL }} style={styles.ownerPhoto} />
+                <ProfileImage
+                  uri={listing.ownerPhotoURL}
+                  name={listing.ownerName}
+                  style={styles.ownerPhoto}
+                  textStyle={styles.profilePhotoInitials}
+                  screen="RentalInfoOwnerScreen"
+                  userId={listing.ownerId}
+                  role="owner"
+                />
                 <Text style={styles.ownerName}>{listing.ownerName}</Text>
               </View>
 
@@ -134,13 +157,29 @@ const RentalInfoOwner = () => {
                     style={styles.transparentButton}
                     onPress={() => handleTenantPress(listing.tenantId, listing.listingID)}
                 >
-                  <Image source={{ uri: listing.tenantPhotoURL }} style={styles.tenantPhoto} />
+                  <ProfileImage
+                    uri={listing.tenantPhotoURL}
+                    name={listing.tenantName}
+                    style={styles.tenantPhoto}
+                    textStyle={styles.profilePhotoInitials}
+                    screen="RentalInfoOwnerScreen"
+                    userId={listing.tenantId}
+                    role="tenant"
+                  />
                   <Text style={styles.buttonText}>{listing.tenantName}</Text>
                   <Text style={styles.arrow}>›</Text>
                 </TouchableOpacity>
               ) : (
                 <View style={styles.transparentButton}>
-                  <Image source={{ uri: listing.tenantPhotoURL }} style={styles.tenantPhoto} />
+                  <ProfileImage
+                    uri={listing.tenantPhotoURL}
+                    name={listing.tenantName}
+                    style={styles.tenantPhoto}
+                    textStyle={styles.profilePhotoInitials}
+                    screen="RentalInfoOwnerScreen"
+                    userId={listing.tenantId}
+                    role="tenant"
+                  />
                   <Text style={[styles.buttonText, { color: '#999' }]}>No current tenant</Text>
                 </View>
               )}
@@ -306,6 +345,9 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: 10,
+  },
+  profilePhotoInitials: {
+    fontSize: 14,
   },
   buttonText: {
     flex: 1,

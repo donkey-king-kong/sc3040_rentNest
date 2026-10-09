@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
+import MorphingInfinity from '../components/MorphingInfinity';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import FairPriceCard from '../components/FairPriceCard';
 import useFairPriceEstimate from '../hooks/useFairPriceEstimate';
+import { normalizeListingImageUrl } from '../components/ListingImage';
 
 const EditListingScreen = () => {
     const router = useRouter();
     const { listingId } = useLocalSearchParams();
     const [modalVisible, setModalVisible] = useState(false);
     const [token, setToken] = useState(null);
+    const [loading, setLoading] = useState(true);
     const [listing, setListing] = useState({
         ownerUserID: 1,
         tenantUserID: 2,
@@ -52,6 +56,8 @@ const EditListingScreen = () => {
                 console.error('Error fetching listing data:', error);
                 Alert.alert('Error', 'Failed to load listing data');
                 router.back();
+            } finally {
+                setLoading(false);
             }
         };
 
@@ -96,9 +102,19 @@ const EditListingScreen = () => {
                 return;
             }
 
+            const requestBody = {
+                ...listing,
+                listingpicture: normalizeListingImageUrl(listing.listingpicture),
+            };
+            console.log('[EditListingScreen] submitting listing image:', {
+                listingId,
+                originalUrl: listing.listingpicture,
+                normalizedUrl: requestBody.listingpicture,
+            });
+
             await axios.put(
                 `${API_BASE_URL}/api/listings/${listingId}`,
-                listing,
+                requestBody,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -120,13 +136,27 @@ const EditListingScreen = () => {
         router.push({ pathname: '/RentalInfoOwnerScreen', params: { listingId } });
     };
 
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <MorphingInfinity size={86} color="#2FA84F" />
+                <Text style={styles.loadingText}>Loading listing...</Text>
+            </View>
+        );
+    }
+
     return (
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
         >
             <ScrollView contentContainerStyle={styles.scrollContainer}>
-                <Text style={styles.heading}>Edit Listing</Text>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+                        <FontAwesome name="chevron-left" size={18} color="#000" />
+                    </TouchableOpacity>
+                    <Text style={styles.heading}>Edit Listing</Text>
+                </View>
 
                 {/* Name */}
                 <Text style={styles.label}>Name</Text>
@@ -270,8 +300,8 @@ const EditListingScreen = () => {
                     style={styles.input}
                     placeholder="Enter image URL"
                     placeholderTextColor="#999"
-                    value={listing.imageUrl}
-                    onChangeText={(value) => handleInputChange('imageUrl', value)}
+                    value={listing.listingpicture || ''}
+                    onChangeText={(value) => handleInputChange('listingpicture', value)}
                 />
 
                 {/* Update Listing Button */}
@@ -305,13 +335,32 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#fff',
     },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: '#555',
+    },
     scrollContainer: {
         padding: 20,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    backButton: {
+        marginRight: 12,
+        padding: 4,
     },
     heading: {
         fontSize: 24,
         fontWeight: 'bold',
-        marginBottom: 20,
     },
     label: {
         fontSize: 16,
