@@ -184,16 +184,20 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
                   height={TOOLTIP.height}
                   rx={TOOLTIP.radius}
                   fill={SURFACE}
+                  fillOpacity={0.84}
                   stroke={INK}
                   strokeWidth={1.2}
+                  pointerEvents="none"
                 />
                 <Path
                   d={tooltip.above
                     ? `M${tooltip.anchorX - 6},${tooltip.pointerY} L${tooltip.anchorX + 6},${tooltip.pointerY} L${tooltip.anchorX},${tooltip.pointerY + 7} Z`
                     : `M${tooltip.anchorX - 6},${tooltip.pointerY} L${tooltip.anchorX + 6},${tooltip.pointerY} L${tooltip.anchorX},${tooltip.pointerY - 7} Z`}
                   fill={SURFACE}
+                  fillOpacity={0.84}
                   stroke={INK}
                   strokeWidth={1}
+                  pointerEvents="none"
                 />
                 <SvgText
                   x={tooltip.left + tooltip.width / 2}
@@ -203,6 +207,7 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
                   fill={TEXT_PRIMARY}
                   textAnchor="middle"
                   fontFamily={FONT}
+                  pointerEvents="none"
                 >
                   {active.label}
                 </SvgText>
@@ -213,6 +218,7 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
                   fill={TEXT_MUTED}
                   textAnchor="middle"
                   fontFamily={FONT}
+                  pointerEvents="none"
                 >
                   {tooltip.valueLabel}
                 </SvgText>
