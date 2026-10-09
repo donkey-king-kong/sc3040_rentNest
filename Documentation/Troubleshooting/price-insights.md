@@ -1,10 +1,8 @@
-# Troubleshooting
+# Price Insights Troubleshooting
 
-## Price Insights
+Use this guide when the listing page shows an empty Price Insights card, the chart does not appear, or it is unclear whether the issue is missing data, a backend error, or stale frontend code.
 
-Use this section when the listing page shows an empty Price Insights card, the chart does not appear, or it is unclear whether the issue is missing data, a backend error, or stale frontend code.
-
-### Expected Logs
+## Expected Logs
 
 When the feature is running correctly, clicking a listing should produce frontend logs like:
 
@@ -22,7 +20,7 @@ The backend terminal should also show:
 
 If the frontend log shows `rawCount` and `dedupedCount` above zero, the backend returned data successfully.
 
-### No Price Insights Logs Appear
+## No Price Insights Logs Appear
 
 If neither frontend nor backend shows `[PriceInsights]` logs, the updated code is probably not running.
 
@@ -56,7 +54,7 @@ npx expo start -c
 
 The `-c` flag clears Expo's cache so the app does not use an old bundle.
 
-### Backend Fails Before Startup
+## Backend Fails Before Startup
 
 If `mvn spring-boot:run` fails at `testCompile` with `ChatHistoryControllerTest`, use:
 
@@ -66,7 +64,7 @@ mvn -Dmaven.test.skip=true spring-boot:run
 
 `-DskipTests` skips running tests, but it can still compile test sources. `-Dmaven.test.skip=true` skips both running and compiling tests.
 
-### Missing Backend Config In A Separate Worktree
+## Missing Backend Config In A Separate Worktree
 
 If backend startup fails with:
 
@@ -83,7 +81,7 @@ cp /Users/bytedance/Desktop/sc3040_rentNest/RentNest/src/main/resources/applicat
 
 Do not commit `application.properties`; it contains local credentials and secrets.
 
-### Frontend Dependencies Missing
+## Frontend Dependencies Missing
 
 If Expo reports:
 
@@ -99,7 +97,7 @@ npm install --legacy-peer-deps
 npx expo start -c
 ```
 
-### Data Exists But Chart Is Empty
+## Data Exists But Chart Is Empty
 
 The chart expects month labels such as:
 
@@ -119,7 +117,7 @@ If the frontend receives data but cannot chart it, it logs:
 
 Check the sample payload in that log. If the date format is not `MMM yyyy`, fix the backend formatter or update the frontend parser.
 
-### How To Read The Logs
+## How To Read The Logs
 
 - `Rental prices fetch completed` with `rawCount > 0`: backend returned usable records.
 - `Rental prices response is empty`: request succeeded, but no comparable rental data was found.
@@ -127,7 +125,7 @@ Check the sample payload in that log. If the date format is not `MMM yyyy`, fix 
 - `completed with no chartable months`: backend found rows but none produced valid monthly medians.
 - `Could not load price insights`: backend hit an exception; use the stack trace in the same log.
 
-### Known Unrelated Startup Warning
+## Known Unrelated Startup Warning
 
 The backend may log this during startup:
 

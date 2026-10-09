@@ -4,7 +4,7 @@ RentNest helps property owners list rental homes and users search for available 
 
 ## Setup Instructions
 
-If setup or debugging gets stuck, see [Troubleshooting](TROUBLESHOOTING.md).
+If setup or debugging gets stuck, see [Price Insights troubleshooting](Documentation/Troubleshooting/price-insights.md).
 
 ### Required Installs
 - Java JDK
