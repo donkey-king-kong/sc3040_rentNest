@@ -1,6 +1,6 @@
 // Previous imports remain unchanged
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Modal} from 'react-native';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Modal, ActivityIndicator} from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import MapView, { Marker } from '../components/AppMap';
 import {useRouter, useLocalSearchParams} from "expo-router";
@@ -10,6 +10,10 @@ import { API_BASE_URL } from '../config/api';
 import { jwtDecode } from 'jwt-decode';
 import MorphingInfinity from '../components/MorphingInfinity';
 import PriceInsightsChart from '../components/PriceInsightsChart';
+import ListingImage from '../components/ListingImage';
+import ProfileImage from '../components/ProfileImage';
+
+const notificationBellIcon = require('../assets/images/notificationBell.png');
 
 const HomeListingScreen = () => {
   console.log('Initializing HomeListingScreen component');
@@ -101,6 +105,11 @@ const HomeListingScreen = () => {
           headers: authHeaders(tokenValue)
         });
         console.log('Listing API response:', listingResponse.data);
+        console.log('[HomeListingScreen] listing image payload:', {
+          listingId,
+          name: listingResponse.data?.name,
+          listingpicture: listingResponse.data?.listingpicture,
+        });
 
         // Apply default values only if the response data is empty or missing properties
         const listingData = listingResponse.data || {};
@@ -116,7 +125,7 @@ const HomeListingScreen = () => {
           beds: listingData.beds || 0,
           baths: listingData.bathroom || 0,
           size: listingData.size || 1, // Prevent division by zero
-          imageURL: listingData.listingpicture || 'https://www.sgluxurycondo.com/wp-content/uploads/2022/11/should-you-buy-a-luxury-condo-buyers-guide-to-luxury-condo-in-singapore-1536x1024.jpg',
+          imageURL: listingData.listingpicture,
           ownerUserID: listingData.ownerId || '',
           ownerName: listingData.ownerName || 'Unknown',
           ownerPhotoURL: listingData.ownerPhotoURL || 'https://thumbs.dreamstime.com/b/tranquil-caucasian-handsome-brunet-man-blue-long-scarf-posing-wrinkled-face-against-background-square-image-236510369.jpg'
@@ -279,35 +288,106 @@ const HomeListingScreen = () => {
   }, [authHeaders, listingId, router]);
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [listingReported, setListingReported] = useState(false);
+  const [isReportingListing, setIsReportingListing] = useState(false);
+  const [listingNotificationMessage, setListingNotificationMessage] = useState('');
+  const notificationTimeoutRef = useRef(null);
 
-  const handleReportListing = () => {
+  useEffect(() => {
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const getReportStorageKey = () => {
+    if (!currentUserID || !listingId) {
+      return null;
+    }
+
+    return `reportedListing:${currentUserID}:${listingId}`;
+  };
+
+  const showListingNotification = (message) => {
+    setListingNotificationMessage(message);
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
+    notificationTimeoutRef.current = setTimeout(() => {
+      setListingNotificationMessage('');
+    }, 2000);
+  };
+
+  const syncListingReportStatus = async (reportStorageKey) => {
+    if (!reportStorageKey || !token) {
+      return;
+    }
+
+    const response = await axios.get(`${API_BASE_URL}/api/listings/${listingId}`, {
+      headers: authHeaders(token)
+    });
+    const isListingFlagged = response.data?.flagged === true || Number(response.data?.flagged) === 1;
+
+    if (!isListingFlagged) {
+      await AsyncStorage.removeItem(reportStorageKey);
+    }
+  };
+
+  const handleReportListing = async () => {
     console.log('Report listing clicked');
+    const reportStorageKey = getReportStorageKey();
+
+    if (!reportStorageKey) {
+      setModalVisible(true);
+      return;
+    }
+
+    try {
+      await syncListingReportStatus(reportStorageKey);
+      const alreadyReported = await AsyncStorage.getItem(reportStorageKey);
+      if (alreadyReported === 'true') {
+        showListingNotification('Listing Already Reported');
+        return;
+      }
+    } catch (err) {
+      console.error(`Error checking reported listing status: ${err.message}`);
+    }
+
     setModalVisible(true);
   };
 
   const handleConfirm = async () => {
+    if (isReportingListing) {
+      return;
+    }
+
     try {
-      await axios.put(`${API_BASE_URL}api/listings/setFlag/${listingId}/true`, {
+      setIsReportingListing(true);
+      const reportStorageKey = getReportStorageKey();
+      await axios.put(`${API_BASE_URL}/api/listings/setFlag/${listingId}/true`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
           'Content-Type': 'application/json'
         }
       });
+      if (reportStorageKey) {
+        await AsyncStorage.setItem(reportStorageKey, 'true');
+      }
+      setModalVisible(false);
+      showListingNotification('Listing Reported');
     } catch (err) {
       console.error(`Error reporting listing: ${err.message}`);
+    } finally {
+      setIsReportingListing(false);
     }
-    setListingReported(true);
   };
 
   const handleCancel = () => {
-    setModalVisible(false);
-    setListingReported(false);
-  };
+    if (isReportingListing) {
+      return;
+    }
 
-  const handleReturn = () => {
-    setListingReported(false);
     setModalVisible(false);
   };
 
@@ -338,7 +418,15 @@ const HomeListingScreen = () => {
   return (
     <ScrollView style={styles.box}>
       <View style={styles.imageWrapper}>
-        <Image source={{ uri: listing.imageURL }} style={styles.image} />
+        <ListingImage
+          uri={listing.imageURL}
+          style={styles.image}
+          screen="HomeListingScreen"
+          listingId={listingId}
+          listingName={listing.name}
+          width={600}
+          height={400}
+        />
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <FontAwesome name="chevron-left" size={18} color="#101820" />
         </TouchableOpacity>
@@ -459,7 +547,15 @@ const HomeListingScreen = () => {
                 <Text style={styles.reviewTitle}>{review.title}</Text>
                 <Text style={styles.reviewText}>{review.text}</Text>
                 <View style={styles.userInfo}>
-                  <Image source={{ uri: review.user.photoURL }} style={styles.userPhoto} />
+                  <ProfileImage
+                    uri={review.user.photoURL}
+                    name={review.user.name}
+                    style={styles.userPhoto}
+                    textStyle={styles.userPhotoInitials}
+                    screen="HomeListingScreen"
+                    userId={review.user.userID}
+                    role="reviewer"
+                  />
                   <Text style={styles.userName}>{review.user.name}</Text>
                 </View>
               </View>
@@ -478,7 +574,15 @@ const HomeListingScreen = () => {
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
                         <View style={styles.ownerInfo}>
-                          <Image source={{ uri: listing.ownerPhotoURL }} style={styles.ownerImage} />
+                          <ProfileImage
+                            uri={listing.ownerPhotoURL}
+                            name={listing.ownerName}
+                            style={styles.ownerImage}
+                            textStyle={styles.ownerImageInitials}
+                            screen="HomeListingScreen"
+                            userId={listing.ownerId}
+                            role="owner"
+                          />
                           <Text style={styles.ownerText}>Posted by: {listing.ownerName}</Text>
                         </View>
                       </View>
@@ -487,8 +591,8 @@ const HomeListingScreen = () => {
                         <TouchableOpacity onPress={handleChat} style={styles.messageButton}>
                           <Text style={styles.buttonText1}>Message Owner</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.reportButton}>
-                          <Text style={styles.buttonText2} onPress={handleReportListing} >Report Listing</Text>
+                        <TouchableOpacity style={styles.reportButton} onPress={handleReportListing}>
+                          <Text style={styles.buttonText2}>Report Listing</Text>
                         </TouchableOpacity>
 
                 {/* Modal for reporting listing */}
@@ -500,32 +604,42 @@ const HomeListingScreen = () => {
                       >
                         <View style={styles.modalOverlay}>
                           <View style={styles.modalContainer}>
-                            {!listingReported ? (
-                              <>
-                                <Text style={styles.modalTitle}>Report Listing?</Text>
-                                <Text style={styles.modalMessage}>This will send the listing to the admin for review.</Text>
-                                <View style={styles.buttonContainer}>
-                                  <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-                                    <Text style={styles.buttonTexta}>Cancel</Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
-                                    <Text style={styles.buttonTextb}>Confirm</Text>
-                                  </TouchableOpacity>
-                                </View>
-                              </>
-                            ) : (
-                              <>
-                                <Image
-                                  source={require('../assets/images/confirmation.png')} // Replace with your icon path
-                                  style={styles.icon}
-                                />
-                                <Text style={styles.reportedMessage}>Listing Reported</Text>
-                                <Text style={styles.reportedListing}>An admin will review the listing and take appropriate actions.</Text>
-                                <TouchableOpacity style={styles.returnButton} onPress={handleReturn}>
-                                  <Text style={styles.buttonTextx}>Return</Text>
-                                </TouchableOpacity>
-                              </>
-                            )}
+                            <Text style={styles.modalTitle}>Report Listing?</Text>
+                            <Text style={styles.modalMessage}>This will send the listing to the admin for review.</Text>
+                            <View style={styles.buttonContainer}>
+                              <TouchableOpacity style={styles.cancelButton} onPress={handleCancel} disabled={isReportingListing}>
+                                <Text style={styles.buttonTexta}>Cancel</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.confirmButton, isReportingListing && styles.disabledConfirmButton]}
+                                onPress={handleConfirm}
+                                disabled={isReportingListing}
+                              >
+                                {isReportingListing ? (
+                                  <View style={styles.reportingContent}>
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                    <Text style={styles.buttonTextb}>Reporting...</Text>
+                                  </View>
+                                ) : (
+                                  <Text style={styles.buttonTextb}>Confirm</Text>
+                                )}
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                      </Modal>
+                      <Modal
+                        visible={!!listingNotificationMessage}
+                        transparent
+                        animationType="fade"
+                        statusBarTranslucent
+                      >
+                        <View style={styles.notificationOverlay} pointerEvents="none">
+                          <View style={styles.notificationCard}>
+                            <View style={styles.notificationIconBox}>
+                              <Image source={notificationBellIcon} style={styles.notificationIcon} />
+                            </View>
+                            <Text style={styles.notificationText}>{listingNotificationMessage}</Text>
                           </View>
                         </View>
                       </Modal>
@@ -735,6 +849,9 @@ placesContainer: {
       borderRadius: 15,
       marginRight: 5,
     },
+    userPhotoInitials: {
+      fontSize: 11,
+    },
     userName: {
       fontSize: 14,
       color: '#555',
@@ -814,6 +931,9 @@ ownerBox: {
     height: 50,
     borderRadius: 25,
     marginRight: 10,
+  },
+  ownerImageInitials: {
+    fontSize: 18,
   },
   ownerText: {
     fontSize: 16,
@@ -899,6 +1019,15 @@ ownerBox: {
     borderColor:'black',
     borderWidth: 1,
   },
+  disabledConfirmButton: {
+    opacity: 0.82,
+  },
+  reportingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
   buttonTexta: {
     textAlign: 'center',
     color: 'black',
@@ -907,31 +1036,45 @@ ownerBox: {
       textAlign: 'center',
       color: 'white',
     },
-  icon: {
-    width: 70,
-    height: 70,
-    marginBottom: 10,
-    borderRadius: 30,
+  notificationOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
-  reportedMessage: {
-    fontSize: 20,
-    color: "FFFFFF",
-    fontWeight: 'bold',
+  notificationCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    backgroundColor: 'rgba(45, 45, 45, 0.82)',
+    borderRadius: 28,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    elevation: 8,
   },
-  reportedListing: {
-    marginVertical: 5,
+  notificationIconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(58, 58, 58, 0.72)',
+    marginBottom: 16,
   },
-  returnButton: {
-    marginTop: 10,
-    padding: 10,
-    paddingHorizontal: 20,
-    backgroundColor: 'black',
-    borderRadius: 5,
-
+  notificationIcon: {
+    width: 34,
+    height: 40,
+    resizeMode: 'contain',
   },
-  buttonTextx: {
-        textAlign: 'center',
-        color: 'white',
+  notificationText: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
   },
 });
 

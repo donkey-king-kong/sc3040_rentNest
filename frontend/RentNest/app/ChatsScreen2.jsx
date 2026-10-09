@@ -10,7 +10,6 @@ import flag from "../assets/images/chatflag.jpg";
 import paperclip from "../assets/images/paperclip.jpg"
 import sendRentalOfferIcon from "../assets/images/sendRentalOffer.jpg"
 import x from "../assets/images/x.jpg"
-import confirmation from "../assets/images/confirmation.png"
 import redFlag from "../assets/images/flag.png";
 import visa from "../assets/images/visa.jpg";
 import master from "../assets/images/master.jpg";
@@ -20,10 +19,11 @@ import axios from "axios";
 import {API_BASE_URL} from "../config/api";
 import MorphingInfinity from '../components/MorphingInfinity';
 import AvatarOrb from '../components/AvatarOrb';
+import ProfileImage from '../components/ProfileImage';
 
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
-const profilePic = require('../assets/images/chatProfilePic.jpg');
+const notificationBellIcon = require('../assets/images/notificationBell.png');
 
 const ChatsScreen2 = () => {
     const router = useRouter();
@@ -41,7 +41,8 @@ const ChatsScreen2 = () => {
     const [isAttachmentModalVisible, setAttachmentModalVisible] = useState(false)
     const [isRentalModalVisible, setRentalModalVisible] = useState(false)
     const [isFlagModalVisible, setFlagModalVisible] = useState(false)
-    const [isUserReportedModalVisible, setUserReportedModalVisible] = useState(false)
+    const [isReportingUser, setReportingUser] = useState(false)
+    const [userReportNotificationMessage, setUserReportNotificationMessage] = useState('')
     const [newMessage, setNewMessage] = useState('');
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false)
     const [isPaymentSuccessfulModalVisible, setPaymentSuccessfulModalVisible] = useState(false)
@@ -54,6 +55,7 @@ const ChatsScreen2 = () => {
     const [cardCvvError, setCardCvvError] = useState('');
     const [Loading, setLoading] = useState(true);
     const chatScrollRef = useRef(null);
+    const notificationTimeoutRef = useRef(null);
     const summaryScrollRef = useRef(null);
     const depositInputRef = useRef(null);
     const leaseStartInputRef = useRef(null);
@@ -221,15 +223,79 @@ const ChatsScreen2 = () => {
         }
     }
 
+    const getUserReportStorageKey = () => {
+        if (!currentUser || !partnerUserId) {
+            return null;
+        }
+
+        return `reportedUser:${currentUser}:${partnerUserId}`;
+    };
+
+    const showUserReportNotification = (message) => {
+        setUserReportNotificationMessage(message);
+        if (notificationTimeoutRef.current) {
+            clearTimeout(notificationTimeoutRef.current);
+        }
+        notificationTimeoutRef.current = setTimeout(() => {
+            setUserReportNotificationMessage('');
+        }, 2000);
+    };
+
+    const syncUserReportStatus = async (reportStorageKey) => {
+        if (!reportStorageKey) {
+            return;
+        }
+
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+            router.replace('/LoginScreen');
+            return;
+        }
+
+        const partnerResponse = await axios.get(`${API_BASE_URL}/api/users/id/${partnerUserId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+        const isPartnerFlagged = Number(partnerResponse.data?.flagged) !== 0;
+
+        if (!isPartnerFlagged) {
+            await AsyncStorage.removeItem(reportStorageKey);
+            setPartner(partnerResponse.data);
+        }
+    };
+
     const flagUser = async () => {
+        if (isReportingUser) {
+            return;
+        }
+
         try{
+            setReportingUser(true);
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
                 router.replace('/LoginScreen');
                 return;
             }
-            const flaggedResponse = await axios.put(`${API_BASE_URL}/api/users/setFlag/${partnerUserId}/1`, {
+            const reportStorageKey = getUserReportStorageKey();
+            if (reportStorageKey) {
+                try {
+                    await syncUserReportStatus(reportStorageKey);
+                    const alreadyReported = await AsyncStorage.getItem(reportStorageKey);
+                    if (alreadyReported === 'true') {
+                        setFlagModalVisible(false);
+                        showUserReportNotification('User Already Reported');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error checking reported user status:', error);
+                }
+            }
+
+            const flaggedResponse = await axios.put(`${API_BASE_URL}/api/users/setFlag/${partnerUserId}/1`, {}, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Accept': 'application/json',
@@ -237,7 +303,11 @@ const ChatsScreen2 = () => {
                 }
             });
             if (flaggedResponse.status === 200){
-                toggleUserReportedModal();
+                if (reportStorageKey) {
+                    await AsyncStorage.setItem(reportStorageKey, 'true');
+                }
+                setFlagModalVisible(false);
+                showUserReportNotification('User Reported');
                 await getPartner();
             }else{
                 console.error('Flagging failed:', flaggedResponse.data)
@@ -245,6 +315,9 @@ const ChatsScreen2 = () => {
         }
         catch (error) {
             console.error('Error flagging partner:', error);
+        }
+        finally {
+            setReportingUser(false);
         }
     }
 
@@ -593,8 +666,7 @@ const ChatsScreen2 = () => {
                     },
                 });
                 if (sendRentalResponse.status === 200){
-                    await getConversation();
-                    setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
+                    // refresh is handled in handleSendOffer after modal closes
                 }else{
                     console.log('Creating Rental:', sendRentalResponse.data);
                 }
@@ -743,6 +815,12 @@ const handlePaymentAndAccept = async () => {
 
     useEffect(() => {
         getConversation();
+
+        return () => {
+            if (notificationTimeoutRef.current) {
+                clearTimeout(notificationTimeoutRef.current);
+            }
+        };
     }, [refresh]);
 
     // Toggle attachment modal visibility
@@ -765,17 +843,20 @@ const handlePaymentAndAccept = async () => {
 
     // Toggle flag modal visibility
     const toggleFlagModal = () => {
-        setFlagModalVisible(!isFlagModalVisible);
+        if (isFlagModalVisible) {
+            setFlagModalVisible(false);
+            return;
+        }
+
+        setFlagModalVisible(true);
     };
     const closeFlagModal = () => {
+        if (isReportingUser) {
+            return;
+        }
+
         setFlagModalVisible(false);
     }
-
-    // Toggle successfully reported modal visibility
-    const toggleUserReportedModal = () => {
-        setFlagModalVisible(false);
-        setUserReportedModalVisible(!isUserReportedModalVisible);
-    };
 
     // Toggle payment modal visibility
     const togglePaymentModal = () => {
@@ -800,20 +881,18 @@ const handlePaymentAndAccept = async () => {
     const isAccepted = chat.length > 0 ? isPaymentSuccessfulModalVisible : false;
     const isTerminationAccepted = chat.length>0 ? rental.status === "terminated" : false;
 
-    const getInitials = (name) => {
-        if (!name) return '?';
-        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-    };
-
     const AvatarCircle = ({ photoURL, name, size = 30, style }) => {
         const dim = { width: size, height: size, borderRadius: size / 2 };
-        if (photoURL) {
-            return <Image source={{ uri: photoURL }} style={[dim, style]} />;
-        }
         return (
-            <View style={[dim, styles.avatarCircle, style]}>
-                <Text style={[styles.avatarInitials, { fontSize: size * 0.38 }]}>{getInitials(name)}</Text>
-            </View>
+            <ProfileImage
+                uri={photoURL}
+                name={name}
+                style={[styles.avatarCircle, dim, style]}
+                textStyle={[styles.avatarInitials, { fontSize: size * 0.38 }]}
+                screen="ChatsScreen2"
+                userId={partnerUserId}
+                role="chat-partner"
+            />
         );
     };
 
@@ -866,6 +945,8 @@ const handlePaymentAndAccept = async () => {
         if (!canSendOffer) return;
         await sendRentalOffer();
         closeRentalModal();
+        await getConversation();
+        setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
     };
 
     const renderMessage = () => {
@@ -1550,44 +1631,49 @@ const handlePaymentAndAccept = async () => {
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Report User?</Text>
                             {/* Close button */}
-                            <TouchableOpacity onPress={closeFlagModal}>
+                            <TouchableOpacity onPress={closeFlagModal} disabled={isReportingUser}>
                                 <Image source={x} style={styles.icon}/>
                             </TouchableOpacity>
                         </View>
                         <Text style={styles.modalDescription}>This will send the chat history to an admin for review.</Text>
                         <View style={styles.buttonAlignment}>
-                            <View style={styles.confirmButton}>
-                                <TouchableOpacity onPress={flagUser}>
-                                    <Text style={styles.whiteButtonText}> Confirm </Text>
-                                </TouchableOpacity>
-                            </View>
-                            <View style={styles.cancelButton}>
-                                <TouchableOpacity onPress={closeFlagModal}>
-                                    <Text style={styles.buttonText}> Cancel </Text>
-                                </TouchableOpacity>
-                            </View>
+                            <TouchableOpacity
+                                style={styles.cancelButton}
+                                onPress={closeFlagModal}
+                                disabled={isReportingUser}
+                            >
+                                <Text style={styles.buttonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.confirmButton, isReportingUser && styles.disabledConfirmButton]}
+                                onPress={flagUser}
+                                disabled={isReportingUser}
+                            >
+                                {isReportingUser ? (
+                                    <View style={styles.reportingContent}>
+                                        <ActivityIndicator size="small" color="#FFFFFF" />
+                                    </View>
+                                ) : (
+                                    <Text style={styles.whiteButtonText}>Confirm</Text>
+                                )}
+                            </TouchableOpacity>
                         </View>
                     </View>
                 </View>
             </Modal>
 
             <Modal
-                animationType="slide"
+                animationType="fade"
                 transparent={true}
-                visible={isUserReportedModalVisible}
-                onRequestClose={toggleUserReportedModal}
+                visible={!!userReportNotificationMessage}
+                statusBarTranslucent
             >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>User Reported</Text>
-                            {/* Close button */}
-                            <TouchableOpacity onPress={toggleUserReportedModal}>
-                                <Image source={x} style={styles.icon}/>
-                            </TouchableOpacity>
+                <View style={styles.notificationOverlay} pointerEvents="none">
+                    <View style={styles.notificationCard}>
+                        <View style={styles.notificationIconBox}>
+                            <Image source={notificationBellIcon} style={styles.notificationIcon} />
                         </View>
-                        <Image source={confirmation} style={styles.confirmationImage}/>
-                        <Text style={styles.modalDescription}>An admin will review the chat history and take appropriate actions</Text>
+                        <Text style={styles.notificationText}>{userReportNotificationMessage}</Text>
                     </View>
                 </View>
             </Modal>
@@ -2496,6 +2582,21 @@ const styles = StyleSheet.create({
         borderWidth: 3,
         borderRadius: 15,
     },
+    disabledConfirmButton: {
+        opacity: 0.82,
+    },
+    reportingContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 10,
+    },
+    reportingButtonText: {
+        color: 'white',
+        fontSize: 13,
+        fontWeight: 'bold',
+    },
     cancelButton:{
         width: 120,
         borderWidth: 3,
@@ -2515,10 +2616,45 @@ const styles = StyleSheet.create({
         width: '100%',
         marginBottom: 10,
     },
-    confirmationImage: {
-        width: 50,
-        height: 50, // Adjust the size as needed
-        marginVertical: 10, // Space around the image
+    notificationOverlay: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 22,
+        backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    },
+    notificationCard: {
+        width: '100%',
+        maxWidth: 360,
+        alignItems: 'center',
+        backgroundColor: 'rgba(45, 45, 45, 0.82)',
+        borderRadius: 28,
+        paddingVertical: 28,
+        paddingHorizontal: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.24,
+        shadowRadius: 22,
+        elevation: 8,
+    },
+    notificationIconBox: {
+        width: 72,
+        height: 72,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(58, 58, 58, 0.72)',
+        marginBottom: 16,
+    },
+    notificationIcon: {
+        width: 34,
+        height: 40,
+        resizeMode: 'contain',
+    },
+    notificationText: {
+        color: '#FFFFFF',
+        fontSize: 22,
+        fontWeight: '800',
     },
     rentalOfferContainer:{
         padding: 20,
