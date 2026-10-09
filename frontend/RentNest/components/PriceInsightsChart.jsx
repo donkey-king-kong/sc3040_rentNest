@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Line, Circle, Rect, Text as SvgText } from 'react-native-svg';
 
 /**
  * Price Insights line chart: median monthly rent of comparable units.
@@ -22,7 +22,6 @@ const SURFACE = '#FFFFFF';
 const GRID = '#E6E6E6';
 const TEXT_PRIMARY = '#111111';
 const TEXT_MUTED = '#52514e';
-const REFERENCE = '#9A9A9A';     // selection rule only
 // Reference lines: told apart by pattern (long dash vs dots) and named in the key below the chart.
 const ASKING_LINE = { stroke: '#3d3d3a', strokeWidth: 2, strokeDasharray: '7 4' };
 const FAIR_LINE = { stroke: '#52514e', strokeWidth: 2, strokeDasharray: '0.1 4', strokeLinecap: 'round' };
@@ -32,8 +31,10 @@ const HEIGHT = 200;
 const FONT = Platform.OS === 'web' ? 'Helvetica, Arial, sans-serif' : undefined;
 const HIT = 32;
 const PAD = { top: 16, right: 16, bottom: 28, left: 52 };
+const TOOLTIP = { minWidth: 96, maxWidth: 148, height: 40, gap: 8, radius: 8, paddingX: 14 };
 
 const money = (n) => `$${Math.round(n).toLocaleString()}`;
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 /** "Sep 2026" -> month index (year * 12 + month), or null. */
 const monthIndex = (label) => {
@@ -65,6 +66,16 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
     .map((d) => ({ label: d.leaseDate, value: Number(d.rentPrice), t: monthIndex(d.leaseDate) }))
     .filter((p) => p.t !== null && p.value > 0)
     .sort((a, b) => a.t - b.t), [data]);
+
+  useEffect(() => {
+    if (data.length > 0 && points.length === 0) {
+      console.warn('[PriceInsights] Chart received data but no points were chartable', {
+        rawCount: data.length,
+        sample: data.slice(0, 5),
+        expectedDateFormat: 'MMM yyyy, for example Sep 2026',
+      });
+    }
+  }, [data, points]);
 
   const header = (
     <TouchableOpacity
@@ -113,6 +124,21 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
   // Month labels: every other point keeps 12 labels from colliding on a phone.
   const labelEvery = points.length > 6 ? 2 : 1;
   const active = selected !== null ? points[selected] : null;
+  const tooltip = active && width > 0 ? (() => {
+    const anchorX = x(active.t);
+    const anchorY = y(active.value);
+    const valueLabel = `Median ${money(active.value)}`;
+    const tooltipWidth = clamp(
+      Math.max(active.label.length * 7.4, valueLabel.length * 7) + TOOLTIP.paddingX * 2,
+      TOOLTIP.minWidth,
+      TOOLTIP.maxWidth
+    );
+    const left = clamp(anchorX - tooltipWidth / 2, 4, Math.max(4, width - tooltipWidth - 4));
+    const aboveTop = anchorY - TOOLTIP.height - TOOLTIP.gap;
+    const top = aboveTop >= 0 ? aboveTop : anchorY + TOOLTIP.gap;
+    const pointerY = aboveTop >= 0 ? top + TOOLTIP.height : top;
+    return { anchorX, anchorY, left, top, pointerY, width: tooltipWidth, valueLabel, above: aboveTop >= 0 };
+  })() : null;
 
   return (
     <View style={styles.card}>
@@ -138,10 +164,6 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
             <Path d={areaPath} fill={INK} fillOpacity={0.08} />
             <Path d={linePath} stroke={INK} strokeWidth={2} fill="none" strokeLinejoin="round" strokeLinecap="round" />
 
-            {active && (
-              <Line x1={x(active.t)} x2={x(active.t)} y1={PAD.top} y2={PAD.top + plotH} stroke={REFERENCE} strokeWidth={1} />
-            )}
-
             {points.map((p, i) => (
               <React.Fragment key={p.label}>
                 <Circle cx={x(p.t)} cy={y(p.value)} r={selected === i ? 6 : 4} fill={INK} stroke={SURFACE} strokeWidth={2} />
@@ -153,14 +175,66 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
               </React.Fragment>
             ))}
 
+            {active && tooltip && (
+              <React.Fragment>
+                <Rect
+                  x={tooltip.left}
+                  y={tooltip.top}
+                  width={tooltip.width}
+                  height={TOOLTIP.height}
+                  rx={TOOLTIP.radius}
+                  fill={SURFACE}
+                  fillOpacity={0.84}
+                  stroke={INK}
+                  strokeWidth={1.2}
+                  pointerEvents="none"
+                />
+                <Path
+                  d={tooltip.above
+                    ? `M${tooltip.anchorX - 6},${tooltip.pointerY} L${tooltip.anchorX + 6},${tooltip.pointerY} L${tooltip.anchorX},${tooltip.pointerY + 7} Z`
+                    : `M${tooltip.anchorX - 6},${tooltip.pointerY} L${tooltip.anchorX + 6},${tooltip.pointerY} L${tooltip.anchorX},${tooltip.pointerY - 7} Z`}
+                  fill={SURFACE}
+                  fillOpacity={0.84}
+                  stroke={INK}
+                  strokeWidth={1}
+                  pointerEvents="none"
+                />
+                <SvgText
+                  x={tooltip.left + tooltip.width / 2}
+                  y={tooltip.top + 16}
+                  fontSize={11}
+                  fontWeight="700"
+                  fill={TEXT_PRIMARY}
+                  textAnchor="middle"
+                  fontFamily={FONT}
+                  pointerEvents="none"
+                >
+                  {active.label}
+                </SvgText>
+                <SvgText
+                  x={tooltip.left + tooltip.width / 2}
+                  y={tooltip.top + 31}
+                  fontSize={11}
+                  fill={TEXT_MUTED}
+                  textAnchor="middle"
+                  fontFamily={FONT}
+                  pointerEvents="none"
+                >
+                  {tooltip.valueLabel}
+                </SvgText>
+              </React.Fragment>
+            )}
+
           </Svg>
         )}
         {/* Tap targets larger than the dots, laid over the chart. */}
         {width > 0 && points.map((p, i) => (
-          <TouchableOpacity
+          <Pressable
             key={`hit-${p.label}`}
             accessibilityLabel={`${p.label}: median ${money(p.value)}`}
             onPress={() => setSelected(selected === i ? null : i)}
+            onHoverIn={() => setSelected(i)}
+            onHoverOut={() => setSelected(current => (current === i ? null : current))}
             style={[styles.hit, { left: x(p.t) - HIT / 2, top: y(p.value) - HIT / 2 }]}
           />
         ))}
@@ -182,12 +256,6 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
           )}
         </View>
       )}
-
-      <Text style={styles.readout}>
-        {active
-          ? `${active.label}: median ${money(active.value)}`
-          : 'Tap a point for details.'}
-      </Text>
 
       <TouchableOpacity onPress={() => setShowTable(!showTable)} accessibilityRole="button" style={styles.toggleHit}>
         <Text style={styles.toggle}>{showTable ? 'Hide table' : 'Show table'}</Text>
@@ -253,11 +321,6 @@ const styles = StyleSheet.create({
     color: TEXT_MUTED,
     marginBottom: 6,
   },
-  readout: {
-    fontSize: 12,
-    color: TEXT_PRIMARY,
-    marginTop: 4,
-  },
   muted: {
     fontSize: 13,
     color: TEXT_MUTED,
@@ -290,13 +353,15 @@ const styles = StyleSheet.create({
   cellHeader: {
     flex: 1,
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 15,
     color: TEXT_PRIMARY,
+    textAlign: 'center',
   },
   cell: {
     flex: 1,
     fontSize: 13,
     color: TEXT_PRIMARY,
+    textAlign: 'center',
   },
 });
 
