@@ -353,13 +353,15 @@ const styles = StyleSheet.create({
   cellHeader: {
     flex: 1,
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 15,
     color: TEXT_PRIMARY,
+    textAlign: 'center',
   },
   cell: {
     flex: 1,
     fontSize: 13,
     color: TEXT_PRIMARY,
+    textAlign: 'center',
   },
 });
 
