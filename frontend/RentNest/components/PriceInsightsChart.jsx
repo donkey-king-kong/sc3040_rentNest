@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Line, Circle, Rect, Text as SvgText } from 'react-native-svg';
 
 /**
  * Price Insights line chart: median monthly rent of comparable units.
@@ -32,8 +32,10 @@ const HEIGHT = 200;
 const FONT = Platform.OS === 'web' ? 'Helvetica, Arial, sans-serif' : undefined;
 const HIT = 32;
 const PAD = { top: 16, right: 16, bottom: 28, left: 52 };
+const TOOLTIP = { width: 118, height: 44, gap: 10, radius: 8 };
 
 const money = (n) => `$${Math.round(n).toLocaleString()}`;
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
 /** "Sep 2026" -> month index (year * 12 + month), or null. */
 const monthIndex = (label) => {
@@ -123,6 +125,15 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
   // Month labels: every other point keeps 12 labels from colliding on a phone.
   const labelEvery = points.length > 6 ? 2 : 1;
   const active = selected !== null ? points[selected] : null;
+  const tooltip = active && width > 0 ? (() => {
+    const anchorX = x(active.t);
+    const anchorY = y(active.value);
+    const left = clamp(anchorX - TOOLTIP.width / 2, 4, Math.max(4, width - TOOLTIP.width - 4));
+    const aboveTop = anchorY - TOOLTIP.height - TOOLTIP.gap;
+    const top = aboveTop >= 0 ? aboveTop : anchorY + TOOLTIP.gap;
+    const pointerY = aboveTop >= 0 ? top + TOOLTIP.height : top;
+    return { anchorX, anchorY, left, top, pointerY, above: aboveTop >= 0 };
+  })() : null;
 
   return (
     <View style={styles.card}>
@@ -163,14 +174,60 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
               </React.Fragment>
             ))}
 
+            {active && tooltip && (
+              <React.Fragment>
+                <Rect
+                  x={tooltip.left}
+                  y={tooltip.top}
+                  width={TOOLTIP.width}
+                  height={TOOLTIP.height}
+                  rx={TOOLTIP.radius}
+                  fill={SURFACE}
+                  stroke={INK}
+                  strokeWidth={1}
+                />
+                <Path
+                  d={tooltip.above
+                    ? `M${tooltip.anchorX - 6},${tooltip.pointerY} L${tooltip.anchorX + 6},${tooltip.pointerY} L${tooltip.anchorX},${tooltip.pointerY + 7} Z`
+                    : `M${tooltip.anchorX - 6},${tooltip.pointerY} L${tooltip.anchorX + 6},${tooltip.pointerY} L${tooltip.anchorX},${tooltip.pointerY - 7} Z`}
+                  fill={SURFACE}
+                  stroke={INK}
+                  strokeWidth={1}
+                />
+                <SvgText
+                  x={tooltip.left + TOOLTIP.width / 2}
+                  y={tooltip.top + 17}
+                  fontSize={11}
+                  fontWeight="700"
+                  fill={TEXT_PRIMARY}
+                  textAnchor="middle"
+                  fontFamily={FONT}
+                >
+                  {active.label}
+                </SvgText>
+                <SvgText
+                  x={tooltip.left + TOOLTIP.width / 2}
+                  y={tooltip.top + 33}
+                  fontSize={11}
+                  fill={TEXT_MUTED}
+                  textAnchor="middle"
+                  fontFamily={FONT}
+                >
+                  Median {money(active.value)}
+                </SvgText>
+              </React.Fragment>
+            )}
+
           </Svg>
         )}
         {/* Tap targets larger than the dots, laid over the chart. */}
         {width > 0 && points.map((p, i) => (
-          <TouchableOpacity
+          <Pressable
             key={`hit-${p.label}`}
             accessibilityLabel={`${p.label}: median ${money(p.value)}`}
             onPress={() => setSelected(selected === i ? null : i)}
+            onHoverIn={() => setSelected(i)}
+            onHoverOut={() => setSelected(current => (current === i ? null : current))}
             style={[styles.hit, { left: x(p.t) - HIT / 2, top: y(p.value) - HIT / 2 }]}
           />
         ))}
@@ -192,12 +249,6 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
           )}
         </View>
       )}
-
-      <Text style={styles.readout}>
-        {active
-          ? `${active.label}: median ${money(active.value)}`
-          : 'Tap a point for details.'}
-      </Text>
 
       <TouchableOpacity onPress={() => setShowTable(!showTable)} accessibilityRole="button" style={styles.toggleHit}>
         <Text style={styles.toggle}>{showTable ? 'Hide table' : 'Show table'}</Text>
@@ -262,11 +313,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: TEXT_MUTED,
     marginBottom: 6,
-  },
-  readout: {
-    fontSize: 12,
-    color: TEXT_PRIMARY,
-    marginTop: 4,
   },
   muted: {
     fontSize: 13,
