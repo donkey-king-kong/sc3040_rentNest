@@ -192,18 +192,55 @@ const HomeListingScreen = () => {
         applyNearbyAmenities([]);
       };
 
+      const fetchPriceInsights = async () => {
+        const url = `${API_BASE_URL}/api/gov/rentalprices/${listingId}`;
+        console.info('[PriceInsights] Fetching rental prices', { listingId, url });
+        try {
+          const response = await axios.get(url, requestConfig);
+          const payload = response.data || [];
+          if (!Array.isArray(payload)) {
+            console.warn('[PriceInsights] Unexpected rental prices response shape', {
+              listingId,
+              status: response.status,
+              payloadType: typeof payload,
+              payload,
+            });
+            setPriceInsights([]);
+            return;
+          }
+
+          const uniquePrices = {};
+          payload.forEach(item => {
+            if (!uniquePrices[item.leaseDate] || item.rentPrice > uniquePrices[item.leaseDate].rentPrice) {
+              uniquePrices[item.leaseDate] = item;
+            }
+          });
+          const dedupedPrices = Object.values(uniquePrices);
+          console.info('[PriceInsights] Rental prices fetch completed', {
+            listingId,
+            status: response.status,
+            rawCount: payload.length,
+            dedupedCount: dedupedPrices.length,
+            sample: dedupedPrices.slice(0, 3),
+          });
+          if (dedupedPrices.length === 0) {
+            console.info('[PriceInsights] Rental prices response is empty', { listingId });
+          }
+          setPriceInsights(dedupedPrices);
+        } catch (error) {
+          console.warn('[PriceInsights] Rental prices request failed', {
+            listingId,
+            message: error.message,
+            status: error.response?.status,
+            response: error.response?.data,
+          });
+          throw error;
+        }
+      };
+
       await Promise.allSettled([
         fetchNearbyAmenitiesUntilReady(),
-        axios.get(`${API_BASE_URL}/api/gov/rentalprices/${listingId}`, requestConfig)
-          .then(response => {
-            const uniquePrices = {};
-            (response.data || []).forEach(item => {
-              if (!uniquePrices[item.leaseDate] || item.rentPrice > uniquePrices[item.leaseDate].rentPrice) {
-                uniquePrices[item.leaseDate] = item;
-              }
-            });
-            setPriceInsights(Object.values(uniquePrices));
-          }),
+        fetchPriceInsights(),
         axios.get(`${API_BASE_URL}/api/reviews/byUser/${ownerUserID}`, requestConfig)
           .then(response => {
             const reviewList = Array.isArray(response.data) ? response.data : [];

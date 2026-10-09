@@ -26,6 +26,7 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Date;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -445,23 +446,39 @@ public class ApiService {
      */
     public List<RentalPrices> getPastRentalPricesByListingId(Long listingId) {
         try {
+            logger.info("[PriceInsights] Starting lookup for listingId={}", listingId);
             Listings listing = listingsRepository.findById(listingId).orElse(null);
-            if (listing == null || listing.getPostal() == null) return new ArrayList<>();
+            if (listing == null) {
+                logger.warn("[PriceInsights] No listing found for listingId={}", listingId);
+                return new ArrayList<>();
+            }
+            if (listing.getPostal() == null) {
+                logger.warn("[PriceInsights] Listing {} has no postal code; cannot load comparable rents", listingId);
+                return new ArrayList<>();
+            }
             String postalCode = String.format("%06d", listing.getPostal());
             List<Object[]> monthAndRent = new ArrayList<>(); // {yyyy-MM, rent}
+            logger.info("[PriceInsights] Listing {} context type={}, postalCode={}, beds={}, size={}, location={}",
+                    listingId, listing.getType(), postalCode, listing.getBeds(), listing.getSize(), listing.getLocation());
 
             if ("HDB".equalsIgnoreCase(listing.getType())) {
                 String flatType = hdbFlatTypeForListing(
                         listing.getName(), listing.getDescription(), listing.getBeds(), listing.getSize());
                 List<HDBRentalContract> hdb = getHDBRentalContractsByFlatType(postalCode, flatType);
+                logger.info("[PriceInsights] Listing {} HDB postal/street lookup flatType={} count={}",
+                        listingId, flatType, hdb.size());
                 if (hdb.size() < 3 && hasText(listing.getLocation())) {
                     // Postal code unknown to OneMap or not a residential block: use the street stored on the listing.
                     List<HDBRentalContract> byStreet = getHDBRentalContractsByStreet(normaliseHdbStreetName(listing.getLocation()), flatType);
+                    logger.info("[PriceInsights] Listing {} HDB listing-location street fallback flatType={} normalisedStreet={} count={}",
+                            listingId, flatType, normaliseHdbStreetName(listing.getLocation()), byStreet.size());
                     if (byStreet.size() > hdb.size()) hdb = byStreet;
                 }
                 String town = hdbTownIn(listing.getLocation());
                 if (hdb.size() < 3 && town != null) {
                     hdb = getHDBRentalContractsByTown(town, flatType);
+                    logger.info("[PriceInsights] Listing {} HDB town fallback town={} flatType={} count={}",
+                            listingId, town, flatType, hdb.size());
                 }
                 for (HDBRentalContract c : hdb) {
                     monthAndRent.add(new Object[]{c.getRentApprovalDate(), c.getMonthlyRent()});
@@ -471,29 +488,53 @@ public class ApiService {
                 String beds = landed ? "NA" : String.valueOf(listing.getBeds());
                 List<RentalContract> contracts = new ArrayList<>();
                 String project = getProjectNameFromPostalCode(postalCode);
+                logger.info("[PriceInsights] Listing {} private context landed={}, bedroomFilter={}, projectFromPostal={}",
+                        listingId, landed, beds, project);
                 if (!landed && project != null && !project.isBlank()
                         && !"Address not found".equals(project) && !"NIL".equalsIgnoreCase(project)) {
                     contracts = getRentalContractsByProject(project, 1, beds);
+                    logger.info("[PriceInsights] Listing {} private project lookup project={} count={}",
+                            listingId, project, contracts.size());
+                } else {
+                    logger.info("[PriceInsights] Listing {} skipped private project lookup because project is unavailable or listing is landed",
+                            listingId);
                 }
                 if (contracts.size() < 3) {
                     contracts = getRentalContractsNearPostalCode(postalCode, PRIVATE_INSIGHT_RADIUS_M, 1, beds);
+                    logger.info("[PriceInsights] Listing {} private radius lookup radiusMeters={} count={}",
+                            listingId, PRIVATE_INSIGHT_RADIUS_M, contracts.size());
                 }
                 if (contracts.size() < 3 && hasText(listing.getLocation())) {
                     contracts = getRentalContractsByStreet(listing.getLocation(), 1, beds);
+                    logger.info("[PriceInsights] Listing {} private street fallback street={} count={}",
+                            listingId, listing.getLocation(), contracts.size());
                 }
                 if (contracts.size() < 3) {
                     contracts = getRentalContractsNearPostalCode(postalCode, PRIVATE_WIDE_RADIUS_M, 1, beds);
+                    logger.info("[PriceInsights] Listing {} private wide radius lookup radiusMeters={} count={}",
+                            listingId, PRIVATE_WIDE_RADIUS_M, contracts.size());
                 }
                 if (contracts.size() < 3) {
                     contracts = getRentalContractsNearPostalCode(postalCode, 3000, 1, beds);
+                    logger.info("[PriceInsights] Listing {} private final radius lookup radiusMeters={} count={}",
+                            listingId, 3000, contracts.size());
                 }
                 for (RentalContract c : contracts) {
                     monthAndRent.add(new Object[]{c.getLeaseDate(), c.getRent()});
                 }
             }
-            return monthlyMedians(monthAndRent, PRICE_INSIGHT_MONTHS);
+            List<RentalPrices> medians = monthlyMedians(monthAndRent, PRICE_INSIGHT_MONTHS);
+            if (medians.isEmpty()) {
+                logger.info("[PriceInsights] Listing {} completed with no chartable months; rawComparableCount={}",
+                        listingId, monthAndRent.size());
+            } else {
+                logger.info("[PriceInsights] Listing {} completed successfully; rawComparableCount={}, medianMonthCount={}, newestMonth={}, oldestMonth={}",
+                        listingId, monthAndRent.size(), medians.size(), medians.get(0).getleaseDate(),
+                        medians.get(medians.size() - 1).getleaseDate());
+            }
+            return medians;
         } catch (RuntimeException e) {
-            logger.warn("[PriceInsights] Could not load price insights for listingId={}: {}", listingId, e.getMessage());
+            logger.warn("[PriceInsights] Could not load price insights for listingId={}: {}", listingId, e.getMessage(), e);
             return new ArrayList<>();
         }
     }
@@ -544,7 +585,7 @@ public class ApiService {
         try {
             SimpleDateFormat inputFormat = new SimpleDateFormat("yyyy-MM");
             Date date = inputFormat.parse(dateStr);
-            SimpleDateFormat outputFormat = new SimpleDateFormat("MMM yyyy");
+            SimpleDateFormat outputFormat = new SimpleDateFormat("MMM yyyy", Locale.ENGLISH);
             return outputFormat.format(date);
         } catch (ParseException e) {
             return dateStr;

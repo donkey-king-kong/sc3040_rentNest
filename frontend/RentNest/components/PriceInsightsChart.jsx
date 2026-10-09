@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import Svg, { Path, Line, Circle, Text as SvgText } from 'react-native-svg';
@@ -65,6 +65,16 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
     .map((d) => ({ label: d.leaseDate, value: Number(d.rentPrice), t: monthIndex(d.leaseDate) }))
     .filter((p) => p.t !== null && p.value > 0)
     .sort((a, b) => a.t - b.t), [data]);
+
+  useEffect(() => {
+    if (data.length > 0 && points.length === 0) {
+      console.warn('[PriceInsights] Chart received data but no points were chartable', {
+        rawCount: data.length,
+        sample: data.slice(0, 5),
+        expectedDateFormat: 'MMM yyyy, for example Sep 2026',
+      });
+    }
+  }, [data, points]);
 
   const header = (
     <TouchableOpacity
