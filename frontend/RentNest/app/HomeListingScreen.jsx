@@ -67,6 +67,14 @@ const HomeListingScreen = () => {
   useEffect(() => {
     const fetchListingData = async () => {
       try {
+        setLoading(true);
+        setListing(null);
+        setNearbySchools([]);
+        setNearbyHawkerCentres([]);
+        setNearbyBusStops([]);
+        setPriceInsights([]);
+        setReviews([]);
+
         const tokenValue = await AsyncStorage.getItem('token');
         
         if (!tokenValue) {
@@ -116,12 +124,9 @@ const HomeListingScreen = () => {
         console.log('Processed listing data:', defaultListing);
         setListing(defaultListing);
 
-        // Show the listing once core details are ready; secondary sections load in the background.
-        setLoading(false);
-        fetchSecondaryListingData(tokenValue, defaultListing.ownerUserID)
-          .catch(error => {
-            console.warn('Secondary listing data failed:', error?.message);
-          });
+        // Keep the transition up until the full page data has settled, so
+        // sections do not briefly render misleading empty states.
+        await fetchSecondaryListingData(tokenValue, defaultListing.ownerUserID);
       } catch (error) {
         console.error('Error in fetchListingData:', error);
         console.error('Error details:', { //Remove when demo
