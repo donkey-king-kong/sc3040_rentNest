@@ -81,7 +81,7 @@ const adviceFor = (pct, isOwner) => {
   if (pct < 0) {
     return isOwner
       ? 'Below similar rentals nearby. You may be able to ask for more.'
-      : 'Below similar rentals nearby. Ask the owner why, for example condition, lease terms or what is included.';
+      : 'Below similar rentals nearby. Ask the owner why it is priced lower, such as the condition, lease terms, or what is included.';
   }
   return isOwner
     ? 'Above similar rentals nearby. Explain what justifies it (renovation, furnishing, view) in your description.'

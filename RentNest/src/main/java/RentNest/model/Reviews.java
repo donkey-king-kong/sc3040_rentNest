@@ -22,6 +22,7 @@ public class Reviews {
 
     private int rating;
     private String title;
+    @Column(columnDefinition = "TEXT")
     private String text;
     private boolean flagged;
 
