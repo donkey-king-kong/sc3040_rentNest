@@ -31,7 +31,7 @@ const HEIGHT = 200;
 const FONT = Platform.OS === 'web' ? 'Helvetica, Arial, sans-serif' : undefined;
 const HIT = 32;
 const PAD = { top: 16, right: 16, bottom: 28, left: 52 };
-const TOOLTIP = { width: 102, height: 38, gap: 8, radius: 8 };
+const TOOLTIP = { minWidth: 96, maxWidth: 148, height: 40, gap: 8, radius: 8, paddingX: 14 };
 
 const money = (n) => `$${Math.round(n).toLocaleString()}`;
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -127,11 +127,17 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
   const tooltip = active && width > 0 ? (() => {
     const anchorX = x(active.t);
     const anchorY = y(active.value);
-    const left = clamp(anchorX - TOOLTIP.width / 2, 4, Math.max(4, width - TOOLTIP.width - 4));
+    const valueLabel = `Median ${money(active.value)}`;
+    const tooltipWidth = clamp(
+      Math.max(active.label.length * 7.4, valueLabel.length * 7) + TOOLTIP.paddingX * 2,
+      TOOLTIP.minWidth,
+      TOOLTIP.maxWidth
+    );
+    const left = clamp(anchorX - tooltipWidth / 2, 4, Math.max(4, width - tooltipWidth - 4));
     const aboveTop = anchorY - TOOLTIP.height - TOOLTIP.gap;
     const top = aboveTop >= 0 ? aboveTop : anchorY + TOOLTIP.gap;
     const pointerY = aboveTop >= 0 ? top + TOOLTIP.height : top;
-    return { anchorX, anchorY, left, top, pointerY, above: aboveTop >= 0 };
+    return { anchorX, anchorY, left, top, pointerY, width: tooltipWidth, valueLabel, above: aboveTop >= 0 };
   })() : null;
 
   return (
@@ -174,7 +180,7 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
                 <Rect
                   x={tooltip.left}
                   y={tooltip.top}
-                  width={TOOLTIP.width}
+                  width={tooltip.width}
                   height={TOOLTIP.height}
                   rx={TOOLTIP.radius}
                   fill={SURFACE}
@@ -190,8 +196,8 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
                   strokeWidth={1}
                 />
                 <SvgText
-                  x={tooltip.left + TOOLTIP.width / 2}
-                  y={tooltip.top + 15}
+                  x={tooltip.left + tooltip.width / 2}
+                  y={tooltip.top + 16}
                   fontSize={11}
                   fontWeight="700"
                   fill={TEXT_PRIMARY}
@@ -201,14 +207,14 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
                   {active.label}
                 </SvgText>
                 <SvgText
-                  x={tooltip.left + TOOLTIP.width / 2}
-                  y={tooltip.top + 29}
+                  x={tooltip.left + tooltip.width / 2}
+                  y={tooltip.top + 31}
                   fontSize={11}
                   fill={TEXT_MUTED}
                   textAnchor="middle"
                   fontFamily={FONT}
                 >
-                  Median {money(active.value)}
+                  {tooltip.valueLabel}
                 </SvgText>
               </React.Fragment>
             )}
