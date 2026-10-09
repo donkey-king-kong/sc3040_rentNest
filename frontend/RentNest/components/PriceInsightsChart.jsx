@@ -22,7 +22,6 @@ const SURFACE = '#FFFFFF';
 const GRID = '#E6E6E6';
 const TEXT_PRIMARY = '#111111';
 const TEXT_MUTED = '#52514e';
-const REFERENCE = '#9A9A9A';     // selection rule only
 // Reference lines: told apart by pattern (long dash vs dots) and named in the key below the chart.
 const ASKING_LINE = { stroke: '#3d3d3a', strokeWidth: 2, strokeDasharray: '7 4' };
 const FAIR_LINE = { stroke: '#52514e', strokeWidth: 2, strokeDasharray: '0.1 4', strokeLinecap: 'round' };
@@ -32,7 +31,7 @@ const HEIGHT = 200;
 const FONT = Platform.OS === 'web' ? 'Helvetica, Arial, sans-serif' : undefined;
 const HIT = 32;
 const PAD = { top: 16, right: 16, bottom: 28, left: 52 };
-const TOOLTIP = { width: 118, height: 44, gap: 10, radius: 8 };
+const TOOLTIP = { width: 102, height: 38, gap: 8, radius: 8 };
 
 const money = (n) => `$${Math.round(n).toLocaleString()}`;
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -159,10 +158,6 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
             <Path d={areaPath} fill={INK} fillOpacity={0.08} />
             <Path d={linePath} stroke={INK} strokeWidth={2} fill="none" strokeLinejoin="round" strokeLinecap="round" />
 
-            {active && (
-              <Line x1={x(active.t)} x2={x(active.t)} y1={PAD.top} y2={PAD.top + plotH} stroke={REFERENCE} strokeWidth={1} />
-            )}
-
             {points.map((p, i) => (
               <React.Fragment key={p.label}>
                 <Circle cx={x(p.t)} cy={y(p.value)} r={selected === i ? 6 : 4} fill={INK} stroke={SURFACE} strokeWidth={2} />
@@ -184,7 +179,7 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
                   rx={TOOLTIP.radius}
                   fill={SURFACE}
                   stroke={INK}
-                  strokeWidth={1}
+                  strokeWidth={1.2}
                 />
                 <Path
                   d={tooltip.above
@@ -196,7 +191,7 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
                 />
                 <SvgText
                   x={tooltip.left + TOOLTIP.width / 2}
-                  y={tooltip.top + 17}
+                  y={tooltip.top + 15}
                   fontSize={11}
                   fontWeight="700"
                   fill={TEXT_PRIMARY}
@@ -207,7 +202,7 @@ const PriceInsightsChart = ({ data = [], askingPrice, fairPrice }) => {
                 </SvgText>
                 <SvgText
                   x={tooltip.left + TOOLTIP.width / 2}
-                  y={tooltip.top + 33}
+                  y={tooltip.top + 29}
                   fontSize={11}
                   fill={TEXT_MUTED}
                   textAnchor="middle"
