@@ -32,6 +32,19 @@ const getApiBaseUrl = () => {
 
 export const API_BASE_URL = getApiBaseUrl();
 
+// Offline map assets in public/map, served by the Expo dev server (see scripts/fetch-map-assets.js).
+// Null outside development, where the map falls back to its CDN and remote tiles.
+const getMapAssetsUrl = () => {
+    if (Platform.OS === 'web') {
+        return `${window.location.origin}/map`;
+    }
+
+    const hostUri = Constants.expoConfig?.hostUri || Constants.expoGoConfig?.debuggerHost;
+    return hostUri ? `http://${hostUri}/map` : null;
+};
+
+export const MAP_ASSETS_URL = getMapAssetsUrl();
+
 export const ENDPOINTS = {
     LOGIN: '/auth/login',
     SIGNUP: '/auth/signup',
