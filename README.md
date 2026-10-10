@@ -8,6 +8,8 @@ See [the recommendation guide](RentNest/RECOMMENDATIONS.md) for the personalised
 
 ## Setup Instructions
 
+If setup or debugging gets stuck, see [Price Insights troubleshooting](Documentation/Troubleshooting/price-insights.md).
+
 ### Required Installs
 - Java JDK
 - Maven
@@ -61,6 +63,17 @@ w = web
 i = iOS simulator
 a = Android emulator
 ```
+
+### Offline Map (Optional)
+The listing map loads its libraries and tiles from the internet by default. To make it work on a poor or blocked connection, download the map assets once while online:
+```bash
+cd frontend/RentNest
+npm run map-assets
+```
+
+This saves about 14 MB to `public/map/`: the map libraries, fonts, icons and Singapore-only map tiles. The Expo dev server then serves them to web and to phones on the same network, so the map needs no internet access. The tile download needs the [go-pmtiles CLI](https://github.com/protomaps/go-pmtiles/releases) on your `PATH`, or its path in `PMTILES_BIN`.
+
+Without these files, the map falls back to the online sources as before.
 
 ### Backend Setup
 1. Go to the backend directory:

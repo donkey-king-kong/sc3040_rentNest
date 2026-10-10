@@ -14,6 +14,8 @@ security.jwt.expiration-time=3600000
 # External APIs
 LTADATAMALL_ACCOUNTKEY=YOUR_API_KEY
 URA_ACCESSKEY=YOUR_API_KEY
+# Optional: data.gov.sg API key (HDB rental data). Blank works but gets a lower rate limit.
+DATAGOVSG_API_KEY=
 
 # AI recommendations (OpenRouter). Leave the key blank to run the recommendation
 # pipeline entirely on its rule-based path; nothing else needs to change.
@@ -43,9 +45,19 @@ rentnest.ai.summary.amenity-radius-meters=1000
 # Timeouts. On expiry the request falls back to the rule-based path rather than failing.
 rentnest.ai.connect-timeout-ms=3000
 rentnest.ai.read-timeout-ms=9000
-# Gemini LLM API for AI chat summary and Ask AI guardrails
+
+# Gemini LLM API for AI chat summary, Ask AI guardrails and AI fair pricing
+# (room-type detection and price explanations)
 # Put the real key only in application.properties. Do not commit real API keys.
 llm.provider=gemini
 llm.api-key=YOUR_GEMINI_API_KEY
 llm.api-url=https://generativelanguage.googleapis.com/v1beta/models
 llm.model=gemini-3.6-flash
+
+# AI fair pricing: price listings without enough real comparables from simulated
+# transactions (labelled "DEMO" on the card). On by default; set false to use real data only.
+pricing.demo-data.enabled=true
+
+# AI fair pricing model (room detection and price explanation). A fast lite model keeps
+# the card responsive (~1 s per call); set a larger model here if needed.
+pricing.ai.model=gemini-3.1-flash-lite

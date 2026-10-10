@@ -6,6 +6,8 @@ import NavigationBar from '../components/NavigationBar';
 import { API_BASE_URL } from '../config/api';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
+import FairPriceCard from '../components/FairPriceCard';
+import useFairPriceEstimate from '../hooks/useFairPriceEstimate';
 import { normalizeListingImageUrl } from '../components/ListingImage';
 
 const CreateListingScreen = () => {
@@ -30,6 +32,16 @@ const CreateListingScreen = () => {
         listingpicture: '',
     });
     const [modalVisible, setModalVisible] = useState(false);
+
+    // AI Fair-Pricing Model: suggested range updates as the owner fills in the form
+    const { estimate: fairPrice, loading: fairPriceLoading } = useFairPriceEstimate({
+        token,
+        type: listing.type,
+        postal: listing.postal,
+        beds: listing.beds,
+        size: listing.size,
+        floor: listing.floor,
+    });
 
     useEffect(() => {
         const loadUserDataAndToken = async () => {
@@ -197,6 +209,17 @@ const CreateListingScreen = () => {
                     value={listing.price}
                     onChangeText={(value) => handleInputChange('price', value)}
                 />
+                {(fairPrice || fairPriceLoading) ? (
+                    <FairPriceCard
+                        compact
+                        estimate={fairPrice}
+                        loading={fairPriceLoading}
+                        askingPrice={listing.price}
+                        onUseSuggested={(mid) => handleInputChange('price', String(mid))}
+                    />
+                ) : (
+                    <Text style={styles.hint}>Fill in the listing type, postal code and bedrooms to get an AI suggested price range.</Text>
+                )}
 
                 {/* Rooms - Bedroom & Bathroom */}
                 <Text style={styles.label}>Rooms</Text>
@@ -331,6 +354,11 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 2,
         elevation: 2,
+    },
+    hint: {
+        fontSize: 12,
+        color: '#666',
+        marginTop: 6,
     },
     typeContainer: {
         flexDirection: 'row',

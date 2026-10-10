@@ -26,6 +26,10 @@ public class NearbyAmenitiesService {
     private final JdbcTemplate jdbcTemplate;
     private final ApiService apiService;
     private final Set<Long> precomputingListingIds = ConcurrentHashMap.newKeySet();
+    /** When a background precompute last finished, so an empty result is not reported as LOADING forever. */
+    private final Map<Long, Long> precomputeFinishedAt = new ConcurrentHashMap<>();
+    /** How long an empty precompute result is trusted before trying again. */
+    private static final long EMPTY_RESULT_RETRY_MILLIS = 10 * 60 * 1000L;
 
     public NearbyAmenitiesService(ListingsRepository listingsRepository,
                                   JdbcTemplate jdbcTemplate,
@@ -61,6 +65,7 @@ public class NearbyAmenitiesService {
             } catch (RuntimeException e) {
                 logger.warn("[NearbyAmenities] Background precompute failed for listingId={}: {}", listingId, e.getMessage());
             } finally {
+                precomputeFinishedAt.put(listingId, System.currentTimeMillis());
                 precomputingListingIds.remove(listingId);
             }
         });
@@ -70,6 +75,14 @@ public class NearbyAmenitiesService {
         List<Map<String, Object>> amenities = getPrecomputedForListing(listingId);
         if (!amenities.isEmpty()) {
             return new NearbyAmenitiesResponse("READY", amenities);
+        }
+
+        // A finished precompute that stored nothing (no coordinates, nothing nearby, or the
+        // external APIs failed) is READY with no amenities, otherwise clients poll forever.
+        Long finishedAt = precomputeFinishedAt.get(listingId);
+        if (finishedAt != null && System.currentTimeMillis() - finishedAt < EMPTY_RESULT_RETRY_MILLIS
+                && !precomputingListingIds.contains(listingId)) {
+            return new NearbyAmenitiesResponse("READY", List.of());
         }
 
         precomputeForListingInBackground(listingId);

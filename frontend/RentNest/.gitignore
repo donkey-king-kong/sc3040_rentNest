@@ -21,7 +21,8 @@ web-build/
 
 expo-env.d.ts
 # @end expo-cli
-# Local environment settings
+
+# Local environment (holds API keys)
 .env
 .env.local
 .env.*.local
