@@ -6,8 +6,8 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Platform,
 } from "react-native";
-import { Picker } from "@react-native-picker/picker";
 import { useFocusEffect, useRouter } from "expo-router";
 import NavigationBar from "../components/NavigationBar";
 import axios from "axios";
@@ -16,7 +16,15 @@ import { jwtDecode } from "jwt-decode";
 import { API_BASE_URL, ENDPOINTS } from "../config/api";
 import MorphingInfinity from "../components/MorphingInfinity";
 import ListingImage from "../components/ListingImage";
+import Dropdown from "../components/Dropdown";
 import { Feather } from "@expo/vector-icons";
+
+const propertyTypeOptions = [
+  { label: "All property types", value: "" },
+  { label: "HDB", value: "HDB" },
+  { label: "Condo", value: "Condo" },
+  { label: "Landed", value: "Landed" },
+];
 
 const emptyForm = {
   query: "",
@@ -45,6 +53,8 @@ export default function HomeScreen() {
   const [form, setForm] = useState(emptyForm);
   const applied = useRef(emptyForm);
   const activeRequest = useRef(null);
+  const searchInput = useRef(null);
+  const [focusedField, setFocusedField] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -179,6 +189,7 @@ export default function HomeScreen() {
           style={styles.loadingScreen}
         >
           <MorphingInfinity size={86} color="#2FA84F" />
+          <Text style={styles.loadingText}>Loading listings...</Text>
         </View>
         <NavigationBar />
       </View>
@@ -192,15 +203,46 @@ export default function HomeScreen() {
         Search in your own words, or use the filters to narrow the results.
       </Text>
       <View style={styles.row}>
-        <TextInput
-          accessibilityLabel="Search homes"
-          style={styles.input}
-          placeholder="Describe the home you want, or a location or postal code"
-          value={form.query}
-          maxLength={300}
-          onChangeText={(value) => update("query", value)}
-          onSubmitEditing={() => fetchListings(form)}
-        />
+        <View
+          style={[
+            styles.searchField,
+            focusedField === "query" && styles.focused,
+          ]}
+        >
+          <Feather
+            name="search"
+            size={16}
+            color="#666"
+            style={styles.searchIcon}
+          />
+          <TextInput
+            ref={searchInput}
+            accessibilityLabel="Search homes"
+            style={[styles.searchInput, styles.noOutline]}
+            placeholder="Area or postal code"
+            placeholderTextColor="#888"
+            numberOfLines={1}
+            value={form.query}
+            maxLength={300}
+            onFocus={() => setFocusedField("query")}
+            onBlur={() => setFocusedField(null)}
+            onChangeText={(value) => update("query", value)}
+            onSubmitEditing={() => fetchListings(form)}
+          />
+          {form.query ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              style={styles.clearButton}
+              onPress={() => {
+                update("query", "");
+                searchInput.current?.focus();
+              }}
+            >
+              <Feather name="x" size={18} color="#333" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
         <TouchableOpacity
           style={styles.button}
           onPress={() => fetchListings(form)}
@@ -211,7 +253,7 @@ export default function HomeScreen() {
       <TouchableOpacity
         accessibilityRole="button"
         accessibilityState={{ expanded: showFilters }}
-        style={styles.filterToggle}
+        style={[styles.control, styles.filterToggle]}
         onPress={() => setShowFilters(!showFilters)}
       >
         <Text style={styles.filterToggleText}>
@@ -230,16 +272,24 @@ export default function HomeScreen() {
         <View>
           <View style={styles.row}>
             {[
-              ["minPrice", "Min S$/month"],
-              ["maxPrice", "Max S$/month"],
-              ["minBeds", "Min bedrooms"],
-            ].map(([key, label]) => (
+              ["minPrice", "Min S$/mo", "Minimum rent, S$ per month"],
+              ["maxPrice", "Max S$/mo", "Maximum rent, S$ per month"],
+              ["minBeds", "Min beds", "Minimum bedrooms"],
+            ].map(([key, placeholder, label]) => (
               <TextInput
                 key={key}
                 accessibilityLabel={label}
-                style={styles.input}
-                placeholder={label}
+                style={[
+                  styles.control,
+                  styles.filterInput,
+                  styles.noOutline,
+                  focusedField === key && styles.focused,
+                ]}
+                placeholder={placeholder}
+                placeholderTextColor="#888"
                 keyboardType="numeric"
+                onFocus={() => setFocusedField(key)}
+                onBlur={() => setFocusedField(null)}
                 value={form[key]}
                 onChangeText={(value) => update(key, value)}
               />
@@ -247,44 +297,37 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.filterLabel}>Property type</Text>
           <View style={styles.pickerRow}>
-            <View style={styles.pickerContainer}>
-              <Picker
-                accessibilityLabel="Property type"
-                selectedValue={form.types[0] || ""}
-                onValueChange={(value) => update("types", value ? [value] : [])}
-                style={styles.picker}
-              >
-                <Picker.Item label="All property types" value="" />
-                <Picker.Item label="HDB" value="HDB" />
-                <Picker.Item label="Condo" value="Condo" />
-                <Picker.Item label="Landed" value="Landed" />
-              </Picker>
-            </View>
+            <Dropdown
+              label="Property type"
+              options={propertyTypeOptions}
+              value={form.types[0] || ""}
+              onChange={(value) => update("types", value ? [value] : [])}
+            />
             <TouchableOpacity
-              style={styles.chip}
+              style={styles.control}
               onPress={() => {
                 setForm(emptyForm);
                 fetchListings(emptyForm);
               }}
             >
-              <Text>Reset</Text>
+              <Text style={styles.controlText}>Reset</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
       <View style={styles.row}>
         <TouchableOpacity
-          style={styles.chip}
+          style={styles.control}
           onPress={() =>
             setSort(sort === "recommended" ? "price" : "recommended")
           }
         >
-          <Text>
+          <Text style={styles.controlText}>
             Sort: {sort === "recommended" ? "Recommended" : "Lowest rent"}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.chip} onPress={clearHistory}>
-          <Text>Reset Recommendations</Text>
+        <TouchableOpacity style={styles.control} onPress={clearHistory}>
+          <Text style={styles.controlText}>Reset Recommendations</Text>
         </TouchableOpacity>
       </View>
       {error ? (
@@ -379,43 +422,73 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     alignItems: "center",
   },
-  input: {
+  searchField: {
     flex: 1,
-    minWidth: 95,
+    minWidth: 0,
+    height: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#c8c8c8",
+    borderRadius: 12,
+    backgroundColor: "#f2f2f2",
+    paddingLeft: 12,
+  },
+  searchIcon: { marginRight: 8 },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    height: "100%",
+    fontSize: 14,
+    paddingRight: 4,
+  },
+  clearButton: {
+    width: 36,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Shared box style for every filter and sort control so they line up.
+  control: {
+    height: 40,
+    justifyContent: "center",
+    paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: "#aaa",
     borderRadius: 8,
-    padding: 12,
+    backgroundColor: "#fff",
   },
+  controlText: { fontSize: 14, color: "#222" },
+  filterInput: { width: 110, fontSize: 14 },
+  // Focus is shown on the rounded box itself, in the app's green, instead of
+  // the browser's default outline around the inner input.
+  focused: {
+    borderColor: "#205c43",
+    ...(Platform.OS === "web" ? { boxShadow: "0 0 0 1px #205c43" } : {}),
+  },
+  noOutline: Platform.OS === "web" ? { outlineStyle: "none" } : {},
   pickerRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+    alignItems: "flex-start",
+    gap: 8,
     marginVertical: 8,
   },
-  pickerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#aaa",
-    borderRadius: 8,
-    overflow: "hidden",
+  button: {
+    height: 44,
+    justifyContent: "center",
+    backgroundColor: "#182c25",
+    borderRadius: 12,
+    paddingHorizontal: 13,
   },
-  picker: { width: 190, height: 42 },
-  button: { backgroundColor: "#182c25", borderRadius: 8, padding: 13 },
   buttonText: { color: "#fff", fontWeight: "bold" },
   filterToggle: {
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    borderWidth: 1,
     borderColor: "#9bb7a5",
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 11,
     marginVertical: 6,
   },
-  filterToggleText: { color: "#205c43", fontWeight: "600" },
+  filterToggleText: { color: "#205c43", fontSize: 14, fontWeight: "600" },
   filterChevron: { marginLeft: 8 },
   link: { color: "#205c43", marginVertical: 6, fontWeight: "600" },
   chip: { padding: 9, borderWidth: 1, borderColor: "#aaa", borderRadius: 8 },
@@ -425,6 +498,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  loadingText: {
+    marginTop: 24,
+    color: "#101820",
+    fontSize: 18,
+    fontWeight: "700",
   },
   list: { flex: 1 },
   card: {
