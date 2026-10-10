@@ -20,8 +20,7 @@ import {
 const AdminAnalyticsScreen = () => {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const period = '12M';
-  const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_ADMIN_SUMMARY, period);
+  const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_ADMIN_SUMMARY);
 
   const header = (
     <>
@@ -113,8 +112,7 @@ const AdminAnalyticsScreen = () => {
   return (
     <>
       {header}
-      <AnalyticsLayout compactTabs showPeriod={false} showRefresh={false} periodAccent="#16794B"
-        period={period} loading={loading} error={error} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}>
+      <AnalyticsLayout compactTabs error={error}>
           <Section title="Overview" action={<RefreshControl onRefresh={retry} loading={loading} asOf={data.asOf} />}>{!loading && <><TileRow>
             <StatTile label="Registered Users" scope="Now" metric={m.registeredUserCount} />
             <StatTile label="Listings" scope="Now" metric={m.listingCount} />
@@ -162,7 +160,6 @@ const AdminAnalyticsScreen = () => {
     </>
   );
 };
-
 
 const styles = StyleSheet.create({
   refreshLoading: { height: 400 },

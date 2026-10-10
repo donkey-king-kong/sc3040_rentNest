@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, useWindowDimensions, ActivityIndicator, Modal, ScrollView, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, useWindowDimensions, Modal, ScrollView, Platform } from 'react-native';
 import { FontAwesome } from 'react-native-vector-icons';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { API_BASE_URL } from '../../config/api';
-import MorphingInfinity from '../MorphingInfinity';
 
 // Chart colors: one validated series hue; "vacant" is a neutral with a border for relief
 export const COLORS = {
@@ -29,35 +28,13 @@ export const CATEGORY_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#8b
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-// ---------- Period ----------
-
-const pad = (n) => String(Math.abs(n)).padStart(2, '0');
-
-// Local midnight with the device's UTC offset, e.g. 2026-01-01T00:00:00+08:00
-export const toOffsetIso = (date) => {
-  const offset = -date.getTimezoneOffset();
-  const sign = offset >= 0 ? '+' : '-';
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T00:00:00`
-    + `${sign}${pad(Math.trunc(offset / 60))}:${pad(offset % 60)}`;
-};
+// ---------- Past-year date range ----------
 
 // Singapore calendar dates, independent of the phone's time zone.
 const singaporeDate = now => new Date(now.getTime() + 8 * 60 * 60 * 1000);
 const singaporeMidnight = date => date.toISOString().slice(0, 10) + 'T00:00:00+08:00';
 const singaporeInstant = now => singaporeDate(now).toISOString().replace('Z', '+08:00');
 
-// Completed calendar months; the current partial month is excluded.
-export const buildPeriod = (months, now = new Date()) => {
-  const today = singaporeDate(now);
-  const year = today.getUTCFullYear();
-  const month = today.getUTCMonth();
-  return { from: singaporeMidnight(new Date(Date.UTC(year, month - months, 1))), to: singaporeMidnight(new Date(Date.UTC(year, month, 1))) };
-};
-export const buildLastDays = (days, now = new Date()) => {
-  const today = singaporeDate(now);
-  const from = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - days + 1));
-  return { from: singaporeMidnight(from), to: singaporeInstant(now) };
-};
 export const buildPastYear = (now = new Date()) => {
   const today = singaporeDate(now);
   return {
@@ -65,17 +42,6 @@ export const buildPastYear = (now = new Date()) => {
     to: singaporeInstant(now),
   };
 };
-export const PERIOD_OPTIONS = [
-  { key: '1M', label: '1 month', build: () => buildPeriod(1) },
-  { key: '2M', label: '2 months', build: () => buildPeriod(2) },
-  { key: '3M', label: '3 months', build: () => buildPeriod(3) },
-  { key: '6M', label: '6 months', build: () => buildPeriod(6) },
-  { key: '12M', label: '1 year', build: () => buildPastYear() },
-  { key: 'LIFETIME', label: 'Lifetime', build: () => ({ period: 'lifetime' }) },
-];
-export const DEFAULT_PERIOD = 'LIFETIME';
-export const resolvePeriodKey = key => PERIOD_OPTIONS.some(option => option.key === key) ? key : DEFAULT_PERIOD;
-const periodFor = key => PERIOD_OPTIONS.find(option => option.key === resolvePeriodKey(key)).build();
 
 // ---------- Data ----------
 
@@ -92,10 +58,10 @@ const describeError = (error) => {
 export const getAuthToken = () => AsyncStorage.getItem('token');
 
 /**
- * Loads an analytics endpoint for a period key from PERIOD_OPTIONS (e.g. '1M', '12M').
- * Keeps the previous data visible while a new period loads.
+ * Loads analytics for the current Singapore month and previous eleven months.
+ * Retry fetches a fresh range and response.
  */
-export function useAnalytics(path, periodKey) {
+export function useAnalytics(path) {
   const [state, setState] = useState({ loading: true, data: null, error: null, unauthenticated: false });
   const [attempt, setAttempt] = useState(0);
 
@@ -110,7 +76,7 @@ export function useAnalytics(path, periodKey) {
           return;
         }
         const response = await axios.get(`${API_BASE_URL}${path}`, {
-          params: periodFor(periodKey),
+          params: buildPastYear(),
           headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
         });
         if (!cancelled) setState({ loading: false, data: response.data, error: null, unauthenticated: false });
@@ -127,7 +93,7 @@ export function useAnalytics(path, periodKey) {
     };
     load();
     return () => { cancelled = true; };
-  }, [path, periodKey, attempt]);
+  }, [path, attempt]);
 
   return { ...state, retry: () => setAttempt((n) => n + 1) };
 }
@@ -175,7 +141,6 @@ export const formatValue = (value, unit) => {
   if (value === null || value === undefined) return '—';
   // The backend rounds percentages and months to 1 decimal place; JSON drops trailing zeros, so restore them
   if (unit === 'percent') return `${Number(value).toFixed(1)}%`;
-  if (unit === 'percentage_points') return `${Number(value).toFixed(1)} pts`;
   if (unit === 'SGD') return `S$${withCommas(value)}`;
   if (isCurrency(unit)) return `${unit} ${withCommas(value)}`;
   if (unit === 'months') return `${Number(value).toFixed(1)} mo`;
@@ -199,14 +164,6 @@ export const formatDay = (iso) => {
   return `${date.getDate()} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
 };
 
-
-export const formatChange = (metric) => {
-  if (!metric || metric.availability !== 'available') return null;
-  const value = Number(metric.value);
-  const suffix = metric.unit === 'percentage_points' ? ' pts' : '%';
-  return `${value > 0 ? '+' : ''}${value.toFixed(1)}${suffix} vs previous period`;
-};
-
 // ---------- Layout ----------
 
 export const Section = ({ title, note, action, children }) => (
@@ -221,49 +178,6 @@ export const Section = ({ title, note, action, children }) => (
 );
 
 export const TileRow = ({ children }) => <View style={styles.tileRow}>{children}</View>;
-
-export const formatPeriodRange = period => {
-  if (!period?.from || !period?.to) return null;
-  const format = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: period.timeZone || 'Asia/Singapore' });
-  return `${format.format(new Date(period.from))} \u2013 ${format.format(new Date(new Date(period.to).getTime() - 1))}`;
-};
-
-export const PeriodSelector = ({ value, onChange, loading, accentColor, trailingAction, dataPeriod, lifetimeLabel = 'Lifetime' }) => {
-  const [open, setOpen] = useState(false);
-  const selected = resolvePeriodKey(value);
-  const optionLabel = option => option.key === 'LIFETIME' ? lifetimeLabel : option.label;
-  const label = optionLabel(PERIOD_OPTIONS.find(option => option.key === selected));
-  const dates = selected === 'LIFETIME'
-    ? (!loading && dataPeriod?.lifetime ? formatPeriodRange(dataPeriod) : 'All recorded history')
-    : formatPeriodRange(periodFor(selected));
-  const color = accentColor || '#16794B';
-  const toggle = () => setOpen(shown => !shown);
-  return <View style={styles.periodContainer}>
-    <View style={styles.periodControlRow}>
-      <Pressable onPress={toggle} accessibilityRole="button" accessibilityLabel="Analytics period" accessibilityState={{ expanded: open }} style={styles.periodTrigger}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.periodCaption}>{dates}</Text>
-          <Text style={styles.periodSelectedLabel}>{label}</Text>
-        </View>
-        {loading ? <ActivityIndicator size="small" color={color} accessibilityLabel="Updating analytics" /> : <FontAwesome name={open ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.inkSecondary} />}
-      </Pressable>
-      {trailingAction}
-    </View>
-    {open ? <View style={styles.periodMenu}>
-      {PERIOD_OPTIONS.map(option => <Pressable key={option.key} onPress={() => { if (selected !== option.key) onChange(option.key); setOpen(false); }} accessibilityRole="button" accessibilityLabel={optionLabel(option)} accessibilityState={{ selected: selected === option.key }} style={[styles.periodOption, selected === option.key && styles.periodOptionSelected]}>
-        <Text style={[styles.periodOptionTitle, { flex: 1 }]}>{optionLabel(option)}</Text>
-        {selected === option.key ? <FontAwesome name="check" size={16} color={color} /> : null}
-      </Pressable>)}
-    </View> : null}
-  </View>;
-};
-
-export const LoadingState = ({ message = "Loading analytics…", textStyle } = {}) => (
-  <View style={styles.centerState}>
-    <MorphingInfinity size={86} color="#2FA84F" />
-    <Text style={[styles.stateText, textStyle]}>{message}</Text>
-  </View>
-);
 
 export const ErrorState = ({ message, onRetry, actionLabel = 'Try again' }) => (
   <View style={styles.centerState}>
@@ -280,7 +194,6 @@ export const ErrorState = ({ message, onRetry, actionLabel = 'Try again' }) => (
 
 /**
  * A single metric. Tap to show how it is calculated. Unavailable metrics show "Not available", never 0.
- * `change` is an optional percent-change metric, shown underneath only when it could be calculated.
  * `featured` gives the main overview figures more visual emphasis.
  */
 const scopeFor = (metric, scope) => scope === 'Now' ? null : scope || (metric?.basis === 'period' ? 'Period' : null);
@@ -307,7 +220,7 @@ export const MetricDetails = ({ label, metric, scope, visible, onClose, hideValu
   </Modal>
 );
 
-export const StatTile = ({ label, metric, change, featured = false, scope, supportingText, unavailableText = 'Not available', children, style, accessibilityLabel }) => {
+export const StatTile = ({ label, metric, featured = false, scope, supportingText, unavailableText = 'Not available', children, style, accessibilityLabel }) => {
   const [showDefinition, setShowDefinition] = useState(false);
   const { width } = useWindowDimensions();
   if (!metric) return null;
@@ -333,39 +246,7 @@ export const StatTile = ({ label, metric, change, featured = false, scope, suppo
       )}
       {children}
       {supportingText ? <Text style={styles.tileChange}>{supportingText}</Text> : null}
-      {available && formatChange(change) ? <Text style={styles.tileChange}>{formatChange(change)}</Text> : null}
       {showDefinition ? <MetricDetails label={label} metric={metric} scope={scope} visible onClose={() => setShowDefinition(false)} /> : null}
-    </Pressable>
-  );
-};
-
-// ---------- Meter ----------
-
-/** A percentage against 100%, on a track from the same hue. */
-export const Meter = ({ label, metric, scope }) => {
-  const [showDefinition, setShowDefinition] = useState(false);
-  if (!metric) return null;
-  const available = metric.availability === 'available';
-  const percent = available ? Math.max(0, Math.min(100, Number(metric.value))) : 0;
-
-  return (
-    <Pressable
-      style={styles.meter}
-      onPress={() => setShowDefinition((shown) => !shown)}
-      accessibilityRole="button"
-      accessibilityLabel={`${label}: ${available ? `${metric.value} percent` : 'not available'}`}
-    >
-      <View style={styles.meterHeader}>
-        <Text style={styles.meterLabel}>{label}</Text><FontAwesome name="info-circle" size={16} color={COLORS.inkSecondary} />
-        <Text style={available ? styles.meterValue : styles.tileUnavailable}>
-          {available ? formatValue(metric.value, metric.unit) : 'Not available'}
-        </Text>
-      </View>
-      {visibleScopeFor(metric, scope) ? <Text style={styles.scope}>{visibleScopeFor(metric, scope)}</Text> : null}
-      <View style={[styles.meterTrack, !available && styles.meterTrackUnavailable]}>
-        {available ? <View style={[styles.meterFill, { width: `${percent}%` }]} /> : null}
-      </View>
-      {showDefinition ? <MetricDetails label={label} metric={metric} scope={scope || 'Now'} visible onClose={() => setShowDefinition(false)} /> : null}
     </Pressable>
   );
 };
@@ -631,50 +512,14 @@ export const LineChart = ({ series, emptyText, maxValue, title, seriesLabel, com
 // ---------- Share bar ----------
 
 /** Parts of a whole as one segmented bar, with a labelled legend so identity never relies on color alone. */
-export const ShareBar = ({ series, emptyText }) => {
 
-  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
+// ---------- Pie chart ----------
 
-  const points = series.points || [];
-  const total = points.reduce((sum, point) => sum + (Number(point.value) || 0), 0);
-  const share = (value) => (total === 0 ? '0.0' : ((Number(value) / total) * 100).toFixed(1));
-
-  return (
-    <View style={styles.chartCard}>
-      <Text style={styles.chartReadout}>{total === 0 ? emptyText : `${withCommas(total)} in total`}</Text>
-
-      {total > 0 ? (
-        <View style={styles.shareBar} accessibilityLabel={points.map((point) => `${point.bucket}: ${point.value}`).join(', ')}>
-          {points.map((point, index) => (Number(point.value) > 0 ? (
-            <View
-              key={point.bucket}
-              style={[styles.shareSegment, { flex: Number(point.value), backgroundColor: CATEGORY_COLORS[index] }]}
-            />
-          ) : null))}
-        </View>
-      ) : null}
-
-      <View style={styles.shareLegend}>
-        {points.map((point, index) => (
-          <View key={point.bucket} style={styles.shareLegendRow}>
-            <View style={[styles.legendSwatch, { backgroundColor: CATEGORY_COLORS[index] }]} />
-            <Text style={styles.shareLegendLabel}>{point.bucket}</Text>
-            <Text style={styles.shareLegendValue}>{`${withCommas(point.value)} · ${share(point.value)}%`}</Text>
-          </View>
-        ))}
-      </View>
-
-    </View>
-  );
-};
-
-// ---------- Donut chart ----------
-
-const DistributionChart = ({ series, emptyText, totalLabel = 'Total users', pie = false, totalMetric, metricLabel = 'Total', title, children }) => {
+export const PieChart = ({ series, emptyText, totalLabel = 'Total users', totalMetric, metricLabel = 'Total', title, children }) => {
   if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} title={title} />;
   const points = (series.points || []).map(point => ({ ...point, value: Math.max(0, Number(point.value) || 0) }));
   const total = points.reduce((sum, point) => sum + point.value, 0);
-  const radius = pie ? 80 : 68;
+  const radius = 80;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
   return (
@@ -682,17 +527,17 @@ const DistributionChart = ({ series, emptyText, totalLabel = 'Total users', pie 
       {title ? <ChartReadout title={title} series={series} hidePeriodLabel compact /> : null}
       {totalMetric ? <View style={{ marginBottom: 20 }}><MetricRow label={metricLabel} metric={totalMetric} showInfo={!title} /></View> : null}
       {children}
-      <View style={styles.donut} accessible accessibilityLabel={total > 0 || !emptyText ? totalLabel + ': ' + total : emptyText}>
+      <View style={styles.pie} accessible accessibilityLabel={total > 0 || !emptyText ? totalLabel + ': ' + total : emptyText}>
         <Svg width={180} height={180}
           {...(Platform.OS === 'web'
             ? { 'aria-hidden': true }
             : { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' })}>
-          <Circle cx={90} cy={90} r={radius} fill={pie ? COLORS.border : 'none'} stroke={pie ? 'none' : COLORS.border} strokeWidth={24} />
+          <Circle cx={90} cy={90} r={radius} fill={COLORS.border} stroke="none" strokeWidth={24} />
           {total > 0 ? points.map((point, index) => {
             const length = point.value / total * circumference;
             const start = offset;
             offset += length;
-            if (pie && point.value > 0) {
+            if (point.value > 0) {
               const color = CATEGORY_COLORS[index % CATEGORY_COLORS.length];
               if (point.value === total) return <Circle key={point.bucket} cx={90} cy={90} r={radius} fill={color} />;
               const startAngle = start / radius - Math.PI / 2;
@@ -702,18 +547,9 @@ const DistributionChart = ({ series, emptyText, totalLabel = 'Total users', pie 
               return <Path key={point.bucket} fill={color}
                 d={`M90 90 L${x(startAngle)} ${y(startAngle)} A${radius} ${radius} 0 ${point.value / total > 0.5 ? 1 : 0} 1 ${x(endAngle)} ${y(endAngle)} Z`} />;
             }
-            return point.value > 0 ? (
-              <Circle key={point.bucket} cx={90} cy={90} r={radius} fill="none"
-                stroke={CATEGORY_COLORS[index % CATEGORY_COLORS.length]} strokeWidth={24}
-                strokeDasharray={[length, circumference]} strokeDashoffset={-start}
-                transform="rotate(-90 90 90)" />
-            ) : null;
+            return null;
           }) : null}
         </Svg>
-        {!pie ? <View style={styles.donutCentre} pointerEvents="none">
-          <Text style={styles.donutTotal}>{withCommas(total)}</Text>
-          <Text style={styles.donutLabel}>{totalLabel}</Text>
-        </View> : null}
       </View>
       {total === 0 && emptyText ? <Text style={styles.chartReadout}>{emptyText}</Text> : null}
       <View style={styles.shareLegend}>
@@ -729,14 +565,10 @@ const DistributionChart = ({ series, emptyText, totalLabel = 'Total users', pie 
   );
 };
 
-export const DonutChart = props => <DistributionChart {...props} />;
-export const PieChart = props => <DistributionChart {...props} pie />;
-
-export const MetricRow = ({ label, metric, change, scope, showInfo = true }) => {
+export const MetricRow = ({ label, metric, scope, showInfo = true }) => {
   const [expanded, setExpanded] = useState(false);
   if (!metric) return null;
   const available = metric.availability === 'available';
-  const comparison = available ? formatChange(change) : null;
   return (
     <Pressable style={styles.metricRow} onPress={() => setExpanded(value => !value)}
       accessibilityRole="button" accessibilityState={{ expanded }}
@@ -747,71 +579,8 @@ export const MetricRow = ({ label, metric, change, scope, showInfo = true }) => 
         <Text style={styles.metricRowValue}>{available ? formatValue(metric.value, metric.unit) : 'Not available'}</Text>
       </View>
       {visibleScopeFor(metric, scope) ? <Text style={styles.scope}>{visibleScopeFor(metric, scope)}</Text> : null}
-      {comparison ? <Text style={styles.metricRowComparison}>{comparison}</Text> : null}
       {expanded ? <MetricDetails label={label} metric={metric} scope={scope} visible onClose={() => setExpanded(false)} /> : null}
     </Pressable>
-  );
-};
-
-// ---------- Occupancy strip ----------
-
-/** One cell per month: filled = occupied, outlined = vacant. Tap a cell to read it. */
-export const OccupancyStrip = ({ series }) => {
-  const [selected, setSelected] = useState(null);
-
-  if (!series || series.availability !== 'available') return <SeriesUnavailable series={series} />;
-
-  const points = series.points || [];
-  const occupiedMonths = points.filter((point) => point.value === 'occupied').length;
-  const selectedPoint = selected !== null ? points[selected] : null;
-
-  return (
-    <View style={styles.chartCard}>
-      <Text style={styles.chartReadout}>
-        {selectedPoint
-          ? `${fullBucket(selectedPoint.bucket)}: ${formatValue(selectedPoint.value, 'status')}`
-          : `Occupied ${occupiedMonths} of ${points.length} months`}
-      </Text>
-
-      <View style={styles.stripRow}>
-        {points.map((point, index) => {
-          const occupied = point.value === 'occupied';
-          return (
-            <Pressable
-              key={point.bucket}
-              style={styles.stripHit}
-              onPress={() => setSelected(selected === index ? null : index)}
-              accessibilityRole="button"
-              accessibilityLabel={`${fullBucket(point.bucket)}: ${point.value}`}
-            >
-              <View
-                style={[
-                  styles.stripCell,
-                  occupied ? styles.stripOccupied : styles.stripVacant,
-                  selected === index && styles.stripSelected,
-                ]}
-              />
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={[styles.xLabels, styles.stripLabels]}>
-        {points.map((point, index) => (
-          <Text key={point.bucket} style={styles.xLabel} numberOfLines={1}>
-            {showLabel(index, points.length) ? shortBucket(point.bucket) : ''}
-          </Text>
-        ))}
-      </View>
-
-      <View style={styles.legend}>
-        <View style={[styles.legendSwatch, styles.stripOccupied]} />
-        <Text style={styles.legendText}>Occupied</Text>
-        <View style={[styles.legendSwatch, styles.stripVacant]} />
-        <Text style={styles.legendText}>Vacant</Text>
-      </View>
-
-    </View>
   );
 };
 
@@ -822,15 +591,7 @@ const styles = StyleSheet.create({
   countBarValue: { fontSize: 16, fontWeight: '600', color: COLORS.ink, fontVariant: ['tabular-nums'] },
   countBarTrack: { height: 12, backgroundColor: COLORS.seriesTrack, borderRadius: 3, overflow: 'hidden' },
   countBarFill: { height: '100%', backgroundColor: COLORS.series, borderRadius: 3 },
-  periodContainer: { marginBottom: 14 },
-  periodControlRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  periodTrigger: { flex: 1, minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#C8C7C2', borderRadius: 8, backgroundColor: COLORS.surface },
-  periodCaption: { fontSize: 14, lineHeight: 20, color: COLORS.inkSecondary, fontVariant: ['tabular-nums'] },
-  periodSelectedLabel: { fontSize: 20, lineHeight: 26, fontWeight: '500', color: COLORS.ink },
-  periodOption: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 8 },
-  periodMenu: { marginTop: 8, padding: 4, borderWidth: 1, borderColor: '#C8C7C2', borderRadius: 8 },
-  periodOptionSelected: { backgroundColor: '#EAF5EE' },
-  periodOptionTitle: { fontSize: 16, lineHeight: 22, fontWeight: '500', color: COLORS.ink },
+
   chartHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   chartInfoButton: { width: 24, height: 24, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   scope: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary, marginTop: 4 },
@@ -841,15 +602,12 @@ const styles = StyleSheet.create({
   detailsClose: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
   detailsValue: { fontSize: 28, fontWeight: '600', marginVertical: 12, color: COLORS.ink, fontVariant: ['tabular-nums'] },
   detailsBody: { fontSize: 16, lineHeight: 24, marginTop: 12, color: COLORS.inkSecondary },
-  donut: { width: 180, height: 180, alignSelf: 'center', marginVertical: 8 },
-  donutCentre: { position: 'absolute', top: 0, bottom: 0, left: 30, right: 30, alignItems: 'center', justifyContent: 'center' },
-  donutTotal: { fontSize: 26, fontWeight: '700', color: COLORS.ink },
-  donutLabel: { fontSize: 12, color: COLORS.inkSecondary, marginTop: 4 },
+  pie: { width: 180, height: 180, alignSelf: 'center', marginVertical: 8 },
   metricRow: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   metricRowMain: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   metricRowLabel: { flex: 1, fontSize: 15, color: COLORS.inkSecondary },
   metricRowValue: { fontSize: 22, fontWeight: '600', color: COLORS.ink, flexShrink: 1 },
-  metricRowComparison: { fontSize: 12, color: COLORS.inkSecondary, marginTop: 6, textAlign: 'right' },
+
   section: {
     marginBottom: 32,
   },
@@ -904,93 +662,14 @@ const styles = StyleSheet.create({
     color: COLORS.inkSecondary,
     marginTop: 6,
   },
-  tileDefinition: {
-    fontSize: 12,
-    color: COLORS.inkSecondary,
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  meter: {
-    paddingVertical: 14, paddingHorizontal: 0, marginTop: 10,
-  },
-  meterHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 8,
-  },
-  meterLabel: {
-    fontSize: 14,
-    color: COLORS.ink,
-  },
-  meterValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.ink,
-  },
-  meterTrack: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.seriesTrack,
-    overflow: 'hidden',
-  },
-  meterTrackUnavailable: {
-    backgroundColor: COLORS.border,
-  },
-  meterFill: {
-    height: '100%',
-    borderRadius: 4,
-    backgroundColor: COLORS.series,
-  },
-  periodRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 8,
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  periodLabel: {
-    fontSize: 14,
-    color: COLORS.inkSecondary,
-    marginRight: 8,
-  },
-  chip: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginRight: 6,
-    backgroundColor: COLORS.surface,
-  },
-  chipSelected: {
-    backgroundColor: COLORS.ink,
-    borderColor: COLORS.ink,
-  },
-  chipText: {
-    fontSize: 14,
-    color: COLORS.ink,
-  },
-  chipTextSelected: {
-    color: COLORS.surface,
-    fontWeight: '600',
-  },
-  periodSpinner: {
-    marginLeft: 4,
-  },
+
   centerState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
-  stateText: {
-    marginTop: 10,
-    fontSize: 14,
-    color: COLORS.inkSecondary,
-  },
+
   errorText: {
     fontSize: 15,
     color: COLORS.error,
@@ -1073,38 +752,7 @@ const styles = StyleSheet.create({
     color: COLORS.inkMuted,
     textAlign: 'center',
   },
-  stripRow: {
-    flexDirection: 'row',
-  },
-  stripLabels: {
-    marginLeft: 0,
-  },
-  stripHit: {
-    flex: 1,
-    paddingHorizontal: 1,
-    paddingVertical: 4,
-  },
-  stripCell: {
-    height: 28,
-    borderRadius: 4,
-  },
-  stripOccupied: {
-    backgroundColor: COLORS.series,
-  },
-  stripVacant: {
-    backgroundColor: COLORS.vacant,
-    borderWidth: 1,
-    borderColor: COLORS.vacantBorder,
-  },
-  stripSelected: {
-    borderWidth: 2,
-    borderColor: COLORS.ink,
-  },
-  legend: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-  },
+
   legendSwatch: {
     width: 12,
     height: 12,
@@ -1124,17 +772,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     flex: undefined,
   },
-  shareBar: {
-    flexDirection: 'row',
-    height: 16,
-    borderRadius: 4,
-    overflow: 'hidden',
-    backgroundColor: COLORS.surface,
-  },
-  shareSegment: {
-    height: '100%',
-    marginRight: 2,
-  },
+
   shareLegend: {
     marginTop: 12,
   },
@@ -1156,9 +794,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.ink,
   },
-  legendText: {
-    fontSize: 12,
-    color: COLORS.inkSecondary,
-    marginRight: 16,
-  },
+
 });

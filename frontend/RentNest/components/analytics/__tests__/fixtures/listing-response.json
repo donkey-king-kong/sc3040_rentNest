@@ -24,7 +24,7 @@
       "value": "vacant",
       "unit": "status",
       "basis": "snapshot",
-      "definition": "'occupied' when the listing has a rental record with status 'active', otherwise 'vacant'.",
+      "definition": "'occupied' when an active tenancy covers asOf (start inclusive, end exclusive), otherwise 'vacant'.",
       "reason": null
     },
     "rentalRecordCount": {
@@ -35,28 +35,12 @@
       "definition": "Rental records (offers) in any status. Rejected offers are not recorded by the app.",
       "reason": null
     },
-    "pendingRentalRecordCount": {
-      "availability": "available",
-      "value": 0,
-      "unit": "count",
-      "basis": "snapshot",
-      "definition": "Rental records with status 'pending' (offer sent, not yet accepted).",
-      "reason": null
-    },
     "acceptedRentalRecordCount": {
       "availability": "available",
       "value": 1,
       "unit": "count",
       "basis": "snapshot",
       "definition": "Rental records with status 'active' or 'terminated'.",
-      "reason": null
-    },
-    "terminatedRentalRecordCount": {
-      "availability": "available",
-      "value": 1,
-      "unit": "count",
-      "basis": "snapshot",
-      "definition": "Rental records with status 'terminated'.",
       "reason": null
     },
     "acceptanceRate": {
@@ -99,60 +83,12 @@
       "definition": "Sum of recorded rent payment amounts (whole SGD) with a billing-month date in the period. Excludes deposits and does not subtract termination refunds; payments have no failed or refunded state.",
       "reason": null
     },
-    "recordedRentPaymentTotalChange": {
-      "availability": "unavailable",
-      "value": null,
-      "unit": "percent",
-      "basis": "period",
-      "definition": "Change in rent recorded compared with the previous period of the same length, by billing month.",
-      "reason": "Nothing in the previous period, so a percentage change cannot be calculated."
-    },
-    "recordedRentPaymentCountChange": {
-      "availability": "unavailable",
-      "value": null,
-      "unit": "percent",
-      "basis": "period",
-      "definition": "Change in payments recorded compared with the previous period of the same length, by billing month.",
-      "reason": "Nothing in the previous period, so a percentage change cannot be calculated."
-    },
     "averageOccupancyRate": {
       "availability": "available",
       "value": 65.6,
       "unit": "percent",
       "basis": "period",
       "definition": "Share of the period the listings were occupied: time covered by accepted rentals divided by (number of listings x length of the period). Uses the listings that exist now.",
-      "reason": null
-    },
-    "averageOccupancyRateChange": {
-      "availability": "available",
-      "value": 65.6,
-      "unit": "percentage_points",
-      "basis": "period",
-      "definition": "Change in average occupancy compared with the previous period of the same length, in percentage points.",
-      "reason": null
-    },
-    "offersSentCount": {
-      "availability": "available",
-      "value": 0,
-      "unit": "count",
-      "basis": "period",
-      "definition": "Offers sent during the period.",
-      "reason": null
-    },
-    "offersAcceptedCount": {
-      "availability": "available",
-      "value": 0,
-      "unit": "count",
-      "basis": "period",
-      "definition": "Offers accepted during the period.",
-      "reason": null
-    },
-    "terminationsCount": {
-      "availability": "available",
-      "value": 0,
-      "unit": "count",
-      "basis": "period",
-      "definition": "Tenancies terminated during the period.",
       "reason": null
     },
     "listingViews": {
@@ -170,14 +106,6 @@
       "basis": "period",
       "definition": "Different people who opened this listing during the period; repeat visits by the same person count once.",
       "reason": null
-    },
-    "photoGalleryViews": {
-      "availability": "unavailable",
-      "value": null,
-      "unit": "count",
-      "basis": "period",
-      "definition": "Times people browsed this listing's photographs.",
-      "reason": "A listing stores a single photograph, so there is no gallery to browse."
     },
     "daysOnMarket": {
       "availability": "unavailable",

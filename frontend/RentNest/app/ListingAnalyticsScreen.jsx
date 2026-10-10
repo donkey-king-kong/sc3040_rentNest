@@ -15,8 +15,7 @@ const ListingAnalyticsScreen = () => {
   const router = useRouter();
   const { listingId } = useLocalSearchParams();
   const { width, fontScale } = useWindowDimensions();
-  const period = '12M';
-  const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_LISTING(listingId), period);
+  const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_LISTING(listingId));
   const [imageFailed, setImageFailed] = useState(false);
   useEffect(() => setImageFailed(false), [data?.listing?.listingPicture]);
 
@@ -52,8 +51,7 @@ const ListingAnalyticsScreen = () => {
 
   return <>
     {header}
-    <AnalyticsLayout compactTabs showHeader={false} showPeriod={false} showRefresh={false}
-      period={period} loading={loading} error={error} onRefresh={retry} dataPeriod={data.period} asOf={data.asOf}>
+    <AnalyticsLayout compactTabs showHeader={false} error={error}>
       <View style={styles.listingHeader}>
         {listing.listingPicture && !imageFailed ? <Image source={{ uri: listing.listingPicture }} style={styles.image}
           accessible={false} onError={() => setImageFailed(true)} />

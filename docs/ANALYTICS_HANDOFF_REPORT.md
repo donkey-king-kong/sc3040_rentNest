@@ -8,7 +8,7 @@
 
 This responds to `01_ANALYTICS_AGENT_HANDOFF.md`. It reports what was built, what was tested and how, what was changed in the shared database, and what remains. Nothing here claims approval against `02_QUALITY_TARGETS_FINAL_DRAFT.md`, which is still a draft.
 
-**5 October 2026 update:** this report preserves the original implementation and test evidence below. The current synthetic-demo history policy supersedes its September tracking cutoffs: analytics uses stored event dates for the selected period, empty event periods return zero, and date-based "Tracked since" labels/comparison gates are removed. Undefined percentage changes and missing or invalid days-on-market dates remain unavailable. See `ANALYTICS_API.md` for the current contract.
+**Current reference:** this report records the original implementation and test evidence. See `ANALYTICS_API.md` for the current response contract. Analytics uses stored event dates, empty event periods return zero, and missing or invalid days-on-market dates produce unavailable values.
 
 ## 1. Summary
 
@@ -68,7 +68,7 @@ After each change, the backend on this branch was started against Supabase with 
 | File | Change |
 |---|---|
 | `app/OwnerAnalyticsScreen.jsx`, `app/ListingAnalyticsScreen.jsx`, `app/AdminAnalyticsScreen.jsx` | **New.** Dashboards. The property page has tabs (Overview, Offers, Payments, Occupancy) and a Change property picker; all three offer 30D / 3M / 6M / 12M. |
-| `components/analytics/AnalyticsKit.jsx` (+ tests, fixture) | **New.** Data hook, icon tiles, meters, bar, line and share charts, period selector |
+| `components/analytics/AnalyticsKit.jsx` (+ tests, fixture) | **New.** Data hook, icon tiles, meters, bar, line and share charts |
 | `package.json`, `package-lock.json` | **Added `react-native-svg` 15.2.0** (the version Expo SDK 51 expects), used by the line charts. The lockfile change is additive only: that package and its 11 dependencies. Teammates need to run `npm install --legacy-peer-deps` after merging. |
 | `components/ModerationListState.jsx` (+ tests) | **New.** Loading, error and empty states for moderation lists |
 | `config/api.js` | Analytics endpoint constants |

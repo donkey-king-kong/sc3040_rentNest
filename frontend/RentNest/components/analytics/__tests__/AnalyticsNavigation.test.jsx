@@ -31,10 +31,6 @@ jest.mock('../../MorphingInfinity', () => () => null);
 
 const text = tree => tree.root.findAllByType(Text).map(n => [].concat(n.props.children).filter(c => typeof c === 'string' || typeof c === 'number').join(''));
 const press = async (tree, label) => {
-  if (['1 month', '3 months'].includes(label)) {
-    const dropdown = tree.root.findAll(n => n.props.accessibilityLabel === 'Analytics period' && typeof n.props.onPress === 'function')[0];
-    await act(async () => dropdown.props.onPress());
-  }
   const target = tree.root.findAll(n => n.props.accessibilityLabel === label && typeof n.props.onPress === 'function')[0];
   expect(target).toBeDefined();
   await act(async () => target.props.onPress());
@@ -54,6 +50,10 @@ beforeEach(() => {
 });
 
 it('owner navigation separates topics and uses the fixed year for property analytics', async () => {
+  // This owner-only metric is not part of the property API fixture.
+  useAnalytics.mockReturnValue({ data: { ...listingResponse, metrics: { ...listingResponse.metrics,
+    terminationsCount: { availability: 'available', value: 0, unit: 'count', basis: 'period' },
+  } }, loading: false });
   const tree = await render(OwnerAnalyticsScreen);
   expect(text(tree)).toContain('Overview');
   expect(text(tree)).toContain('Monthly Rent Recorded');
@@ -64,11 +64,10 @@ it('owner navigation separates topics and uses the fixed year for property analy
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Offers tab')).toHaveLength(0);
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Rent tab')).toHaveLength(0);
   expect(text(tree)).not.toContain('Payments recorded');
-  expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '12M');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/owner');
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Occupancy tab')).toHaveLength(0);
   expect(text(tree)).toContain('Monthly Occupancy');
   expect(text(tree)).toContain('Tenancy Length');
-  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Analytics period' && node.props.onPress)).toHaveLength(0);
   expect(tree.root.findAll(node => node.props.label === 'Tenants Hosted')).toHaveLength(1);
   const { CountBarChart } = require('../AnalyticsKit');
   expect(tree.root.findAllByType(CountBarChart)).toHaveLength(1);
@@ -80,18 +79,18 @@ it('owner navigation separates topics and uses the fixed year for property analy
   expect(text(tree)).not.toContain('Offers (all time)');
   expect(text(tree)).not.toContain('Activity in this period');
   expect(text(tree)).toContain('Tenancy Length');
-  expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '12M');
-  expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '12M');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/owner');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/owner');
   await press(tree, 'Properties tab');
   expect(text(tree)).toContain('By Property');
   expect(text(tree)).not.toContain('Offers (all time)');
   await press(tree, 'View analytics for A2');
-  expect(mockPush).toHaveBeenCalledWith({ pathname: '/ListingAnalyticsScreen', params: { listingId: 2, period: '12M' } });
+  expect(mockPush).toHaveBeenCalledWith({ pathname: '/ListingAnalyticsScreen', params: { listingId: 2 } });
   await press(tree, 'Overview tab');
-  expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '12M');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/owner');
 });
 
-it('admin overview includes user status without reports or tabs', async () => {
+it('admin overview displays account status', async () => {
   const count = value => ({ availability: 'available', value, unit: 'count', basis: 'snapshot' });
   useAnalytics.mockReturnValue({ data: { ...listingResponse, metrics: { ...listingResponse.metrics,
     flaggedListingCount: count(2), flaggedUserCount: count(0), flaggedReviewCount: count(3), bannedUserCount: count(1), registeredUserCount: count(4),
@@ -103,7 +102,6 @@ it('admin overview includes user status without reports or tabs', async () => {
   expect(text(tree)).not.toContain('Moderation and safety');
   expect(text(tree)).not.toContain('Rental activity');
   expect(text(tree)).not.toContain('Past 12 months');
-  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Analytics period' && node.props.onPress)).toHaveLength(0);
   expect(tree.root.findAll(node => ['Rentals tab', 'Users tab'].includes(node.props.accessibilityLabel))).toHaveLength(0);
   expect(text(tree)).toContain('Rentals');
   expect(text(tree)).not.toContain('User overview');
@@ -111,8 +109,6 @@ it('admin overview includes user status without reports or tabs', async () => {
   expect(tree.root.findAll(node => node.props.accessibilityRole === 'tab')).toHaveLength(0);
   expect(text(tree)).not.toContain('Reported records');
   expect(text(tree)).toEqual(expect.arrayContaining(['Allowed to Sign In', 'Blocked from Signing In']));
-  const { DonutChart } = require('../AnalyticsKit');
-  expect(tree.root.findAllByType(DonutChart)).toHaveLength(0);
   const { PieChart } = require('../AnalyticsKit');
   expect(tree.root.findAllByType(PieChart).find(node => node.props.totalLabel === 'Registered Users').props.series.points).toEqual([
     { bucket: 'Allowed to Sign In', value: 3 }, { bucket: 'Blocked from Signing In', value: 1 },
@@ -224,7 +220,7 @@ it('keeps the property header and back navigation available during initial loadi
   await act(async () => tree.unmount());
 });
 
-it('admin rentals divides recorded offers without double counting and removes user growth', async () => {
+it('admin rental categories reconcile with total offers', async () => {
   useAnalytics.mockReturnValue({ data: {
     ...listingResponse,
     metrics: { ...listingResponse.metrics,
@@ -274,21 +270,19 @@ it('property analytics retains all sections on one page with a fixed past-year p
     'Average Tenancy', 'Tenants Hosted', 'Time to Accepted Offer', 'Days on Market',
   ]));
   expect(tree.root.findAll(node => node.props.accessibilityRole === 'tab')).toHaveLength(0);
-  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Analytics period' && node.props.onPress)).toHaveLength(0);
   expect(text(tree)).not.toContain('Change property');
-  expect(useAnalytics).toHaveBeenLastCalledWith('/listing/2', '12M');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/listing/2');
 });
 
-it('owner hides the extra past-year heading and keeps property navigation', async () => {
+it('owner tabs preserve property navigation', async () => {
   const tree = await render(OwnerAnalyticsScreen);
   const labels = text(tree);
   expect(labels).not.toContain('Past 12 months');
   await press(tree, 'Properties tab');
   expect(text(tree)).not.toContain('Period');
-  expect(tree.root.findAll(node => node.props.accessibilityLabel === '3 months')).toHaveLength(0);
   await press(tree, 'Overview tab');
   expect(text(tree)).not.toContain('Past 12 months');
-  expect(useAnalytics).toHaveBeenLastCalledWith('/owner', '12M');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/owner');
 });
 
 it.each([OwnerAnalyticsScreen, ListingAnalyticsScreen, AdminAnalyticsScreen])('refreshes analytics using the fixed past-year period', async Component => {
@@ -298,7 +292,9 @@ it.each([OwnerAnalyticsScreen, ListingAnalyticsScreen, AdminAnalyticsScreen])('r
   expect(text(tree).some(value => value.includes('vs previous period'))).toBe(false);
   await press(tree, 'Refresh analytics');
   expect(retry).toHaveBeenCalledTimes(1);
-  expect(useAnalytics.mock.calls.at(-1)[1]).toBe('12M');
+  const endpoint = Component === OwnerAnalyticsScreen ? '/owner'
+    : Component === ListingAnalyticsScreen ? '/listing/2' : '/admin';
+  expect(useAnalytics.mock.calls.at(-1)).toEqual([endpoint]);
 });
 it('does not display a contradictory rental status breakdown', async () => {
   const metric = value => ({ availability: 'available', value, unit: 'count' });
@@ -307,7 +303,7 @@ it('does not display a contradictory rental status breakdown', async () => {
   expect(text(tree)).toContain('Rental status counts cannot be reconciled.');
 });
 
-it('retains rental charts and occupied listing calculation details without activity number cards', async () => {
+it('owner displays rental charts and occupancy details', async () => {
   const metric = (value, basis) => ({ availability: 'available', value, unit: 'count', basis });
   useAnalytics.mockReturnValue({ data: { ...listingResponse, metrics: { ...listingResponse.metrics, listingCount: metric(3, 'snapshot'), rentalRecordCount: metric(5, 'snapshot'), acceptedRentalRecordCount: metric(3, 'snapshot'), offersAcceptedCount: metric(1, 'period'), activeTenancyCount: metric(2, 'snapshot') } }, loading: false });
   const tree = await render(OwnerAnalyticsScreen);
@@ -363,9 +359,9 @@ it('owner hides all metrics during refresh while keeping its header, tabs and re
 });
 
 it('opens property analytics using the fixed past-year period', async () => {
-  mockRouteParams = { listingId: '2', period: '12M' };
+  mockRouteParams = { listingId: '2' };
   await render(ListingAnalyticsScreen);
-  expect(useAnalytics).toHaveBeenLastCalledWith('/listing/2', '12M');
+  expect(useAnalytics).toHaveBeenLastCalledWith('/listing/2');
 });
 
 it('hides property history during refresh and displays the returned history afterwards', async () => {
@@ -404,7 +400,6 @@ it.each([OwnerAnalyticsScreen, ListingAnalyticsScreen])('shows Refreshing beside
   expect(text(tree).some(value => value.includes('Updated'))).toBe(true);
   expect(text(tree)).not.toContain('Refreshing...');
 });
-
 
 it('uses period metrics for property performance and all-time metrics for tenancy history', async () => {
   const count = (value, basis = 'snapshot') => ({ availability: 'available', value, unit: 'count', basis });
@@ -493,7 +488,6 @@ it('retries failed property analytics requests without losing back navigation', 
   await press(tree, 'Back to owner analytics');
   expect(mockBack).toHaveBeenCalledTimes(1);
 });
-
 
 it('preserves property information after a failed photo and retries when its URL changes', async () => {
   const photoData = url => ({ ...listingResponse, listing: { ...listingResponse.listing, listingPicture: url } });

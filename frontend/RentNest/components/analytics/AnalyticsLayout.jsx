@@ -1,6 +1,6 @@
 import React, { useId, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Platform, useWindowDimensions } from 'react-native';
-import { COLORS, PeriodSelector } from './AnalyticsKit';
+import { COLORS } from './AnalyticsKit';
 import { FontAwesome } from 'react-native-vector-icons';
 import MorphingInfinity from '../MorphingInfinity';
 
@@ -20,9 +20,8 @@ export function ActivitySection({ title = 'Past 12 months', loading, onRefresh, 
   </View>;
 }
 
-// Keep navigation above the scrolling panel. Changing tabs resets that panel to the top,
-// while the selected period stays in the screen's state.
-export default function AnalyticsLayout({ header, title, subtitle, tabs = [], tab, onTabChange, period, onPeriodChange, loading, error, children, compactTabs = false, periodAccent, periodBelowTabs = false, showPeriod = true, showRefresh = true, showHeader = true, onRefresh, dataPeriod, asOf }) {
+// Keep navigation above the scrolling panel. Changing tabs resets the panel to the top.
+export default function AnalyticsLayout({ header, title, subtitle, tabs = [], tab, onTabChange, error, children, compactTabs = false, showHeader = true }) {
   const id = useId();
   const buttons = useRef([]);
   const { width } = useWindowDimensions();
@@ -35,7 +34,6 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
     onTabChange(tabs[next]);
     buttons.current[next]?.focus();
   };
-  const refreshButton = onRefresh ? <RefreshControl onRefresh={onRefresh} loading={loading} asOf={asOf} /> : null;
   return (
     <View style={[styles.screen, compactTabs && styles.adminScreen]}>
       <View style={styles.container}>
@@ -44,7 +42,6 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
             {title ? <Text style={styles.title}>{title}</Text> : null}
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           </>}
-          {showPeriod && !periodBelowTabs ? <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} trailingAction={refreshButton} dataPeriod={dataPeriod} /> : null}
           {tabs.length > 0 ? <TabContainer
             {...(compactTabs ? { horizontal: true, showsHorizontalScrollIndicator: false,
               contentContainerStyle: styles.compactTabRow, style: styles.compactTabs } : { style: styles.tabs })}
@@ -61,10 +58,6 @@ export default function AnalyticsLayout({ header, title, subtitle, tabs = [], ta
               </Pressable>
             ))}
           </TabContainer> : null}
-          {showPeriod && periodBelowTabs ? <View style={styles.periodBelowTabs}>
-            <PeriodSelector value={period} onChange={onPeriodChange} loading={loading} accentColor={periodAccent} trailingAction={refreshButton} dataPeriod={dataPeriod} />
-          </View> : null}
-          {!showPeriod && showRefresh ? <View style={styles.toolbar}>{refreshButton}</View> : null}
         </View> : null}
         <ScrollView key={tab} nativeID={`${id}-panel`}
           {...(web && tabs.length > 0 ? { role: 'tabpanel', 'aria-labelledby': `${id}-tab-${tabs.indexOf(tab)}` } : {})}
@@ -83,12 +76,12 @@ const styles = StyleSheet.create({
   activityTitle: { fontSize: 20, fontWeight: '600', color: COLORS.ink, flexShrink: 1 },
   refreshGroup: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
   activityLoading: { minHeight: 140, alignItems: 'center', justifyContent: 'center' },
-  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginTop: 8 },
+
   updatedTime: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary, fontVariant: ['tabular-nums'] },
-  rangeText: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary },
+
   refresh: { minWidth: 80, minHeight: 48, flexShrink: 0, flexDirection: 'row', gap: 6, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 },
   refreshText: { color: '#16794B', fontWeight: '600' },
-  periodBelowTabs: { marginTop: 16 },
+
   adminScreen: { backgroundColor: COLORS.surface },
   adminHeader: { backgroundColor: '#FFFFFF', paddingTop: 0 },
   screen: { flex: 1, backgroundColor: COLORS.surface },

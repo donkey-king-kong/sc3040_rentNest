@@ -6,22 +6,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import listingResponse from './fixtures/listing-response.json';
 import { Circle, Path } from 'react-native-svg';
 import {
-  PeriodSelector,
   chartMaximum,
   BarChart,
   CountBarChart,
-  DonutChart,
   PieChart,
   MetricRow,
   LineChart,
-  PERIOD_OPTIONS,
-  ShareBar,
   StatTile,
-  buildLastDays,
   buildPastYear,
-  buildPeriod,
-  formatPeriodRange,
-  formatChange,
   formatValue,
   useAnalytics,
 } from '../AnalyticsKit';
@@ -79,7 +71,6 @@ describe('formatValue', () => {
     expect(formatValue(50, 'percent')).toBe('50.0%');
     expect(formatValue(3, 'months')).toBe('3.0 mo');
     expect(formatValue(12, 'days')).toBe('12.0 days');
-    expect(formatValue(49.2, 'percentage_points')).toBe('49.2 pts');
     expect(formatValue(4.5, 'rating_out_of_5')).toBe('4.5 / 5.0');
     expect(formatValue(7.5, 'months')).toBe('7.5 mo');
     expect(formatValue(1234567, 'count')).toBe('1,234,567');
@@ -87,38 +78,13 @@ describe('formatValue', () => {
   });
 });
 
-describe('buildPeriod', () => {
+describe('buildPastYear', () => {
   it('includes the current Singapore month and previous eleven months through now', () => {
     const now = new Date('2026-09-30T17:00:00Z');
     const range = buildPastYear(now);
     expect(range.from).toBe('2025-11-01T00:00:00+08:00');
     expect(range.to).toBe('2026-10-01T01:00:00.000+08:00');
     expect(new Date(range.to).getTime()).toBe(now.getTime());
-  });
-  it('covers whole months with an explicit offset and stays within 366 days', () => {
-    const { from, to } = buildPeriod(12);
-    const isoWithOffset = /^\d{4}-\d{2}-01T00:00:00[+-]\d{2}:\d{2}$/;
-    expect(from).toMatch(isoWithOffset);
-    expect(to).toMatch(isoWithOffset);
-    const days = (new Date(to) - new Date(from)) / 86400000;
-    expect(days).toBeGreaterThan(360);
-    expect(days).toBeLessThanOrEqual(366);
-  });
-
-  it('covers 30 Singapore calendar dates through the current instant', () => {
-    const now = new Date('2026-10-05T18:09:00Z');
-    const { from, to } = buildLastDays(30, now);
-    expect(from).toBe('2026-09-07T00:00:00+08:00');
-    expect(to).toBe('2026-10-06T02:09:00.000+08:00');
-    expect(new Date(to).getTime()).toBe(now.getTime());
-  });
-  it('uses completed months without including future days', () => {
-    const now = new Date('2026-10-05T18:09:00Z');
-    expect(buildPeriod(3, now)).toEqual({ from: '2026-07-01T00:00:00+08:00', to: '2026-10-01T00:00:00+08:00' });
-    expect(buildPeriod(1, new Date('2026-09-30T17:00:00Z'))).toEqual({ from: '2026-09-01T00:00:00+08:00', to: '2026-10-01T00:00:00+08:00' });
-  });
-  it('offers the five simple preset choices', () => {
-    expect(PERIOD_OPTIONS.map(option => option.key)).toEqual(['1M', '2M', '3M', '6M', '12M', 'LIFETIME']);
   });
 
 });
@@ -137,30 +103,13 @@ describe('StatTile', () => {
     expect(text).not.toContain('Not available');
   });
 
-  it('hides redundant period scope without adding legacy coverage explanations', () => {
+  it('hides redundant period scope', () => {
     const metric = {
       ...available(3, 'count', 'period'),
-      coverage: { start: '2026-09-16T18:26:00Z', end: '2026-10-01T00:00:00Z', complete: false },
     };
     const text = renderedText(renderStatic(<StatTile label="Offers sent" metric={metric} />));
     expect(text).not.toContain('Period');
     expect(text.some((item) => item.startsWith('Tracked since '))).toBe(false);
-  });
-
-  it('hides redundant period scope for fully covered metrics', () => {
-    const metric = {
-      ...available(3, 'count', 'period'),
-      coverage: { start: '2026-01-01T00:00:00Z', end: '2026-04-01T00:00:00Z', complete: true },
-    };
-    expect(renderedText(renderStatic(<StatTile label="Offers sent" metric={metric} />))).not.toContain('Period');
-  });
-
-  it('shows a change line only when the change could be calculated', () => {
-    const withChange = renderedText(renderStatic(<StatTile label="New users" metric={available(2)} change={available(100, 'percent', 'period')} />));
-    expect(withChange).toContain('+100.0% vs previous period');
-
-    const withoutChange = renderedText(renderStatic(<StatTile label="New users" metric={available(2)} change={unavailable('Needs the previous period.')} />));
-    expect(withoutChange.some((item) => item.includes('vs previous period'))).toBe(false);
   });
 
   it('shows unavailable metrics as not available with the reason, never 0', () => {
@@ -169,16 +118,6 @@ describe('StatTile', () => {
     expect(text).toContain('Not available');
     expect(text).not.toContain('Not tracked yet.');
     expect(text).not.toContain('0');
-  });
-});
-
-describe('formatChange', () => {
-  it('signs increases and decreases', () => {
-    expect(formatChange(available(12.5, 'percent'))).toBe('+12.5% vs previous period');
-    expect(formatChange(available(-40, 'percent'))).toBe('-40.0% vs previous period');
-    expect(formatChange(available(0, 'percent'))).toBe('0.0% vs previous period');
-    expect(formatChange(unavailable('No previous data.'))).toBeNull();
-    expect(formatChange(available(49.2, 'percentage_points'))).toBe('+49.2 pts vs previous period');
   });
 });
 
@@ -331,39 +270,16 @@ describe('LineChart', () => {
   });
 });
 
-describe('ShareBar', () => {
-  it('labels every group with its count and share, including empty groups', () => {
-    const series = {
-      availability: 'available', unit: 'count', basis: 'snapshot', definition: '', reason: null,
-      points: [
-        { bucket: 'Owners only', value: 2 },
-        { bucket: 'Tenants only', value: 2 },
-        { bucket: 'Both', value: 0 },
-        { bucket: 'Neither', value: 4 },
-      ],
-    };
-    const text = renderedText(renderStatic(<ShareBar series={series} emptyText="No users yet" />));
-    expect(text).toContain('8 in total');
-    expect(text).toContain('Owners only');
-    expect(text).toContain('2 · 25.0%');
-    expect(text).toContain('0 · 0.0%');
-    expect(text).toContain('4 · 50.0%');
-  });
-
-  it('says when there is nothing to show', () => {
-    const series = { availability: 'available', unit: 'count', basis: 'snapshot', points: [{ bucket: 'Neither', value: 0 }] };
-    expect(renderedText(renderStatic(<ShareBar series={series} emptyText="No users yet" />))).toContain('No users yet');
-  });
-});
-
 describe('useAnalytics', () => {
   let latest;
   const Probe = ({ path }) => {
-    latest = useAnalytics(path, '12M');
+    latest = useAnalytics(path);
     return null;
   };
 
-  it('sends the stored token and a period, then exposes the data', async () => {
+  it('sends the stored token and the exact past-year range, then exposes the data', async () => {
+    const now = new Date('2026-10-10T08:30:00Z');
+    jest.useFakeTimers({ now });
     await AsyncStorage.setItem('token', 'test-token');
     axios.get.mockResolvedValue({ data: listingResponse });
 
@@ -372,13 +288,14 @@ describe('useAnalytics', () => {
     expect(axios.get).toHaveBeenCalledWith(
       'http://test.local/api/analytics/owner/listings/2',
       expect.objectContaining({
-        params: expect.objectContaining({ from: expect.any(String), to: expect.any(String) }),
+        params: buildPastYear(now),
         headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
       }),
     );
     expect(latest.loading).toBe(false);
     expect(latest.data).toEqual(listingResponse);
     expect(latest.error).toBeNull();
+    jest.useRealTimers();
   });
 
   it('turns a 404 into a readable message without data', async () => {
@@ -412,7 +329,6 @@ describe('useAnalytics', () => {
 describe('ListingAnalyticsScreen', () => {
   // The first full-screen render loads many React Native modules
   jest.setTimeout(30000);
-
 
   it('renders activity, payments, occupancy and date-dependent metrics on one page', async () => {
     await AsyncStorage.setItem('token', 'test-token');
@@ -525,6 +441,26 @@ it('one admin refresh replaces all overview, rental, user and trend data', async
 });
 
 describe('Admin user presentation', () => {
+  it('shows pie slices and legend counts, including zero groups', () => {
+    const series = { availability: 'available', points: [
+      { bucket: 'Allowed to Sign In', value: 6 }, { bucket: 'Blocked from Signing In', value: 2 },
+      { bucket: 'Empty group', value: 0 },
+    ] };
+    const tree = renderStatic(<PieChart series={series} />);
+    expect(renderedText(tree)).toEqual(expect.arrayContaining(['6 (75.0%)', '2 (25.0%)', '0 (0.0%)']));
+    expect(tree.root.findAllByType(Path)).toHaveLength(2);
+    expect(tree.root.findAllByType(Circle).some(node => node.props.strokeDasharray)).toBe(false);
+  });
+
+  it('handles a single pie slice and empty or unavailable distributions', () => {
+    const tree = renderStatic(<PieChart series={{ availability: 'available', points: [{ bucket: 'Active', value: 4 }] }} />);
+    expect(renderedText(tree)).toContain('4 (100.0%)');
+    expect(tree.root.findAllByType(Path)).toHaveLength(0);
+    expect(tree.root.findAllByType(Circle)).toHaveLength(2);
+    expect(renderedText(renderStatic(<PieChart series={{ availability: 'available', points: [] }} emptyText="No rentals yet" />))).toContain('No rentals yet');
+    expect(renderedText(renderStatic(<PieChart series={{ availability: 'unavailable', reason: 'No recorded history' }} />))).toContain('No recorded history');
+  });
+
   it.each([CountBarChart, PieChart])('places titled chart details in the header and hides the total row icon', async Chart => {
     const definition = 'Pending offers await a response. Active offers have been accepted.';
     let tree;
@@ -540,21 +476,9 @@ describe('Admin user presentation', () => {
     await act(async () => tree.unmount());
   });
 
-  it('shows the donut total and counts and percentages, including zero groups', () => {
-    const series = { availability: 'available', points: [{ bucket: 'Owners', value: 2 }, { bucket: 'Tenants', value: 6 }, { bucket: 'Neither', value: 0 }] };
-    const tree = renderStatic(<DonutChart series={series} emptyText="No users yet" />);
-    expect(renderedText(tree)).toEqual(expect.arrayContaining(['8', 'Total users', 'Owners', '2 (25.0%)', '6 (75.0%)', '0 (0.0%)']));
-    const segments = tree.root.findAllByType(Circle).filter(node => node.props.strokeDasharray);
-    expect(segments).toHaveLength(2);
-    expect(segments.every(node => Number.isFinite(node.props.strokeDashoffset))).toBe(true);
-  });
-  it('handles empty and unavailable distribution data', () => {
-    expect(renderedText(renderStatic(<DonutChart series={{ availability: 'available', points: [] }} emptyText="No users yet" />))).toContain('No users yet');
-    expect(renderedText(renderStatic(<DonutChart series={{ availability: 'unavailable', reason: 'No tracking data' }} />))).toEqual(expect.arrayContaining(['Not available', 'No tracking data']));
-  });
-  it('retains growth comparisons and tappable metric definitions', async () => {
-    const tree = renderStatic(<MetricRow label="New users" metric={{ ...available(0), definition: 'Accounts created in the selected period.' }} change={available(20, 'percent')} />);
-    expect(renderedText(tree)).toEqual(expect.arrayContaining(['New users', '0', '+20.0% vs previous period']));
+  it('keeps metric definitions tappable', async () => {
+    const tree = renderStatic(<MetricRow label="New users" metric={{ ...available(0), definition: 'Accounts created in the selected period.' }} />);
+    expect(renderedText(tree)).toEqual(expect.arrayContaining(['New users', '0']));
     const target = tree.root.findAll(node => node.props.accessibilityLabel === 'New users: 0' && typeof node.props.onPress === 'function')[0];
     await act(async () => target.props.onPress());
     expect(renderedText(tree)).toContain('Accounts created in the selected period.');
@@ -577,42 +501,6 @@ it('shows exact tenancy counts including zero buckets and keeps empty and unavai
   expect(renderedText(tree).some(value => value.includes('%'))).toBe(false);
   expect(renderedText(renderStatic(<CountBarChart series={{ ...series, points: series.points.map(point => ({ ...point, value: 0 })) }} emptyText="No accepted tenancies yet" />))).toContain('No accepted tenancies yet');
   expect(renderedText(renderStatic(<CountBarChart series={{ availability: 'unavailable', reason: 'No recorded history' }} />))).toContain('No recorded history');
-});
-
-it('shows the date range above the selected period and supports lifetime', async () => {
-  const dataPeriod = { from: '2024-12-26T00:00:00+08:00', to: '2026-10-06T12:00:00+08:00', lifetime: true };
-  expect(formatPeriodRange(dataPeriod)).toBe('Dec 26, 2024 \u2013 Oct 6, 2026');
-  expect(formatPeriodRange({ from: '2026-09-01T00:00:00+08:00', to: '2026-10-01T00:00:00+08:00' })).toBe('Sep 1, 2026 \u2013 Sep 30, 2026');
-  const onChange = jest.fn();
-  const tree = renderStatic(<PeriodSelector value="LIFETIME" dataPeriod={dataPeriod} lifetimeLabel="Since published" onChange={onChange} />);
-  expect(renderedText(tree).slice(0, 2)).toEqual(['Dec 26, 2024 \u2013 Oct 6, 2026', 'Since published']);
-  const lifetime = PERIOD_OPTIONS.find(option => option.key === 'LIFETIME');
-  expect(lifetime.build()).toEqual({ period: 'lifetime' });
-  await AsyncStorage.setItem('token', 'test-token');
-  axios.get.mockResolvedValue({ data: { period: dataPeriod } });
-  const Probe = () => { useAnalytics('/api/analytics/admin/summary', 'LIFETIME'); return null; };
-  await act(async () => { create(<Probe />); });
-  expect(axios.get).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ params: { period: 'lifetime' } }));
-});
-
-it('opens the simple dropdown and closes after selecting a preset', async () => {
-  const onChange = jest.fn();
-  let tree;
-  await act(async () => { tree = create(<PeriodSelector value="12M" onChange={onChange} />); });
-  const control = () => tree.root.findAll(n => n.props.accessibilityLabel === 'Analytics period' && n.props.onPress)[0];
-  expect(control().props.accessibilityState.expanded).toBe(false);
-  await act(async () => control().props.onPress());
-  expect(renderedText(tree)).toEqual(expect.arrayContaining(['1 month', '2 months', '3 months', '6 months', '1 year', 'Lifetime']));
-  expect(renderedText(tree)).not.toContain('Custom');
-  const option = tree.root.findAll(n => n.props.accessibilityLabel === '3 months' && n.props.onPress)[0];
-  await act(async () => option.props.onPress());
-  expect(onChange).toHaveBeenCalledWith('3M');
-  expect(control().props.accessibilityState.expanded).toBe(false);
-  await act(async () => control().props.onPress());
-  const lifetime = tree.root.findAll(n => n.props.accessibilityLabel === 'Lifetime' && n.props.onPress)[0];
-  await act(async () => lifetime.props.onPress());
-  expect(onChange).toHaveBeenLastCalledWith('LIFETIME');
-  expect(control().props.accessibilityState.expanded).toBe(false);
 });
 
 it('keeps calculation details off the dashboard and opens and closes them on demand', async () => {

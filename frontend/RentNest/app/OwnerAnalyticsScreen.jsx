@@ -22,8 +22,7 @@ import {
 const OwnerAnalyticsScreen = () => {
   const router = useRouter();
   const [tab, setTab] = useState('Overview');
-  const period = '12M';
-  const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_SUMMARY, period);
+  const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_SUMMARY);
   const [refreshKey, setRefreshKey] = useState(0);
   const listings = useOwnedListings(refreshKey);
   const refresh = () => { retry(); setRefreshKey(value => value + 1); };
@@ -58,8 +57,6 @@ const OwnerAnalyticsScreen = () => {
     activeTenancyCount: 'Your listings with a tenancy covering today.',
     tenantsHostedCount: 'Different tenants who have accepted an offer for one of your listings.',
     averageTenancyMonths: 'Average tenancy length in months. Active rentals use the agreed lease length. Ended rentals use their recorded end date.',
-    ownerAverageRating: 'Your average review rating out of 5.',
-    ownerReviewCount: 'Reviews other users have left about you.',
     recordedRentPaymentTotal: 'Rent payments for the past 12 months, based on the month paid for. Deposits are excluded and refunds are not deducted.',
     terminationsCount: 'Rentals terminated in the past 12 months. Rentals without a termination date are left out.',
   };
@@ -113,9 +110,8 @@ const OwnerAnalyticsScreen = () => {
   return (
     <>
       {header}
-      <AnalyticsLayout compactTabs periodAccent="#16794B" showPeriod={false} showRefresh={false}
-        tabs={['Overview', 'Properties']} tab={tab} onTabChange={setTab}
-        period={period} loading={loading} error={error} onRefresh={refresh} dataPeriod={data.period} asOf={data.asOf}>
+      <AnalyticsLayout compactTabs
+        tabs={['Overview', 'Properties']} tab={tab} onTabChange={setTab} error={error}>
         {tab === 'Overview' ? <>
           <Section title="Overview" action={
             <RefreshControl onRefresh={refresh} loading={loading} asOf={data.asOf} />
@@ -191,7 +187,7 @@ const OwnerAnalyticsScreen = () => {
                 <Pressable
                   key={listing.listingID}
                   style={styles.listingRow}
-                  onPress={() => router.push({ pathname: '/ListingAnalyticsScreen', params: { listingId: listing.listingID, period } })}
+                  onPress={() => router.push({ pathname: '/ListingAnalyticsScreen', params: { listingId: listing.listingID } })}
                   accessibilityRole="button"
                   accessibilityLabel={`View analytics for ${listing.name}`}
                 >

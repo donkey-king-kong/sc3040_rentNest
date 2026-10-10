@@ -1,6 +1,6 @@
 # Analytics API
 
-The analytics endpoints return metrics used by the owner, property and admin dashboards. Fields without a current UI consumer, including growth comparisons, report statistics and the photo-gallery placeholder, have been removed.
+The analytics endpoints return metrics used by the owner, property and admin dashboards.
 
 ## Access and periods
 
