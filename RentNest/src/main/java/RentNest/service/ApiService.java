@@ -466,7 +466,7 @@ public class ApiService {
         List<RentalContract> allRentalContracts = new ArrayList<>();
     
         // Generate Daily Token
-        String tokenUrl = "https://www.ura.gov.sg/uraDataService/insertNewToken.action";
+        String tokenUrl = "https://eservice.ura.gov.sg/uraDataService/insertNewToken/v1";
         HttpHeaders tokenHeaders = new HttpHeaders();
         tokenHeaders.set("AccessKey", URA_ACCESSKEY);
         ResponseEntity<String> tokenResponse = restTemplate.exchange(tokenUrl, HttpMethod.GET, new org.springframework.http.HttpEntity<>(tokenHeaders), String.class);
@@ -474,7 +474,7 @@ public class ApiService {
     
         for (String refPeriod : refPeriods) {
             // Get Rental Prices
-            String rentalUrl = "https://www.ura.gov.sg/uraDataService/invokeUraDS?service=PMI_Resi_Rental&refPeriod=" + refPeriod;
+            String rentalUrl = "https://eservice.ura.gov.sg/uraDataService/invokeUraDS/v1?service=PMI_Resi_Rental&refPeriod=" + refPeriod;
             HttpHeaders rentalHeaders = new HttpHeaders();
             rentalHeaders.set("AccessKey", URA_ACCESSKEY);
             rentalHeaders.set("Token", dailyToken);
@@ -505,7 +505,7 @@ public class ApiService {
         List<RentalContract> allRentalContracts = new ArrayList<>();
     
         // Generate Daily Token
-        String tokenUrl = "https://www.ura.gov.sg/uraDataService/insertNewToken.action";
+        String tokenUrl = "https://eservice.ura.gov.sg/uraDataService/insertNewToken/v1";
         HttpHeaders tokenHeaders = new HttpHeaders();
         tokenHeaders.set("AccessKey", URA_ACCESSKEY);
         ResponseEntity<String> tokenResponse = restTemplate.exchange(tokenUrl, HttpMethod.GET, new org.springframework.http.HttpEntity<>(tokenHeaders), String.class);
@@ -513,7 +513,7 @@ public class ApiService {
     
         for (String refPeriod : refPeriods) {
             // Get Rental Prices
-            String rentalUrl = "https://www.ura.gov.sg/uraDataService/invokeUraDS?service=PMI_Resi_Rental&refPeriod=" + refPeriod;
+            String rentalUrl = "https://eservice.ura.gov.sg/uraDataService/invokeUraDS/v1?service=PMI_Resi_Rental&refPeriod=" + refPeriod;
             HttpHeaders rentalHeaders = new HttpHeaders();
             rentalHeaders.set("AccessKey", URA_ACCESSKEY);
             rentalHeaders.set("Token", dailyToken);
