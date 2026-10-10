@@ -2,8 +2,8 @@ package RentNest.controller;
 
 import RentNest.dto.analytics.AnalyticsPeriod;
 import RentNest.model.User;
-import RentNest.service.AnalyticsException;
 import RentNest.service.AnalyticsService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,7 +12,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/analytics")
@@ -32,10 +34,12 @@ public class AnalyticsController {
             @RequestParam(required = false) String to) {
         try {
             AnalyticsPeriod resolvedPeriod = analyticsService.parsePeriod(from, to);
-            return ResponseEntity.ok(analyticsService.ownerSummary(user, resolvedPeriod));
-        } catch (AnalyticsException e) {
-            return ResponseEntity.status(e.getStatus())
-                    .body(Map.of("error", e.getCode(), "message", e.getMessage()));
+            return ResponseEntity.ok(analyticsService.getOwnerAnalytics(user, resolvedPeriod));
+        } catch (IllegalArgumentException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "INVALID_PERIOD");
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 
@@ -48,10 +52,17 @@ public class AnalyticsController {
             @RequestParam(required = false) String to) {
         try {
             AnalyticsPeriod resolvedPeriod = analyticsService.parsePeriod(from, to);
-            return ResponseEntity.ok(analyticsService.listingAnalytics(user, listingId, resolvedPeriod));
-        } catch (AnalyticsException e) {
-            return ResponseEntity.status(e.getStatus())
-                    .body(Map.of("error", e.getCode(), "message", e.getMessage()));
+            return ResponseEntity.ok(analyticsService.getOwnerPropertyListingAnalytics(user, listingId, resolvedPeriod));
+        } catch (IllegalArgumentException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "INVALID_PERIOD");
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (NoSuchElementException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "NOT_FOUND");
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
         }
     }
 
@@ -63,10 +74,17 @@ public class AnalyticsController {
             @RequestParam(required = false) String to) {
         try {
             AnalyticsPeriod resolvedPeriod = analyticsService.parsePeriod(from, to);
-            return ResponseEntity.ok(analyticsService.platformSummary(user, resolvedPeriod));
-        } catch (AnalyticsException e) {
-            return ResponseEntity.status(e.getStatus())
-                    .body(Map.of("error", e.getCode(), "message", e.getMessage()));
+            return ResponseEntity.ok(analyticsService.getPlatformAnalytics(user, resolvedPeriod));
+        } catch (IllegalArgumentException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "INVALID_PERIOD");
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (SecurityException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "FORBIDDEN");
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
         }
     }
 }

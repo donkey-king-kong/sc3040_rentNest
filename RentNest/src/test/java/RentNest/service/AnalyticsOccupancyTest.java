@@ -65,8 +65,8 @@ class AnalyticsOccupancyTest {
         // Duplicate records must not count a listing twice.
         var s = service(List.of(row, row), 1L);
         var period = s.parsePeriod(FROM, TO);
-        var owner = s.ownerSummary(owner(), period);
-        var listing = s.listingAnalytics(owner(), 1L, period);
+        var owner = s.getOwnerAnalytics(owner(), period);
+        var listing = s.getOwnerPropertyListingAnalytics(owner(), 1L, period);
         assertEquals(NOW, owner.asOf());
         assertEquals(NOW, listing.asOf());
         assertEquals(occupied ? 1L : 0L, owner.metrics().get("activeTenancyCount").value());
@@ -79,9 +79,9 @@ class AnalyticsOccupancyTest {
                 Date.from(Instant.parse(TO)), null, null, null, null);
         var s = service(List.of(row), 1L);
         var period = s.parsePeriod(FROM, TO);
-        var result = s.listingAnalytics(owner(), 1L, period);
+        var result = s.getOwnerPropertyListingAnalytics(owner(), 1L, period);
         assertEquals(new BigDecimal("50.0"), result.metrics().get("averageOccupancyRate").value());
-        var monthly = s.ownerSummary(owner(), period).series().get("monthlyOccupancyRate").points();
+        var monthly = s.getOwnerAnalytics(owner(), period).series().get("monthlyOccupancyRate").points();
         // The April bucket ends at midnight Singapore time, eight hours before TO.
         assertEquals(new BigDecimal("49.4"), monthly.getFirst().value());
         assertFalse(result.metrics().containsKey("averageOccupancyRateChange"));
@@ -89,10 +89,10 @@ class AnalyticsOccupancyTest {
 
     @Test void emptyHistoryKeepsZeroMonthlyOccupancyButNoListingsIsUnavailable() {
         var s = service(List.of(), 1L);
-        var result = s.ownerSummary(owner(), s.parsePeriod(FROM, TO));
+        var result = s.getOwnerAnalytics(owner(), s.parsePeriod(FROM, TO));
         assertEquals(new BigDecimal("0.0"), result.series().get("monthlyOccupancyRate").points().getFirst().value());
         var empty = service(List.of(), 0L);
-        assertEquals("unavailable", empty.ownerSummary(owner(), empty.parsePeriod(FROM, TO))
+        assertEquals("unavailable", empty.getOwnerAnalytics(owner(), empty.parsePeriod(FROM, TO))
                 .series().get("monthlyOccupancyRate").availability());
     }
 }

@@ -44,6 +44,7 @@ class AnalyticsControllerIntegrationTest {
     private static final String TO = "2026-04-01T00:00:00+08:00";
 
     @Autowired private MockMvc mockMvc;
+    @Autowired private RentNest.controller.AnalyticsController analyticsController;
     @Autowired private JwtService jwtService;
     @Autowired private UserRepository userRepository;
     @Autowired private ListingsRepository listingsRepository;
@@ -174,9 +175,13 @@ class AnalyticsControllerIntegrationTest {
     void foreignAndNonexistentListingsReturnIdentical404() throws Exception {
         String foreign = mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/listings/" + listingB1.getListingID())))
                 .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Listing not found."))
                 .andReturn().getResponse().getContentAsString();
         String missing = mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/listings/999999")))
                 .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Listing not found."))
                 .andReturn().getResponse().getContentAsString();
         org.junit.jupiter.api.Assertions.assertEquals(foreign, missing);
     }
@@ -185,6 +190,15 @@ class AnalyticsControllerIntegrationTest {
     void nonAdminCannotReadPlatformAnalytics() throws Exception {
         mockMvc.perform(asUser(ownerA, get("/api/analytics/admin/summary")))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void platformControllerPreservesServiceAccessErrorResponse() {
+        var response = analyticsController.getPlatformAnalytics(ownerA, FROM, TO);
+        org.junit.jupiter.api.Assertions.assertEquals(403, response.getStatusCode().value());
+        org.junit.jupiter.api.Assertions.assertEquals(java.util.Map.of(
+                "error", "FORBIDDEN",
+                "message", "You do not have access to platform analytics."), response.getBody());
     }
 
     @Test
@@ -483,15 +497,32 @@ class AnalyticsControllerIntegrationTest {
         String token = "Bearer " + jwtService.generateToken(ownerA);
 
         mockMvc.perform(get(url).header("Authorization", token).param("to", TO))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_PERIOD"))
+                .andExpect(jsonPath("$.message").value("Both 'from' and 'to' are required ISO-8601 date-times with an offset, e.g. 2026-01-01T00:00:00+08:00."));
         mockMvc.perform(get(url).header("Authorization", token).param("from", "not-a-date").param("to", TO))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_PERIOD"))
+                .andExpect(jsonPath("$.message").value("'from' must be an ISO-8601 date-time with an offset, e.g. 2026-01-01T00:00:00+08:00."));
         mockMvc.perform(get(url).header("Authorization", token).param("from", "2026-01-01T00:00:00").param("to", TO))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(get(url).header("Authorization", token).param("from", TO).param("to", FROM))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_PERIOD"))
+                .andExpect(jsonPath("$.message").value("'from' must be before 'to'."));
         mockMvc.perform(get(url).header("Authorization", token).param("from", FROM).param("to", FROM))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void propertyAndPlatformEndpointsPreserveInvalidPeriodResponse() throws Exception {
+        for (String url : java.util.List.of("/api/analytics/owner/listings/" + listingA2.getListingID(),
+                "/api/analytics/admin/summary")) {
+            mockMvc.perform(asUser(admin, get(url), TO, FROM))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("INVALID_PERIOD"))
+                    .andExpect(jsonPath("$.message").value("'from' must be before 'to'."));
+        }
     }
 
     @Test
