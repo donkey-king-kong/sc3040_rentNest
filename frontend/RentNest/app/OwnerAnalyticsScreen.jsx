@@ -57,7 +57,7 @@ const OwnerAnalyticsScreen = () => {
     activeTenancyCount: 'Your listings with a tenancy covering today.',
     tenantsHostedCount: 'Different tenants who have accepted an offer for one of your listings.',
     averageTenancyMonths: 'Average tenancy length in months. Active rentals use the agreed lease length. Ended rentals use their recorded end date.',
-    recordedRentPaymentTotal: 'Rent payments for the past 12 months, based on the month paid for. Deposits are excluded and refunds are not deducted.',
+    recordedRentPaymentTotal: 'All recorded rent payments for listings you currently own. Deposits are excluded and refunds are not deducted.',
     terminationsCount: 'Rentals terminated in the past 12 months. Rentals without a termination date are left out.',
   };
   const m = Object.fromEntries(Object.entries(data.metrics).map(([key, metric]) => [key,
@@ -118,7 +118,7 @@ const OwnerAnalyticsScreen = () => {
           }>
             {!loading && <>
             <TileRow>
-              <StatTile label="Total Rent Collected" metric={m.recordedRentPaymentTotal} />
+              <StatTile label="Total Rent Collected" scope="All time" metric={m.recordedRentPaymentTotal} />
               <StatTile label="Total Views" scope="All time" metric={m.totalListingViews || {
                 availability: 'unavailable', unit: 'count', basis: 'snapshot',
                 reason: 'The total listing views could not be loaded.',

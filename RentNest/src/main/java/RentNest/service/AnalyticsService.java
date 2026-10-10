@@ -158,7 +158,10 @@ public class AnalyticsService {
                 : Metric.available(BigDecimal.valueOf(averageRating).setScale(2, RoundingMode.HALF_UP), "rating_out_of_5", SNAPSHOT,
                 "Average rating of reviews about you."));
 
-        putRentTotal(metrics, payments);
+        metrics.put("recordedRentPaymentTotal", Metric.available(
+                queries.sumAllRecordedRentPaymentsByOwner(ownerId), currency, SNAPSHOT,
+                "All recorded rent payments for listings you currently own. "
+                        + "Deposits are excluded and refunds are not deducted."));
 
         putTerminationCount(metrics, rentals, period);
 

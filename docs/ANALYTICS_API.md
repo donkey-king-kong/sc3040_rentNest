@@ -24,7 +24,7 @@ Snapshot metrics describe stored records or the state at `asOf` and ignore the r
 
 | Scope | Snapshot keys | Period keys |
 |---|---|---|
-| Owner | `listingCount`, `totalListingViews`, `activeTenancyCount`, `tenantsHostedCount`, `averageTenancyMonths`, `ownerReviewCount`, `ownerAverageRating` | `recordedRentPaymentTotal`, `terminationsCount` |
+| Owner | `listingCount`, `totalListingViews`, `activeTenancyCount`, `tenantsHostedCount`, `averageTenancyMonths`, `ownerReviewCount`, `ownerAverageRating`, `recordedRentPaymentTotal` | `terminationsCount` |
 | Property | `occupancyStatus`, `rentalRecordCount`, `acceptedRentalRecordCount`, `acceptanceRate`, `tenantsHostedCount`, `averageTenancyMonths`, `daysOnMarket` | `recordedRentPaymentCount`, `recordedRentPaymentTotal`, `averageOccupancyRate`, `listingViews`, `uniqueListingViewers` |
 | Platform | `registeredUserCount`, `listingCount`, `lifetimeRecordedRentPaymentTotal`, `ownerUserCount`, `currentTenantUserCount`, `expiredTenantUserCount`, `terminatedTenantUserCount`, `bannedUserCount`, `rentalRecordCount`, `pendingRentalRecordCount`, `activeRentalRecordCount`, `upcomingRentalRecordCount`, `expiredRentalRecordCount`, `terminatedRentalRecordCount`, `unclassifiedRentalRecordCount` | None |
 

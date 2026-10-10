@@ -1,22 +1,19 @@
 package RentNest.controller;
 
 import RentNest.dto.analytics.AnalyticsPeriod;
-import RentNest.dto.analytics.AnalyticsResponse;
 import RentNest.model.User;
 import RentNest.service.AnalyticsException;
 import RentNest.service.AnalyticsService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/**
- * Analytics endpoints. The owner/actor is always the authenticated user;
- * client-supplied user or owner IDs are never read.
- *
- * Period parameters are ISO-8601 date-times with an offset, applied as [from, to).
- */
 @RestController
 @RequestMapping("/api/analytics")
 public class AnalyticsController {
@@ -27,43 +24,55 @@ public class AnalyticsController {
         this.analyticsService = analyticsService;
     }
 
-    // GET /api/analytics/owner/summary?from=2026-01-01T00:00:00+08:00&to=2026-04-01T00:00:00+08:00
+    // Get analytics for the authenticated owner's properties.
     @GetMapping("/owner/summary")
-    public ResponseEntity<AnalyticsResponse> ownerSummary(
+    public ResponseEntity<?> getOwnerAnalytics(
             @AuthenticationPrincipal User user,
-            @RequestParam(required = false, name = "period") String selection,
+            @RequestParam(required = false, name = "period") String periodSelection,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
-        AnalyticsPeriod period = analyticsService.resolvePeriod(user, null, false, selection, from, to);
-        return ResponseEntity.ok(analyticsService.ownerSummary(user, period));
+        try {
+            AnalyticsPeriod resolvedPeriod = analyticsService.resolvePeriod(
+                    user, null, false, periodSelection, from, to);
+            return ResponseEntity.ok(analyticsService.ownerSummary(user, resolvedPeriod));
+        } catch (AnalyticsException e) {
+            return ResponseEntity.status(e.getStatus())
+                    .body(Map.of("error", e.getCode(), "message", e.getMessage()));
+        }
     }
 
-    // GET /api/analytics/owner/listings/{listingId}?from=...&to=...
+    // Get analytics for a property owned by the authenticated user.
     @GetMapping("/owner/listings/{listingId}")
-    public ResponseEntity<AnalyticsResponse> listingAnalytics(
+    public ResponseEntity<?> getOwnerPropertyListingAnalytics(
             @AuthenticationPrincipal User user,
             @PathVariable Long listingId,
-            @RequestParam(required = false, name = "period") String selection,
+            @RequestParam(required = false, name = "period") String periodSelection,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
-        AnalyticsPeriod period = analyticsService.resolvePeriod(user, listingId, false, selection, from, to);
-        return ResponseEntity.ok(analyticsService.listingAnalytics(user, listingId, period));
+        try {
+            AnalyticsPeriod resolvedPeriod = analyticsService.resolvePeriod(
+                    user, listingId, false, periodSelection, from, to);
+            return ResponseEntity.ok(analyticsService.listingAnalytics(user, listingId, resolvedPeriod));
+        } catch (AnalyticsException e) {
+            return ResponseEntity.status(e.getStatus())
+                    .body(Map.of("error", e.getCode(), "message", e.getMessage()));
+        }
     }
 
-    // GET /api/analytics/admin/summary?from=...&to=...  (admin accounts only)
+    // Get platform analytics for an authenticated admin.
     @GetMapping("/admin/summary")
-    public ResponseEntity<AnalyticsResponse> platformSummary(
+    public ResponseEntity<?> getPlatformAnalytics(
             @AuthenticationPrincipal User user,
-            @RequestParam(required = false, name = "period") String selection,
+            @RequestParam(required = false, name = "period") String periodSelection,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
-        AnalyticsPeriod period = analyticsService.resolvePeriod(user, null, true, selection, from, to);
-        return ResponseEntity.ok(analyticsService.platformSummary(user, period));
-    }
-
-    @ExceptionHandler(AnalyticsException.class)
-    public ResponseEntity<Map<String, String>> handleAnalyticsException(AnalyticsException e) {
-        return ResponseEntity.status(e.getStatus())
-                .body(Map.of("error", e.getCode(), "message", e.getMessage()));
+        try {
+            AnalyticsPeriod resolvedPeriod = analyticsService.resolvePeriod(
+                    user, null, true, periodSelection, from, to);
+            return ResponseEntity.ok(analyticsService.platformSummary(user, resolvedPeriod));
+        } catch (AnalyticsException e) {
+            return ResponseEntity.status(e.getStatus())
+                    .body(Map.of("error", e.getCode(), "message", e.getMessage()));
+        }
     }
 }

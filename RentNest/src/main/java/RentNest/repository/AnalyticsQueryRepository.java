@@ -120,6 +120,14 @@ public class AnalyticsQueryRepository {
                 .getSingleResult();
     }
 
+    public long sumAllRecordedRentPaymentsByOwner(Long ownerId) {
+        return entityManager.createQuery(
+                        "SELECT COALESCE(SUM(p.amount), 0) FROM Payment p " +
+                        "WHERE p.rentals.listings.owner.userID = :ownerId", Long.class)
+                .setParameter("ownerId", ownerId)
+                .getSingleResult();
+    }
+
     private static final String PAYMENT_ROW_SELECT =
             "SELECT new RentNest.repository.AnalyticsQueryRepository$PaymentRow(p.date, p.amount) FROM Payment p " +
             "WHERE p.date >= :from AND p.date < :to ";

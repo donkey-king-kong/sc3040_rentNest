@@ -242,7 +242,8 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(jsonPath("$.metrics.ownerAverageRating.value").value(4.5))
                 .andExpect(jsonPath("$.metrics.ownerReviewCount.value").value(2))
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentCount").doesNotExist())
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(3500))
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(5500))
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.basis").value("snapshot"))
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.unit").value("SGD"))
                 .andExpect(jsonPath("$.series.tenancyDurationDistribution.points[0].bucket").value("<3 months"))
                 .andExpect(jsonPath("$.series.tenancyDurationDistribution.points[0].value").value(0))
@@ -264,6 +265,39 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(jsonPath("$.series.monthlyRecordedRentPayments.points[1].value").value(0))
                 .andExpect(jsonPath("$.series.monthlyRecordedRentPayments.points[2].bucket").value("2026-03"))
                 .andExpect(jsonPath("$.series.monthlyRecordedRentPayments.points[2].value").value(2000));
+    }
+
+    @Test
+    void ownerRentTotalIncludesOlderPaymentsAndIgnoresRangeWithoutChangingChartsOrPropertyTotals() throws Exception {
+        Rentals ownerRental = rentalsRepository.findByListings_ListingID(listingA2.getListingID()).orElseThrow();
+        Rentals otherRental = rentalsRepository.findByListings_ListingID(listingB1.getListingID()).orElseThrow();
+        payment(ownerRental, 700L, "2024-01-01T00:00:00+08:00");
+        payment(otherRental, 900L, "2024-01-01T00:00:00+08:00");
+
+        mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(6200))
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.basis").value("snapshot"))
+                .andExpect(jsonPath("$.series.monthlyRecordedRentPayments.points.length()").value(3))
+                .andExpect(jsonPath("$.series.monthlyRecordedRentPayments.points[0].value").value(1500))
+                .andExpect(jsonPath("$.series.monthlyRecordedRentPayments.points[1].value").value(0))
+                .andExpect(jsonPath("$.series.monthlyRecordedRentPayments.points[2].value").value(2000));
+
+        mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary"),
+                        "2026-03-01T00:00:00+08:00", TO))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(6200))
+                .andExpect(jsonPath("$.series.monthlyRecordedRentPayments.points.length()").value(1))
+                .andExpect(jsonPath("$.series.monthlyRecordedRentPayments.points[0].value").value(2000));
+
+        mockMvc.perform(asUser(ownerB, get("/api/analytics/owner/summary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(1900));
+
+        mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/listings/" + listingA2.getListingID())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(1500))
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.basis").value("period"));
     }
 
     @Test
@@ -438,7 +472,7 @@ class AnalyticsControllerIntegrationTest {
                         "2025-12-31T16:00:00Z", "2026-03-31T16:00:00Z"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentCount").doesNotExist())
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(3500))
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(5500))
                 .andExpect(jsonPath("$.period.from").value("2025-12-31T16:00:00Z"))
                 .andExpect(jsonPath("$.period.boundary").value("[from,to)"));
     }
@@ -468,7 +502,7 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(jsonPath("$.period.from").value("2023-12-31T16:00:00Z"))
                 .andExpect(jsonPath("$.period.to").value("2026-03-31T16:00:00Z"))
                 .andExpect(jsonPath("$.series.monthlyRecordedRentPayments.points.length()").value(27))
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(3500));
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(5500));
     }
 
     // ---------- Fixture helpers ----------
