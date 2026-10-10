@@ -84,6 +84,21 @@ public class AnalyticsQueryRepository {
         return entityManager.createQuery(RENTAL_ROW_SELECT, RentalRow.class).getResultList();
     }
 
+    public long countAcceptedRentalsByListing(Long listingId) {
+        return entityManager.createQuery(
+                        "SELECT COUNT(r) FROM Rentals r WHERE r.listings.listingID = :listingId " +
+                        "AND LOWER(TRIM(r.status)) IN ('active', 'terminated')", Long.class)
+                .setParameter("listingId", listingId)
+                .getSingleResult();
+    }
+
+    public long countRentalsByStatus(String status) {
+        return entityManager.createQuery(
+                        "SELECT COUNT(r) FROM Rentals r WHERE LOWER(TRIM(r.status)) = :status", Long.class)
+                .setParameter("status", status)
+                .getSingleResult();
+    }
+
     // Payment queries
 
     /** All recorded rent amounts, independent of the selected reporting period. */
@@ -121,6 +136,15 @@ public class AnalyticsQueryRepository {
     public List<PaymentRow> findAllPaymentRows(Instant from, Instant to) {
         return setDateRangeParameters(entityManager.createQuery(PAYMENT_ROW_SELECT, PaymentRow.class), from, to)
                 .getResultList();
+    }
+
+    public long sumRecordedRentPaymentsByListing(Long listingId, Instant from, Instant to) {
+        return setDateRangeParameters(entityManager.createQuery(
+                        "SELECT COALESCE(SUM(p.amount), 0) FROM Payment p " +
+                        "WHERE p.rentals.listings.listingID = :listingId " +
+                        "AND p.date >= :from AND p.date < :to", Long.class), from, to)
+                .setParameter("listingId", listingId)
+                .getSingleResult();
     }
 
     private static <T> TypedQuery<T> setDateRangeParameters(TypedQuery<T> query, Instant from, Instant to) {

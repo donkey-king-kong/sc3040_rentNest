@@ -376,6 +376,54 @@ class AnalyticsControllerIntegrationTest {
     // ---------- Per-listing ----------
 
     @Test
+    void repositoryCountsKeepStatusNormalisationAndListingScope() throws Exception {
+        Listings property = listing(emptyOwner, "Status counts", false);
+        rental(property, emptyOwner, " ACTIVE ", FROM, TO);
+        rental(listing(emptyOwner, "Terminated count", false), emptyOwner, " Terminated ", FROM, TO);
+        rental(listing(emptyOwner, "Pending count", false), emptyOwner, " PENDING ", FROM, TO);
+        Listings unknownStatus = listing(emptyOwner, "Unknown status", false);
+        rental(unknownStatus, emptyOwner, null, FROM, TO);
+
+        mockMvc.perform(asUser(emptyOwner, get("/api/analytics/owner/listings/" + property.getListingID())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRentalOffers").value(1))
+                .andExpect(jsonPath("$.acceptedOffers").value(1))
+                .andExpect(jsonPath("$.acceptanceRate").value(100.0));
+
+        mockMvc.perform(asUser(emptyOwner, get("/api/analytics/owner/listings/" + unknownStatus.getListingID())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.acceptedOffers").value(0))
+                .andExpect(jsonPath("$.acceptanceRate").value(0));
+
+        mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendingRentals").value(3))
+                .andExpect(jsonPath("$.terminatedRentals").value(2));
+    }
+
+    @Test
+    void repositoryRentSumKeepsPropertyScopeNullAmountsAndDateBoundaries() throws Exception {
+        Listings property = listing(emptyOwner, "Payment boundaries", false);
+        Rentals rental = rental(property, emptyOwner, "active", FROM, TO);
+        payment(rental, 100L, FROM);
+        payment(rental, 200L, "2026-02-01T00:00:00+08:00");
+        payment(rental, 400L, TO);
+        payment(rental, 500L, "2025-12-01T00:00:00+08:00");
+        Payment missingAmount = new Payment();
+        missingAmount.setRentals(rental);
+        missingAmount.setDate(date(FROM));
+        paymentRepository.save(missingAmount);
+
+        mockMvc.perform(asUser(emptyOwner, get("/api/analytics/owner/listings/" + property.getListingID())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rentCollected").value(300))
+                .andExpect(jsonPath("$.paymentCount").value(3))
+                .andExpect(jsonPath("$.monthlyRent[0].value").value(100))
+                .andExpect(jsonPath("$.monthlyRent[1].value").value(200))
+                .andExpect(jsonPath("$.monthlyRent[2].value").value(0));
+    }
+
+    @Test
     void listingAnalyticsMatchFixture() throws Exception {
         mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/listings/" + listingA2.getListingID())))
                 .andExpect(status().isOk())

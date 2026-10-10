@@ -142,7 +142,8 @@ public class AnalyticsService {
         List<RentalRow> rentals = analyticsQueryRepository.findRentalRowsByListing(listingId);
         List<PaymentRow> payments = analyticsQueryRepository.findPaymentRowsByListing(listingId, period.getFrom(), period.getTo());
         AnalyticsValueDTO averageTenancy = calculateAverageTenancy(rentals);
-        AnalyticsValueDTO acceptance = rate(countAccepted(rentals), rentals.size());
+        long acceptedOffers = analyticsQueryRepository.countAcceptedRentalsByListing(listingId);
+        AnalyticsValueDTO acceptance = rate(acceptedOffers, rentals.size());
         AnalyticsValueDTO daysOnMarket = listingDaysOnMarket(listing.getCreatedAt(), rentals, asOf);
 
         PropertyAnalyticsDTO response = new PropertyAnalyticsDTO();
@@ -158,13 +159,14 @@ public class AnalyticsService {
         response.setFirstAcceptedAt(hasUndatedAcceptance(rentals) ? null : firstAcceptedAt(rentals).orElse(null));
         response.setOccupancyStatus(countOccupiedListings(rentals, asOf) > 0 ? "occupied" : "vacant");
         response.setTotalRentalOffers(rentals.size());
-        response.setAcceptedOffers(countAccepted(rentals));
+        response.setAcceptedOffers(acceptedOffers);
         response.setAcceptanceRate(acceptance.getValue());
         response.setAcceptanceRateUnavailableReason(acceptance.getUnavailableReason());
         response.setTenantsHosted(countDistinctAcceptedTenants(rentals));
         response.setAverageTenancyMonths(averageTenancy.getValue());
         response.setAverageTenancyUnavailableReason(averageTenancy.getUnavailableReason());
-        response.setRentCollected(sumAmounts(payments));
+        response.setRentCollected(analyticsQueryRepository.sumRecordedRentPaymentsByListing(
+                listingId, period.getFrom(), period.getTo()));
         response.setPaymentCount(payments.size());
         response.setOccupancyRate(occupancyPercent(occupiedMillis(rentals, period.getFrom(), period.getTo()),
                 1, period.getFrom(), period.getTo()).setScale(1, RoundingMode.HALF_UP));
@@ -197,8 +199,8 @@ public class AnalyticsService {
         response.setTerminatedTenants(tenants.terminated());
         response.setBlockedUsers(analyticsQueryRepository.countUsersWithFlag(2));
         response.setTotalRentalOffers(rentals.size());
-        response.setPendingRentals(countStatus(rentals, STATUS_PENDING));
-        response.setTerminatedRentals(countStatus(rentals, STATUS_TERMINATED));
+        response.setPendingRentals(analyticsQueryRepository.countRentalsByStatus(STATUS_PENDING));
+        response.setTerminatedRentals(analyticsQueryRepository.countRentalsByStatus(STATUS_TERMINATED));
         response.setActiveRentals(rentalCounts.active());
         response.setUpcomingRentals(rentalCounts.upcoming());
         response.setExpiredRentals(rentalCounts.expired());
@@ -556,18 +558,6 @@ public class AnalyticsService {
 
     private static boolean wasTerminated(RentalRow rental) {
         return STATUS_TERMINATED.equals(normalise(rental.status())) || rental.terminatedAt() != null;
-    }
-
-    private static long countAccepted(List<RentalRow> rentals) {
-        return rentals.stream().filter(rental -> ACCEPTED_STATUSES.contains(normalise(rental.status()))).count();
-    }
-
-    private static long countStatus(List<RentalRow> rentals, String status) {
-        return rentals.stream().filter(rental -> status.equals(normalise(rental.status()))).count();
-    }
-
-    private static long sumAmounts(List<PaymentRow> payments) {
-        return payments.stream().mapToLong(payment -> nullToZero(payment.amount())).reduce(0L, Math::addExact);
     }
 
     private static String normalise(String status) {

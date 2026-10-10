@@ -20,6 +20,8 @@ Responses use DTO classes with private fields, getters and setters. Each respons
 
 All analytics DTOs live in `RentNest.dto`. The service uses `AnalyticsPeriod` for validated start and end dates and `AnalyticsValueDTO` for a numeric result with an unavailable explanation. Chart builders return lists of `AnalyticsChartPointDTO` or `AnalyticsStatusPointDTO` directly.
 
+`AnalyticsQueryRepository` calculates property accepted-offer counts, platform pending and terminated counts, and property rent totals using database aggregates. Rental and payment rows are still fetched for chart and tenancy calculations.
+
 Snapshot metrics describe stored records or the state at `asOf` and ignore the requested range. Period metrics and monthly series use that range. Stored historical dates are used without a global deployment cutoff.
 
 ## Retained metrics
