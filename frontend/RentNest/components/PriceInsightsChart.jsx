@@ -22,9 +22,9 @@ const SURFACE = '#FFFFFF';
 const GRID = '#E6E6E6';
 const TEXT_PRIMARY = '#111111';
 const TEXT_MUTED = '#52514e';
-// Reference lines: told apart by pattern (long dash vs dots) and named in the key below the chart.
-const ASKING_LINE = { stroke: '#3d3d3a', strokeWidth: 2, strokeDasharray: '7 4' };
-const FAIR_LINE = { stroke: '#52514e', strokeWidth: 2, strokeDasharray: '0.1 4', strokeLinecap: 'round' };
+// Reference lines: told apart by color, pattern, and the key below the chart.
+const ASKING_LINE = { stroke: '#D97706', strokeWidth: 2, strokeDasharray: '7 4' };
+const FAIR_LINE = { stroke: '#2563EB', strokeWidth: 2, strokeDasharray: '0.1 4', strokeLinecap: 'round' };
 
 const HEIGHT = 200;
 // SVG text defaults to a serif font in browsers; native already uses the system font.
