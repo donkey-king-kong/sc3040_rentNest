@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { jwtDecode } from 'jwt-decode';
 import MorphingInfinity from '../components/MorphingInfinity';
+import PriceInsightsChart from '../components/PriceInsightsChart';
 import ListingImage from '../components/ListingImage';
 import ProfileImage from '../components/ProfileImage';
 
@@ -70,6 +71,14 @@ const HomeListingScreen = () => {
   useEffect(() => {
     const fetchListingData = async () => {
       try {
+        setLoading(true);
+        setListing(null);
+        setNearbySchools([]);
+        setNearbyHawkerCentres([]);
+        setNearbyBusStops([]);
+        setPriceInsights([]);
+        setReviews([]);
+
         const tokenValue = await AsyncStorage.getItem('token');
         
         if (!tokenValue) {
@@ -124,12 +133,9 @@ const HomeListingScreen = () => {
         console.log('Processed listing data:', defaultListing);
         setListing(defaultListing);
 
-        // Show the listing once core details are ready; secondary sections load in the background.
-        setLoading(false);
-        fetchSecondaryListingData(tokenValue, defaultListing.ownerUserID)
-          .catch(error => {
-            console.warn('Secondary listing data failed:', error?.message);
-          });
+        // Keep the transition up until the full page data has settled, so
+        // sections do not briefly render misleading empty states.
+        await fetchSecondaryListingData(tokenValue, defaultListing.ownerUserID);
       } catch (error) {
         console.error('Error in fetchListingData:', error);
         console.error('Error details:', { //Remove when demo
@@ -200,18 +206,55 @@ const HomeListingScreen = () => {
         applyNearbyAmenities([]);
       };
 
+      const fetchPriceInsights = async () => {
+        const url = `${API_BASE_URL}/api/gov/rentalprices/${listingId}`;
+        console.info('[PriceInsights] Fetching rental prices', { listingId, url });
+        try {
+          const response = await axios.get(url, requestConfig);
+          const payload = response.data || [];
+          if (!Array.isArray(payload)) {
+            console.warn('[PriceInsights] Unexpected rental prices response shape', {
+              listingId,
+              status: response.status,
+              payloadType: typeof payload,
+              payload,
+            });
+            setPriceInsights([]);
+            return;
+          }
+
+          const uniquePrices = {};
+          payload.forEach(item => {
+            if (!uniquePrices[item.leaseDate] || item.rentPrice > uniquePrices[item.leaseDate].rentPrice) {
+              uniquePrices[item.leaseDate] = item;
+            }
+          });
+          const dedupedPrices = Object.values(uniquePrices);
+          console.info('[PriceInsights] Rental prices fetch completed', {
+            listingId,
+            status: response.status,
+            rawCount: payload.length,
+            dedupedCount: dedupedPrices.length,
+            sample: dedupedPrices.slice(0, 3),
+          });
+          if (dedupedPrices.length === 0) {
+            console.info('[PriceInsights] Rental prices response is empty', { listingId });
+          }
+          setPriceInsights(dedupedPrices);
+        } catch (error) {
+          console.warn('[PriceInsights] Rental prices request failed', {
+            listingId,
+            message: error.message,
+            status: error.response?.status,
+            response: error.response?.data,
+          });
+          throw error;
+        }
+      };
+
       await Promise.allSettled([
         fetchNearbyAmenitiesUntilReady(),
-        axios.get(`${API_BASE_URL}/api/gov/rentalprices/${listingId}`, requestConfig)
-          .then(response => {
-            const uniquePrices = {};
-            (response.data || []).forEach(item => {
-              if (!uniquePrices[item.leaseDate] || item.rentPrice > uniquePrices[item.leaseDate].rentPrice) {
-                uniquePrices[item.leaseDate] = item;
-              }
-            });
-            setPriceInsights(Object.values(uniquePrices));
-          }),
+        fetchPriceInsights(),
         axios.get(`${API_BASE_URL}/api/reviews/byUser/${ownerUserID}`, requestConfig)
           .then(response => {
             const reviewList = Array.isArray(response.data) ? response.data : [];
@@ -525,18 +568,8 @@ const HomeListingScreen = () => {
           )}
          </View>
          {/* Display Price Insights */}
-                <Text style={styles.header1}>Price Insights</Text>
-                <View style={styles.table}>
-                    <View style={styles.row}>
-                        <Text style={styles.cellHeader}>Lease Date</Text>
-                        <Text style={styles.cellHeader}>Rent Price</Text>
-                    </View>
-                    {priceInsights.map((item) => (
-                      <View key={item.leaseDate} style={styles.row}>
-                        <Text style={styles.cell}>{item.leaseDate}</Text>
-                        <Text style={styles.cell}>${item.rentPrice}</Text>
-                      </View>
-                    ))}
+                <View style={styles.priceInsightsContainer}>
+                  <PriceInsightsChart data={priceInsights} askingPrice={listing.price} />
                 </View>
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
@@ -617,6 +650,9 @@ const HomeListingScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  priceInsightsContainer: {
+    marginHorizontal: 0,
+  },
   box: {
     flex: 1,
     backgroundColor: '#fff',
@@ -877,12 +913,6 @@ container: {
     flex: 1,
     textAlign: 'center',
   },
-  header1: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      marginBottom: 10,
-      paddingHorizontal: 20
-    },
 ownerBox: {
     borderWidth: 1,
     borderColor: '#000', // Black outline
