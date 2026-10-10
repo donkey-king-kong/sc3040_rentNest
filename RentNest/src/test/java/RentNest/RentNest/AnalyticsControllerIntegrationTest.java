@@ -281,6 +281,30 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(jsonPath("$.metrics.ownerAverageRating.reason").isNotEmpty());
     }
 
+    @Test
+    void adminSeparatesExpiredAndUpcomingRentalsWithoutChangingStoredStatus() throws Exception {
+        Instant now = Instant.now();
+        User expiredTenant = user("expired.tenant@test.local", 0);
+        User upcomingTenant = user("upcoming.tenant@test.local", 0);
+        Rentals expired = rental(listing(ownerA, "Expired", false), expiredTenant, "active",
+                now.minusSeconds(200).toString(), now.minusSeconds(100).toString());
+        rental(listing(ownerA, "Upcoming", false), upcomingTenant, "active",
+                now.plusSeconds(100).toString(), now.plusSeconds(200).toString());
+
+        mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics.rentalRecordCount.value").value(6))
+                .andExpect(jsonPath("$.metrics.activeRentalRecordCount.value").value(1))
+                .andExpect(jsonPath("$.metrics.upcomingRentalRecordCount.value").value(1))
+                .andExpect(jsonPath("$.metrics.expiredRentalRecordCount.value").value(1))
+                .andExpect(jsonPath("$.metrics.unclassifiedRentalRecordCount.value").value(0))
+                .andExpect(jsonPath("$.metrics.currentTenantUserCount.value").value(1))
+                .andExpect(jsonPath("$.metrics.expiredTenantUserCount.value").value(1))
+                .andExpect(jsonPath("$.metrics.terminatedTenantUserCount.value").value(1))
+                .andExpect(jsonPath("$.metrics.pastTenantUserCount.value").value(2));
+        org.junit.jupiter.api.Assertions.assertEquals("active", rentalsRepository.findById(expired.getRentalID()).orElseThrow().getStatus());
+    }
+
     // ---------- Per-listing ----------
 
     @Test

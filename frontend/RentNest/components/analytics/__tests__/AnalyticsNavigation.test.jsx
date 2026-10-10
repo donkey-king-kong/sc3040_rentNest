@@ -96,6 +96,7 @@ it('admin overview includes user status without reports or tabs', async () => {
   useAnalytics.mockReturnValue({ data: { ...listingResponse, metrics: { ...listingResponse.metrics,
     flaggedListingCount: count(2), flaggedUserCount: count(0), flaggedReviewCount: count(3), bannedUserCount: count(1), registeredUserCount: count(4),
     lifetimeRecordedRentPaymentTotal: { ...count(6500), unit: 'SGD' }, acceptedRentalRecordCount: count(2), activeRentalRecordCount: count(1),
+    upcomingRentalRecordCount: count(0), expiredRentalRecordCount: count(0), unclassifiedRentalRecordCount: count(0),
   } }, loading: false });
   const tree = await render(AdminAnalyticsScreen);
   expect(text(tree)).toContain('Monthly Rent Recorded');
@@ -140,7 +141,7 @@ it('shows property owners and separate current and past tenants without changing
   const count = value => ({ availability: 'available', value, unit: 'count', basis: 'snapshot' });
   useAnalytics.mockReturnValue({ data: {
     ...listingResponse,
-    metrics: { ...listingResponse.metrics, registeredUserCount: count(20), ownerUserCount: count(6), currentTenantUserCount: count(3), pastTenantUserCount: count(2) },
+    metrics: { ...listingResponse.metrics, registeredUserCount: count(20), ownerUserCount: count(6), currentTenantUserCount: count(3), pastTenantUserCount: count(2), expiredTenantUserCount: count(1), terminatedTenantUserCount: count(1) },
     series: { ...listingResponse.series, userDistribution: { availability: 'available', points: [
       { bucket: 'Owners only', value: 2 }, { bucket: 'Tenants only', value: 3 },
       { bucket: 'Both', value: 4 }, { bucket: 'Neither', value: 11 },
@@ -149,15 +150,15 @@ it('shows property owners and separate current and past tenants without changing
   const tree = await render(AdminAnalyticsScreen);
   expect(text(tree)).not.toContain('Both');
   expect(text(tree)).not.toContain('Neither');
-  expect(text(tree)).toEqual(expect.arrayContaining(['Property Owners', 'Current Tenants', 'Past Tenants']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['Property Owners', 'Current Tenants', 'Lease Expired', 'Tenancy Terminated']));
   const { CountBarChart } = require('../AnalyticsKit');
   const chart = tree.root.findAllByType(CountBarChart).find(node => node.props.series.points[0]?.bucket === 'Property Owners');
-  expect(chart.props.series.points.map(point => point.value)).toEqual([6, 3, 2]);
+  expect(chart.props.series.points.map(point => point.value)).toEqual([6, 3, 1, 1]);
   expect(chart.props.totalLabel).toBe('Total Users');
   expect(chart.props.title).toBe('Property and Tenancy Activity');
   expect(chart.props.totalMetric.value).toBe(20);
   expect(chart.props.scaleToTotal).toBeUndefined();
-  expect(text(tree)).toEqual(expect.arrayContaining(['6', '3', '2']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['6', '3', '1']));
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Registered Users: 20').length).toBeGreaterThan(0);
 });
 
@@ -165,7 +166,7 @@ it('keeps current and past tenant labels visible when the backend does not retur
   const tree = await render(AdminAnalyticsScreen);
   const { CountBarChart } = require('../AnalyticsKit');
   const chart = tree.root.findAllByType(CountBarChart).find(node => node.props.series.points[0]?.bucket === 'Property Owners');
-  expect(text(tree)).toEqual(expect.arrayContaining(['Current Tenants', 'Past Tenants']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['Current Tenants', 'Lease Expired', 'Tenancy Terminated']));
   expect(chart.props.series.points.slice(1).every(point => point.availability === 'unavailable' && point.value === null)).toBe(true);
 });
 
@@ -231,14 +232,21 @@ it('admin rentals divides recorded offers without double counting and removes us
       acceptedRentalRecordCount: { availability: 'available', value: 6, unit: 'count' },
       pendingRentalRecordCount: { availability: 'available', value: 4, unit: 'count' },
       terminatedRentalRecordCount: { availability: 'available', value: 3, unit: 'count' },
+      activeRentalRecordCount: { availability: 'available', value: 1, unit: 'count' },
+      upcomingRentalRecordCount: { availability: 'available', value: 1, unit: 'count' },
+      expiredRentalRecordCount: { availability: 'available', value: 1, unit: 'count' },
+      unclassifiedRentalRecordCount: { availability: 'available', value: 0, unit: 'count' },
       terminationRate: { availability: 'available', value: 50, unit: 'percent' },
     },
   }, loading: false });
   const tree = await render(AdminAnalyticsScreen);
   expect(text(tree)).toEqual(expect.arrayContaining(['Total Rental Offers', '10', 'Pending', 'Active', 'Terminated', '3 (30.0%)', '4 (40.0%)']));
+  expect(text(tree)).toEqual(expect.arrayContaining(['Upcoming', 'Expired', '1 (10.0%)']));
+  expect(text(tree)).not.toContain('Details Unavailable');
   expect(text(tree)).not.toContain('Terminated / accepted');
   const { PieChart, MetricRow } = require('../AnalyticsKit');
   const offers = tree.root.findAllByType(PieChart).find(node => node.props.totalLabel === 'Recorded Offers');
+  expect(offers.props.series.points.reduce((sum, point) => sum + point.value, 0)).toBe(10);
   expect(offers.findByType(MetricRow).props.metric.value).toBe(10);
   expect(text(tree).indexOf('Rentals')).toBeLessThan(text(tree).indexOf('Monthly Rent Recorded'));
   expect(text(tree).indexOf('Total Rental Offers')).toBeLessThan(text(tree).indexOf('Monthly Rent Recorded'));

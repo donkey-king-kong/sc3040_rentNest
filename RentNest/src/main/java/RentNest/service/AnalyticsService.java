@@ -263,6 +263,10 @@ public class AnalyticsService {
                 "Distinct users with at least one active tenancy covering asOf. The start is inclusive and the end is exclusive. A user with both current and past tenancies counts as current."));
         metrics.put("pastTenantUserCount", Metric.available(tenantCounts.past(), COUNT, SNAPSHOT,
                 "Distinct users with at least one accepted tenancy that has ended, and no current tenancy. Pending offers and future-starting tenancies do not qualify as past tenancies."));
+        metrics.put("expiredTenantUserCount", Metric.available(tenantCounts.expired(), COUNT, SNAPSHOT,
+                "Past tenants whose most recently ended tenancy expired naturally. Users with a current tenancy are excluded."));
+        metrics.put("terminatedTenantUserCount", Metric.available(tenantCounts.terminated(), COUNT, SNAPSHOT,
+                "Past tenants whose most recently ended tenancy was terminated. Users with a current tenancy are excluded. Termination takes precedence when end dates tie."));
         metrics.put("bannedUserCount", Metric.available(bannedUsers, COUNT, SNAPSHOT, "Users with flag value 2 (banned)."));
         metrics.put("userBanRate", rate(bannedUsers, userCount, SNAPSHOT,
                 "Banned users divided by all users.", "No users, so the ban rate cannot be calculated."));
@@ -274,6 +278,15 @@ public class AnalyticsService {
                 "Reviews currently flagged. Counts flagged items, not individual reports."));
 
         putRentalMetrics(metrics, rentals);
+        RentalCounts rentalCounts = rentalCounts(rentals, asOf);
+        metrics.put("activeRentalRecordCount", Metric.available(rentalCounts.active(), COUNT, SNAPSHOT,
+                "Active rentals whose tenancy dates cover the calculation time. Start is inclusive and end is exclusive."));
+        metrics.put("upcomingRentalRecordCount", Metric.available(rentalCounts.upcoming(), COUNT, SNAPSHOT,
+                "Accepted rentals whose tenancy has not started yet."));
+        metrics.put("expiredRentalRecordCount", Metric.available(rentalCounts.expired(), COUNT, SNAPSHOT,
+                "Rentals still marked active whose lease has ended naturally."));
+        metrics.put("unclassifiedRentalRecordCount", Metric.available(rentalCounts.unclassified(), COUNT, SNAPSHOT,
+                "Rentals that cannot be classified because their status or tenancy dates are missing or invalid."));
         long terminated = countStatus(rentals, STATUS_TERMINATED);
         metrics.put("terminationRate", rate(terminated, countAccepted(rentals), SNAPSHOT,
                 "Terminated rentals divided by accepted (active or terminated) rentals.",
@@ -740,11 +753,36 @@ public class AnalyticsService {
                 .count();
     }
 
-    record TenantCounts(long current, long past) {}
+    record TenantCounts(long current, long expired, long terminated) {
+        long past() { return expired + terminated; }
+    }
+
+    record RentalCounts(long active, long upcoming, long expired, long unclassified) {}
+
+    static RentalCounts rentalCounts(List<RentalRow> rentals, Instant asOf) {
+        long active = 0, upcoming = 0, expired = 0, unclassified = 0;
+        for (RentalRow rental : rentals) {
+            String status = normalise(rental.status());
+            if (STATUS_PENDING.equals(status) || STATUS_TERMINATED.equals(status)) continue;
+            if (!STATUS_ACTIVE.equals(status) || rental.rentalDate() == null || rental.tenancyEnd() == null
+                    || !rental.rentalDate().before(rental.tenancyEnd())) {
+                unclassified++;
+            } else if (!rental.tenancyEnd().toInstant().isAfter(asOf)) {
+                // An active row with a termination timestamp is inconsistent, not a natural expiry.
+                if (rental.terminatedAt() == null) expired++;
+                else unclassified++;
+            } else if (rental.rentalDate().toInstant().isAfter(asOf)) {
+                upcoming++;
+            } else {
+                active++;
+            }
+        }
+        return new RentalCounts(active, upcoming, expired, unclassified);
+    }
 
     static TenantCounts tenantCounts(List<RentalRow> rentals, Instant asOf) {
         Set<Long> current = new java.util.HashSet<>();
-        Set<Long> past = new java.util.HashSet<>();
+        Map<Long, RentalRow> latestEnded = new HashMap<>();
         for (RentalRow rental : rentals) {
             if (rental.tenantUserId() == null || rental.rentalDate() == null || rental.tenancyEnd() == null) continue;
             Instant start = rental.rentalDate().toInstant();
@@ -754,11 +792,19 @@ public class AnalyticsService {
             if (STATUS_ACTIVE.equals(status) && !start.isAfter(asOf) && end.isAfter(asOf)) {
                 current.add(rental.tenantUserId());
             } else if (ACCEPTED_STATUSES.contains(status) && !end.isAfter(asOf)) {
-                past.add(rental.tenantUserId());
+                latestEnded.merge(rental.tenantUserId(), rental, (previous, next) -> {
+                    int order = next.tenancyEnd().compareTo(previous.tenancyEnd());
+                    return order > 0 || (order == 0 && wasTerminated(next)) ? next : previous;
+                });
             }
         }
-        past.removeAll(current);
-        return new TenantCounts(current.size(), past.size());
+        current.forEach(latestEnded::remove);
+        long terminated = latestEnded.values().stream().filter(AnalyticsService::wasTerminated).count();
+        return new TenantCounts(current.size(), latestEnded.size() - terminated, terminated);
+    }
+
+    private static boolean wasTerminated(RentalRow rental) {
+        return STATUS_TERMINATED.equals(normalise(rental.status())) || rental.terminatedAt() != null;
     }
 
     private static long countAccepted(List<RentalRow> rentals) {

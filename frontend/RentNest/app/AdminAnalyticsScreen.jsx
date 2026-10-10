@@ -51,18 +51,19 @@ const AdminAnalyticsScreen = () => {
     registeredUserCount: 'All registered user accounts.',
     listingCount: 'All listings currently on the platform.',
     lifetimeRecordedRentPaymentTotal: 'All recorded rent payments. Deposits are excluded and refunds are not deducted.',
-    activeRentalRecordCount: 'Accepted rentals that have not been marked terminated. Some may not have started yet or may have passed their lease end date.',
-    rentalRecordCount: 'All rental offers, including pending, active and terminated offers.',
+    activeRentalRecordCount: 'Rentals with an active tenancy covering today.',
+    rentalRecordCount: 'All rental offers, including pending, ongoing, upcoming and ended rentals.',
   };
   const m = Object.fromEntries(Object.entries(data.metrics).map(([key, metric]) => [key,
     explanations[key] ? { ...metric, definition: explanations[key] } : metric]));
   const participation = {
     availability: 'available', unit: 'count', basis: 'snapshot',
-    definition: 'Property owners have at least one listing. Current tenants rent today. Past tenants rented before and have no current tenancy. A user can be both an owner and a tenant.',
+    definition: 'Current tenants rent today. Past tenants are grouped by how their latest tenancy ended, with termination taking precedence if end dates tie. Anyone renting today is excluded from both past groups. A user can also be a property owner.',
     points: [
       ['Property Owners', m.ownerUserCount],
       ['Current Tenants', m.currentTenantUserCount],
-      ['Past Tenants', m.pastTenantUserCount],
+      ['Lease Expired', m.expiredTenantUserCount],
+      ['Tenancy Terminated', m.terminatedTenantUserCount],
     ].map(([bucket, metric]) => {
       const available = metric?.availability === 'available' && metric.value !== null
         && Number.isInteger(Number(metric.value)) && Number(metric.value) >= 0;
@@ -91,20 +92,22 @@ const AdminAnalyticsScreen = () => {
     ],
   } : { availability: 'unavailable', reason: 'User counts are not available.' };
   const total = m.rentalRecordCount;
-  const accepted = m.acceptedRentalRecordCount;
-  const terminated = m.terminatedRentalRecordCount;
-  const pending = m.pendingRentalRecordCount;
-  const counts = [total, accepted, terminated, pending];
+  const rentalCategories = [
+    ['Pending', m.pendingRentalRecordCount],
+    ['Active', m.activeRentalRecordCount],
+    ['Upcoming', m.upcomingRentalRecordCount],
+    ['Expired', m.expiredRentalRecordCount],
+    ['Terminated', m.terminatedRentalRecordCount],
+    ['Details Unavailable', m.unclassifiedRentalRecordCount],
+  ];
+  const counts = [total, ...rentalCategories.map(([, metric]) => metric)];
   const valid = counts.every(metric => metric?.availability === 'available' && metric.value !== null && Number.isInteger(Number(metric.value)) && Number(metric.value) >= 0);
-  const reconciled = valid && Number(accepted.value) >= Number(terminated.value) && Number(total.value) === Number(accepted.value) + Number(pending.value);
+  const reconciled = valid && Number(total.value) === rentalCategories.reduce((sum, [, metric]) => sum + Number(metric.value), 0);
   const offerDistribution = reconciled ? {
     availability: 'available',
-    definition: 'Pending offers await a response. Active offers have been accepted and may start later. Terminated rentals were ended through a termination request.',
-    points: [
-      { bucket: 'Pending', value: Number(pending.value) },
-      { bucket: 'Active', value: Number(accepted.value) - Number(terminated.value) },
-      { bucket: 'Terminated', value: Number(terminated.value) },
-    ],
+    definition: 'Pending offers await acceptance. Active tenancies cover today. Upcoming tenancies start later. Expired leases ended naturally. Terminated tenancies were explicitly ended. Missing or inconsistent details are shown separately.',
+    points: rentalCategories.filter(([bucket, metric]) => bucket !== 'Details Unavailable' || Number(metric.value) > 0)
+      .map(([bucket, metric]) => ({ bucket, value: Number(metric.value) })),
   } : { availability: 'unavailable', reason: counts.find(metric => metric?.reason)?.reason || 'Rental status counts cannot be reconciled.' };
 
   return (

@@ -473,6 +473,8 @@ it('one admin refresh replaces all overview, rental, user and trend data', async
       registeredUserCount: metric(10 * version), listingCount: metric(3 * version),
       lifetimeRecordedRentPaymentTotal: available(1000 * version, 'SGD'),
       activeRentalRecordCount: metric(version), rentalRecordCount: metric(4 * version),
+      upcomingRentalRecordCount: metric(0), expiredRentalRecordCount: metric(0), unclassifiedRentalRecordCount: metric(0),
+      expiredTenantUserCount: metric(version), terminatedTenantUserCount: metric(0),
       acceptedRentalRecordCount: metric(2 * version), pendingRentalRecordCount: metric(2 * version),
       terminatedRentalRecordCount: metric(version), ownerUserCount: metric(version),
       currentTenantUserCount: metric(version), pastTenantUserCount: metric(version),
@@ -508,7 +510,7 @@ it('one admin refresh replaces all overview, rental, user and trend data', async
   expect(pies.find(node => node.props.title === 'Rentals').props.totalMetric.value).toBe(8);
   expect(pies.find(node => node.props.title === 'User Accounts').props.totalMetric.value).toBe(20);
   const bars = tree.root.findAllByType(CountBarChart);
-  expect(bars.find(node => node.props.title === 'Property and Tenancy Activity').props.series.points.map(point => point.value)).toEqual([2, 2, 2]);
+  expect(bars.find(node => node.props.title === 'Property and Tenancy Activity').props.series.points.map(point => point.value)).toEqual([2, 2, 2, 0]);
   expect(bars.find(node => node.props.title === 'Reported records')).toBeUndefined();
   const lines = tree.root.findAllByType(LineChart);
   expect(lines.find(node => node.props.title === 'Monthly Rent Recorded').props.series).toBe(refreshed.series.monthlyRecordedRentPayments);

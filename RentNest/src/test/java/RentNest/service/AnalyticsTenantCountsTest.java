@@ -45,4 +45,33 @@ class AnalyticsTenantCountsTest {
         assertEquals(0, counts.current());
         assertEquals(1, counts.past());
     }
+
+    @Test
+    void classifiesPastUsersByLatestEndedTenancyWithTerminationWinningTies() {
+        var counts = AnalyticsService.tenantCounts(List.of(
+                rental(1L, "terminated", -300, -200), rental(1L, "active", -100, -1),
+                rental(2L, "active", -300, -200), rental(2L, "terminated", -100, -1),
+                rental(3L, "terminated", -100, -1), rental(3L, "active", -100, -1),
+                rental(4L, "terminated", -300, -200), rental(4L, "active", -100, 100)), NOW);
+        assertEquals(1, counts.current());
+        assertEquals(1, counts.expired());
+        assertEquals(2, counts.terminated());
+        assertEquals(3, counts.past());
+    }
+
+    @Test
+    void rentalCategoriesRespectDatesWithoutLosingUnknownRows() {
+        var counts = AnalyticsService.rentalCounts(List.of(
+                rental(1L, "active", 0, 100), rental(2L, "active", -100, 0),
+                rental(3L, "active", 1, 100), rental(4L, "active", 100, -100),
+                rental(5L, "pending", -100, -1), rental(6L, "terminated", -100, -1),
+                rental(7L, "unexpected", -100, 100),
+                new RentalRow(1L, "active", 8L, null, null, null, null, null, null),
+                new RentalRow(1L, "active", 9L, Date.from(NOW.minusSeconds(100)),
+                        Date.from(NOW.plusSeconds(100)), null, null, Date.from(NOW.minusSeconds(1)), null)), NOW);
+        assertEquals(1, counts.active());
+        assertEquals(1, counts.upcoming());
+        assertEquals(1, counts.expired());
+        assertEquals(4, counts.unclassified());
+    }
 }

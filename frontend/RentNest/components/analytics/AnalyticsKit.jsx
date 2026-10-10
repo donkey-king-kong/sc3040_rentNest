@@ -25,7 +25,7 @@ export const COLORS = {
 };
 
 // Categorical palette in fixed order (validated): identity is never color alone, labels always accompany it
-export const CATEGORY_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100'];
+export const CATEGORY_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#8b5bb5', '#687782'];
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
