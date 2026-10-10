@@ -53,19 +53,19 @@ public class ReviewsController {
         return reviewsService.getAllReviews();
     }
 
-    // Update Review (only the review's author or an admin)
+    // Update Review (only the review's author)
     @PutMapping("/{id}")
     public ResponseEntity<Reviews> updateReview(@PathVariable Long id, @RequestBody ReviewsDTO reviewDTO, @AuthenticationPrincipal User user) {
         Optional<Reviews> existing = reviewsService.getReviewById(id);
         if (existing.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        if (user == null || !(user.isAdmin() || existing.get().isWrittenBy(user))) {
+        if (user == null || !existing.get().isWrittenBy(user)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        // Only an admin may change who a review is attributed to
+        // A review's original author cannot be changed.
         Long requestedReviewer = reviewDTO.getReviewerID();
-        if (requestedReviewer != null && !requestedReviewer.equals(existing.get().getReviewerId()) && !user.isAdmin()) {
+        if (requestedReviewer != null && !requestedReviewer.equals(existing.get().getReviewerId())) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         Reviews updatedReview = reviewsService.updateReview(id, reviewDTO, user);

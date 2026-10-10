@@ -155,6 +155,10 @@ public class ListingsService {
         if (listingOptional.isPresent()) {
             Listings listing = listingOptional.get();
 
+            if (listingDTO.getOwnerUserID() != null && !listingDTO.getOwnerUserID().equals(listing.getOwnerId())) {
+                throw new SecurityException("A listing's owner cannot be changed through editing.");
+            }
+
             // Map fields from ListingsDTO to Listings entity
             listing.setName(listingDTO.getName());
             listing.setType(listingDTO.getType());
@@ -168,13 +172,6 @@ public class ListingsService {
             listing.setBathroom(listingDTO.getBathroom());
             listing.setDescription(listingDTO.getDescription());
             listing.setListingpicture(listingDTO.getListingpicture());
-
-            // Update owner if necessary (optional, based on your use case)
-            if (listingDTO.getOwnerUserID() != null) {
-                User owner = userRepository.findById(listingDTO.getOwnerUserID())
-                        .orElseThrow(() -> new RuntimeException("Owner not found"));
-                listing.setOwner(owner);
-            }
 
             // Save the updated listing back to the repository
             listingsRepository.save(listing);

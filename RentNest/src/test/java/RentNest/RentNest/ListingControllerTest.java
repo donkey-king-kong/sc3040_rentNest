@@ -163,16 +163,15 @@ public class ListingControllerTest {
     }
 
     @Test
-    public void testAdminCanReassignListing() {
+    public void testAdminCannotReassignListing() {
         listing.setOwner(userWithId(1L, User.ROLE_USER));
         listingsDTO.setOwnerUserID(2L);
         when(listingsService.getListingById(1L)).thenReturn(Optional.of(listing));
-        when(listingsService.updateListing(1L, listingsDTO)).thenReturn(Optional.of(listing));
 
         ResponseEntity<Listings> response = listingsController.updateListing(1L, listingsDTO, userWithId(99L, User.ROLE_ADMIN));
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(listingsService, times(1)).updateListing(1L, listingsDTO);
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(listingsService, never()).updateListing(anyLong(), any());
     }
 
     // Test for DELETE /api/listings/{id} (Delete a listing)

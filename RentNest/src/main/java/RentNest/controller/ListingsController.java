@@ -80,19 +80,19 @@
         }
 
 
-        // PUT - Update an existing listing (only its owner or an admin)
+        // PUT - Update an existing listing (only its owner)
         @PutMapping("/{id}")
         public ResponseEntity<Listings> updateListing(@PathVariable Long id, @RequestBody ListingsDTO listingDTO, @AuthenticationPrincipal User user) {
             Optional<Listings> existing = listingsService.getListingById(id);
             if (existing.isEmpty()) {
                 return ResponseEntity.notFound().build();
             }
-            if (user == null || !(user.isAdmin() || existing.get().isOwnedBy(user))) {
+            if (user == null || !existing.get().isOwnedBy(user)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
-            // Only an admin may hand a listing to a different owner
+            // A listing's owner cannot be changed through editing.
             Long requestedOwner = listingDTO.getOwnerUserID();
-            if (requestedOwner != null && !requestedOwner.equals(existing.get().getOwnerId()) && !user.isAdmin()) {
+            if (requestedOwner != null && !requestedOwner.equals(existing.get().getOwnerId())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
             Optional<Listings> updatedListing = listingsService.updateListing(id, listingDTO);

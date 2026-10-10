@@ -134,6 +134,30 @@ public class ReviewsControllerTest {
     }
 
     @Test
+    public void testAdminCannotEditAnotherAuthorsReview() {
+        User author = userWithId(5L, User.ROLE_USER);
+        Reviews existing = new Reviews();
+        existing.setReviewer(author);
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.of(existing));
+        ResponseEntity<Reviews> response = reviewsController.updateReview(1L, new ReviewsDTO(), userWithId(7L, User.ROLE_ADMIN));
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(reviewsService, never()).updateReview(anyLong(), any(ReviewsDTO.class), any(User.class));
+    }
+
+    @Test
+    public void testAdminAuthorCannotReassignTheirOwnReview() {
+        User author = userWithId(5L, User.ROLE_ADMIN);
+        Reviews existing = new Reviews();
+        existing.setReviewer(author);
+        ReviewsDTO dto = new ReviewsDTO();
+        dto.setReviewerID(7L);
+        when(reviewsService.getReviewById(1L)).thenReturn(Optional.of(existing));
+        ResponseEntity<Reviews> response = reviewsController.updateReview(1L, dto, author);
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verify(reviewsService, never()).updateReview(anyLong(), any(ReviewsDTO.class), any(User.class));
+    }
+
+    @Test
     public void testAuthorCannotReassignReviewToSomeoneElse() {
         User author = userWithId(5L, User.ROLE_USER);
         Reviews existing = new Reviews();

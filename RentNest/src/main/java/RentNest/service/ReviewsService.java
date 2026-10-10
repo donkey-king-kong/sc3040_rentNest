@@ -124,12 +124,7 @@ public class ReviewsService {
 
         Long requestedReviewer = reviewDTO.getReviewerID();
         if (requestedReviewer != null && !requestedReviewer.equals(existingReview.getReviewerId())) {
-            if (!authenticatedUser.isAdmin()) {
-                throw new SecurityException("Only an admin can reassign a review.");
-            }
-            User reviewer = userRepository.findById(requestedReviewer)
-                    .orElseThrow(() -> new RuntimeException("Reviewer not found"));
-            existingReview.setReviewer(reviewer);
+            throw new SecurityException("A review's author cannot be changed.");
         }
 
         // Update fields that can be modified
@@ -148,13 +143,19 @@ public class ReviewsService {
         Reviews existingReview = reviewsRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Review not found with id: " + id));
 
-        assertReviewAuthor(existingReview, authenticatedUser);
+        assertReviewDeletionAllowed(existingReview, authenticatedUser);
         reviewsRepository.delete(existingReview);
     }
 
     private void assertReviewAuthor(Reviews review, User authenticatedUser) {
+        if (authenticatedUser == null || !review.isWrittenBy(authenticatedUser)) {
+            throw new SecurityException("Only the review author can edit this review.");
+        }
+    }
+
+    private void assertReviewDeletionAllowed(Reviews review, User authenticatedUser) {
         if (authenticatedUser == null || !(authenticatedUser.isAdmin() || review.isWrittenBy(authenticatedUser))) {
-            throw new SecurityException("Only the review author or an admin can modify this review.");
+            throw new SecurityException("Only the review author or an admin can delete this review.");
         }
     }
 

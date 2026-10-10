@@ -26,8 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Editing and deleting listings and reviews through the real security filter chain, against a
- * disposable in-memory H2 database. Only the owner/author or an admin may change them, and only an
- * admin may reassign ownership. All data is synthetic.
+ * disposable in-memory H2 database. Only the owner/author may edit content; admins can delete
+ * content and dismiss reports. Ownership and authorship cannot be reassigned. All data is synthetic.
  */
 @RentNestIntegrationTest
 class OwnershipAuthorizationIntegrationTest {
@@ -41,6 +41,8 @@ class OwnershipAuthorizationIntegrationTest {
     @Autowired private PaymentRepository paymentRepository;
     @Autowired private RequestsRepository requestsRepository;
     @Autowired private ChatHistoryRepository chatHistoryRepository;
+    @Autowired private RentNest.service.ReviewsService reviewsService;
+    @Autowired private RentNest.service.ListingsService listingsService;
 
     private User owner;
     private User otherUser;
@@ -193,6 +195,80 @@ class OwnershipAuthorizationIntegrationTest {
                         .content("{\"rating\":1,\"title\":\"Edited\",\"text\":\"Edited text\",\"reviewerID\":" + admin.getUserID() + "}"))
                 .andExpect(status().isForbidden());
         assertEquals(otherUser.getUserID(), reviewsRepository.findById(review.getReviewid()).orElseThrow().getReviewerId());
+    }
+
+    @Test
+    void adminCannotEditOtherUsersContentOrReassignIt() throws Exception {
+        mockMvc.perform(put("/api/listings/" + listing.getListingID()).header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Admin edit\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/listings/" + listing.getListingID()).header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"ownerUserID\":" + admin.getUserID() + "}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/reviews/" + review.getReviewid()).header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"rating\":1,\"title\":\"Admin edit\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/reviews/" + review.getReviewid()).header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reviewerID\":" + admin.getUserID() + "}"))
+                .andExpect(status().isForbidden());
+        assertEquals("Synthetic listing", listingsRepository.findById(listing.getListingID()).orElseThrow().getName());
+        assertEquals(owner.getUserID(), listingsRepository.findById(listing.getListingID()).orElseThrow().getOwnerId());
+        assertEquals(3, reviewsRepository.findById(review.getReviewid()).orElseThrow().getRating());
+        assertEquals(otherUser.getUserID(), reviewsRepository.findById(review.getReviewid()).orElseThrow().getReviewerId());
+    }
+
+    @Test
+    void adminCanEditOwnContentWithUnchangedIdentityButCannotReassignIt() throws Exception {
+        listing.setOwner(admin);
+        listingsRepository.save(listing);
+        review.setReviewer(admin);
+        reviewsRepository.save(review);
+        mockMvc.perform(put("/api/listings/" + listing.getListingID()).header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Own listing\",\"ownerUserID\":" + admin.getUserID() + "}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/reviews/" + review.getReviewid()).header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"rating\":4,\"title\":\"Own review\",\"text\":\"Edited\",\"reviewerID\":" + admin.getUserID() + "}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/listings/" + listing.getListingID()).header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"ownerUserID\":" + owner.getUserID() + "}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/reviews/" + review.getReviewid()).header("Authorization", bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"reviewerID\":" + otherUser.getUserID() + "}"))
+                .andExpect(status().isForbidden());
+        assertEquals("Own listing", listingsRepository.findById(listing.getListingID()).orElseThrow().getName());
+        assertEquals("Own review", reviewsRepository.findById(review.getReviewid()).orElseThrow().getTitle());
+    }
+
+    @Test
+    void servicesRejectReassignmentEvenWithoutControllerChecks() {
+        RentNest.dto.ListingsDTO listingDto = new RentNest.dto.ListingsDTO();
+        listingDto.setOwnerUserID(otherUser.getUserID());
+        org.junit.jupiter.api.Assertions.assertThrows(SecurityException.class,
+                () -> listingsService.updateListing(listing.getListingID(), listingDto));
+        RentNest.dto.ReviewsDTO reviewDto = new RentNest.dto.ReviewsDTO();
+        org.junit.jupiter.api.Assertions.assertThrows(SecurityException.class,
+                () -> reviewsService.updateReview(review.getReviewid(), reviewDto, admin));
+        otherUser.setRole(User.ROLE_ADMIN);
+        userRepository.save(otherUser);
+        reviewDto.setReviewerID(owner.getUserID());
+        org.junit.jupiter.api.Assertions.assertThrows(SecurityException.class,
+                () -> reviewsService.updateReview(review.getReviewid(), reviewDto, otherUser));
+    }
+
+    @Test
+    void adminCanStillDismissListingAndReviewReports() throws Exception {
+        listing.setFlagged(true);
+        listingsRepository.save(listing);
+        review.setFlagged(true);
+        reviewsRepository.save(review);
+        mockMvc.perform(put("/api/listings/setFlag/" + listing.getListingID() + "/false")
+                        .header("Authorization", bearer(admin)))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/reviews/setFlag/" + review.getReviewid() + "/false")
+                        .header("Authorization", bearer(admin)))
+                .andExpect(status().isOk());
+        assertFalse(listingsRepository.findById(listing.getListingID()).orElseThrow().isFlagged());
+        assertFalse(reviewsRepository.findById(review.getReviewid()).orElseThrow().isFlagged());
     }
 
     // ---------- Unauthenticated ----------

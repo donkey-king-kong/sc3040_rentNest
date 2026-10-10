@@ -4,6 +4,8 @@ Status: implemented on `feature/dashboard-usability-fixes`. Analytics uses store
 
 ## Endpoints
 
+Related content permissions: review editing is limited to the original author, and listing editing to its current owner, including when that user is an admin. Editing cannot change `reviewerID` or `ownerUserID`; omitted or unchanged IDs are accepted. Admins retain permission to delete content and dismiss reports.
+
 | Method | Path | Who can call it |
 |---|---|---|
 | GET | `/api/analytics/owner/summary?from=&to=` | Any logged-in user. Returns analytics for the caller's own listings. |
