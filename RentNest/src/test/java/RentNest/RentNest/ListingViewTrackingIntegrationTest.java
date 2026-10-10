@@ -21,7 +21,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.sql.Timestamp;
 
-import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -198,13 +197,10 @@ class ListingViewTrackingIntegrationTest {
     }
 
     @Test
-    void photoGalleryViewsStayUnavailableWithAStatedReason() throws Exception {
+    void unusedPhotoGalleryMetricIsNotReturned() throws Exception {
         mockMvc.perform(listingAnalytics(daysAgo(1), daysAhead(1)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.photoGalleryViews.availability").value("unavailable"))
-                .andExpect(jsonPath("$.metrics.photoGalleryViews.value").value(nullValue()))
-                .andExpect(jsonPath("$.metrics.photoGalleryViews.reason").value(
-                        "A listing stores a single photograph, so there is no gallery to browse."));
+                .andExpect(jsonPath("$.metrics.photoGalleryViews").doesNotExist());
     }
 
     @Test

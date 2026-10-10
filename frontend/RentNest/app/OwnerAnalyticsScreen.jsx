@@ -56,18 +56,12 @@ const OwnerAnalyticsScreen = () => {
   const explanations = {
     listingCount: 'All listings you own.',
     activeTenancyCount: 'Your listings with a tenancy covering today.',
-    occupancyRate: 'The percentage of your listings occupied today.',
     tenantsHostedCount: 'Different tenants who have accepted an offer for one of your listings.',
     averageTenancyMonths: 'Average tenancy length in months. Active rentals use the agreed lease length. Ended rentals use their recorded end date.',
     ownerAverageRating: 'Your average review rating out of 5.',
     ownerReviewCount: 'Reviews other users have left about you.',
     recordedRentPaymentTotal: 'Rent payments for the past 12 months, based on the month paid for. Deposits are excluded and refunds are not deducted.',
-    averageOccupancyRate: 'The average share of time your listings were occupied over the past 12 months, using the listings you currently own.',
-    tenantsInPeriodCount: 'Different tenants whose accepted tenancy overlaps the past 12 months.',
-    offersSentCount: 'Offers sent in the past 12 months. Offers without a sent date are left out.',
-    offersAcceptedCount: 'Offers accepted in the past 12 months. Offers without an acceptance date are left out.',
     terminationsCount: 'Rentals terminated in the past 12 months. Rentals without a termination date are left out.',
-    averageDaysOnMarket: 'Average days from publishing a listing to its first accepted offer in the past 12 months. Missing or invalid dates are left out.',
   };
   const m = Object.fromEntries(Object.entries(data.metrics).map(([key, metric]) => [key,
     explanations[key] ? { ...metric, definition: explanations[key] } : metric]));

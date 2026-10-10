@@ -8,7 +8,6 @@ import jakarta.persistence.TypedQuery;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
-import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -83,25 +82,6 @@ public class AnalyticsQueryRepository {
 
     public long countAllListings() {
         return entityManager.createQuery("SELECT COUNT(l) FROM Listings l", Long.class).getSingleResult();
-    }
-
-    public long countFlaggedListings() {
-        return entityManager.createQuery("SELECT COUNT(l) FROM Listings l WHERE l.flagged = true", Long.class)
-                .getSingleResult();
-    }
-
-    public long countListingsCreatedByOwner(Long ownerId, Instant from, Instant to) {
-        return withPeriod(entityManager.createQuery(
-                        "SELECT COUNT(l) FROM Listings l WHERE l.owner.userID = :ownerId " +
-                        "AND l.createdAt >= :from AND l.createdAt < :to", Long.class), from, to)
-                .setParameter("ownerId", ownerId)
-                .getSingleResult();
-    }
-
-    public long countListingsCreated(Instant from, Instant to) {
-        return withPeriod(entityManager.createQuery(
-                        "SELECT COUNT(l) FROM Listings l WHERE l.createdAt >= :from AND l.createdAt < :to", Long.class), from, to)
-                .getSingleResult();
     }
 
     public long countDistinctListingOwners() {
@@ -211,34 +191,10 @@ public class AnalyticsQueryRepository {
                 .getSingleResult();
     }
 
-    public long countFlaggedReviews() {
-        return entityManager.createQuery("SELECT COUNT(r) FROM Reviews r WHERE r.flagged = true", Long.class)
-                .getSingleResult();
-    }
-
     // ---------- Users ----------
 
     public long countAllUsers() {
         return entityManager.createQuery("SELECT COUNT(u) FROM User u", Long.class).getSingleResult();
-    }
-
-    public long countUsersCreated(Instant from, Instant to) {
-        return withPeriod(entityManager.createQuery(
-                        "SELECT COUNT(u) FROM User u WHERE u.createdAt >= :from AND u.createdAt < :to", Long.class), from, to)
-                .getSingleResult();
-    }
-
-    private static final String OWNS_A_LISTING =
-            "EXISTS (SELECT l.listingID FROM Listings l WHERE l.owner.userID = u.userID)";
-    private static final String HAS_ACCEPTED_TENANCY =
-            "EXISTS (SELECT r.rentalID FROM Rentals r WHERE r.tenantUserID = u.userID AND LOWER(TRIM(r.status)) IN :acceptedStatuses)";
-
-    /** Counts users by whether they own a listing and whether they have been the tenant on an accepted rental. */
-    public long countUsersByRole(boolean owner, boolean tenant, Collection<String> acceptedStatuses) {
-        String where = (owner ? "" : "NOT ") + OWNS_A_LISTING + " AND " + (tenant ? "" : "NOT ") + HAS_ACCEPTED_TENANCY;
-        return entityManager.createQuery("SELECT COUNT(u) FROM User u WHERE " + where, Long.class)
-                .setParameter("acceptedStatuses", acceptedStatuses)
-                .getSingleResult();
     }
 
     public long countUsersWithFlag(int flag) {

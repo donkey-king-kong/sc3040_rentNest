@@ -108,13 +108,13 @@ class AnalyticsDaysOnMarketTest {
                 row(5, "active", PUBLISHED, "2026-08-20T00:00:00Z")); // reversed excluded
         var s = service(PUBLISHED, rows);
         var period = s.parsePeriod(FROM, TO);
-        assertEquals(new BigDecimal("8.0"), s.ownerSummary(actor(), period).metrics().get("averageDaysOnMarket").value());
-        assertEquals(new BigDecimal("8.0"), s.platformSummary(actor(), period).metrics().get("averageDaysOnMarket").value());
+        assertEquals(new BigDecimal("8.0"), s.ownerSummary(actor(), period).series().get("monthlyAverageDaysOnMarket").points().getFirst().value());
+        assertEquals(new BigDecimal("8.0"), s.platformSummary(actor(), period).series().get("monthlyAverageDaysOnMarket").points().getFirst().value());
     }
 
     @Test void laterAcceptanceDoesNotPullAnOldFirstAcceptanceIntoPeriod() {
         var s = service(PUBLISHED, List.of(row(1, "terminated", PUBLISHED, ACCEPTED), row(1, "active", PUBLISHED, "2026-09-21T00:00:00Z")));
-        assertNull(s.ownerSummary(actor(), s.parsePeriod("2026-09-20T00:00:00Z", TO)).metrics().get("averageDaysOnMarket").value());
+        assertNull(s.ownerSummary(actor(), s.parsePeriod("2026-09-20T00:00:00Z", TO)).series().get("monthlyAverageDaysOnMarket").points().getFirst().value());
     }
 
     @Test void historicalAveragesUseValidFirstAcceptancesAndExcludeMissingOrInvalidDates() {
@@ -130,10 +130,9 @@ class AnalyticsDaysOnMarketTest {
         var s = service(published, rows);
         var period = s.parsePeriod("2026-08-01T00:00:00Z", "2026-09-01T00:00:00Z");
         for (var result : List.of(s.ownerSummary(actor(), period), s.platformSummary(actor(), period))) {
-            var average = result.metrics().get("averageDaysOnMarket");
+            var average = result.series().get("monthlyAverageDaysOnMarket");
             assertEquals("available", average.availability());
-            assertEquals(new BigDecimal("10.0"), average.value());
-            assertNull(average.coverage());
+            assertEquals(new BigDecimal("10.0"), average.points().getFirst().value());
         }
     }
 }

@@ -30,6 +30,8 @@ import AdminAnalyticsScreen from '../../../app/AdminAnalyticsScreen';
 import { AdminLoadingState } from '../../AdminUI';
 
 jest.mock('axios');
+// Dashboard tests cover loader visibility; its looping animation is unrelated to chart assertions.
+jest.mock('../../MorphingInfinity', () => () => null);
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 jest.mock('../../../config/api', () => ({
@@ -496,7 +498,7 @@ it('one admin refresh replaces all overview, rental, user and trend data', async
   const refreshButton = () => tree.root.findAll(node => node.props.accessibilityLabel === 'Refresh analytics' && node.props.onPress)[0];
   await act(async () => refreshButton().props.onPress());
   expect(axios.get).toHaveBeenCalledTimes(2);
-  expect(tree.root.findByType(AdminLoadingState).props.message).toBeNull();
+  expect(tree.root.findByType(AdminLoadingState).props.message).toBe('Loading analytics…');
   [StatTile, PieChart, CountBarChart, LineChart, BarChart].forEach(component => {
     expect(tree.root.findAllByType(component)).toHaveLength(0);
   });

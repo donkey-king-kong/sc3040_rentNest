@@ -24,6 +24,7 @@ import java.time.OffsetDateTime;
 import java.util.Date;
 
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.aMapWithSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -227,20 +228,20 @@ class AnalyticsControllerIntegrationTest {
     void ownerSummaryAggregatesMatchFixture() throws Exception {
         mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics", aMapWithSize(9)))
+                .andExpect(jsonPath("$.series", aMapWithSize(6)))
                 .andExpect(jsonPath("$.metrics.activeTenancyCount.value").value(1))
-                .andExpect(jsonPath("$.metrics.occupancyRate.value").value(33.3))
-                .andExpect(jsonPath("$.metrics.occupancyRate.unit").value("percent"))
-                .andExpect(jsonPath("$.metrics.rentalRecordCount.value").value(3))
-                .andExpect(jsonPath("$.metrics.pendingRentalRecordCount.value").value(1))
-                .andExpect(jsonPath("$.metrics.acceptedRentalRecordCount.value").value(2))
-                .andExpect(jsonPath("$.metrics.terminatedRentalRecordCount.value").value(1))
-                .andExpect(jsonPath("$.metrics.acceptanceRate.value").value(66.7))
+                .andExpect(jsonPath("$.metrics.occupancyRate").doesNotExist())
+                .andExpect(jsonPath("$.metrics.rentalRecordCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.pendingRentalRecordCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.acceptedRentalRecordCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.terminatedRentalRecordCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.acceptanceRate").doesNotExist())
                 .andExpect(jsonPath("$.metrics.tenantsHostedCount.value").value(2))
                 .andExpect(jsonPath("$.metrics.averageTenancyMonths.value").value(7.5))
                 .andExpect(jsonPath("$.metrics.ownerAverageRating.value").value(4.5))
                 .andExpect(jsonPath("$.metrics.ownerReviewCount.value").value(2))
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentCount.value").value(2))
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentCount.basis").value("period"))
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentCount").doesNotExist())
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(3500))
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.unit").value("SGD"))
                 .andExpect(jsonPath("$.series.tenancyDurationDistribution.points[0].bucket").value("<3 months"))
@@ -273,9 +274,8 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(jsonPath("$.metrics.listingCount.value").value(0))
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.availability").value("available"))
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(0))
-                .andExpect(jsonPath("$.metrics.occupancyRate.availability").value("unavailable"))
-                .andExpect(jsonPath("$.metrics.occupancyRate.value").value(nullValue()))
-                .andExpect(jsonPath("$.metrics.acceptanceRate.availability").value("unavailable"))
+                .andExpect(jsonPath("$.metrics.occupancyRate").doesNotExist())
+                .andExpect(jsonPath("$.metrics.acceptanceRate").doesNotExist())
                 .andExpect(jsonPath("$.metrics.averageTenancyMonths.availability").value("unavailable"))
                 .andExpect(jsonPath("$.metrics.ownerAverageRating.availability").value("unavailable"))
                 .andExpect(jsonPath("$.metrics.ownerAverageRating.reason").isNotEmpty());
@@ -301,7 +301,7 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(jsonPath("$.metrics.currentTenantUserCount.value").value(1))
                 .andExpect(jsonPath("$.metrics.expiredTenantUserCount.value").value(1))
                 .andExpect(jsonPath("$.metrics.terminatedTenantUserCount.value").value(1))
-                .andExpect(jsonPath("$.metrics.pastTenantUserCount.value").value(2));
+                .andExpect(jsonPath("$.metrics.pastTenantUserCount").doesNotExist());
         org.junit.jupiter.api.Assertions.assertEquals("active", rentalsRepository.findById(expired.getRentalID()).orElseThrow().getStatus());
     }
 
@@ -311,6 +311,8 @@ class AnalyticsControllerIntegrationTest {
     void listingAnalyticsMatchFixture() throws Exception {
         mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/listings/" + listingA2.getListingID())))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics", aMapWithSize(12)))
+                .andExpect(jsonPath("$.series", aMapWithSize(2)))
                 .andExpect(jsonPath("$.scope").value("listing"))
                 .andExpect(jsonPath("$.listing.name").value("A2"))
                 .andExpect(jsonPath("$.metrics.occupancyStatus.value").value("vacant"))
@@ -334,30 +336,31 @@ class AnalyticsControllerIntegrationTest {
     void adminSummaryAggregatesMatchFixture() throws Exception {
         mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary")))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metrics", aMapWithSize(15)))
+                .andExpect(jsonPath("$.series", aMapWithSize(4)))
                 .andExpect(jsonPath("$.scope").value("platform"))
                 .andExpect(jsonPath("$.metrics.registeredUserCount.value").value(8))
                 .andExpect(jsonPath("$.metrics.listingCount.value").value(4))
                 .andExpect(jsonPath("$.metrics.ownerUserCount.value").value(2))
-                .andExpect(jsonPath("$.metrics.tenantUserCount.value").value(2))
+                .andExpect(jsonPath("$.metrics.tenantUserCount").doesNotExist())
                 .andExpect(jsonPath("$.metrics.bannedUserCount.value").value(1))
                 .andExpect(jsonPath("$.metrics.currentTenantUserCount.availability").value("available"))
                 .andExpect(jsonPath("$.metrics.currentTenantUserCount.basis").value("snapshot"))
-                .andExpect(jsonPath("$.metrics.pastTenantUserCount.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.pastTenantUserCount.basis").value("snapshot"))
-                .andExpect(jsonPath("$.metrics.userBanRate.value").value(12.5))
-                .andExpect(jsonPath("$.metrics.flaggedUserCount.value").value(1))
-                .andExpect(jsonPath("$.metrics.flaggedListingCount.value").value(1))
-                .andExpect(jsonPath("$.metrics.flaggedReviewCount.value").value(1))
+                .andExpect(jsonPath("$.metrics.pastTenantUserCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.userBanRate").doesNotExist())
+                .andExpect(jsonPath("$.metrics.flaggedUserCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.flaggedListingCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.flaggedReviewCount").doesNotExist())
                 .andExpect(jsonPath("$.metrics.rentalRecordCount.value").value(4))
-                .andExpect(jsonPath("$.metrics.acceptedRentalRecordCount.value").value(2))
-                .andExpect(jsonPath("$.metrics.terminationRate.value").value(50.0))
+                .andExpect(jsonPath("$.metrics.acceptedRentalRecordCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.terminationRate").doesNotExist())
                 .andExpect(jsonPath("$.metrics.activeRentalRecordCount.value").value(1))
                 .andExpect(jsonPath("$.metrics.activeRentalRecordCount.basis").value("snapshot"))
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentCount.value").value(3))
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(4500))
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal").doesNotExist())
                 .andExpect(jsonPath("$.metrics.lifetimeRecordedRentPaymentTotal.value").value(6500))
                 .andExpect(jsonPath("$.metrics.lifetimeRecordedRentPaymentTotal.basis").value("snapshot"))
-                .andExpect(jsonPath("$.metrics.reportResolutionRate.availability").value("unavailable"));
+                .andExpect(jsonPath("$.metrics.reportResolutionRate").doesNotExist());
     }
 
     // ---------- Comparisons and occupancy over time ----------
@@ -368,15 +371,14 @@ class AnalyticsControllerIntegrationTest {
      */
 
     @Test
-    void occupancyOverThePeriodMatchesFixture() throws Exception {
+    void monthlyOccupancyMatchesFixture() throws Exception {
         // 1 Jan to 1 Apr (90 days): A1 90 days + A2 59 days = 149 of 3 x 90 listing-days = 55.2%
         mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.averageOccupancyRate.value").value(55.2))
-                // A zero baseline still permits a percentage-point difference.
-                .andExpect(jsonPath("$.metrics.averageOccupancyRateChange.value").value(55.2))
-                .andExpect(jsonPath("$.metrics.tenantsInPeriodCount.value").value(2))
-                .andExpect(jsonPath("$.metrics.tenantsInPeriodChange.availability").value("unavailable"))
+                .andExpect(jsonPath("$.metrics.averageOccupancyRate").doesNotExist())
+                .andExpect(jsonPath("$.metrics.averageOccupancyRateChange").doesNotExist())
+                .andExpect(jsonPath("$.metrics.tenantsInPeriodCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.tenantsInPeriodChange").doesNotExist())
                 // Jan: 31/93, Feb: 56/84, Mar: 62/93
                 .andExpect(jsonPath("$.series.monthlyOccupancyRate.points[0].value").value(33.3))
                 .andExpect(jsonPath("$.series.monthlyOccupancyRate.points[1].value").value(66.7))
@@ -385,34 +387,29 @@ class AnalyticsControllerIntegrationTest {
     }
 
     @Test
-    void changesAgainstThePreviousPeriodMatchFixture() throws Exception {
+    void unusedOwnerComparisonMetricsAreNotReturned() throws Exception {
         // 1 Feb to 1 Apr (59 days); previous period 4 Dec 2025 to 1 Feb 2026
         mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary"), "2026-02-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                // Rent: S$2,000 now vs S$1,500 before
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotalChange.value").value(33.3))
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentCountChange.value").value(0.0))
-                // Occupancy: 118/177 = 66.67% now vs 31/177 = 17.51% before = +49.2 percentage points
-                .andExpect(jsonPath("$.metrics.averageOccupancyRate.value").value(66.7))
-                .andExpect(jsonPath("$.metrics.averageOccupancyRateChange.value").value(49.2))
-                .andExpect(jsonPath("$.metrics.averageOccupancyRateChange.unit").value("percentage_points"))
-                // Tenants: 2 now vs 1 before (A2 starts exactly when the previous period ends)
-                .andExpect(jsonPath("$.metrics.tenantsInPeriodChange.value").value(100.0));
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotalChange").doesNotExist())
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentCountChange").doesNotExist())
+                .andExpect(jsonPath("$.metrics.averageOccupancyRate").doesNotExist())
+                .andExpect(jsonPath("$.metrics.averageOccupancyRateChange").doesNotExist())
+                .andExpect(jsonPath("$.metrics.tenantsInPeriodChange").doesNotExist());
     }
 
     @Test
-    void emptyPreviousPeriodMakesPaymentChangeUnavailable() throws Exception {
+    void unusedPaymentComparisonIsNotReturned() throws Exception {
         mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotalChange.availability").value("unavailable"))
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotalChange.value").value(nullValue()));
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotalChange").doesNotExist());
     }
 
     @Test
     void ownerWithNoListingsHasNoOccupancyTrend() throws Exception {
         mockMvc.perform(asUser(emptyOwner, get("/api/analytics/owner/summary")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.averageOccupancyRate.availability").value("unavailable"))
+                .andExpect(jsonPath("$.metrics.averageOccupancyRate").doesNotExist())
                 .andExpect(jsonPath("$.series.monthlyOccupancyRate.availability").value("unavailable"));
     }
 
@@ -426,15 +423,10 @@ class AnalyticsControllerIntegrationTest {
     }
 
     @Test
-    void userDistributionGroupsAddUpToAllUsers() throws Exception {
-        // Owners: A, B. Accepted tenants: tenant 1, tenant 2. Neither: empty owner, admin, flagged, banned.
+    void unusedUserDistributionIsNotReturned() throws Exception {
         mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.series.userDistribution.points[0].bucket").value("Owners only"))
-                .andExpect(jsonPath("$.series.userDistribution.points[0].value").value(2))
-                .andExpect(jsonPath("$.series.userDistribution.points[1].value").value(2))
-                .andExpect(jsonPath("$.series.userDistribution.points[2].value").value(0))
-                .andExpect(jsonPath("$.series.userDistribution.points[3].value").value(4))
+                .andExpect(jsonPath("$.series.userDistribution").doesNotExist())
                 .andExpect(jsonPath("$.metrics.registeredUserCount.value").value(8));
     }
 
@@ -445,7 +437,7 @@ class AnalyticsControllerIntegrationTest {
         mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary"),
                         "2025-12-31T16:00:00Z", "2026-03-31T16:00:00Z"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentCount.value").value(2))
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentCount").doesNotExist())
                 .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(3500))
                 .andExpect(jsonPath("$.period.from").value("2025-12-31T16:00:00Z"))
                 .andExpect(jsonPath("$.period.boundary").value("[from,to)"));
@@ -482,7 +474,7 @@ class AnalyticsControllerIntegrationTest {
     // ---------- Fixture helpers ----------
 
     @Test
-    void lifetimeIncludesOlderPaymentsAndHasNoPreviousPeriod() throws Exception {
+    void lifetimeIncludesOlderPaymentsWithoutUnusedMetrics() throws Exception {
         String oldDate = "2024-12-26T00:00:00+08:00";
         Rentals rental = rentalsRepository.findAll().stream()
                 .filter(row -> row.getListings().getListingID().equals(listingA2.getListingID()))
@@ -495,10 +487,10 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.period.lifetime").value(true))
                 .andExpect(jsonPath("$.period.from").value("2024-12-25T16:00:00Z"))
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(7000))
-                .andExpect(jsonPath("$.metrics.acceptedRentalRecordCount.value").value(2))
-                .andExpect(jsonPath("$.metrics.offersAcceptedCount.value").value(2))
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotalChange.availability").value("unavailable"));
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal").doesNotExist())
+                .andExpect(jsonPath("$.metrics.acceptedRentalRecordCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.offersAcceptedCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotalChange").doesNotExist());
     }
 
     @Test

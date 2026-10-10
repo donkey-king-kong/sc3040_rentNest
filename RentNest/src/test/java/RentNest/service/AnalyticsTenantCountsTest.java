@@ -23,7 +23,7 @@ class AnalyticsTenantCountsTest {
                 rental(2L, "active", -100, -1), rental(2L, "terminated", -200, -100),
                 rental(3L, "terminated", -100, 0)), NOW);
         assertEquals(1, counts.current());
-        assertEquals(2, counts.past());
+        assertEquals(2, (counts.expired() + counts.terminated()));
     }
 
     @Test
@@ -34,7 +34,7 @@ class AnalyticsTenantCountsTest {
                 rental(null, "active", -100, 100), rental(5L, "active", 100, -100),
                 new RentalRow(1L, "terminated", 6L, null, null, null, null, null, null)), NOW);
         assertEquals(1, counts.current());
-        assertEquals(1, counts.past());
+        assertEquals(1, (counts.expired() + counts.terminated()));
     }
 
     @Test
@@ -43,7 +43,7 @@ class AnalyticsTenantCountsTest {
                 Date.from(NOW.minusSeconds(100)), Date.from(NOW.plusSeconds(100)),
                 null, null, Date.from(NOW.minusSeconds(1)), null)), NOW);
         assertEquals(0, counts.current());
-        assertEquals(1, counts.past());
+        assertEquals(1, (counts.expired() + counts.terminated()));
     }
 
     @Test
@@ -56,7 +56,7 @@ class AnalyticsTenantCountsTest {
         assertEquals(1, counts.current());
         assertEquals(1, counts.expired());
         assertEquals(2, counts.terminated());
-        assertEquals(3, counts.past());
+        assertEquals(3, (counts.expired() + counts.terminated()));
     }
 
     @Test

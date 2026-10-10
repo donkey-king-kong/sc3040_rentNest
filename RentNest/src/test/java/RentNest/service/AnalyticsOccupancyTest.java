@@ -70,32 +70,29 @@ class AnalyticsOccupancyTest {
         assertEquals(NOW, owner.asOf());
         assertEquals(NOW, listing.asOf());
         assertEquals(occupied ? 1L : 0L, owner.metrics().get("activeTenancyCount").value());
-        assertEquals(new BigDecimal(occupied ? "100.0" : "0.0"), owner.metrics().get("occupancyRate").value());
+        assertFalse(owner.metrics().containsKey("occupancyRate"));
         assertEquals(occupied ? "occupied" : "vacant", listing.metrics().get("occupancyStatus").value());
     }
 
-    @Test void zeroPreviousOccupancyHasValidPositivePointChange() {
-        assertPointChange("2026-04-16T00:00:00Z", TO, "50.0");
-    }
-    @Test void zeroCurrentOccupancyHasValidNegativePointChange() {
-        assertPointChange("2026-03-17T00:00:00Z", FROM, "-50.0");
-    }
-    private void assertPointChange(String start, String end, String expected) {
-        var row = new RentalRow(1L, "terminated", 2L, Date.from(Instant.parse(start)),
-                Date.from(Instant.parse(end)), null, null, null, null);
+    @Test void propertyAverageAndMonthlyOccupancyRetainOverlapCalculation() {
+        var row = new RentalRow(1L, "terminated", 2L, Date.from(Instant.parse("2026-04-16T00:00:00Z")),
+                Date.from(Instant.parse(TO)), null, null, null, null);
         var s = service(List.of(row), 1L);
-        var result = s.ownerSummary(owner(), s.parsePeriod(FROM, TO));
-        assertEquals("available", result.metrics().get("averageOccupancyRateChange").availability());
-        assertEquals(new BigDecimal(expected), result.metrics().get("averageOccupancyRateChange").value());
-        assertEquals("percentage_points", result.metrics().get("averageOccupancyRateChange").unit());
-        assertEquals("unavailable", result.metrics().get("recordedRentPaymentTotalChange").availability());
+        var period = s.parsePeriod(FROM, TO);
+        var result = s.listingAnalytics(owner(), 1L, period);
+        assertEquals(new BigDecimal("50.0"), result.metrics().get("averageOccupancyRate").value());
+        var monthly = s.ownerSummary(owner(), period).series().get("monthlyOccupancyRate").points();
+        // The April bucket ends at midnight Singapore time, eight hours before TO.
+        assertEquals(new BigDecimal("49.4"), monthly.getFirst().value());
+        assertFalse(result.metrics().containsKey("averageOccupancyRateChange"));
     }
-    @Test void emptyHistoryIsZeroChangeButNoListingsIsUnavailable() {
+
+    @Test void emptyHistoryKeepsZeroMonthlyOccupancyButNoListingsIsUnavailable() {
         var s = service(List.of(), 1L);
         var result = s.ownerSummary(owner(), s.parsePeriod(FROM, TO));
-        assertEquals(new BigDecimal("0.0"), result.metrics().get("averageOccupancyRateChange").value());
+        assertEquals(new BigDecimal("0.0"), result.series().get("monthlyOccupancyRate").points().getFirst().value());
         var empty = service(List.of(), 0L);
         assertEquals("unavailable", empty.ownerSummary(owner(), empty.parsePeriod(FROM, TO))
-                .metrics().get("averageOccupancyRateChange").availability());
+                .series().get("monthlyOccupancyRate").availability());
     }
 }

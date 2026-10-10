@@ -199,12 +199,11 @@ class LifecycleTimestampsIntegrationTest {
 
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), "2026-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.newListingCount.value").value(3))
-                .andExpect(jsonPath("$.metrics.offersSentCount.value").value(3))
-                .andExpect(jsonPath("$.metrics.offersAcceptedCount.value").value(3))
+                .andExpect(jsonPath("$.metrics.newListingCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.offersSentCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.offersAcceptedCount").doesNotExist())
                 .andExpect(jsonPath("$.metrics.terminationsCount.value").value(1))
-                .andExpect(jsonPath("$.metrics.averageDaysOnMarket.value").value(12.0))
-                .andExpect(jsonPath("$.metrics.averageDaysOnMarket.unit").value("days"))
+                .andExpect(jsonPath("$.metrics.averageDaysOnMarket").doesNotExist())
                 .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[0].value").value(0))
                 .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[1].value").value(2))
                 .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[2].value").value(1))
@@ -212,7 +211,6 @@ class LifecycleTimestampsIntegrationTest {
                 .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[0].value").value(nullValue()))
                 .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[1].value").value(10.0))
                 .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[2].value").value(14.0))
-                .andExpect(jsonPath("$.metrics.offersSentCount.coverage").doesNotExist())
                 .andExpect(jsonPath("$.metrics.listingCount.coverage").doesNotExist());
     }
 
@@ -223,11 +221,9 @@ class LifecycleTimestampsIntegrationTest {
 
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), "2025-12-01T00:00:00+08:00", "2026-03-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.offersSentCount.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.offersSentCount.value").value(1))
-                .andExpect(jsonPath("$.metrics.offersAcceptedCount.value").value(2))
-                .andExpect(jsonPath("$.metrics.averageDaysOnMarket.value").value(10.0))
-                .andExpect(jsonPath("$.metrics.offersSentCount.coverage").doesNotExist());
+                .andExpect(jsonPath("$.metrics.offersSentCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.offersAcceptedCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.averageDaysOnMarket").doesNotExist());
     }
 
     @Test
@@ -236,43 +232,34 @@ class LifecycleTimestampsIntegrationTest {
 
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), "2025-06-01T00:00:00+08:00", "2025-12-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.offersSentCount.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.offersSentCount.value").value(0))
-                .andExpect(jsonPath("$.metrics.offersAcceptedCount.value").value(0))
+                .andExpect(jsonPath("$.metrics.offersSentCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.offersAcceptedCount").doesNotExist())
                 .andExpect(jsonPath("$.metrics.terminationsCount.value").value(0))
-                .andExpect(jsonPath("$.metrics.averageDaysOnMarket.availability").value("unavailable"))
-                .andExpect(jsonPath("$.metrics.newListingCount.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.newListingCount.value").value(0));
+                .andExpect(jsonPath("$.metrics.averageDaysOnMarket").doesNotExist())
+                .andExpect(jsonPath("$.metrics.newListingCount").doesNotExist());
 
         mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary"), "2025-06-01T00:00:00+08:00", "2025-12-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.newUserCount.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.newUserCount.value").value(0))
-                .andExpect(jsonPath("$.metrics.newListingCount.value").value(0))
-                .andExpect(jsonPath("$.metrics.offersAcceptedCount.value").value(0));
+                .andExpect(jsonPath("$.metrics.newUserCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.newListingCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.offersAcceptedCount").doesNotExist());
     }
 
     @Test
-    void historicalPercentChangeUsesRecordedBaselineAndStillRejectsZeroBaseline() throws Exception {
+    void unusedOfferComparisonsAreAbsentForHistoricalPeriods() throws Exception {
         createLifecycleFixture();
 
-        // March: offers sent in the previous period (29 Jan to 1 Mar): 1 before, 2 now.
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), "2026-03-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.offersSentChange.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.offersSentChange.value").value(100.0))
-                .andExpect(jsonPath("$.metrics.offersSentChange.coverage").doesNotExist());
+                .andExpect(jsonPath("$.metrics.offersSentChange").doesNotExist());
 
-        // Jan to Apr: no offers were recorded in the previous period, so its baseline is zero.
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), "2026-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.offersSentChange.availability").value("unavailable"))
-                .andExpect(jsonPath("$.metrics.offersSentChange.reason").value(
-                        "Nothing in the previous period, so a percentage change cannot be calculated."));
+                .andExpect(jsonPath("$.metrics.offersSentChange").doesNotExist());
     }
 
     @Test
-    void percentageChangesRemainAvailableWhenThePeriodCrossesTheFormerSeptemberCutoff() throws Exception {
+    void unusedGrowthAndOfferMetricsAreAbsentAcrossHistoricalDates() throws Exception {
         Listings previous = saveListing("Previous", "2026-08-28T00:00:00+08:00");
         Listings first = saveListing("First", "2026-09-11T00:00:00+08:00");
         Listings second = saveListing("Second", "2026-09-19T00:00:00+08:00");
@@ -287,17 +274,15 @@ class LifecycleTimestampsIntegrationTest {
         String to = "2026-09-24T00:00:00+08:00";
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), from, to))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.offersSentCount.value").value(2))
-                .andExpect(jsonPath("$.metrics.offersSentChange.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.offersSentChange.value").value(100.0))
-                .andExpect(jsonPath("$.metrics.averageDaysOnMarket.value").value(4.0));
+                .andExpect(jsonPath("$.metrics.offersSentCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.offersSentChange").doesNotExist())
+                .andExpect(jsonPath("$.metrics.averageDaysOnMarket").doesNotExist());
 
         mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary"), from, to))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.newUserCountChange.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.newUserCountChange.value").value(100.0))
-                .andExpect(jsonPath("$.metrics.newListingCountChange.value").value(100.0))
-                .andExpect(jsonPath("$.metrics.averageDaysOnMarket.value").value(4.0));
+                .andExpect(jsonPath("$.metrics.newUserCountChange").doesNotExist())
+                .andExpect(jsonPath("$.metrics.newListingCountChange").doesNotExist())
+                .andExpect(jsonPath("$.metrics.averageDaysOnMarket").doesNotExist());
     }
 
     @Test
@@ -327,19 +312,17 @@ class LifecycleTimestampsIntegrationTest {
     }
 
     @Test
-    void platformGrowthMetricsMatchFixture() throws Exception {
+    void unusedPlatformGrowthMetricsAreNotReturned() throws Exception {
         createLifecycleFixture();
 
-        // March. Users: tenant 5 Mar, second tenant 6 Mar (2); previous period 29 Jan to 1 Mar: admin 10 Feb (1).
-        // Listings: L2 1 Mar (1); previous period: L1 1 Feb (1).
         mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary"), "2026-03-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.newUserCount.value").value(2))
-                .andExpect(jsonPath("$.metrics.newUserCountChange.value").value(100.0))
-                .andExpect(jsonPath("$.metrics.newListingCount.value").value(1))
-                .andExpect(jsonPath("$.metrics.newListingCountChange.value").value(0.0))
-                .andExpect(jsonPath("$.metrics.offersAcceptedCount.value").value(1))
-                .andExpect(jsonPath("$.metrics.averageDaysOnMarket.value").value(14.0));
+                .andExpect(jsonPath("$.metrics.newUserCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.newUserCountChange").doesNotExist())
+                .andExpect(jsonPath("$.metrics.newListingCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.newListingCountChange").doesNotExist())
+                .andExpect(jsonPath("$.metrics.offersAcceptedCount").doesNotExist())
+                .andExpect(jsonPath("$.metrics.averageDaysOnMarket").doesNotExist());
     }
 
     // ---------- Helpers ----------
