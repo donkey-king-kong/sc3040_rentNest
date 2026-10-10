@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import { FontAwesome } from 'react-native-vector-icons';
 import { AdminLoadingState } from '../components/AdminUI';
 import AnalyticsLayout, { ActivitySection, RefreshControl } from '../components/analytics/AnalyticsLayout';
+import { displayMetric, displayChart } from '../components/analytics/AnalyticsPresentation';
 import { ENDPOINTS } from '../config/api';
 import {
   COLORS,
@@ -52,60 +53,39 @@ const OwnerAnalyticsScreen = () => {
   if (!data && loading) return <AdminLoadingState message="Loading analytics…" />;
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
-  const explanations = {
-    listingCount: 'All listings you own.',
-    activeTenancyCount: 'Your listings with a tenancy covering today.',
-    tenantsHostedCount: 'Different tenants who have accepted an offer for one of your listings.',
-    averageTenancyMonths: 'Average tenancy length in months. Active rentals use the agreed lease length. Ended rentals use their recorded end date.',
-    recordedRentPaymentTotal: 'All recorded rent payments for listings you currently own. Deposits are excluded and refunds are not deducted.',
-    terminationsCount: 'Rentals terminated in the past 12 months. Rentals without a termination date are left out.',
-  };
-  const m = Object.fromEntries(Object.entries(data.metrics).map(([key, metric]) => [key,
-    explanations[key] ? { ...metric, definition: explanations[key] } : metric]));
-  const series = {
-    ...data.series,
-    tenancyDurationDistribution: { ...data.series.tenancyDurationDistribution,
-      definition: 'Accepted rentals grouped by tenancy length. Active rentals use the agreed lease length. Ended rentals use their recorded end date.' },
-    monthlyRecordedRentPayments: { ...data.series.monthlyRecordedRentPayments,
-      definition: 'Rent payments grouped by the month paid for over the past 12 months. Deposits are excluded and refunds are not deducted.' },
-    monthlyOccupancyRate: { ...data.series.monthlyOccupancyRate,
-      definition: 'The share of time your listings were occupied each month, using the listings you currently own. Only time within the past 12 months is included.' },
-  };
-  const vacantListings = m.listingCount?.availability === 'available' && m.activeTenancyCount?.availability === 'available' && m.listingCount.value >= m.activeTenancyCount.value
-    ? { ...m.listingCount, value: m.listingCount.value - m.activeTenancyCount.value, definition: 'Your listings without a tenancy covering today.' }
-    : { availability: 'unavailable', unit: 'count', reason: 'Current listing counts cannot be reconciled.' };
-  const validListingCounts = [m.listingCount, m.activeTenancyCount, vacantListings].every(metric =>
-    metric?.availability === 'available' && metric.value !== null
-    && Number.isInteger(Number(metric.value)) && Number(metric.value) >= 0);
+  const totalListings = displayMetric(data.totalListings, 'count', 'All listings you own.');
+  const totalRent = displayMetric(data.totalRentCollected, data.currency, 'All recorded rent payments for listings you currently own. Deposits are excluded and refunds are not deducted.');
+  const totalViews = displayMetric(data.totalViews, 'count', 'All recorded visits to your current listings. Repeat visits count separately. Your own visits are excluded.', 'The total listing views could not be loaded.');
+  const tenantsHosted = displayMetric(data.tenantsHosted, 'count', 'Different tenants who have accepted an offer for one of your listings.');
+  const averageTenancy = displayMetric(data.averageTenancyMonths, 'months', 'Average tenancy length in months. Active rentals use the agreed lease length. Ended rentals use their recorded end date.', data.averageTenancyUnavailableReason);
+  const terminations = displayMetric(data.terminations, 'count', 'Rentals terminated in the past 12 months. Rentals without a termination date are left out.', null, 'period');
+  const validListingCounts = [data.totalListings, data.occupiedListings].every(value => Number.isInteger(value) && value >= 0)
+    && data.occupiedListings <= data.totalListings;
   const listingDistribution = validListingCounts ? {
     availability: 'available', unit: 'count', basis: 'snapshot',
     definition: 'All your listings, grouped by whether a tenancy covers today. Occupancy rate is the percentage occupied today.',
     points: [
-      { bucket: 'Occupied Listings', value: Number(m.activeTenancyCount.value) },
-      { bucket: 'Vacant Listings', value: Number(vacantListings.value) },
+      { bucket: 'Occupied Listings', value: data.occupiedListings },
+      { bucket: 'Vacant Listings', value: data.totalListings - data.occupiedListings },
     ],
   } : { availability: 'unavailable', reason: 'Listing counts are not available or do not add up.' };
-  const reviewCount = m.ownerReviewCount?.availability === 'available'
-    && m.ownerReviewCount.value !== null && Number.isInteger(Number(m.ownerReviewCount.value))
-    && Number(m.ownerReviewCount.value) >= 0 ? Number(m.ownerReviewCount.value) : null;
+  const reviewCount = Number.isInteger(data.reviewCount) && data.reviewCount >= 0 ? data.reviewCount : null;
   const reviewSummary = reviewCount === null ? 'Review count not available'
-    : reviewCount === 0 ? null : `Based on ${reviewCount.toLocaleString('en-SG')} ${reviewCount === 1 ? 'review' : 'reviews'}`;
-  const rating = m.ownerAverageRating ? { ...m.ownerAverageRating,
-    definition: `Your average review rating out of 5.${reviewSummary ? ' ' + reviewSummary + '.' : ''}` } : null;
-  const starRating = rating?.availability === 'available' && rating.value !== null
-    && Number.isFinite(Number(rating.value)) && Number(rating.value) >= 0 && Number(rating.value) <= 5
-    ? Number(rating.value) : null;
-  const tenancyLengths = series.tenancyDurationDistribution;
-  const validTenancyLengths = tenancyLengths?.availability === 'available'
-    && Array.isArray(tenancyLengths.points) && tenancyLengths.points.every(point =>
-      point.value !== null && Number.isInteger(Number(point.value)) && Number(point.value) >= 0);
-  const totalTenancies = {
-    availability: validTenancyLengths ? 'available' : 'unavailable',
-    value: validTenancyLengths ? tenancyLengths.points.reduce((sum, point) => sum + Number(point.value), 0) : null,
-    unit: 'count', basis: 'snapshot',
-    definition: 'Accepted tenancies included in the length groups. Tenancies with missing or invalid start and end dates are left out.',
-    reason: validTenancyLengths ? null : 'Tenancy lengths are not available.',
-  };
+    : reviewCount === 0 ? null : 'Based on ' + reviewCount.toLocaleString('en-SG') + ' ' + (reviewCount === 1 ? 'review' : 'reviews');
+  const rating = displayMetric(data.averageRating, 'rating_out_of_5',
+    'Your average review rating out of 5.' + (reviewSummary ? ' ' + reviewSummary + '.' : ''), data.averageRatingUnavailableReason);
+  const starRating = data.averageRating != null && Number.isFinite(Number(data.averageRating))
+    && Number(data.averageRating) >= 0 && Number(data.averageRating) <= 5 ? Number(data.averageRating) : null;
+  const tenancyLengths = displayChart(data.tenancyLengths, 'count', 'Accepted rentals grouped by tenancy length. Active rentals use the agreed lease length. Ended rentals use their recorded end date.', null, 'snapshot');
+  const validTenancyLengths = Array.isArray(data.tenancyLengths) && data.tenancyLengths.every(point =>
+    point.value !== null && Number.isInteger(Number(point.value)) && Number(point.value) >= 0);
+  const totalTenancies = displayMetric(validTenancyLengths ? data.tenancyLengths.reduce((sum, point) => sum + Number(point.value), 0) : null,
+    'count', 'Accepted tenancies included in the length groups. Tenancies with missing or invalid start and end dates are left out.', 'Tenancy lengths are not available.');
+  const monthlyRent = displayChart(data.monthlyRent, data.currency, 'Rent payments grouped by the month paid for over the past 12 months. Deposits are excluded and refunds are not deducted.');
+  const monthlyOccupancy = displayChart(data.monthlyOccupancy, 'percent', 'The share of time your listings were occupied each month, using the listings you currently own. Only time within the past 12 months is included.', data.monthlyOccupancyUnavailableReason);
+  const monthlyAcceptedOffers = displayChart(data.monthlyAcceptedOffers, 'count', 'Offers accepted each month. Offers without an acceptance date are left out.');
+  const monthlyTerminations = displayChart(data.monthlyTerminations, 'count', 'Rentals terminated each month. Rentals without a termination date are left out.');
+  const monthlyDaysOnMarket = displayChart(data.monthlyAverageDaysOnMarket, 'days', 'Average days from publishing a listing to its first accepted offer, grouped by acceptance month. Missing or invalid dates are left out. Months with no qualifying listings are blank.');
 
   return (
     <>
@@ -118,18 +98,15 @@ const OwnerAnalyticsScreen = () => {
           }>
             {!loading && <>
             <TileRow>
-              <StatTile label="Total Rent Collected" scope="All time" metric={m.recordedRentPaymentTotal} />
-              <StatTile label="Total Views" scope="All time" metric={m.totalListingViews || {
-                availability: 'unavailable', unit: 'count', basis: 'snapshot',
-                reason: 'The total listing views could not be loaded.',
-              }} />
+              <StatTile label="Total Rent Collected" scope="All time" metric={totalRent} />
+              <StatTile label="Total Views" scope="All time" metric={totalViews} />
             </TileRow>
             <TileRow>
-              <StatTile label="Tenants Hosted" scope="All time" metric={m.tenantsHostedCount} />
-              <StatTile label="Average Tenancy" scope="All time" metric={m.averageTenancyMonths} />
+              <StatTile label="Tenants Hosted" scope="All time" metric={tenantsHosted} />
+              <StatTile label="Average Tenancy" scope="All time" metric={averageTenancy} />
             </TileRow>
             <TileRow>
-              <StatTile label="Terminations" metric={m.terminationsCount} />
+              <StatTile label="Terminations" metric={terminations} />
               <StatTile label="Rating and Reviews" scope="All time" metric={rating}
                 supportingText={reviewSummary} unavailableText={reviewCount === 0 ? 'No reviews yet' : 'Not available'}>
                 {starRating !== null ? <View style={styles.ratingStars} accessible accessibilityLabel={`${starRating} out of 5 stars`}>
@@ -148,20 +125,20 @@ const OwnerAnalyticsScreen = () => {
             <AdminLoadingState message="Loading analytics…" backgroundColor="#FFFFFF" />
           </View> : <>
           <Section>
-            <PieChart title="Listing Occupancy" series={listingDistribution} totalMetric={m.listingCount}
+            <PieChart title="Listing Occupancy" series={listingDistribution} totalMetric={totalListings}
               metricLabel="Total Listings" totalLabel="Listings" emptyText="No listings yet" />
           </Section>
           <ActivitySection title={null} loading={loading}>
-            <Section><LineChart title="Monthly Rent Recorded" series={series.monthlyRecordedRentPayments} showEveryMonth emptyText="No rent recorded in the past 12 months" /></Section>
-            <Section><LineChart title="Monthly Occupancy" series={series.monthlyOccupancyRate} showEveryMonth emptyText="No occupancy in the past 12 months" maxValue={100} /></Section>
+            <Section><LineChart title="Monthly Rent Recorded" series={monthlyRent} showEveryMonth emptyText="No rent recorded in the past 12 months" /></Section>
+            <Section><LineChart title="Monthly Occupancy" series={monthlyOccupancy} showEveryMonth emptyText="No occupancy in the past 12 months" maxValue={100} /></Section>
             <Section>
-              <LineChart title="Monthly Rental Activity" series={series.monthlyOffersAccepted}
-                seriesLabel="Offers Accepted" comparisonSeries={series.monthlyTerminations}
+              <LineChart title="Monthly Rental Activity" series={monthlyAcceptedOffers}
+                seriesLabel="Offers Accepted" comparisonSeries={monthlyTerminations}
                 comparisonLabel="Terminations" cleanHeader hidePeriodLabel showEveryMonth
                 emptyText="No dated rental activity in the past 12 months" />
             </Section>
             <Section>
-              <BarChart title="Average Days on Market" series={series.monthlyAverageDaysOnMarket}
+              <BarChart title="Average Days on Market" series={monthlyDaysOnMarket}
                 cleanHeader hidePeriodLabel showEveryMonth emptyText="No accepted offers with valid dates in the past 12 months" />
             </Section>
           </ActivitySection>

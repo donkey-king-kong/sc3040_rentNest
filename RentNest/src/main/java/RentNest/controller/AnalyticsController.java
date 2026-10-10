@@ -1,6 +1,6 @@
 package RentNest.controller;
 
-import RentNest.dto.analytics.AnalyticsPeriod;
+import RentNest.dto.AnalyticsPeriod;
 import RentNest.model.User;
 import RentNest.service.AnalyticsService;
 import org.springframework.http.HttpStatus;

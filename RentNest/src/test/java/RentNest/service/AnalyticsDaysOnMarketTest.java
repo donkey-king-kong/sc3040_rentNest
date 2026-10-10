@@ -71,31 +71,31 @@ class AnalyticsDaysOnMarketTest {
     @MethodSource("dateCases")
     void usesOnlyCompletedRecordedIntervals(String name, String published, String accepted, String status, String expected, String reason) {
         var s = service(published, List.of(row(1L, status, published, accepted)));
-        var result = s.getOwnerPropertyListingAnalytics(actor(), 1L, s.parsePeriod(FROM, TO)).metrics().get("daysOnMarket");
-        assertEquals(expected == null ? "unavailable" : "available", result.availability());
-        assertEquals(expected == null ? null : new BigDecimal(expected), result.value());
-        if (reason != null) assertTrue(result.reason().contains(reason));
+        var result = s.getOwnerPropertyListingAnalytics(actor(), 1L, s.parsePeriod(FROM, TO));
+        assertEquals(expected == null, result.getDaysOnMarket() == null);
+        assertEquals(expected == null ? null : new BigDecimal(expected), result.getDaysOnMarket());
+        if (reason != null) assertTrue(result.getDaysOnMarketUnavailableReason().contains(reason));
     }
 
     @Test void listingWithoutAnyOfferIsNotElapsedAge() {
         var s = service(PUBLISHED, List.of());
-        var m = s.getOwnerPropertyListingAnalytics(actor(), 1L, s.parsePeriod(FROM, TO)).metrics().get("daysOnMarket");
-        assertNull(m.value());
-        assertTrue(m.reason().contains("No rental offer"));
+        var m = s.getOwnerPropertyListingAnalytics(actor(), 1L, s.parsePeriod(FROM, TO));
+        assertNull(m.getDaysOnMarket());
+        assertTrue(m.getDaysOnMarketUnavailableReason().contains("No rental offer"));
     }
 
     @Test void firstAcceptanceWinsAndIgnoresSelectedPeriod() {
         var s = service(PUBLISHED, List.of(row(1, "active", PUBLISHED, "2026-09-21T00:00:00Z"), row(1, "terminated", PUBLISHED, ACCEPTED)));
         var result = s.getOwnerPropertyListingAnalytics(actor(), 1L, s.parsePeriod("2026-09-20T00:00:00Z", TO));
-        assertEquals(new BigDecimal("10.0"), result.metrics().get("daysOnMarket").value());
-        assertEquals(Instant.parse(ACCEPTED), result.listing().get("firstAcceptedAt"));
+        assertEquals(new BigDecimal("10.0"), result.getDaysOnMarket());
+        assertEquals(Instant.parse(ACCEPTED), result.getFirstAcceptedAt());
     }
 
     @Test void unknownHistoricalAcceptanceDoesNotBecomeALaterKnownDate() {
         var s = service(PUBLISHED, List.of(row(1, "terminated", PUBLISHED, null), row(1, "active", PUBLISHED, ACCEPTED)));
         var result = s.getOwnerPropertyListingAnalytics(actor(), 1L, s.parsePeriod(FROM, TO));
-        assertNull(result.metrics().get("daysOnMarket").value());
-        assertNull(result.listing().get("firstAcceptedAt"));
+        assertNull(result.getDaysOnMarket());
+        assertNull(result.getFirstAcceptedAt());
     }
 
     @Test void ownerAndAdminAverageTheSameValidFirstAcceptancesWithinHalfOpenPeriod() {
@@ -108,13 +108,13 @@ class AnalyticsDaysOnMarketTest {
                 row(5, "active", PUBLISHED, "2026-08-20T00:00:00Z")); // reversed excluded
         var s = service(PUBLISHED, rows);
         var period = s.parsePeriod(FROM, TO);
-        assertEquals(new BigDecimal("8.0"), s.getOwnerAnalytics(actor(), period).series().get("monthlyAverageDaysOnMarket").points().getFirst().value());
-        assertEquals(new BigDecimal("8.0"), s.getPlatformAnalytics(actor(), period).series().get("monthlyAverageDaysOnMarket").points().getFirst().value());
+        assertEquals(new BigDecimal("8.0"), s.getOwnerAnalytics(actor(), period).getMonthlyAverageDaysOnMarket().getFirst().getValue());
+        assertEquals(new BigDecimal("8.0"), s.getPlatformAnalytics(actor(), period).getMonthlyAverageDaysOnMarket().getFirst().getValue());
     }
 
     @Test void laterAcceptanceDoesNotPullAnOldFirstAcceptanceIntoPeriod() {
         var s = service(PUBLISHED, List.of(row(1, "terminated", PUBLISHED, ACCEPTED), row(1, "active", PUBLISHED, "2026-09-21T00:00:00Z")));
-        assertNull(s.getOwnerAnalytics(actor(), s.parsePeriod("2026-09-20T00:00:00Z", TO)).series().get("monthlyAverageDaysOnMarket").points().getFirst().value());
+        assertNull(s.getOwnerAnalytics(actor(), s.parsePeriod("2026-09-20T00:00:00Z", TO)).getMonthlyAverageDaysOnMarket().getFirst().getValue());
     }
 
     @Test void historicalAveragesUseValidFirstAcceptancesAndExcludeMissingOrInvalidDates() {
@@ -129,10 +129,11 @@ class AnalyticsDaysOnMarketTest {
                 row(4, "active", published, accepted)); // cannot determine this listing's first acceptance
         var s = service(published, rows);
         var period = s.parsePeriod("2026-08-01T00:00:00Z", "2026-09-01T00:00:00Z");
-        for (var result : List.of(s.getOwnerAnalytics(actor(), period), s.getPlatformAnalytics(actor(), period))) {
-            var average = result.series().get("monthlyAverageDaysOnMarket");
-            assertEquals("available", average.availability());
-            assertEquals(new BigDecimal("10.0"), average.points().getFirst().value());
-        }
+        var result = s.getOwnerAnalytics(actor(), period);
+        var average = result.getMonthlyAverageDaysOnMarket();
+        assertNotNull(average);
+        assertEquals(new BigDecimal("10.0"), average.getFirst().getValue());
+        assertEquals(new BigDecimal("10.0"), s.getPlatformAnalytics(actor(), period)
+                .getMonthlyAverageDaysOnMarket().getFirst().getValue());
     }
 }

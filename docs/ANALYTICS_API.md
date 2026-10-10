@@ -16,7 +16,9 @@ Pass `from` and `to` as ISO-8601 date-times with offsets. Ranges include `from` 
 
 The dashboards request a fixed past-year range.
 
-Responses contain `schemaVersion`, `scope`, `asOf`, `period`, `metrics` and `series`. The property response also contains `listing`, including `listedAt` and `firstAcceptedAt`. Metrics include `availability`, `value`, `unit`, `basis`, `definition` and an optional `reason`. An unavailable value is `null`, not zero. Series include metadata and a `points` array of `{bucket, value}`.
+Responses use DTO classes with private fields, getters and setters. Each response includes `asOf` and `currency`. Unavailable averages are `null` with a separate explanation field. Measured zero counts remain zero. Numeric chart points contain `label` and `value`; property occupancy points contain `label` and `status`.
+
+All analytics DTOs live in `RentNest.dto`. The service uses `AnalyticsPeriod` for validated start and end dates and `AnalyticsValueDTO` for a numeric result with an unavailable explanation. Chart builders return lists of `AnalyticsChartPointDTO` or `AnalyticsStatusPointDTO` directly.
 
 Snapshot metrics describe stored records or the state at `asOf` and ignore the requested range. Period metrics and monthly series use that range. Stored historical dates are used without a global deployment cutoff.
 
@@ -24,19 +26,25 @@ Snapshot metrics describe stored records or the state at `asOf` and ignore the r
 
 | Scope | Snapshot keys | Period keys |
 |---|---|---|
-| Owner | `listingCount`, `totalListingViews`, `activeTenancyCount`, `tenantsHostedCount`, `averageTenancyMonths`, `ownerReviewCount`, `ownerAverageRating`, `recordedRentPaymentTotal` | `terminationsCount` |
-| Property | `occupancyStatus`, `rentalRecordCount`, `acceptedRentalRecordCount`, `acceptanceRate`, `tenantsHostedCount`, `averageTenancyMonths`, `daysOnMarket` | `recordedRentPaymentCount`, `recordedRentPaymentTotal`, `averageOccupancyRate`, `listingViews`, `uniqueListingViewers` |
-| Platform | `registeredUserCount`, `listingCount`, `lifetimeRecordedRentPaymentTotal`, `ownerUserCount`, `currentTenantUserCount`, `expiredTenantUserCount`, `terminatedTenantUserCount`, `bannedUserCount`, `rentalRecordCount`, `pendingRentalRecordCount`, `activeRentalRecordCount`, `upcomingRentalRecordCount`, `expiredRentalRecordCount`, `terminatedRentalRecordCount`, `unclassifiedRentalRecordCount` | None |
+| Owner | `totalListings`, `occupiedListings`, `totalViews`, `totalRentCollected`, `tenantsHosted`, `averageTenancyMonths`, `reviewCount`, `averageRating` | `terminations` |
+| Property | `occupancyStatus`, `totalRentalOffers`, `acceptedOffers`, `acceptanceRate`, `tenantsHosted`, `averageTenancyMonths`, `daysOnMarket` | `rentCollected`, `paymentCount`, `occupancyRate`, `totalViews`, `uniqueViewers` |
+
+`OwnerAnalyticsDTO` supplies `averageRatingUnavailableReason`, `averageTenancyUnavailableReason` and `monthlyOccupancyUnavailableReason`. `PropertyAnalyticsDTO` supplies `acceptanceRateUnavailableReason`, `averageTenancyUnavailableReason` and `daysOnMarketUnavailableReason`. These explanations are null when the corresponding value is available. Property details are direct fields: `listingId`, `name`, `type`, `location`, `price`, `listingPicture`, `listedAt` and `firstAcceptedAt`.
 
 ## Retained series
 
 | Scope | Series keys |
 |---|---|
-| Owner | `monthlyRecordedRentPayments`, `monthlyOccupancyRate`, `monthlyOffersAccepted`, `monthlyTerminations`, `monthlyAverageDaysOnMarket`, `tenancyDurationDistribution` |
-| Property | `monthlyRecordedRentPayments`, `monthlyOccupancy` |
-| Platform | `monthlyRecordedRentPayments`, `monthlyOffersAccepted`, `monthlyTerminations`, `monthlyAverageDaysOnMarket` |
+| Owner | `monthlyRent`, `monthlyOccupancy`, `monthlyAcceptedOffers`, `monthlyTerminations`, `monthlyAverageDaysOnMarket`, `tenancyLengths` |
+| Property | `monthlyRent`, `monthlyOccupancy` |
 
-`tenancyDurationDistribution` describes accepted rentals across their stored history. Other series use the requested period. Monthly event counts include zero months; days-on-market buckets without qualifying acceptances have null values.
+`tenancyLengths` describes accepted rentals across their stored history. Other charts use the requested period. Monthly event counts include zero months; days-on-market months without qualifying acceptances have null values. Owner monthly occupancy is null with an explanation when there are no listings.
+
+## Admin response
+
+The admin endpoint returns AdminAnalyticsDTO, a class with private fields, getters and setters. Counts and totals are named fields: registeredUsers, totalListings, totalRentCollected, totalRentalOffers, pendingRentals, activeRentals, upcomingRentals, expiredRentals, terminatedRentals, unclassifiedRentals, propertyOwners, currentTenants, expiredTenants, terminatedTenants and blockedUsers.
+
+The response includes asOf and currency. Monthly chart lists are monthlyRent, monthlyAcceptedOffers, monthlyTerminations and monthlyAverageDaysOnMarket. Each point has label and value. A null days-on-market value means no qualifying listing in that month. Rent totals include all recorded payments; monthly charts use the requested date range.
 
 ## Definitions
 

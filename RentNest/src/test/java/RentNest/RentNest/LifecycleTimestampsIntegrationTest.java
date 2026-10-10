@@ -176,21 +176,21 @@ class LifecycleTimestampsIntegrationTest {
         mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary"),
                         "2026-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[0].value").value(0))
-                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[1].value").value(2))
-                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[2].value").value(1))
-                .andExpect(jsonPath("$.series.monthlyTerminations.points[1].value").value(0))
-                .andExpect(jsonPath("$.series.monthlyTerminations.points[2].value").value(1))
-                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[0].value").value(nullValue()))
-                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[1].value").value(10.0))
-                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[2].value").value(14.0));
+                .andExpect(jsonPath("$.monthlyAcceptedOffers[0].value").value(0))
+                .andExpect(jsonPath("$.monthlyAcceptedOffers[1].value").value(2))
+                .andExpect(jsonPath("$.monthlyAcceptedOffers[2].value").value(1))
+                .andExpect(jsonPath("$.monthlyTerminations[1].value").value(0))
+                .andExpect(jsonPath("$.monthlyTerminations[2].value").value(1))
+                .andExpect(jsonPath("$.monthlyAverageDaysOnMarket[0].value").value(nullValue()))
+                .andExpect(jsonPath("$.monthlyAverageDaysOnMarket[1].value").value(10.0))
+                .andExpect(jsonPath("$.monthlyAverageDaysOnMarket[2].value").value(14.0));
         // Partial months exclude events outside the selected range.
         mockMvc.perform(asUser(admin, get("/api/analytics/admin/summary"),
                         "2026-02-12T00:00:00+08:00", "2026-03-25T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[0].value").value(1))
-                .andExpect(jsonPath("$.series.monthlyTerminations.points[1].value").value(0))
-                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[0].value").value(nullValue()));
+                .andExpect(jsonPath("$.monthlyAcceptedOffers[0].value").value(1))
+                .andExpect(jsonPath("$.monthlyTerminations[1].value").value(0))
+                .andExpect(jsonPath("$.monthlyAverageDaysOnMarket[0].value").value(nullValue()));
     }
 
     @Test
@@ -202,15 +202,15 @@ class LifecycleTimestampsIntegrationTest {
                 .andExpect(jsonPath("$.metrics.newListingCount").doesNotExist())
                 .andExpect(jsonPath("$.metrics.offersSentCount").doesNotExist())
                 .andExpect(jsonPath("$.metrics.offersAcceptedCount").doesNotExist())
-                .andExpect(jsonPath("$.metrics.terminationsCount.value").value(1))
+                .andExpect(jsonPath("$.terminations").value(1))
                 .andExpect(jsonPath("$.metrics.averageDaysOnMarket").doesNotExist())
-                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[0].value").value(0))
-                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[1].value").value(2))
-                .andExpect(jsonPath("$.series.monthlyOffersAccepted.points[2].value").value(1))
-                .andExpect(jsonPath("$.series.monthlyTerminations.points[2].value").value(1))
-                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[0].value").value(nullValue()))
-                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[1].value").value(10.0))
-                .andExpect(jsonPath("$.series.monthlyAverageDaysOnMarket.points[2].value").value(14.0))
+                .andExpect(jsonPath("$.monthlyAcceptedOffers[0].value").value(0))
+                .andExpect(jsonPath("$.monthlyAcceptedOffers[1].value").value(2))
+                .andExpect(jsonPath("$.monthlyAcceptedOffers[2].value").value(1))
+                .andExpect(jsonPath("$.monthlyTerminations[2].value").value(1))
+                .andExpect(jsonPath("$.monthlyAverageDaysOnMarket[0].value").value(nullValue()))
+                .andExpect(jsonPath("$.monthlyAverageDaysOnMarket[1].value").value(10.0))
+                .andExpect(jsonPath("$.monthlyAverageDaysOnMarket[2].value").value(14.0))
                 .andExpect(jsonPath("$.metrics.listingCount.coverage").doesNotExist());
     }
 
@@ -234,7 +234,7 @@ class LifecycleTimestampsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metrics.offersSentCount").doesNotExist())
                 .andExpect(jsonPath("$.metrics.offersAcceptedCount").doesNotExist())
-                .andExpect(jsonPath("$.metrics.terminationsCount.value").value(0))
+                .andExpect(jsonPath("$.terminations").value(0))
                 .andExpect(jsonPath("$.metrics.averageDaysOnMarket").doesNotExist())
                 .andExpect(jsonPath("$.metrics.newListingCount").doesNotExist());
 
@@ -292,23 +292,23 @@ class LifecycleTimestampsIntegrationTest {
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/listings/" + listingIdByName("L1")),
                         "2026-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.daysOnMarket.value").value(10.0))
-                .andExpect(jsonPath("$.listing.listedAt").value("2026-01-31T16:00:00Z"))
-                .andExpect(jsonPath("$.listing.firstAcceptedAt").value("2026-02-10T16:00:00Z"));
+                .andExpect(jsonPath("$.daysOnMarket").value(10.0))
+                .andExpect(jsonPath("$.listedAt").value("2026-01-31T16:00:00Z"))
+                .andExpect(jsonPath("$.firstAcceptedAt").value("2026-02-10T16:00:00Z"));
 
         // Publication date missing: the interval is unknown, not zero.
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/listings/" + listingIdByName("L3")),
                         "2026-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.daysOnMarket.availability").value("unavailable"));
+                .andExpect(jsonPath("$.daysOnMarket").value(nullValue()));
 
         // Never rented: no completed publication-to-acceptance interval yet.
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/listings/" + listingIdByName("L4")),
                         "2026-01-01T00:00:00+08:00", "2026-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.daysOnMarket.value").value(nullValue()))
-                .andExpect(jsonPath("$.metrics.daysOnMarket.reason").value("No rental offer has been accepted yet. Days on market will be available after acceptance."))
-                .andExpect(jsonPath("$.listing.firstAcceptedAt").value(nullValue()));
+                .andExpect(jsonPath("$.daysOnMarket").value(nullValue()))
+                .andExpect(jsonPath("$.daysOnMarketUnavailableReason").value("No rental offer has been accepted yet. Days on market will be available after acceptance."))
+                .andExpect(jsonPath("$.firstAcceptedAt").value(nullValue()));
     }
 
     @Test

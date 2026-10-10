@@ -143,10 +143,8 @@ class ListingViewTrackingIntegrationTest {
 
         mockMvc.perform(listingAnalytics(daysAgo(1), daysAhead(1)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.listingViews.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.listingViews.value").value(3))
-                .andExpect(jsonPath("$.metrics.uniqueListingViewers.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.uniqueListingViewers.value").value(2))
+                .andExpect(jsonPath("$.totalViews").value(3))
+                .andExpect(jsonPath("$.uniqueViewers").value(2))
                 .andExpect(jsonPath("$.metrics.listingViews.coverage").doesNotExist());
     }
 
@@ -154,9 +152,8 @@ class ListingViewTrackingIntegrationTest {
     void noViewsIsAMeasuredZeroNotUnavailable() throws Exception {
         mockMvc.perform(listingAnalytics(daysAgo(1), daysAhead(1)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.listingViews.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.listingViews.value").value(0))
-                .andExpect(jsonPath("$.metrics.uniqueListingViewers.value").value(0));
+                .andExpect(jsonPath("$.totalViews").value(0))
+                .andExpect(jsonPath("$.uniqueViewers").value(0));
     }
 
     @Test
@@ -166,17 +163,15 @@ class ListingViewTrackingIntegrationTest {
         // A window that closed yesterday cannot contain a view recorded just now
         mockMvc.perform(listingAnalytics(daysAgo(3), daysAgo(1)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.listingViews.value").value(0));
+                .andExpect(jsonPath("$.totalViews").value(0));
     }
 
     @Test
     void anEmptyHistoricalPeriodHasAvailableZeroViews() throws Exception {
         mockMvc.perform(listingAnalytics("2024-01-01T00:00:00+08:00", "2024-04-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.listingViews.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.listingViews.value").value(0))
-                .andExpect(jsonPath("$.metrics.uniqueListingViewers.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.uniqueListingViewers.value").value(0));
+                .andExpect(jsonPath("$.totalViews").value(0))
+                .andExpect(jsonPath("$.uniqueViewers").value(0));
     }
 
     @Test
@@ -190,9 +185,8 @@ class ListingViewTrackingIntegrationTest {
 
         mockMvc.perform(listingAnalytics("2026-08-01T00:00:00+08:00", "2026-09-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.listingViews.availability").value("available"))
-                .andExpect(jsonPath("$.metrics.listingViews.value").value(3))
-                .andExpect(jsonPath("$.metrics.uniqueListingViewers.value").value(2))
+                .andExpect(jsonPath("$.totalViews").value(3))
+                .andExpect(jsonPath("$.uniqueViewers").value(2))
                 .andExpect(jsonPath("$.metrics.listingViews.coverage").doesNotExist());
     }
 

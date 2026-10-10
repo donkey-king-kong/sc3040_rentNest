@@ -41,7 +41,7 @@ After each change, the backend on this branch was started against Supabase with 
 | `controller/AnalyticsController.java` | **New.** The three analytics endpoints |
 | `service/AnalyticsService.java`, `service/AnalyticsException.java` | **New.** Metric definitions, period validation, coverage |
 | `repository/AnalyticsQueryRepository.java` | **New.** Aggregate queries, always scoped in SQL |
-| `dto/analytics/*.java` | **New.** Response types |
+| `dto/AdminAnalyticsDTO.java`, `dto/OwnerAnalyticsDTO.java`, `dto/PropertyAnalyticsDTO.java` | Analytics response classes |
 | `model/User.java` | `role`, real authorities, `createdAt` |
 | `model/Listings.java` | `createdAt`, `isOwnedBy` |
 | `model/Rentals.java` | `createdAt`, `acceptedAt`, `terminatedAt` |

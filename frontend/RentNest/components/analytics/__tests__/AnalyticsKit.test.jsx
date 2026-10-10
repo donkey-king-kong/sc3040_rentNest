@@ -384,25 +384,20 @@ describe('ListingAnalyticsScreen', () => {
 it('one admin refresh replaces all overview, rental, user and trend data', async () => {
   await AsyncStorage.setItem('token', 'test-token');
   const response = version => {
-    const metric = value => available(value);
-    const trend = value => ({ availability: 'available', basis: 'period', unit: 'count',
-      points: [{ bucket: '2026-09', value }] });
-    return { ...listingResponse, metrics: { ...listingResponse.metrics,
-      registeredUserCount: metric(10 * version), listingCount: metric(3 * version),
-      lifetimeRecordedRentPaymentTotal: available(1000 * version, 'SGD'),
-      activeRentalRecordCount: metric(version), rentalRecordCount: metric(4 * version),
-      upcomingRentalRecordCount: metric(0), expiredRentalRecordCount: metric(0), unclassifiedRentalRecordCount: metric(0),
-      expiredTenantUserCount: metric(version), terminatedTenantUserCount: metric(0),
-      acceptedRentalRecordCount: metric(2 * version), pendingRentalRecordCount: metric(2 * version),
-      terminatedRentalRecordCount: metric(version), ownerUserCount: metric(version),
-      currentTenantUserCount: metric(version), pastTenantUserCount: metric(version),
-      bannedUserCount: metric(version), flaggedListingCount: metric(version),
-      flaggedUserCount: metric(version), flaggedReviewCount: metric(version),
-    }, series: { ...listingResponse.series,
-      monthlyRecordedRentPayments: { ...trend(1000 * version), unit: 'SGD' },
-      monthlyOffersAccepted: trend(2 * version), monthlyTerminations: trend(version),
-      monthlyAverageDaysOnMarket: { ...trend(3 * version), unit: 'days' },
-    } };
+    const trend = value => [{ label: '2026-09', value }];
+    return {
+      asOf: listingResponse.asOf, currency: 'SGD',
+      registeredUsers: 10 * version, totalListings: 3 * version,
+      totalRentCollected: 1000 * version,
+      activeRentals: version, totalRentalOffers: 4 * version,
+      upcomingRentals: 0, expiredRentals: 0, unclassifiedRentals: 0,
+      expiredTenants: version, terminatedTenants: 0,
+      pendingRentals: 2 * version, terminatedRentals: version,
+      propertyOwners: version, currentTenants: version, blockedUsers: version,
+      monthlyRent: trend(1000 * version),
+      monthlyAcceptedOffers: trend(2 * version), monthlyTerminations: trend(version),
+      monthlyAverageDaysOnMarket: trend(3 * version),
+    };
   };
   const initial = response(1);
   const refreshed = response(2);
@@ -431,11 +426,13 @@ it('one admin refresh replaces all overview, rental, user and trend data', async
   expect(bars.find(node => node.props.title === 'Property and Tenancy Activity').props.series.points.map(point => point.value)).toEqual([2, 2, 2, 0]);
   expect(bars.find(node => node.props.title === 'Reported records')).toBeUndefined();
   const lines = tree.root.findAllByType(LineChart);
-  expect(lines.find(node => node.props.title === 'Monthly Rent Recorded').props.series).toBe(refreshed.series.monthlyRecordedRentPayments);
+  expect(lines.find(node => node.props.title === 'Monthly Rent Recorded').props.series.points).toEqual([
+    { bucket: '2026-09', value: 2000 },
+  ]);
   const activity = lines.find(node => node.props.title === 'Monthly Rental Activity');
-  expect(activity.props.series).toBe(refreshed.series.monthlyOffersAccepted);
-  expect(activity.props.comparisonSeries).toBe(refreshed.series.monthlyTerminations);
-  expect(tree.root.findByType(BarChart).props.series).toBe(refreshed.series.monthlyAverageDaysOnMarket);
+  expect(activity.props.series.points).toEqual([{ bucket: '2026-09', value: 4 }]);
+  expect(activity.props.comparisonSeries.points).toEqual([{ bucket: '2026-09', value: 2 }]);
+  expect(tree.root.findByType(BarChart).props.series.points).toEqual([{ bucket: '2026-09', value: 6 }]);
   expect(refreshButton().props.disabled).toBe(false);
   await act(async () => tree.unmount());
 });

@@ -3,6 +3,7 @@ import { View, Text, Image, Pressable, StyleSheet, useWindowDimensions } from 'r
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { FontAwesome } from 'react-native-vector-icons';
 import { AdminLoadingState } from '../components/AdminUI';
+import { displayMetric, displayChart } from '../components/analytics/AnalyticsPresentation';
 import { ENDPOINTS } from '../config/api';
 import AnalyticsLayout, { RefreshControl } from '../components/analytics/AnalyticsLayout';
 import ListingOccupancyCalendar from '../components/analytics/ListingOccupancyCalendar';
@@ -17,7 +18,7 @@ const ListingAnalyticsScreen = () => {
   const { width, fontScale } = useWindowDimensions();
   const { data, loading, error, unauthenticated, retry } = useAnalytics(ENDPOINTS.ANALYTICS_OWNER_LISTING(listingId));
   const [imageFailed, setImageFailed] = useState(false);
-  useEffect(() => setImageFailed(false), [data?.listing?.listingPicture]);
+  useEffect(() => setImageFailed(false), [data?.listingPicture]);
 
   const header = <>
     <Stack.Screen options={{ title: 'Property Analytics' }} />
@@ -38,16 +39,26 @@ const ListingAnalyticsScreen = () => {
   </View></>;
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
-  const m = data.metrics;
-  const listing = data.listing || {};
-  const status = m.occupancyStatus?.availability === 'available' ? m.occupancyStatus.value : null;
+  const listing = data;
+  const status = data.occupancyStatus;
   const statusLabel = status === 'occupied' ? 'Occupied' : status === 'vacant' ? 'Vacant' : 'Status unavailable';
   const tileStyle = width < 360 || fontScale > 1.2 ? styles.singleColumnTile : undefined;
-  const publishedDate = listing.listedAt ? formatDay(listing.listedAt) : 'Not recorded';
-  const acceptedDate = listing.firstAcceptedAt ? formatDay(listing.firstAcceptedAt) : 'Not recorded';
-  const daysOnMarket = m.daysOnMarket || { availability: 'unavailable', unit: 'days', reason: 'Listing history is not available.' };
-  const daysOnMarketLabel = daysOnMarket.availability === 'available'
-    ? formatValue(daysOnMarket.value, daysOnMarket.unit) : 'Not available';
+  const publishedDate = data.listedAt ? formatDay(data.listedAt) : 'Not recorded';
+  const acceptedDate = data.firstAcceptedAt ? formatDay(data.firstAcceptedAt) : 'Not recorded';
+  const daysOnMarket = displayMetric(data.daysOnMarket, 'days', "Elapsed days from publication to the first accepted rental offer. Stops at acceptance; never uses the lease start date or today's date.", data.daysOnMarketUnavailableReason || (data.daysOnMarket == null ? 'Listing history is not available.' : null));
+  const daysOnMarketLabel = data.daysOnMarket != null ? formatValue(data.daysOnMarket, 'days') : 'Not available';
+  const rentCollected = displayMetric(data.rentCollected, data.currency, 'Rent payments recorded for the month paid for. Deposits are excluded and refunds are not deducted.', null, 'period');
+  const occupancyRate = displayMetric(data.occupancyRate, 'percent', 'The share of the selected time covered by accepted tenancies.', null, 'period');
+  const totalViews = displayMetric(data.totalViews, 'count', 'Times this listing was opened, including repeat visits. Your own visits are excluded.', null, 'period');
+  const uniqueViewers = displayMetric(data.uniqueViewers, 'count', 'Different people who opened this listing. Repeat visits by the same person count once.', null, 'period');
+  const paymentCount = displayMetric(data.paymentCount, 'count', 'Rent payment records for the month paid for, rather than the transaction date.', null, 'period');
+  const totalOffers = displayMetric(data.totalRentalOffers, 'count', 'Rental records in any status.');
+  const acceptedOffers = displayMetric(data.acceptedOffers, 'count', 'Rental records with active or terminated status.');
+  const acceptanceRate = displayMetric(data.acceptanceRate, 'percent', 'Accepted rental records divided by all rental records. Pending offers count as not accepted.', data.acceptanceRateUnavailableReason);
+  const averageTenancy = displayMetric(data.averageTenancyMonths, 'months', 'Average length of accepted tenancies. Active rentals use the agreed length. Ended rentals use their recorded end date.', data.averageTenancyUnavailableReason);
+  const tenantsHosted = displayMetric(data.tenantsHosted, 'count', 'Different tenants on accepted rentals.');
+  const monthlyRent = displayChart(data.monthlyRent, data.currency, 'Rent payments grouped by the month paid for. Deposits are excluded and refunds are not deducted.');
+  const monthlyOccupancy = displayChart(data.monthlyOccupancy, 'status', 'Occupied when an accepted tenancy overlaps the month. Terminated rentals end on their termination date.');
 
   return <>
     {header}
@@ -70,12 +81,12 @@ const ListingAnalyticsScreen = () => {
         <Text style={styles.sectionNote}>Past 12 months</Text>
         {!loading ? <>
           <TileRow>
-            <StatTile label="Rent Recorded" metric={m.recordedRentPaymentTotal} style={tileStyle} />
-            <StatTile label="Average Occupancy" metric={m.averageOccupancyRate} style={tileStyle} />
-            <StatTile label="Listing Views" metric={m.listingViews} style={tileStyle} />
-            <StatTile label="Unique Viewers" metric={m.uniqueListingViewers} style={tileStyle} />
+            <StatTile label="Rent Recorded" metric={rentCollected} style={tileStyle} />
+            <StatTile label="Average Occupancy" metric={occupancyRate} style={tileStyle} />
+            <StatTile label="Listing Views" metric={totalViews} style={tileStyle} />
+            <StatTile label="Unique Viewers" metric={uniqueViewers} style={tileStyle} />
           </TileRow>
-          <MetricRow label="Payments Recorded" metric={m.recordedRentPaymentCount} />
+          <MetricRow label="Payments Recorded" metric={paymentCount} />
         </> : null}
       </Section>
 
@@ -83,18 +94,18 @@ const ListingAnalyticsScreen = () => {
         <AdminLoadingState message="Loading analytics…" backgroundColor="#FFFFFF" />
       </View> : <>
         <Section>
-          <LineChart title="Monthly Rent Recorded" series={data.series.monthlyRecordedRentPayments}
+          <LineChart title="Monthly Rent Recorded" series={monthlyRent}
             showEveryMonth={width >= 600} emptyText="No rent recorded in the past 12 months" />
         </Section>
-        <Section><ListingOccupancyCalendar series={data.series.monthlyOccupancy} /></Section>
+        <Section><ListingOccupancyCalendar series={monthlyOccupancy} /></Section>
 
         <Section title="Tenancy History">
           <Text style={styles.sectionNote}>All time</Text>
-          <MetricRow label="Offers Sent" scope="All time" metric={m.rentalRecordCount} />
-          <MetricRow label="Offers Accepted" scope="All time" metric={m.acceptedRentalRecordCount} />
-          <MetricRow label="Acceptance Rate" scope="All time" metric={m.acceptanceRate} />
-          <MetricRow label="Average Tenancy" scope="All time" metric={m.averageTenancyMonths} />
-          <MetricRow label="Tenants Hosted" scope="All time" metric={m.tenantsHostedCount} />
+          <MetricRow label="Offers Sent" scope="All time" metric={totalOffers} />
+          <MetricRow label="Offers Accepted" scope="All time" metric={acceptedOffers} />
+          <MetricRow label="Acceptance Rate" scope="All time" metric={acceptanceRate} />
+          <MetricRow label="Average Tenancy" scope="All time" metric={averageTenancy} />
+          <MetricRow label="Tenants Hosted" scope="All time" metric={tenantsHosted} />
         </Section>
 
         <Section title="Time to Accepted Offer">

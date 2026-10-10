@@ -1,163 +1,55 @@
 {
-  "schemaVersion": 1,
-  "scope": "listing",
   "asOf": "2026-09-16T19:16:52.198544800Z",
-  "period": {
-    "from": "2025-12-31T16:00:00Z",
-    "to": "2026-03-31T16:00:00Z",
-    "boundary": "[from,to)",
-    "timeZone": "Asia/Singapore"
-  },
-  "listing": {
-    "listingId": 2,
-    "name": "A2",
-    "type": "HDB",
-    "location": null,
-    "price": 2000,
-    "listingPicture": null,
-    "listedAt": null,
-    "firstAcceptedAt": null
-  },
-  "metrics": {
-    "occupancyStatus": {
-      "availability": "available",
-      "value": "vacant",
-      "unit": "status",
-      "basis": "snapshot",
-      "definition": "'occupied' when an active tenancy covers asOf (start inclusive, end exclusive), otherwise 'vacant'.",
-      "reason": null
+  "currency": "SGD",
+  "listingId": 2,
+  "name": "A2",
+  "type": "HDB",
+  "location": null,
+  "price": 2000,
+  "listingPicture": null,
+  "listedAt": null,
+  "firstAcceptedAt": null,
+  "totalRentalOffers": 1,
+  "acceptedOffers": 1,
+  "tenantsHosted": 1,
+  "rentCollected": 1500,
+  "paymentCount": 1,
+  "totalViews": 0,
+  "uniqueViewers": 0,
+  "acceptanceRate": 100,
+  "averageTenancyMonths": 3,
+  "occupancyRate": 65.6,
+  "daysOnMarket": null,
+  "occupancyStatus": "vacant",
+  "acceptanceRateUnavailableReason": null,
+  "averageTenancyUnavailableReason": null,
+  "daysOnMarketUnavailableReason": "The publication date was not recorded for this listing.",
+  "monthlyRent": [
+    {
+      "label": "2026-01",
+      "value": 1500
     },
-    "rentalRecordCount": {
-      "availability": "available",
-      "value": 1,
-      "unit": "count",
-      "basis": "snapshot",
-      "definition": "Rental records (offers) in any status. Rejected offers are not recorded by the app.",
-      "reason": null
+    {
+      "label": "2026-02",
+      "value": 0
     },
-    "acceptedRentalRecordCount": {
-      "availability": "available",
-      "value": 1,
-      "unit": "count",
-      "basis": "snapshot",
-      "definition": "Rental records with status 'active' or 'terminated'.",
-      "reason": null
-    },
-    "acceptanceRate": {
-      "availability": "available",
-      "value": 100,
-      "unit": "percent",
-      "basis": "snapshot",
-      "definition": "Accepted rental records divided by all rental records. Pending offers count as not accepted.",
-      "reason": null
-    },
-    "tenantsHostedCount": {
-      "availability": "available",
-      "value": 1,
-      "unit": "count",
-      "basis": "snapshot",
-      "definition": "Distinct tenants on accepted (active or terminated) rentals.",
-      "reason": null
-    },
-    "averageTenancyMonths": {
-      "availability": "available",
-      "value": 3,
-      "unit": "months",
-      "basis": "snapshot",
-      "definition": "Average tenancy length of accepted rentals, from rental start to its end. Terminated rentals end at their recorded termination time (or, if terminated before that was recorded, at the lease expiry the app overwrites with the termination date), so this is the actual length; for active rentals it is the contracted length.",
-      "reason": null
-    },
-    "recordedRentPaymentCount": {
-      "availability": "available",
-      "value": 1,
-      "unit": "count",
-      "basis": "period",
-      "definition": "Rent payment records whose billing-month date falls in the period. The date is the month paid for, not the transaction time.",
-      "reason": null
-    },
-    "recordedRentPaymentTotal": {
-      "availability": "available",
-      "value": 1500,
-      "unit": "SGD",
-      "basis": "period",
-      "definition": "Sum of recorded rent payment amounts (whole SGD) with a billing-month date in the period. Excludes deposits and does not subtract termination refunds; payments have no failed or refunded state.",
-      "reason": null
-    },
-    "averageOccupancyRate": {
-      "availability": "available",
-      "value": 65.6,
-      "unit": "percent",
-      "basis": "period",
-      "definition": "Share of the period the listings were occupied: time covered by accepted rentals divided by (number of listings x length of the period). Uses the listings that exist now.",
-      "reason": null
-    },
-    "listingViews": {
-      "availability": "available",
-      "value": 0,
-      "unit": "count",
-      "basis": "period",
-      "definition": "Times this listing's detail page was opened during the period, counting repeat visits separately. Your own visits to your listing are not recorded.",
-      "reason": null
-    },
-    "uniqueListingViewers": {
-      "availability": "available",
-      "value": 0,
-      "unit": "count",
-      "basis": "period",
-      "definition": "Different people who opened this listing during the period; repeat visits by the same person count once.",
-      "reason": null
-    },
-    "daysOnMarket": {
-      "availability": "unavailable",
-      "value": null,
-      "unit": "days",
-      "basis": "snapshot",
-      "definition": "Elapsed days from publication to the first accepted rental offer. Stops at acceptance; never uses the lease start date or today's date.",
-      "reason": "The publication date was not recorded for this listing."
+    {
+      "label": "2026-03",
+      "value": 0
     }
-  },
-  "series": {
-    "monthlyRecordedRentPayments": {
-      "availability": "available",
-      "unit": "SGD",
-      "basis": "period",
-      "definition": "Recorded rent payment totals per calendar month in Asia/Singapore. Edge months only include dates inside the period.",
-      "reason": null,
-      "points": [
-        {
-          "bucket": "2026-01",
-          "value": 1500
-        },
-        {
-          "bucket": "2026-02",
-          "value": 0
-        },
-        {
-          "bucket": "2026-03",
-          "value": 0
-        }
-      ]
+  ],
+  "monthlyOccupancy": [
+    {
+      "label": "2026-01",
+      "status": "vacant"
     },
-    "monthlyOccupancy": {
-      "availability": "available",
-      "unit": "status",
-      "basis": "period",
-      "definition": "'occupied' when an accepted rental's start-to-expiry range overlaps the month (in Asia/Singapore), otherwise 'vacant'. Terminated rentals end on their termination date.",
-      "reason": null,
-      "points": [
-        {
-          "bucket": "2026-01",
-          "value": "vacant"
-        },
-        {
-          "bucket": "2026-02",
-          "value": "occupied"
-        },
-        {
-          "bucket": "2026-03",
-          "value": "occupied"
-        }
-      ]
+    {
+      "label": "2026-02",
+      "status": "occupied"
+    },
+    {
+      "label": "2026-03",
+      "status": "occupied"
     }
-  }
+  ]
 }
