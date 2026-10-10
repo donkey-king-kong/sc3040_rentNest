@@ -28,12 +28,10 @@ public class AnalyticsController {
     @GetMapping("/owner/summary")
     public ResponseEntity<?> getOwnerAnalytics(
             @AuthenticationPrincipal User user,
-            @RequestParam(required = false, name = "period") String periodSelection,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
         try {
-            AnalyticsPeriod resolvedPeriod = analyticsService.resolvePeriod(
-                    user, null, false, periodSelection, from, to);
+            AnalyticsPeriod resolvedPeriod = analyticsService.parsePeriod(from, to);
             return ResponseEntity.ok(analyticsService.ownerSummary(user, resolvedPeriod));
         } catch (AnalyticsException e) {
             return ResponseEntity.status(e.getStatus())
@@ -46,12 +44,10 @@ public class AnalyticsController {
     public ResponseEntity<?> getOwnerPropertyListingAnalytics(
             @AuthenticationPrincipal User user,
             @PathVariable Long listingId,
-            @RequestParam(required = false, name = "period") String periodSelection,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
         try {
-            AnalyticsPeriod resolvedPeriod = analyticsService.resolvePeriod(
-                    user, listingId, false, periodSelection, from, to);
+            AnalyticsPeriod resolvedPeriod = analyticsService.parsePeriod(from, to);
             return ResponseEntity.ok(analyticsService.listingAnalytics(user, listingId, resolvedPeriod));
         } catch (AnalyticsException e) {
             return ResponseEntity.status(e.getStatus())
@@ -63,12 +59,10 @@ public class AnalyticsController {
     @GetMapping("/admin/summary")
     public ResponseEntity<?> getPlatformAnalytics(
             @AuthenticationPrincipal User user,
-            @RequestParam(required = false, name = "period") String periodSelection,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to) {
         try {
-            AnalyticsPeriod resolvedPeriod = analyticsService.resolvePeriod(
-                    user, null, true, periodSelection, from, to);
+            AnalyticsPeriod resolvedPeriod = analyticsService.parsePeriod(from, to);
             return ResponseEntity.ok(analyticsService.platformSummary(user, resolvedPeriod));
         } catch (AnalyticsException e) {
             return ResponseEntity.status(e.getStatus())

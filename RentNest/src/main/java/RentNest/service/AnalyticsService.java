@@ -24,7 +24,6 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -86,26 +85,6 @@ public class AnalyticsService {
     }
 
     // ---------- Period ----------
-
-    public AnalyticsPeriod resolvePeriod(User actor, Long listingId, boolean platform,
-                                         String selection, String from, String to) {
-        if (selection == null) return parsePeriod(from, to);
-        if (!"lifetime".equals(selection) || from != null || to != null) {
-            throw AnalyticsException.invalidPeriod("Use either period=lifetime or a 'from' and 'to' range.");
-        }
-        if (platform) requireAdmin(actor);
-        Listings listing = listingId == null ? null : queries.findListingOwnedBy(listingId, actor.getUserID())
-                .orElseThrow(AnalyticsException::listingNotFound);
-        Instant end = clock.instant();
-        Optional<Instant> earliest = listing != null && listing.getCreatedAt() != null
-                ? Optional.of(listing.getCreatedAt().toInstant())
-                : queries.findEarliestAnalyticsDate(platform ? null : actor.getUserID(), listingId);
-        Instant start = earliest
-                .filter(date -> date.isBefore(end))
-                .orElseGet(() -> end.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant());
-        if (!start.isBefore(end)) start = end.minusNanos(1);
-        return new AnalyticsPeriod(start, end, AnalyticsPeriod.BOUNDARY, zone.getId(), true);
-    }
 
     public AnalyticsPeriod parsePeriod(String from, String to) {
         if (from == null || from.isBlank() || to == null || to.isBlank()) {
@@ -205,11 +184,11 @@ public class AnalyticsService {
         putPaymentMetrics(metrics, payments);
         putOccupancyMetrics(metrics, rentals, 1, period);
 
-        metrics.put("listingViews", viewCount(period,
+        metrics.put("listingViews", createPeriodCountMetric(period,
                 "Times this listing's detail page was opened during the period, counting repeat visits separately. "
                         + "Your own visits to your listing are not recorded.",
                 (from, to) -> queries.countListingViews(listingId, from, to)));
-        metrics.put("uniqueListingViewers", viewCount(period,
+        metrics.put("uniqueListingViewers", createPeriodCountMetric(period,
                 "Different people who opened this listing during the period; repeat visits by the same person count once.",
                 (from, to) -> queries.countDistinctListingViewers(listingId, from, to)));
         metrics.put("daysOnMarket", listingDaysOnMarket(listing.getCreatedAt(), rentals, asOf));
@@ -328,7 +307,7 @@ public class AnalyticsService {
 
     private Series monthlyPaymentSeries(List<PaymentRow> payments, AnalyticsPeriod period) {
         Map<String, Long> totals = new LinkedHashMap<>();
-        trendBuckets(period).forEach(bucket -> totals.put(bucket.label(), 0L));
+        buildMonthlyDateRanges(period).forEach(range -> totals.put(range.label(), 0L));
         for (PaymentRow payment : payments) {
             String bucket = YearMonth.from(payment.date().toInstant().atZone(zone)).toString();
             totals.computeIfPresent(bucket, (key, total) -> total + nullToZero(payment.amount()));
@@ -343,15 +322,13 @@ public class AnalyticsService {
 
     private Series monthlyOccupancySeries(List<RentalRow> rentals, AnalyticsPeriod period) {
         List<Series.Point> points = new ArrayList<>();
-        for (YearMonth month : monthsInPeriod(period)) {
-            Instant monthStart = max(month.atDay(1).atStartOfDay(zone).toInstant(), period.from());
-            Instant monthEnd = min(month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant(), period.to());
+        for (MonthlyDateRange range : buildMonthlyDateRanges(period)) {
             boolean occupied = rentals.stream()
                     .filter(rental -> ACCEPTED_STATUSES.contains(normalise(rental.status())))
                     .filter(rental -> rental.rentalDate() != null && rental.tenancyEnd() != null)
-                    .anyMatch(rental -> rental.rentalDate().toInstant().isBefore(monthEnd)
-                            && rental.tenancyEnd().toInstant().isAfter(monthStart));
-            points.add(new Series.Point(month.format(DateTimeFormatter.ofPattern("yyyy-MM")), occupied ? "occupied" : "vacant"));
+                    .anyMatch(rental -> rental.rentalDate().toInstant().isBefore(range.to())
+                            && rental.tenancyEnd().toInstant().isAfter(range.from()));
+            points.add(new Series.Point(range.label(), occupied ? "occupied" : "vacant"));
         }
         return Series.available("status", PERIOD,
                 "'occupied' when an accepted rental's start-to-expiry range overlaps the month (in " + zone.getId()
@@ -397,11 +374,11 @@ public class AnalyticsService {
             return Series.unavailable(PERCENT, PERIOD, definition, "No listings, so occupancy cannot be calculated.");
         }
         List<Series.Point> points = new ArrayList<>();
-        for (YearMonth month : monthsInPeriod(period)) {
-            Instant monthStart = max(month.atDay(1).atStartOfDay(zone).toInstant(), period.from());
-            Instant monthEnd = min(month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant(), period.to());
-            BigDecimal rate = occupancyPercent(occupiedMillis(rentals, monthStart, monthEnd), listingCount, monthStart, monthEnd);
-            points.add(new Series.Point(month.format(DateTimeFormatter.ofPattern("yyyy-MM")), rate.setScale(1, RoundingMode.HALF_UP)));
+        for (MonthlyDateRange range : buildMonthlyDateRanges(period)) {
+            BigDecimal rate = occupancyPercent(
+                    occupiedMillis(rentals, range.from(), range.to()),
+                    listingCount, range.from(), range.to());
+            points.add(new Series.Point(range.label(), rate.setScale(1, RoundingMode.HALF_UP)));
         }
         return Series.available(PERCENT, PERIOD, definition, points);
     }
@@ -447,46 +424,58 @@ public class AnalyticsService {
 
     // ---------- Lifecycle timestamps ----------
 
-    /** A count of recorded events in the period; an empty period is an available zero. */
-    private Metric lifecycleCount(AnalyticsPeriod period, String definition, BiFunction<Instant, Instant, Long> countBetween) {
+    private Metric createPeriodCountMetric(AnalyticsPeriod period, String definition,
+                                          BiFunction<Instant, Instant, Long> countBetween) {
         return Metric.available(countBetween.apply(period.from(), period.to()), COUNT, PERIOD, definition);
     }
 
     private void putTerminationCount(Map<String, Metric> metrics, List<RentalRow> rentals, AnalyticsPeriod period) {
-        metrics.put("terminationsCount", lifecycleCount(period, "Tenancies terminated during the period.",
+        metrics.put("terminationsCount", createPeriodCountMetric(period, "Tenancies terminated during the period.",
                 (from, to) -> countInRange(rentals, RentalRow::terminatedAt, from, to)));
-    }
-
-    /** Count recorded views by their event timestamps, independently of when the feature was introduced. */
-    private Metric viewCount(AnalyticsPeriod period, String definition, BiFunction<Instant, Instant, Long> countBetween) {
-        return Metric.available(countBetween.apply(period.from(), period.to()), COUNT, PERIOD, definition);
     }
 
     private Series monthlyLifecycleSeries(List<RentalRow> rentals, AnalyticsPeriod period,
                                           Function<RentalRow, Date> dateOf, String definition) {
-        List<Series.Point> points = trendBuckets(period).stream().map(bucket -> {
-            return new Series.Point(bucket.label(), countInRange(rentals, dateOf, bucket.from(), bucket.to()));
+        List<Series.Point> points = buildMonthlyDateRanges(period).stream().map(range -> {
+            return new Series.Point(range.label(), countInRange(rentals, dateOf, range.from(), range.to()));
         }).toList();
         return Series.available(COUNT, PERIOD, definition, points);
     }
 
     private Series monthlyDaysOnMarketSeries(List<RentalRow> rentals, AnalyticsPeriod period, Instant asOf) {
-        List<Series.Point> points = trendBuckets(period).stream().map(bucket -> {
+        List<Series.Point> points = buildMonthlyDateRanges(period).stream().map(range -> {
             Metric average = averageDaysOnMarket(rentals, new AnalyticsPeriod(
-                    bucket.from(), bucket.to(),
+                    range.from(), range.to(),
                     period.boundary(), period.timeZone()), asOf);
-            return new Series.Point(bucket.label(), average.value());
+            return new Series.Point(range.label(), average.value());
         }).toList();
         return Series.available("days", PERIOD,
                 "Average days from publishing a listing to its first accepted offer, grouped by acceptance month. Missing or invalid dates are left out. Months with no qualifying listings are blank.", points);
     }
 
-    private record TrendBucket(String label, Instant from, Instant to) {}
+    private record MonthlyDateRange(String label, Instant from, Instant to) {}
 
-    private List<TrendBucket> trendBuckets(AnalyticsPeriod period) {
-        return monthsInPeriod(period).stream().map(month -> new TrendBucket(
-                month.toString(), max(month.atDay(1).atStartOfDay(zone).toInstant(), period.from()),
-                min(month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant(), period.to()))).toList();
+    private List<MonthlyDateRange> buildMonthlyDateRanges(AnalyticsPeriod period) {
+        YearMonth firstMonth = YearMonth.from(period.from().atZone(zone));
+        YearMonth lastMonth = YearMonth.from(
+                period.to().minusNanos(1).atZone(zone));
+
+        List<MonthlyDateRange> ranges = new ArrayList<>();
+
+        for (YearMonth month = firstMonth;
+             !month.isAfter(lastMonth);
+             month = month.plusMonths(1)) {
+            Instant start = max(
+                    month.atDay(1).atStartOfDay(zone).toInstant(),
+                    period.from());
+            Instant end = min(
+                    month.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant(),
+                    period.to());
+
+            ranges.add(new MonthlyDateRange(month.toString(), start, end));
+        }
+
+        return ranges;
     }
 
     private Metric averageDaysOnMarket(List<RentalRow> rentals, AnalyticsPeriod period, Instant asOf) {
@@ -590,16 +579,6 @@ public class AnalyticsService {
         BigDecimal fraction = BigDecimal.valueOf(remainingDays)
                 .divide(BigDecimal.valueOf(anchor.lengthOfMonth()), 4, RoundingMode.HALF_UP);
         return BigDecimal.valueOf(wholeMonths).add(fraction);
-    }
-
-    private List<YearMonth> monthsInPeriod(AnalyticsPeriod period) {
-        YearMonth first = YearMonth.from(period.from().atZone(zone));
-        YearMonth last = YearMonth.from(period.to().minusNanos(1).atZone(zone));
-        List<YearMonth> months = new ArrayList<>();
-        for (YearMonth month = first; !month.isAfter(last); month = month.plusMonths(1)) {
-            months.add(month);
-        }
-        return months;
     }
 
     private static long countOccupiedListings(List<RentalRow> rentals, Instant asOf) {

@@ -12,9 +12,9 @@ Send the JWT in `Authorization: Bearer <token>`.
 | `/api/analytics/owner/listings/{listingId}` | Property owner only |
 | `/api/analytics/admin/summary` | User with the `ADMIN` role |
 
-Pass either `from` and `to` as ISO-8601 date-times with offsets, or `period=lifetime`. These options cannot be combined. Ranges include `from` and exclude `to`; `from` must precede `to`. There is no maximum range length. Monthly buckets use `analytics.time-zone`, defaulting to `Asia/Singapore`.
+Pass `from` and `to` as ISO-8601 date-times with offsets. Ranges include `from` and exclude `to`; `from` must precede `to`. There is no maximum range length. Monthly buckets use `analytics.time-zone`, defaulting to `Asia/Singapore`.
 
-The dashboards request a fixed past-year range. The API also supports lifetime: property lifetime starts at its stored publication date when available, while owner and platform lifetime use the earliest stored date in their authorized scope.
+The dashboards request a fixed past-year range.
 
 Responses contain `schemaVersion`, `scope`, `asOf`, `period`, `metrics` and `series`. The property response also contains `listing`, including `listedAt` and `firstAcceptedAt`. Metrics include `availability`, `value`, `unit`, `basis`, `definition` and an optional `reason`. An unavailable value is `null`, not zero. Series include metadata and a `points` array of `{bucket, value}`.
 
@@ -58,4 +58,4 @@ Review editing remains author-only, and property editing remains owner-only, inc
 
 ## Verification
 
-Backend integration tests use disposable H2 fixtures and verify authorization, owner isolation, response fields, monthly calculations, view tracking, lifetime and date boundaries. Service tests cover occupancy, tenant classification and days on market. Frontend analytics tests verify rendering and navigation.
+Backend integration tests use disposable H2 fixtures and verify authorization, owner isolation, response fields, monthly calculations, view tracking and date boundaries. Service tests cover occupancy, tenant classification and days on market. Frontend analytics tests verify rendering and navigation.

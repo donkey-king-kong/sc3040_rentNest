@@ -507,42 +507,6 @@ class AnalyticsControllerIntegrationTest {
 
     // ---------- Fixture helpers ----------
 
-    @Test
-    void lifetimeIncludesOlderPaymentsWithoutUnusedMetrics() throws Exception {
-        String oldDate = "2024-12-26T00:00:00+08:00";
-        Rentals rental = rentalsRepository.findAll().stream()
-                .filter(row -> row.getListings().getListingID().equals(listingA2.getListingID()))
-                .findFirst().orElseThrow();
-        payment(rental, 500L, oldDate);
-        paymentRepository.flush();
-        mockMvc.perform(get("/api/analytics/admin/summary")
-                        .header("Authorization", "Bearer " + jwtService.generateToken(admin))
-                        .param("period", "lifetime"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.period.lifetime").value(true))
-                .andExpect(jsonPath("$.period.from").value("2024-12-25T16:00:00Z"))
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal").doesNotExist())
-                .andExpect(jsonPath("$.metrics.acceptedRentalRecordCount").doesNotExist())
-                .andExpect(jsonPath("$.metrics.offersAcceptedCount").doesNotExist())
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotalChange").doesNotExist());
-    }
-
-    @Test
-    void lifetimeKeepsScopeAuthorizationAndRejectsMixedRanges() throws Exception {
-        String token = "Bearer " + jwtService.generateToken(ownerA);
-        mockMvc.perform(get("/api/analytics/admin/summary").header("Authorization", token).param("period", "lifetime"))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/analytics/owner/listings/" + listingB1.getListingID())
-                        .header("Authorization", token).param("period", "lifetime"))
-                .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/analytics/owner/summary").header("Authorization", token)
-                        .param("period", "lifetime").param("from", FROM).param("to", TO))
-                .andExpect(status().isBadRequest());
-        mockMvc.perform(get("/api/analytics/owner/summary").header("Authorization", token).param("period", "lifetime"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.metrics.recordedRentPaymentTotal.value").value(5500));
-    }
-
     private MockHttpServletRequestBuilder asUser(User user, MockHttpServletRequestBuilder request) {
         return asUser(user, request, FROM, TO);
     }

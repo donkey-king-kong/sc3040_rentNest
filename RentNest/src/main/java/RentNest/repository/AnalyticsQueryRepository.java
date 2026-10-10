@@ -34,34 +34,6 @@ public class AnalyticsQueryRepository {
     public record PaymentRow(Date date, Long amount) {
     }
 
-    /** Earliest dated record in the authorized scope, including legacy billing dates. */
-    public Optional<Instant> findEarliestAnalyticsDate(Long ownerId, Long listingId) {
-        String listingFilter = listingId != null ? " WHERE l.listingID = :scopeId"
-                : ownerId != null ? " WHERE l.owner.userID = :scopeId" : "";
-        String rentalFilter = listingFilter.replace("l.", "r.listings.");
-        String paymentFilter = listingFilter.replace("l.", "p.rentals.listings.");
-        String viewFilter = listingFilter.replace("l.listingID", "v.listing.listingID")
-                .replace("l.owner.userID", "v.listing.owner.userID");
-        Long scopeId = listingId != null ? listingId : ownerId;
-        List<String> statements = new java.util.ArrayList<>(List.of(
-                "SELECT MIN(l.createdAt) FROM Listings l" + listingFilter,
-                "SELECT MIN(r.createdAt) FROM Rentals r" + rentalFilter,
-                "SELECT MIN(r.rentalDate) FROM Rentals r" + rentalFilter,
-                "SELECT MIN(r.acceptedAt) FROM Rentals r" + rentalFilter,
-                "SELECT MIN(r.terminatedAt) FROM Rentals r" + rentalFilter,
-                "SELECT MIN(p.date) FROM Payment p" + paymentFilter,
-                "SELECT MIN(v.viewedAt) FROM ListingView v" + viewFilter));
-        if (listingId == null) {
-            statements.add("SELECT MIN(u.createdAt) FROM User u"
-                    + (ownerId != null ? " WHERE u.userID = :scopeId" : ""));
-        }
-        return statements.stream().map(statement -> {
-            TypedQuery<Date> query = entityManager.createQuery(statement, Date.class);
-            if (scopeId != null) query.setParameter("scopeId", scopeId);
-            return query.getSingleResult();
-        }).filter(java.util.Objects::nonNull).map(Date::toInstant).min(Instant::compareTo);
-    }
-
     // ---------- Listings ----------
 
     public long countListingsByOwner(Long ownerId) {
@@ -112,7 +84,7 @@ public class AnalyticsQueryRepository {
         return entityManager.createQuery(RENTAL_ROW_SELECT, RentalRow.class).getResultList();
     }
 
-    // ---------- Payments (always period-bounded) ----------
+    // Payment queries
 
     /** All recorded rent amounts, independent of the selected reporting period. */
     public long sumAllRecordedRentPayments() {
@@ -133,29 +105,29 @@ public class AnalyticsQueryRepository {
             "WHERE p.date >= :from AND p.date < :to ";
 
     public List<PaymentRow> findPaymentRowsByOwner(Long ownerId, Instant from, Instant to) {
-        return withPeriod(entityManager.createQuery(
+        return setDateRangeParameters(entityManager.createQuery(
                         PAYMENT_ROW_SELECT + "AND p.rentals.listings.owner.userID = :ownerId", PaymentRow.class), from, to)
                 .setParameter("ownerId", ownerId)
                 .getResultList();
     }
 
     public List<PaymentRow> findPaymentRowsByListing(Long listingId, Instant from, Instant to) {
-        return withPeriod(entityManager.createQuery(
+        return setDateRangeParameters(entityManager.createQuery(
                         PAYMENT_ROW_SELECT + "AND p.rentals.listings.listingID = :listingId", PaymentRow.class), from, to)
                 .setParameter("listingId", listingId)
                 .getResultList();
     }
 
     public List<PaymentRow> findAllPaymentRows(Instant from, Instant to) {
-        return withPeriod(entityManager.createQuery(PAYMENT_ROW_SELECT, PaymentRow.class), from, to)
+        return setDateRangeParameters(entityManager.createQuery(PAYMENT_ROW_SELECT, PaymentRow.class), from, to)
                 .getResultList();
     }
 
-    private static <T> TypedQuery<T> withPeriod(TypedQuery<T> query, Instant from, Instant to) {
+    private static <T> TypedQuery<T> setDateRangeParameters(TypedQuery<T> query, Instant from, Instant to) {
         return query.setParameter("from", Date.from(from)).setParameter("to", Date.from(to));
     }
 
-    // ---------- Listing views (always period-bounded) ----------
+    // Listing view queries
 
     /** All recorded listing visits across the owner's current listings, including repeat visits. */
     public long countAllListingViewsByOwner(Long ownerId) {
@@ -173,7 +145,7 @@ public class AnalyticsQueryRepository {
 
     /** Recorded views of the listing in the period, counting repeat visits separately. */
     public long countListingViews(Long listingId, Instant from, Instant to) {
-        return withPeriod(entityManager.createQuery(
+        return setDateRangeParameters(entityManager.createQuery(
                         "SELECT COUNT(v) " + LISTING_VIEW_WHERE, Long.class), from, to)
                 .setParameter("listingId", listingId)
                 .setParameter("kind", ListingView.KIND_LISTING)
@@ -182,7 +154,7 @@ public class AnalyticsQueryRepository {
 
     /** Distinct signed-in viewers in the period. Anonymous views are not counted, since they have no identity. */
     public long countDistinctListingViewers(Long listingId, Instant from, Instant to) {
-        return withPeriod(entityManager.createQuery(
+        return setDateRangeParameters(entityManager.createQuery(
                         "SELECT COUNT(DISTINCT v.viewerUserId) " + LISTING_VIEW_WHERE, Long.class), from, to)
                 .setParameter("listingId", listingId)
                 .setParameter("kind", ListingView.KIND_LISTING)
