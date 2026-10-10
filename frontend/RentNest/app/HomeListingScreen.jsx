@@ -118,25 +118,32 @@ const HomeListingScreen = () => {
 
         // Apply default values only if the response data is empty or missing properties
         const listingData = listingResponse.data || {};
+        const isDemo = listingData.demo === true;
         const defaultListing = {
+          isDemo,
           name: listingData.name || 'No Name Available',
           location: listingData.location || 'Location not available',
           price: listingData.price || 0,
           rating: 4.0,
-          pincode: listingData.postal || 489836,
+          pincode: listingData.postal || (isDemo ? 'Not provided' : 489836),
           type: listingData.type || 'Not specified',
           rentalType: 'Room Rental',
-          description: listingData.description || 'No description available',
+          description: isDemo ? (listingData.description || '').replace('FICTIONAL DEMO:', 'SAMPLE LISTING:').replace(/\bdemo\b/gi, 'sample') : (listingData.description || 'No description available'),
           beds: listingData.beds || 0,
           baths: listingData.bathroom || 0,
           size: listingData.size || 1, // Prevent division by zero
           imageURL: listingData.listingpicture,
           ownerUserID: listingData.ownerId || '',
-          ownerName: listingData.ownerName || 'Unknown',
+          ownerName: isDemo ? 'Sample Property Owner' : (listingData.ownerName || 'Unknown'),
           ownerPhotoURL: listingData.ownerPhotoURL || 'https://thumbs.dreamstime.com/b/tranquil-caucasian-handsome-brunet-man-blue-long-scarf-posing-wrinkled-face-against-background-square-image-236510369.jpg'
         };
         console.log('Processed listing data:', defaultListing);
         setListing(defaultListing);
+        if (isDemo) {
+          setNearbySchools([]); setNearbyHawkerCentres([]); setNearbyBusStops([]);
+          setPriceInsights([]); setReviews([]);
+          return; // Fictional demo addresses must not trigger government data lookups.
+        }
 
         // AI fair-price estimate (non-blocking: the rest of the page loads while it runs)
         axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_FOR_LISTING(listingId)}`, {
@@ -516,6 +523,10 @@ const HomeListingScreen = () => {
         {/* Display listing ID for future backend connection */}
         {/*<Text style={styles.listingId}>Listing ID: {listingId}</Text>*/}
 
+        {listing.isDemo && <Text style={{ color: '#805300', marginVertical: 12 }}>
+          Sample listing. Photo is illustrative; prices and property details are invented for testing. No verified address, nearby amenities or market-price comparison.
+        </Text>}
+        {!listing.isDemo && <>
         {/* Heading for the location section */}
         <Text style={styles.schoolsLabel}>About the Location</Text>
 
@@ -610,10 +621,11 @@ const HomeListingScreen = () => {
                 <View style={styles.priceInsightsContainer}>
                   <PriceInsightsChart data={priceInsights} askingPrice={listing.price} fairPrice={fairPrice?.available ? fairPrice.fairPrice : null} />
                 </View>
+        </>}
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
                         <View style={styles.ownerInfo}>
-                          <ProfileImage
+                          {!listing.isDemo && <ProfileImage
                             uri={listing.ownerPhotoURL}
                             name={listing.ownerName}
                             style={styles.ownerImage}
@@ -621,14 +633,14 @@ const HomeListingScreen = () => {
                             screen="HomeListingScreen"
                             userId={listing.ownerId}
                             role="owner"
-                          />
+                          />}
                           <Text style={styles.ownerText}>Posted by: {listing.ownerName}</Text>
                         </View>
                       </View>
 
                       {/* Buttons */}
-                        <TouchableOpacity onPress={handleChat} style={styles.messageButton}>
-                          <Text style={styles.buttonText1}>Message Owner</Text>
+                        <TouchableOpacity disabled={listing.isDemo} onPress={handleChat} style={styles.messageButton}>
+                          <Text style={styles.buttonText1}>{listing.isDemo ? 'Sample listing — enquiries unavailable' : 'Message Owner'}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.reportButton} onPress={handleReportListing}>
                           <Text style={styles.buttonText2}>Report Listing</Text>

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Pressable, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import { FontAwesome } from '@expo/vector-icons';
@@ -9,8 +9,11 @@ import { FontAwesome } from '@expo/vector-icons';
 const errorIcon = require('../assets/images/errorIcon.png');
 
 const LoginScreen = () => {
-  const [email, setEmail] = useState('');
+  const params = useLocalSearchParams();
+  const [email, setEmail] = useState(typeof params.email === 'string' ? params.email : '');
   const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const pending = useRef(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
@@ -19,16 +22,17 @@ const LoginScreen = () => {
   const router = useRouter();
 
   const handleLogin = async () => {
+    if (pending.current) return;
     setFormError('');
     setFieldErrors({});
 
-    // Validation
-    if (!email) {
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
       setFieldErrors({ email: true });
       setFormError('ERROR: Email is required.');
       return;
     }
-    if (!/\S+@\S+\.\S+/.test(email)) {
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
       setFieldErrors({ email: true });
       setFormError('ERROR: Email format is invalid.');
       return;
@@ -39,57 +43,39 @@ const LoginScreen = () => {
       return;
     }
 
+    pending.current = true;
+    setSubmitting(true);
     try {
-      console.log('Attempting login for:', email); // Debug log
       const response = await axios.post(`${API_BASE_URL}${ENDPOINTS.LOGIN}`, {
-        email: email,
-        password: password
-      });
-  
-      console.log('Response received:', response.status); // Debug log
-  
-      // Check if we have the expected data
-      if (!response.data || !response.data.token) {
+        email: cleanEmail,
+        password,
+      }, { timeout: 15000 });
+
+      if (!response.data?.token) {
         throw new Error('Invalid response format');
       }
-  
-      try {
-        await AsyncStorage.setItem('token', response.data.token);
-        if (response.data.userId) {
-          await AsyncStorage.setItem('userId', response.data.userId.toString());
-        } else {
-          await AsyncStorage.removeItem('userId');
-        }
-  
-        // Configure axios defaults
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
-  
-        // Special case for admin
-        if (email === 'admin@gmail.com') {
-          router.push('/AdminScreen');
-          return;
-        }
-  
-        router.push('/HomeScreen');
-      } catch (storageError) {
-        console.log('Storage error:', storageError);
-        setFormError('ERROR: Failed to save login information.');
+
+      await AsyncStorage.setItem('token', response.data.token);
+      if (response.data.userId) {
+        await AsyncStorage.setItem('userId', String(response.data.userId));
+      } else {
+        await AsyncStorage.removeItem('userId');
       }
-    } catch (error) {
-      console.log('Login error:', error); // Debug log
-      if (error.response) {
-        // The server responded with an error
+
+      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+      router.replace(cleanEmail === 'admin@gmail.com' ? '/AdminScreen' : '/HomeScreen');
+    } catch (failure) {
+      if (failure.response) {
         setFieldErrors({ email: true, password: true });
         setFormError('ERROR: Invalid email or password.');
-      } else if (error.request) {
-        // The request was made but no response received
-        console.log('No response received:', error.request);
+      } else if (failure.request) {
         setFormError('ERROR: Could not connect to the server. Please check your connection.');
       } else {
-        // Something happened in setting up the request
-        console.log('Request setup error:', error.message);
         setFormError('ERROR: Could not connect to the server. Please try again.');
       }
+    } finally {
+      pending.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -97,6 +83,9 @@ const LoginScreen = () => {
     <View style={styles.container}>
       <View style={styles.formContainer}>
         <Text style={styles.title}>Login to your account</Text>
+        {params.registered === '1' ? (
+          <Text style={styles.registeredNotice}>Account created successfully. Log in with the password you just chose.</Text>
+        ) : null}
 
         <Pressable
           style={[styles.inputContainer, fieldErrors.email && styles.errorInputContainer]}
@@ -171,8 +160,8 @@ const LoginScreen = () => {
       </View>
 
       <View style={styles.bottomContainer}>
-        <TouchableOpacity style={styles.primaryButton} onPress={handleLogin}>
-          <Text style={styles.primaryButtonText}>Login now</Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleLogin} disabled={submitting}>
+          <Text style={styles.primaryButtonText}>{submitting ? 'Logging in…' : 'Login now'}</Text>
         </TouchableOpacity>
 
         <View style={styles.signupContainer}>
@@ -203,6 +192,11 @@ const styles = StyleSheet.create({
     color: '#101820',
     textAlign: 'center',
     marginBottom: 58,
+  },
+  registeredNotice: {
+    color: '#205c43',
+    textAlign: 'center',
+    marginBottom: 16,
   },
   inputContainer: {
     flexDirection: 'row',

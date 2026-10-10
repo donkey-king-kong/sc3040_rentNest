@@ -2,6 +2,10 @@
 
 RentNest helps property owners list rental homes and users search for available rentals.
 
+## Recommendations
+
+See [the recommendation guide](RentNest/RECOMMENDATIONS.md) for the personalised ranking flow, Singapore sample listings, walkthrough, setup and tests.
+
 ## Setup Instructions
 
 If setup or debugging gets stuck, see [Price Insights troubleshooting](Documentation/Troubleshooting/price-insights.md).
