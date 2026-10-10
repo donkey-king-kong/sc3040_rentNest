@@ -35,7 +35,7 @@ const ListingAnalyticsScreen = () => {
   if (unauthenticated) return <>{header}<ErrorState message={error || 'Please log in to view analytics.'}
     onRetry={() => router.replace('/LandingScreen')} actionLabel="Go to login" /></>;
   if (!data && loading) return <>{header}<View style={styles.initialLoading} accessibilityLabel="Loading property analytics">
-    <AdminLoadingState message={null} backgroundColor="#FFFFFF" />
+    <AdminLoadingState message="Loading analytics…" backgroundColor="#FFFFFF" />
   </View></>;
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
@@ -82,7 +82,7 @@ const ListingAnalyticsScreen = () => {
       </Section>
 
       {loading ? <View style={styles.refreshLoading} accessibilityLabel="Refreshing property analytics">
-        <AdminLoadingState message={null} backgroundColor="#FFFFFF" />
+        <AdminLoadingState message="Loading analytics…" backgroundColor="#FFFFFF" />
       </View> : <>
         <Section>
           <LineChart title="Monthly Rent Recorded" series={data.series.monthlyRecordedRentPayments}

@@ -44,7 +44,7 @@ const AdminAnalyticsScreen = () => {
       </>
     );
   }
-  if (!data && loading) return <AdminLoadingState message={null} />;
+  if (!data && loading) return <AdminLoadingState message="Loading analytics…" />;
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
   const explanations = {
@@ -130,7 +130,7 @@ const AdminAnalyticsScreen = () => {
             }} />
           </TileRow></>}</Section>
           {loading ? <View style={styles.refreshLoading} accessibilityLabel="Refreshing analytics">
-            <AdminLoadingState message={null} backgroundColor="#FFFFFF" />
+            <AdminLoadingState message="Loading analytics…" backgroundColor="#FFFFFF" />
           </View> : <>
           <Section>
             <PieChart title="Rentals" series={offerDistribution} totalLabel="Recorded Offers" emptyText="No recorded offers yet" totalMetric={m.rentalRecordCount} metricLabel="Total Rental Offers" />

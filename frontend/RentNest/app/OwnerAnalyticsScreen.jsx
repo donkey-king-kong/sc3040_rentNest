@@ -50,7 +50,7 @@ const OwnerAnalyticsScreen = () => {
       </>
     );
   }
-  if (!data && loading) return <AdminLoadingState message={null} />;
+  if (!data && loading) return <AdminLoadingState message="Loading analytics…" />;
   if (!data) return <>{header}<ErrorState message={error} onRetry={retry} /></>;
 
   const explanations = {
@@ -155,7 +155,7 @@ const OwnerAnalyticsScreen = () => {
             </>}
           </Section>
           {loading ? <View style={styles.refreshLoading} accessibilityLabel="Refreshing analytics">
-            <AdminLoadingState message={null} backgroundColor="#FFFFFF" />
+            <AdminLoadingState message="Loading analytics…" backgroundColor="#FFFFFF" />
           </View> : <>
           <Section>
             <PieChart title="Listing Occupancy" series={listingDistribution} totalMetric={m.listingCount}
@@ -187,7 +187,7 @@ const OwnerAnalyticsScreen = () => {
               <RefreshControl onRefresh={refresh} loading={loading || listings.loading} asOf={data.asOf} />
             }>
               {loading || listings.loading ? <View style={styles.refreshLoading} accessibilityLabel="Refreshing property analytics">
-                <AdminLoadingState message={null} backgroundColor="#FFFFFF" />
+                <AdminLoadingState message="Loading analytics…" backgroundColor="#FFFFFF" />
               </View> : null}
               {!loading && listings.error ? <Text style={styles.inlineError}>{listings.error}</Text> : null}
               {!loading && !listings.loading && !listings.error && listings.items.length === 0 ? (
