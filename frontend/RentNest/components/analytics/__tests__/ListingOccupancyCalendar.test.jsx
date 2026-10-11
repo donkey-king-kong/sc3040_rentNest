@@ -2,7 +2,7 @@ import React from 'react';
 import { Text } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import ListingOccupancyCalendar from '../ListingOccupancyCalendar';
-import { MetricDetails } from '../AnalyticsKit';
+import { InfoTooltip } from '../AnalyticsKit';
 
 jest.mock('../../../config/api', () => ({ API_BASE_URL: 'http://test.local', ENDPOINTS: {} }));
 jest.mock('@react-native-async-storage/async-storage', () => require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
@@ -100,10 +100,10 @@ it('shows empty and unavailable history without inventing vacant months', async 
 it('opens and closes the backend calculation details', async () => {
   const series = available([{ bucket: '2026-01', value: 'occupied' }]);
   const tree = await render(series);
-  expect(tree.root.findAllByType(MetricDetails)).toHaveLength(0);
+  expect(text(tree)).not.toContain(series.definition);
   await press(tree, 'Monthly occupancy calculation details');
-  expect(tree.root.findByType(MetricDetails).props.metric).toBe(series);
+  expect(tree.root.findByType(InfoTooltip).props.metric).toBe(series);
   expect(text(tree)).toContain(series.definition);
   await press(tree, 'Close calculation details');
-  expect(tree.root.findAllByType(MetricDetails)).toHaveLength(0);
+  expect(text(tree)).not.toContain(series.definition);
 });

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { FontAwesome } from 'react-native-vector-icons';
-import { COLORS, MetricDetails } from './AnalyticsKit';
+import { COLORS, InfoTooltip } from './AnalyticsKit';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const statusFor = point => point.availability !== 'unavailable' && ['occupied', 'vacant'].includes(point.value)
@@ -18,7 +18,6 @@ export default function ListingOccupancyCalendar({ series }) {
   const { width, fontScale } = useWindowDimensions();
   const compact = width < 360 || fontScale > 1.2;
   const [selected, setSelected] = useState(null);
-  const [showDefinition, setShowDefinition] = useState(false);
   useEffect(() => setSelected(null), [series]);
   const available = series?.availability === 'available';
   const points = available ? series.points || [] : [];
@@ -32,10 +31,7 @@ export default function ListingOccupancyCalendar({ series }) {
   return <View style={styles.card}>
     <View style={styles.heading}>
       <Text accessibilityRole="header" style={styles.title}>Monthly Occupancy</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Monthly occupancy calculation details"
-        onPress={() => setShowDefinition(true)} style={styles.info}>
-        <FontAwesome name="info-circle" size={18} color={COLORS.inkSecondary} />
-      </Pressable>
+      <InfoTooltip label="Monthly Occupancy" metric={series} accessibilityLabel="Monthly occupancy calculation details" />
     </View>
     {available && points.length > 0 ? <>
       <Text style={styles.note}>Occupied means a tenancy overlapped at least part of the month.</Text>
@@ -74,8 +70,6 @@ export default function ListingOccupancyCalendar({ series }) {
       <Text style={styles.readoutTitle}>{available ? 'No occupancy history yet' : 'Not available'}</Text>
       {series?.reason ? <Text style={styles.note}>{series.reason}</Text> : null}
     </View>}
-    {showDefinition ? <MetricDetails label="Monthly Occupancy" metric={series} hideValue visible
-      onClose={() => setShowDefinition(false)} /> : null}
   </View>;
 }
 
@@ -83,7 +77,6 @@ const styles = StyleSheet.create({
   card: { padding: 16, backgroundColor: COLORS.surface, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, marginTop: 6 },
   heading: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   title: { flex: 1, fontSize: 18, fontWeight: '600', color: COLORS.ink },
-  info: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: -12, marginVertical: -8 },
   note: { fontSize: 13, lineHeight: 19, color: COLORS.inkSecondary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4, marginTop: 12 },
   monthSlot: { width: '33.333333%', padding: 4 },

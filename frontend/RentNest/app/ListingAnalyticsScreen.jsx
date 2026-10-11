@@ -45,20 +45,20 @@ const ListingAnalyticsScreen = () => {
   const tileStyle = width < 360 || fontScale > 1.2 ? styles.singleColumnTile : undefined;
   const publishedDate = data.listedAt ? formatDay(data.listedAt) : 'Not recorded';
   const acceptedDate = data.firstAcceptedAt ? formatDay(data.firstAcceptedAt) : 'Not recorded';
-  const daysOnMarket = displayMetric(data.daysOnMarket, 'days', "Elapsed days from publication to the first accepted rental offer. Stops at acceptance; never uses the lease start date or today's date.", data.daysOnMarketUnavailableReason || (data.daysOnMarket == null ? 'Listing history is not available.' : null));
+  const daysOnMarket = displayMetric(data.daysOnMarket, 'days', "Days from publication to first acceptance, rather than the lease start date.", data.daysOnMarketUnavailableReason || (data.daysOnMarket == null ? 'Listing history is not available.' : null));
   const daysOnMarketLabel = data.daysOnMarket != null ? formatValue(data.daysOnMarket, 'days') : 'Not available';
-  const rentCollected = displayMetric(data.rentCollected, data.currency, 'Rent payments recorded for the month paid for. Deposits are excluded and refunds are not deducted.', null, 'period');
+  const rentCollected = displayMetric(data.rentCollected, data.currency, 'Rent recorded for the past 12 months by billing month. Excludes deposits; refunds are not deducted.', null, 'period');
   const occupancyRate = displayMetric(data.occupancyRate, 'percent', 'The share of the selected time covered by accepted tenancies.', null, 'period');
   const totalViews = displayMetric(data.totalViews, 'count', 'Times this listing was opened, including repeat visits. Your own visits are excluded.', null, 'period');
   const uniqueViewers = displayMetric(data.uniqueViewers, 'count', 'Different people who opened this listing. Repeat visits by the same person count once.', null, 'period');
-  const paymentCount = displayMetric(data.paymentCount, 'count', 'Rent payment records for the month paid for, rather than the transaction date.', null, 'period');
+  const paymentCount = displayMetric(data.paymentCount, 'count', 'Number of rent payments by billing month, rather than transaction date.', null, 'period');
   const totalOffers = displayMetric(data.totalRentalOffers, 'count', 'Rental records in any status.');
   const acceptedOffers = displayMetric(data.acceptedOffers, 'count', 'Rental records with active or terminated status.');
-  const acceptanceRate = displayMetric(data.acceptanceRate, 'percent', 'Accepted rental records divided by all rental records. Pending offers count as not accepted.', data.acceptanceRateUnavailableReason);
-  const averageTenancy = displayMetric(data.averageTenancyMonths, 'months', 'Average length of accepted tenancies. Active rentals use the agreed length. Ended rentals use their recorded end date.', data.averageTenancyUnavailableReason);
+  const acceptanceRate = displayMetric(data.acceptanceRate, 'percent', 'Percentage of rental offers accepted. Pending offers are not accepted.', data.acceptanceRateUnavailableReason);
+  const averageTenancy = displayMetric(data.averageTenancyMonths, 'months', 'Average accepted tenancy length. Active rentals use the agreed length; ended rentals use their recorded end date.', data.averageTenancyUnavailableReason);
   const tenantsHosted = displayMetric(data.tenantsHosted, 'count', 'Different tenants on accepted rentals.');
-  const monthlyRent = displayChart(data.monthlyRent, data.currency, 'Rent payments grouped by the month paid for. Deposits are excluded and refunds are not deducted.');
-  const monthlyOccupancy = displayChart(data.monthlyOccupancy, 'status', 'Occupied when an accepted tenancy overlaps the month. Terminated rentals end on their termination date.');
+  const monthlyRent = displayChart(data.monthlyRent, data.currency, 'Rent grouped by the month paid for. Excludes deposits; refunds are not deducted.');
+  const monthlyOccupancy = displayChart(data.monthlyOccupancy, 'status', 'Occupied if an accepted tenancy overlaps the month. Terminated rentals end on their termination date.');
 
   return <>
     {header}

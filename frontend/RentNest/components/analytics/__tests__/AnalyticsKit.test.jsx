@@ -476,7 +476,7 @@ describe('Admin user presentation', () => {
   it('keeps metric definitions tappable', async () => {
     const tree = renderStatic(<MetricRow label="New users" metric={{ ...available(0), definition: 'Accounts created in the selected period.' }} />);
     expect(renderedText(tree)).toEqual(expect.arrayContaining(['New users', '0']));
-    const target = tree.root.findAll(node => node.props.accessibilityLabel === 'New users: 0' && typeof node.props.onPress === 'function')[0];
+    const target = tree.root.findAll(node => node.props.accessibilityLabel === 'About New users' && typeof node.props.onPress === 'function')[0];
     await act(async () => target.props.onPress());
     expect(renderedText(tree)).toContain('Accounts created in the selected period.');
     expect(renderedText(renderStatic(<MetricRow label="New listings" metric={unavailable('No tracking data')} />))).toContain('Not available');
@@ -506,11 +506,35 @@ it('keeps calculation details off the dashboard and opens and closes them on dem
   await act(async () => { tree = create(<StatTile label="Offers accepted" metric={metric} />); });
   expect(renderedText(tree)).not.toContain('Period');
   expect(renderedText(tree)).not.toContain(metric.definition);
-  const card = tree.root.findAll(node => node.props.accessibilityLabel === 'Offers accepted: 1' && node.props.onPress)[0];
+  const card = tree.root.findAll(node => node.props.accessibilityLabel === 'About Offers accepted' && node.props.onPress)[0];
   await act(async () => card.props.onPress());
   expect(renderedText(tree)).toContain(metric.definition);
-  expect(renderedText(tree)).toContain('Period');
+  expect(renderedText(tree)).not.toContain('Period');
   const close = tree.root.findAll(node => node.props.accessibilityLabel === 'Close calculation details' && node.props.onPress)[0];
   await act(async () => close.props.onPress());
   expect(renderedText(tree)).not.toContain(metric.definition);
+});
+
+
+it('opens info on hover and focus, keeps it open while reading, and dismisses on blur', async () => {
+  jest.useFakeTimers();
+  let tree;
+  const definition = 'Rent grouped by the month paid for.';
+  await act(async () => { tree = create(<StatTile label="Rent" metric={{ ...available(0), definition }} />); });
+  const icon = () => tree.root.findAll(node => node.props.accessibilityLabel === 'About Rent' && node.props.onHoverIn)[0];
+  await act(async () => icon().props.onHoverIn());
+  expect(renderedText(tree)).toContain(definition);
+  await act(async () => icon().props.onHoverOut());
+  await act(async () => icon().props.onHoverIn());
+  await act(async () => jest.advanceTimersByTime(200));
+  expect(renderedText(tree)).toContain(definition);
+  await act(async () => icon().props.onHoverOut());
+  await act(async () => jest.advanceTimersByTime(200));
+  expect(renderedText(tree)).not.toContain(definition);
+  await act(async () => icon().props.onFocus());
+  expect(renderedText(tree)).toContain(definition);
+  await act(async () => icon().props.onBlur());
+  expect(renderedText(tree)).not.toContain(definition);
+  await act(async () => tree.unmount());
+  jest.useRealTimers();
 });

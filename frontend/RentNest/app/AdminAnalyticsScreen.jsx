@@ -58,7 +58,7 @@ const AdminAnalyticsScreen = () => {
   const totalOffers = metric(data.totalRentalOffers, 'All rental offers, including pending, ongoing, upcoming and ended rentals.');
   const participation = {
     availability: 'available', unit: 'count',
-    definition: 'Current tenants rent today. Past tenants are grouped by how their latest tenancy ended, with termination taking precedence if end dates tie. Anyone renting today is excluded from both past groups. A user can also be a property owner.',
+    definition: 'Current tenants rent today. Past tenants are grouped by their latest ended tenancy. Owners may also be tenants.',
     points: [
       ['Property Owners', data.propertyOwners], ['Current Tenants', data.currentTenants],
       ['Lease Expired', data.expiredTenants], ['Tenancy Terminated', data.terminatedTenants],
@@ -71,7 +71,7 @@ const AdminAnalyticsScreen = () => {
     && data.blockedUsers <= data.registeredUsers;
   const banDistribution = validUserCounts ? {
     availability: 'available',
-    definition: 'All registered users, grouped by whether they can sign in. Reported users can still sign in unless blocked.',
+    definition: 'Users grouped by sign-in access.',
     points: [
       { bucket: 'Allowed to Sign In', value: data.registeredUsers - data.blockedUsers },
       { bucket: 'Blocked from Signing In', value: data.blockedUsers },
@@ -87,14 +87,14 @@ const AdminAnalyticsScreen = () => {
   const reconciled = valid && data.totalRentalOffers === rentalCategories.reduce((sum, [, value]) => sum + value, 0);
   const offerDistribution = reconciled ? {
     availability: 'available',
-    definition: 'Pending offers await acceptance. Active tenancies cover today. Upcoming tenancies start later. Expired leases ended naturally. Terminated tenancies were explicitly ended. Missing or inconsistent details are shown separately.',
+    definition: 'Pending: awaiting acceptance. Active: renting today. Upcoming: starts later. Expired: lease ended. Terminated: ended through termination.',
     points: rentalCategories.filter(([bucket, value]) => bucket !== 'Details Unavailable' || value > 0)
       .map(([bucket, value]) => ({ bucket, value })),
   } : { availability: 'unavailable', reason: 'Rental status counts cannot be reconciled.' };
-  const monthlyRent = chart(data.monthlyRent, data.currency, 'Rent payments grouped by the month paid for. Deposits are excluded and refunds are not deducted.');
+  const monthlyRent = chart(data.monthlyRent, data.currency, 'Rent grouped by the month paid for. Excludes deposits; refunds are not deducted.');
   const monthlyAcceptedOffers = chart(data.monthlyAcceptedOffers, 'count', 'Offers accepted each month. Offers without an acceptance date are left out.');
   const monthlyTerminations = chart(data.monthlyTerminations, 'count', 'Rentals terminated each month. Rentals without a termination date are left out.');
-  const monthlyDaysOnMarket = chart(data.monthlyAverageDaysOnMarket, 'days', 'Average days from publishing a listing to its first accepted offer, grouped by acceptance month. Missing or invalid dates are left out. Months with no qualifying listings are blank.');
+  const monthlyDaysOnMarket = chart(data.monthlyAverageDaysOnMarket, 'days', 'Average days from publication to first acceptance, grouped by acceptance month. Months without data are blank.');
 
   return (
     <>

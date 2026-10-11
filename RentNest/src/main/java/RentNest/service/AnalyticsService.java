@@ -122,7 +122,7 @@ public class AnalyticsService {
         response.setAverageRating(reviewCount == 0 ? null
                 : BigDecimal.valueOf((Double) rating[0]).setScale(2, RoundingMode.HALF_UP));
         response.setAverageRatingUnavailableReason(reviewCount == 0 ? "No reviews yet." : null);
-        response.setTerminations(countInRange(rentals, RentalRow::terminatedAt, period.getFrom(), period.getTo()));
+        response.setTerminations(rentals.stream().filter(rental -> rental.terminatedAt() != null).count());
         response.setMonthlyRent(buildMonthlyPaymentSeries(payments, period));
         response.setTenancyLengths(buildTenancyDistribution(rentals));
         response.setMonthlyOccupancy(occupancy);

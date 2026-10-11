@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, useWindowDimensions, Modal, ScrollView, Platform } from 'react-native';
 import { FontAwesome } from 'react-native-vector-icons';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
@@ -193,7 +193,7 @@ export const ErrorState = ({ message, onRetry, actionLabel = 'Try again' }) => (
 // ---------- Stat tile ----------
 
 /**
- * A single metric. Tap to show how it is calculated. Unavailable metrics show "Not available", never 0.
+ * A single metric with an info tooltip. Unavailable metrics show "Not available", never 0.
  * `featured` gives the main overview figures more visual emphasis.
  */
 const scopeFor = (metric, scope) => scope === 'Now' ? null : scope || (metric?.basis === 'period' ? 'Period' : null);
@@ -201,42 +201,82 @@ const visibleScopeFor = (metric, scope) => {
   const label = scopeFor(metric, scope);
   return ['Now', 'All time', 'Period'].includes(label) ? null : label;
 };
-export const MetricDetails = ({ label, metric, scope, visible, onClose, hideValue = false }) => (
-  <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-    <View style={styles.detailsBackdrop}>
-      <View style={styles.detailsPanel} accessibilityViewIsModal>
-        <View style={styles.detailsHeader}>
-          <Text accessibilityRole="header" style={styles.detailsTitle}>{label}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close calculation details" onPress={onClose} style={styles.detailsClose}><FontAwesome name="times" size={20} color={COLORS.ink} /></Pressable>
-        </View>
-        <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-          {scopeFor(metric, scope) ? <Text style={styles.scope}>{scopeFor(metric, scope)}</Text> : null}
-          {!hideValue ? <Text style={styles.detailsValue}>{metric?.availability === 'available' ? formatValue(metric.value, metric.unit) : 'Not available'}</Text> : null}
-          <Text style={styles.detailsBody}>{metric?.definition || 'Calculation details are not recorded.'}</Text>
-          {metric?.reason ? <Text style={styles.detailsBody}>{metric.reason}</Text> : null}
-        </ScrollView>
-      </View>
-    </View>
-  </Modal>
-);
+export const InfoTooltip = ({ label, metric, accessibilityLabel = 'About ' + label }) => {
+  const anchor = useRef(null);
+  const closeTimer = useRef(null);
+  const [visible, setVisible] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0, width: 24, height: 24 });
+  const [tooltipHeight, setTooltipHeight] = useState(100);
+  const { width, height } = useWindowDimensions();
+  const tooltipWidth = Math.min(300, width - 24);
+  const left = Math.max(12, Math.min(position.x + position.width - tooltipWidth, width - tooltipWidth - 12));
+  const below = position.y + position.height + 8;
+  const top = below + tooltipHeight <= height - 12 ? below : Math.max(12, position.y - tooltipHeight - 8);
+  const close = () => { setVisible(false); setPinned(false); };
+  const keepOpen = () => clearTimeout(closeTimer.current);
+  const open = () => {
+    keepOpen();
+    anchor.current?.measureInWindow?.((x, y, w, h) => setPosition({ x, y, width: w, height: h }));
+    setVisible(true);
+  };
+  const leave = () => {
+    if (!pinned) closeTimer.current = setTimeout(() => setVisible(false), 150);
+  };
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
+  useEffect(() => {
+    if (!visible || Platform.OS !== 'web') return;
+    const dismiss = event => { if (event.key === 'Escape') close(); };
+    const onScroll = () => close();
+    document.addEventListener('keydown', dismiss);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onScroll);
+    return () => {
+      document.removeEventListener('keydown', dismiss);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [visible]);
+  const bubble = <View accessibilityRole="text" onLayout={event => setTooltipHeight(event.nativeEvent.layout.height)}
+    onHoverIn={keepOpen} onHoverOut={leave}
+    style={[styles.infoTooltip, { left, top, width: tooltipWidth, maxHeight: height - 24 }]}>
+    <View style={[styles.tooltipPointer, { left: Math.max(12, Math.min(position.x + position.width / 2 - left - 5, tooltipWidth - 22)),
+      ...(top === below ? { top: -5 } : { bottom: -5 }) }]} />
+    <ScrollView><Text style={styles.tooltipTitle}>{label}</Text>
+      <Text style={styles.tooltipBody}>{metric?.definition || 'Calculation details are not recorded.'}</Text>
+      {metric?.reason ? <Text style={styles.tooltipBody}>{metric.reason}</Text> : null}
+    </ScrollView>
+  </View>;
+  return <>
+    <Pressable ref={anchor} style={styles.chartInfoButton} hitSlop={8}
+      accessibilityRole="button" accessibilityLabel={accessibilityLabel} accessibilityState={{ expanded: visible }}
+      onHoverIn={open} onHoverOut={leave} onFocus={open} onBlur={close}
+      onPress={() => { if (pinned) close(); else { open(); setPinned(true); } }}>
+      <FontAwesome name="info-circle" size={18} color={COLORS.inkSecondary} />
+    </Pressable>
+    {visible ? Platform.OS === 'web'
+      ? require('react-dom').createPortal(<div style={{ position: 'fixed', inset: 0, zIndex: 10000, pointerEvents: 'none' }}>
+          {pinned ? <Pressable accessibilityLabel="Close calculation details" onPress={close} style={[StyleSheet.absoluteFill, { pointerEvents: 'auto' }]} /> : null}
+          <View style={{ pointerEvents: 'auto' }}>{bubble}</View>
+        </div>, document.body)
+      : <Modal transparent visible animationType="none" onRequestClose={close}>
+          <View style={{ flex: 1 }}>
+            <Pressable accessibilityLabel="Close calculation details" onPress={close} style={StyleSheet.absoluteFill} />
+            {bubble}
+          </View>
+        </Modal> : null}
+  </>;
+};
 
 export const StatTile = ({ label, metric, featured = false, scope, supportingText, unavailableText = 'Not available', children, style, accessibilityLabel }) => {
-  const [showDefinition, setShowDefinition] = useState(false);
   const { width } = useWindowDimensions();
   if (!metric) return null;
   const available = metric.availability === 'available';
 
   return (
-    <Pressable
-      style={[styles.tile, width >= 1000 && styles.wideTile, featured && styles.featuredTile, style]}
-      onPress={() => setShowDefinition((shown) => !shown)}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel || `${label}: ${available ? formatValue(metric.value, metric.unit) : unavailableText}${supportingText ? '. ' + supportingText : ''}`}
-      accessibilityHint="Shows how this metric is calculated"
-      accessibilityState={{ expanded: showDefinition }}
-    >
+    <View accessibilityLabel={accessibilityLabel || `${label}: ${available ? formatValue(metric.value, metric.unit) : unavailableText}`} style={[styles.tile, width >= 1000 && styles.wideTile, featured && styles.featuredTile, style]}>
       <View style={styles.tileHeader}>
-        <Text style={styles.tileLabel}>{label}</Text><FontAwesome name="info-circle" size={16} color={COLORS.inkSecondary} />
+        <Text style={styles.tileLabel}>{label}</Text><InfoTooltip label={label} metric={metric} />
       </View>
       {visibleScopeFor(metric, scope) ? <Text style={styles.scope}>{visibleScopeFor(metric, scope)}</Text> : null}
       {available ? (
@@ -246,8 +286,7 @@ export const StatTile = ({ label, metric, featured = false, scope, supportingTex
       )}
       {children}
       {supportingText ? <Text style={styles.tileChange}>{supportingText}</Text> : null}
-      {showDefinition ? <MetricDetails label={label} metric={metric} scope={scope} visible onClose={() => setShowDefinition(false)} /> : null}
-    </Pressable>
+    </View>
   );
 };
 
@@ -257,7 +296,6 @@ const showLabel = (index, count) => count <= 6 || index % 2 === 0;
 const showTrendLabel = (index, points, everyMonth) => everyMonth || showLabel(index, points.length);
 
 const ChartReadout = ({ series, children, hidePeriodLabel = false, title, compact = false }) => {
-  const [visible, setVisible] = useState(false);
   const scope = series.basis === 'period' ? 'Period' : 'All time';
   return <>
     <View style={[styles.chartHeading, title && { alignItems: 'flex-start' }, compact && { marginBottom: 4 }]}>
@@ -266,11 +304,8 @@ const ChartReadout = ({ series, children, hidePeriodLabel = false, title, compac
         {children ? <Text style={styles.chartReadout}>{children}</Text> : null}
         {!hidePeriodLabel && scope === 'Period' ? <Text style={styles.scope}>{scope}</Text> : null}
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Chart calculation details" onPress={() => setVisible(true)} hitSlop={12} style={styles.chartInfoButton}>
-        <FontAwesome name="info-circle" size={18} color={COLORS.inkSecondary} />
-      </Pressable>
+      <InfoTooltip label={title || 'About this chart'} metric={series} accessibilityLabel="Chart calculation details" />
     </View>
-    {visible ? <MetricDetails label={title || 'About this chart'} metric={series} hideValue visible onClose={() => setVisible(false)} /> : null}
   </>;
 };
 
@@ -566,21 +601,16 @@ export const PieChart = ({ series, emptyText, totalLabel = 'Total users', totalM
 };
 
 export const MetricRow = ({ label, metric, scope, showInfo = true }) => {
-  const [expanded, setExpanded] = useState(false);
   if (!metric) return null;
   const available = metric.availability === 'available';
   return (
-    <Pressable style={styles.metricRow} onPress={() => setExpanded(value => !value)}
-      accessibilityRole="button" accessibilityState={{ expanded }}
-      accessibilityLabel={label + ': ' + (available ? formatValue(metric.value, metric.unit) : 'not available')}
-      accessibilityHint="Shows how this metric is calculated">
+    <View style={styles.metricRow} accessibilityLabel={label + ": " + (available ? formatValue(metric.value, metric.unit) : "not available")}>
       <View style={styles.metricRowMain}>
-        <Text style={styles.metricRowLabel}>{label}</Text>{showInfo ? <FontAwesome name="info-circle" size={16} color={COLORS.inkSecondary} /> : null}
+        <Text style={styles.metricRowLabel}>{label}</Text>{showInfo ? <InfoTooltip label={label} metric={metric} /> : null}
         <Text style={styles.metricRowValue}>{available ? formatValue(metric.value, metric.unit) : 'Not available'}</Text>
       </View>
       {visibleScopeFor(metric, scope) ? <Text style={styles.scope}>{visibleScopeFor(metric, scope)}</Text> : null}
-      {expanded ? <MetricDetails label={label} metric={metric} scope={scope} visible onClose={() => setExpanded(false)} /> : null}
-    </Pressable>
+    </View>
   );
 };
 
@@ -595,13 +625,11 @@ const styles = StyleSheet.create({
   chartHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   chartInfoButton: { width: 24, height: 24, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   scope: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary, marginTop: 4 },
-  detailsBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' },
-  detailsPanel: { maxHeight: '80%', backgroundColor: COLORS.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 24, paddingBottom: 32 },
-  detailsHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  detailsTitle: { flex: 1, fontSize: 20, fontWeight: '600', color: COLORS.ink },
-  detailsClose: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
-  detailsValue: { fontSize: 28, fontWeight: '600', marginVertical: 12, color: COLORS.ink, fontVariant: ['tabular-nums'] },
-  detailsBody: { fontSize: 16, lineHeight: 24, marginTop: 12, color: COLORS.inkSecondary },
+  infoTooltip: { position: 'absolute', backgroundColor: COLORS.surface, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border,
+    padding: 12, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
+  tooltipPointer: { position: 'absolute', width: 10, height: 10, backgroundColor: COLORS.surface, transform: [{ rotate: '45deg' }] },
+  tooltipTitle: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: COLORS.ink, marginBottom: 4 },
+  tooltipBody: { fontSize: 13, lineHeight: 19, color: COLORS.inkSecondary },
   pie: { width: 180, height: 180, alignSelf: 'center', marginVertical: 8 },
   metricRow: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   metricRowMain: { flexDirection: 'row', alignItems: 'center', gap: 16 },

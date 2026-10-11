@@ -614,6 +614,38 @@ class AnalyticsControllerIntegrationTest {
                 .andExpect(jsonPath("$.totalRentCollected").value(5500));
     }
 
+    @Test
+    void ownerTerminationTotalIncludesHistoryWhileMonthlyChartKeepsItsPeriod() throws Exception {
+        User tenant = user("termination.history@test.local", 0);
+        Rentals oldRental = rental(listing(ownerA, "Old termination", false), tenant, "terminated",
+                "2024-01-01T00:00:00+08:00", "2025-01-01T00:00:00+08:00");
+        oldRental.setTerminatedAt(date("2025-01-01T00:00:00+08:00"));
+        rentalsRepository.save(oldRental);
+        Rentals recentRental = rental(listing(ownerA, "Recent termination", false), tenant, "terminated",
+                FROM, "2026-02-01T00:00:00+08:00");
+        recentRental.setTerminatedAt(date("2026-02-01T00:00:00+08:00"));
+        rentalsRepository.save(recentRental);
+        Rentals foreignRental = rental(listing(ownerB, "Other owner termination", false), tenant, "terminated",
+                FROM, "2026-02-01T00:00:00+08:00");
+        foreignRental.setTerminatedAt(date("2026-02-01T00:00:00+08:00"));
+        rentalsRepository.save(foreignRental);
+
+        mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.terminations").value(2))
+                .andExpect(jsonPath("$.monthlyTerminations[0].value").value(0))
+                .andExpect(jsonPath("$.monthlyTerminations[1].value").value(1))
+                .andExpect(jsonPath("$.monthlyTerminations[2].value").value(0));
+        mockMvc.perform(asUser(ownerA, get("/api/analytics/owner/summary"),
+                        "2026-03-01T00:00:00+08:00", TO))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.terminations").value(2))
+                .andExpect(jsonPath("$.monthlyTerminations[0].value").value(0));
+        mockMvc.perform(asUser(emptyOwner, get("/api/analytics/owner/summary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.terminations").value(0));
+    }
+
     // ---------- Fixture helpers ----------
 
     private MockHttpServletRequestBuilder asUser(User user, MockHttpServletRequestBuilder request) {

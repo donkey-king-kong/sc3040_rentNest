@@ -67,7 +67,7 @@ it('owner navigation separates topics and uses the fixed year for property analy
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Occupancy tab')).toHaveLength(0);
   expect(text(tree)).toContain('Monthly Occupancy');
   expect(text(tree)).toContain('Tenancy Length');
-  expect(tree.root.findAll(node => node.props.label === 'Tenants Hosted')).toHaveLength(1);
+  expect(tree.root.findAllByType(require('../AnalyticsKit').StatTile).filter(node => node.props.label === 'Tenants Hosted')).toHaveLength(1);
   const { CountBarChart } = require('../AnalyticsKit');
   expect(tree.root.findAllByType(CountBarChart)).toHaveLength(1);
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Tenancy Length' && node.props.onPress)).toHaveLength(0);
@@ -160,11 +160,11 @@ it('shows a completed days-on-market interval with both dates while retaining vi
   expect(text(tree)).toEqual(expect.arrayContaining(['1 Sep 2026', '11 Sep 2026']));
   const accessibleTimeline = tree.root.findAll(node => node.props.accessibilityLabel ===
     'Days on Market: 10.0 days. Published: 1 Sep 2026. First Offer Accepted: 11 Sep 2026'
-    && typeof node.props.onPress === 'function');
+);
   expect(accessibleTimeline.length).toBeGreaterThan(0);
-  await act(async () => accessibleTimeline[0].props.onPress());
-  const { MetricDetails } = require('../AnalyticsKit');
-  expect(tree.root.findByType(MetricDetails).props.label).toBe('Days on Market');
+  const info = tree.root.findAll(node => node.props.accessibilityLabel === 'About Days on Market' && node.props.onPress)[0];
+  await act(async () => info.props.onPress());
+  expect(text(tree)).toContain('Days from publication to first acceptance, rather than the lease start date.');
   expect(text(tree)).toContain('Payments Recorded');
   expect(text(tree)).toContain('Time to Accepted Offer');
 });
@@ -388,7 +388,7 @@ it('uses period metrics for property performance and all-time metrics for tenanc
   expect(tree.root.findByType(LineChart).props.series).toMatchObject({ points: data.monthlyRent.map(point => ({ bucket: point.label, value: point.value })) });
   const ListingOccupancyCalendar = require('../ListingOccupancyCalendar').default;
   expect(tree.root.findByType(ListingOccupancyCalendar).props.series).toMatchObject({ points: data.monthlyOccupancy.map(point => ({ bucket: point.label, value: point.status })) });
-  await press(tree, 'Offers Sent: 9');
+  await press(tree, 'About Offers Sent');
   expect(text(tree)).toContain('All time');
 });
 
@@ -458,7 +458,7 @@ it('retains accessible publication history when an older response omits days on 
   expect(text(tree)).toEqual(expect.arrayContaining(['Days on Market', 'Not available', 'Listing history is not available.']));
   expect(tree.root.findAll(node => node.props.accessibilityLabel ===
     'Days on Market: Not available. Published: Not recorded. First Offer Accepted: Not recorded'
-    && typeof node.props.onPress === 'function').length).toBeGreaterThan(0);
+).length).toBeGreaterThan(0);
 });
 
 it('shows owner unavailable explanations without turning missing averages into zero', async () => {
@@ -474,7 +474,7 @@ it('shows owner unavailable explanations without turning missing averages into z
   expect(tiles.find(node => node.props.label === 'Total Rent Collected').props.metric).toMatchObject({ availability: 'available', value: 0 });
   expect(tiles.find(node => node.props.label === 'Rating and Reviews').props.metric).toMatchObject({ availability: 'unavailable', value: null, reason: 'No reviews yet.' });
   expect(tiles.find(node => node.props.label === 'Average Tenancy').props.metric).toMatchObject({ availability: 'unavailable', value: null });
-  await press(tree, 'Average Tenancy: Not available');
+  await press(tree, 'About Average Tenancy');
   expect(text(tree)).toEqual(expect.arrayContaining(['No reviews yet', 'No accepted rentals with valid start and end dates.', 'No listings, so occupancy cannot be calculated.']));
   expect(tree.root.findAllByType(LineChart).find(node => node.props.title === 'Monthly Occupancy').props.series).toMatchObject({ availability: 'unavailable', points: [] });
 });
@@ -491,7 +491,7 @@ it('shows property unavailable averages and preserves measured zero counts', asy
   const rows = tree.root.findAllByType(MetricRow);
   for (const label of ['Acceptance Rate', 'Average Tenancy']) {
     expect(rows.find(node => node.props.label === label).props.metric).toMatchObject({ availability: 'unavailable', value: null });
-    await press(tree, `${label}: not available`);
+    await press(tree, `About ${label}`);
   }
   expect(text(tree)).toEqual(expect.arrayContaining(['No rental records, so the acceptance rate cannot be calculated.', 'No accepted rentals with valid start and end dates.']));
 });
