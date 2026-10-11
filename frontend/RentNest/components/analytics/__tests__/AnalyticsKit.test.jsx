@@ -360,11 +360,9 @@ describe('ListingAnalyticsScreen', () => {
     expect(text).toEqual(expect.arrayContaining(['Offers Sent', 'Offers Accepted']));
     expect(text).not.toContain('Tenancies ended');
 
-    // Occupancy
     text = renderedText(tree);
-    expect(text).toContain('Monthly Occupancy');
-    expect(text).toContain('Occupied means a tenancy overlapped at least part of the month.');
-    expect(tree.root.findAll(node => node.props.accessibilityLabel === 'February 2026: Occupied').length).toBeGreaterThan(0);
+    expect(text).not.toContain('Monthly Occupancy');
+    expect(tree.root.findAll(node => node.props.accessibilityLabel === 'February 2026: Occupied')).toHaveLength(0);
     expect(text).toContain('3.0 mo');
   });
 

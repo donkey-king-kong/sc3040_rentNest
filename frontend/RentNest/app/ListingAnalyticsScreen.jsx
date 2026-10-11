@@ -6,7 +6,6 @@ import { AdminLoadingState } from '../components/AdminUI';
 import { displayMetric, displayChart } from '../components/analytics/AnalyticsPresentation';
 import { ENDPOINTS } from '../config/api';
 import AnalyticsLayout, { RefreshControl } from '../components/analytics/AnalyticsLayout';
-import ListingOccupancyCalendar from '../components/analytics/ListingOccupancyCalendar';
 import {
   COLORS, ErrorState, LineChart, MetricRow, Section, StatTile, TileRow,
   formatDay, formatValue, useAnalytics,
@@ -58,7 +57,6 @@ const ListingAnalyticsScreen = () => {
   const averageTenancy = displayMetric(data.averageTenancyMonths, 'months', 'Average accepted tenancy length. Active rentals use the agreed length; ended rentals use their recorded end date.', data.averageTenancyUnavailableReason);
   const tenantsHosted = displayMetric(data.tenantsHosted, 'count', 'Different tenants on accepted rentals.');
   const monthlyRent = displayChart(data.monthlyRent, data.currency, 'Rent grouped by the month paid for. Excludes deposits; refunds are not deducted.');
-  const monthlyOccupancy = displayChart(data.monthlyOccupancy, 'status', 'Occupied if an accepted tenancy overlaps the month. Terminated rentals end on their termination date.');
 
   return <>
     {header}
@@ -95,9 +93,8 @@ const ListingAnalyticsScreen = () => {
       </View> : <>
         <Section>
           <LineChart title="Monthly Rent Recorded" series={monthlyRent}
-            showEveryMonth={width >= 600} emptyText="No rent recorded in the past 12 months" />
+            showEveryMonth emptyText="No rent recorded in the past 12 months" />
         </Section>
-        <Section><ListingOccupancyCalendar series={monthlyOccupancy} /></Section>
 
         <Section title="Tenancy History">
           <Text style={styles.sectionNote}>All time</Text>

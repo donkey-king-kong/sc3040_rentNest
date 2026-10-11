@@ -232,7 +232,7 @@ it('does not fabricate an offer distribution when counts are unavailable', async
 it('property analytics retains all sections on one page with a fixed past-year period', async () => {
   const tree = await render(ListingAnalyticsScreen);
   expect(text(tree)).toEqual(expect.arrayContaining([
-    'Overview', 'Payments Recorded', 'Monthly Rent Recorded', 'Monthly Occupancy',
+    'Overview', 'Payments Recorded', 'Monthly Rent Recorded',
     'Tenancy History', 'Offers Sent', 'Offers Accepted', 'Acceptance Rate',
     'Average Tenancy', 'Tenants Hosted', 'Time to Accepted Offer', 'Days on Market',
   ]));
@@ -386,8 +386,8 @@ it('uses period metrics for property performance and all-time metrics for tenanc
   }
   expect(text(tree)).toEqual(expect.arrayContaining(['S$18,450', '62.4%', '186', '93', '14.5 mo']));
   expect(tree.root.findByType(LineChart).props.series).toMatchObject({ points: data.monthlyRent.map(point => ({ bucket: point.label, value: point.value })) });
-  const ListingOccupancyCalendar = require('../ListingOccupancyCalendar').default;
-  expect(tree.root.findByType(ListingOccupancyCalendar).props.series).toMatchObject({ points: data.monthlyOccupancy.map(point => ({ bucket: point.label, value: point.status })) });
+  expect(text(tree)).not.toContain('Monthly Occupancy');
+  expect(tree.root.findByType(LineChart).props.showEveryMonth).toBe(true);
   await press(tree, 'About Offers Sent');
   expect(text(tree)).toContain('All time');
 });
