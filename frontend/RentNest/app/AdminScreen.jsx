@@ -159,7 +159,7 @@ const AdminScreen = () => {
     },
   ];
 
-  if (isLoading) return <AdminLoadingState backgroundColor="#FFFFFF" />;
+  if (isLoading) return <AdminLoadingState message="Loading admin page..." backgroundColor="#FFFFFF" />;
 
   const hasUnavailable = Object.values(counts).some(value => value === null);
 
