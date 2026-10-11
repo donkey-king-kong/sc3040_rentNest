@@ -304,13 +304,16 @@ export default function HomeScreen() {
               onChange={(value) => update("types", value ? [value] : [])}
             />
             <TouchableOpacity
-              style={styles.control}
+              accessibilityRole="button"
+              accessibilityLabel="Clear advanced filters"
+              style={styles.clearFiltersButton}
               onPress={() => {
-                setForm(emptyForm);
-                fetchListings(emptyForm);
+                const clearedFilters = { ...emptyForm, query: form.query };
+                setForm(clearedFilters);
+                fetchListings(clearedFilters);
               }}
             >
-              <Text style={styles.controlText}>Reset</Text>
+              <Text style={styles.clearFiltersText}>Clear</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -459,6 +462,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   controlText: { fontSize: 14, color: "#222" },
+  clearFiltersButton: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 8,
+  },
+  clearFiltersText: {
+    color: "#205c43",
+    fontSize: 14,
+    fontWeight: "600",
+    textDecorationLine: "underline",
+  },
   filterInput: { width: 110, fontSize: 14 },
   // Focus is shown on the rounded box itself, in the app's green, instead of
   // the browser's default outline around the inner input.
@@ -469,7 +485,7 @@ const styles = StyleSheet.create({
   noOutline: Platform.OS === "web" ? { outlineStyle: "none" } : {},
   pickerRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 8,
     marginVertical: 8,
   },
