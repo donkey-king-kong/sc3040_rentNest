@@ -27,9 +27,7 @@ class RecommendationServiceTest {
         RuleBasedQueryParser rules = new RuleBasedQueryParser();
         service = new RecommendationService(repository,
                 new AiQueryParser(client, properties, rules),
-                new AiReranker(client, properties),
-                new ListingSummaryService(client, properties, repository,
-                        (listingId, radius) -> AmenityLookup.Counts.NONE));
+                new AiReranker(client, properties));
     }
 
     private Listings listing(long id, int price, String type, String location, int beds) {
@@ -113,5 +111,31 @@ class RecommendationServiceTest {
         assertTrue(cheapest.marketNote().contains("below the median for 2-bedroom condos in Tampines"),
                 cheapest.marketNote());
         assertTrue(cheapest.marketNote().contains("median S$3000"), cheapest.marketNote());
+    }
+
+    @Test void summariesStayTemplateOnlyWhenOtherAiStagesAreEnabled() {
+        AiQueryParser parser = mock(AiQueryParser.class);
+        AiReranker ranker = mock(AiReranker.class);
+        when(parser.isEnabled()).thenReturn(true);
+        when(parser.parse("")).thenReturn(new RuleBasedQueryParser().parse(""));
+        when(ranker.isEnabled()).thenReturn(true);
+        when(ranker.rerank(anyList(), anyString(), anyString(), any()))
+                .thenAnswer(invocation -> new AiReranker.Result(invocation.getArgument(0), Map.of(), true));
+        RecommendationService enabledService = new RecommendationService(repository, parser, ranker);
+        Listings home = listing(1, 2500, "Condo", "Tampines", 2);
+        when(repository.findRecommendationCandidates(7L)).thenReturn(List.of(home));
+
+        var first = enabledService.recommend(request("", null), 7L);
+        assertEquals("off", first.ai().summaries());
+        assertEquals("ai", first.ai().sorting());
+        assertEquals("template", first.recommendations().getFirst().summarySource());
+        assertTrue(first.recommendations().getFirst().summary().contains("S$2500/month"));
+
+        home.setPrice(2700);
+        var updated = enabledService.recommend(request("", null), 7L);
+        assertTrue(updated.recommendations().getFirst().summary().contains("S$2700/month"));
+        assertFalse(updated.recommendations().getFirst().summary().contains("S$2500/month"));
+        verify(repository, times(2)).findRecommendationCandidates(7L);
+        verifyNoMoreInteractions(repository);
     }
 }

@@ -1,0 +1,692 @@
+[
+  {
+    "listingid": 59,
+    "latitude": 1.336285,
+    "longitude": 103.848429,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 60,
+    "latitude": 1.29973,
+    "longitude": 103.835588,
+    "amenity_count": 5,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 5,
+    "amenity_fingerprint": "0bcd55b76e414f10674ba45e29f8f179"
+  },
+  {
+    "listingid": 61,
+    "latitude": 1.346739,
+    "longitude": 103.955937,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 62,
+    "latitude": 1.39675689809427,
+    "longitude": 103.893462037031,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 63,
+    "latitude": 1.293383,
+    "longitude": 103.809331,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 64,
+    "latitude": 1.304829,
+    "longitude": 103.909545,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 65,
+    "latitude": 1.434071,
+    "longitude": 103.837079,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 66,
+    "latitude": 1.311316,
+    "longitude": 103.795243,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 67,
+    "latitude": 1.372598,
+    "longitude": 103.854878,
+    "amenity_count": 8,
+    "schools": 2,
+    "hawker_centres": 1,
+    "bus_stops": 5,
+    "amenity_fingerprint": "75c8575374469d5fb4bd24fdeae6efa9"
+  },
+  {
+    "listingid": 68,
+    "latitude": 1.316991,
+    "longitude": 103.843867,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 69,
+    "latitude": 1.390594,
+    "longitude": 103.902214,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 70,
+    "latitude": 1.34409,
+    "longitude": 103.948084,
+    "amenity_count": 6,
+    "schools": 0,
+    "hawker_centres": 1,
+    "bus_stops": 5,
+    "amenity_fingerprint": "5d4e09c8b3acd1c6bc8d0f4b8f4c0152"
+  },
+  {
+    "listingid": 71,
+    "latitude": 1.431505,
+    "longitude": 103.773516,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 72,
+    "latitude": 1.366919,
+    "longitude": 103.970689,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 73,
+    "latitude": 1.370736,
+    "longitude": 103.895121,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 74,
+    "latitude": 1.301376,
+    "longitude": 103.898167,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 75,
+    "latitude": 1.310512,
+    "longitude": 103.80069,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 76,
+    "latitude": 1.344056,
+    "longitude": 103.947394,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 77,
+    "latitude": 1.294162,
+    "longitude": 103.838428,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 78,
+    "latitude": 1.3761471344871,
+    "longitude": 103.847279332398,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 79,
+    "latitude": 1.37602740631452,
+    "longitude": 103.834730666546,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 80,
+    "latitude": 1.34918033846671,
+    "longitude": 103.846702572322,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 81,
+    "latitude": 1.34947644493455,
+    "longitude": 103.847038124284,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 82,
+    "latitude": 1.35965938478525,
+    "longitude": 103.83269196692,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 83,
+    "latitude": 1.34752183684458,
+    "longitude": 103.852047817532,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 84,
+    "latitude": 1.34682504729819,
+    "longitude": 103.852579052032,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 85,
+    "latitude": 1.347049,
+    "longitude": 103.852277,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 86,
+    "latitude": 1.344859,
+    "longitude": 103.848401,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 87,
+    "latitude": 1.3451431233477,
+    "longitude": 103.847990805259,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 88,
+    "latitude": 1.34551249132105,
+    "longitude": 103.848314162386,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 89,
+    "latitude": 1.345675,
+    "longitude": 103.848033,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 90,
+    "latitude": 1.298668,
+    "longitude": 103.841687,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 91,
+    "latitude": 1.298417,
+    "longitude": 103.841405,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 92,
+    "latitude": 1.303614,
+    "longitude": 103.829242,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 93,
+    "latitude": 1.348097,
+    "longitude": 103.724184,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 94,
+    "latitude": 1.348098,
+    "longitude": 103.725087,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 95,
+    "latitude": 1.347716,
+    "longitude": 103.724184,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 96,
+    "latitude": 1.347716,
+    "longitude": 103.725087,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 97,
+    "latitude": 1.347353,
+    "longitude": 103.723952,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 98,
+    "latitude": 1.347203,
+    "longitude": 103.724501,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 99,
+    "latitude": 1.346848,
+    "longitude": 103.724042,
+    "amenity_count": 8,
+    "schools": 3,
+    "hawker_centres": 0,
+    "bus_stops": 5,
+    "amenity_fingerprint": "1a191ce8dd1426c2a55cbc35fed6e1c6"
+  },
+  {
+    "listingid": 100,
+    "latitude": 1.346846,
+    "longitude": 103.72523,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 101,
+    "latitude": 1.347203,
+    "longitude": 103.724769,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 102,
+    "latitude": 1.347353,
+    "longitude": 103.72532,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 103,
+    "latitude": 1.348209,
+    "longitude": 103.726358,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 104,
+    "latitude": 1.348347,
+    "longitude": 103.727243,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 105,
+    "latitude": 1.348726,
+    "longitude": 103.726333,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 106,
+    "latitude": 1.348725,
+    "longitude": 103.727243,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 107,
+    "latitude": 1.349082,
+    "longitude": 103.726196,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 108,
+    "latitude": 1.349175,
+    "longitude": 103.72724,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 109,
+    "latitude": 1.349589,
+    "longitude": 103.72724,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 110,
+    "latitude": 1.349587,
+    "longitude": 103.726315,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 111,
+    "latitude": 1.337011,
+    "longitude": 103.738787,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 112,
+    "latitude": 1.336097,
+    "longitude": 103.738219,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 113,
+    "latitude": 1.336687,
+    "longitude": 103.738059,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 114,
+    "latitude": 1.336585,
+    "longitude": 103.737623,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 115,
+    "latitude": 1.337387,
+    "longitude": 103.738528,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 116,
+    "latitude": 1.33725,
+    "longitude": 103.737675,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 117,
+    "latitude": 1.337755,
+    "longitude": 103.738093,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 118,
+    "latitude": 1.33838,
+    "longitude": 103.737283,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 119,
+    "latitude": 1.338362,
+    "longitude": 103.735911,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 120,
+    "latitude": 1.338871,
+    "longitude": 103.736219,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 121,
+    "latitude": 1.338776,
+    "longitude": 103.735604,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 122,
+    "latitude": 1.33921,
+    "longitude": 103.735824,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 123,
+    "latitude": 1.338798,
+    "longitude": 103.734808,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 124,
+    "latitude": 1.339214,
+    "longitude": 103.73461,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 125,
+    "latitude": 1.339791,
+    "longitude": 103.735503,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 126,
+    "latitude": 1.339708,
+    "longitude": 103.734698,
+    "amenity_count": 0,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 0,
+    "amenity_fingerprint": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  {
+    "listingid": 127,
+    "latitude": 1.336406,
+    "longitude": 103.743075,
+    "amenity_count": 5,
+    "schools": 0,
+    "hawker_centres": 0,
+    "bus_stops": 5,
+    "amenity_fingerprint": "f795aee61ffb816286adbca1ff6986b6"
+  }
+]
