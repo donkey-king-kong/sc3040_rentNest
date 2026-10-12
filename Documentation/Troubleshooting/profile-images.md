@@ -132,6 +132,23 @@ and trailing URL. Post-change Android visual confirmation is still outstanding:
 the emulator session changed screens, and the isolated debugger fixture could
 not connect. Web captures do not certify the Android shadow fix.
 
+### Sign-Up Layout
+
+The heading, five fields, validation messages, Sign Up button, and sign-in link
+share one scrollable column. The column is vertically centered when it fits and
+scrolls on shorter screens. Navigation supplies the top safe area; the column
+keeps bottom safe-area padding. iOS uses keyboard padding with the actual top
+inset, while Android relies on window resizing instead of an extra height offset.
+
+All 85 focused tests pass, including layout structure and focus stability for
+iOS, Android, and web configurations. Browser checks at 390x900, 320x640, and
+1440x900 verified centering where space permits, unchanged field-to-button spacing
+on focus, and button reachability after resizing to 400px height. No page errors
+occurred. Android Expo Go captures confirmed centering and focus without losing
+fields. The emulator did not display its software keyboard, so IME-open behavior
+is not certified; its original keyboard setting was restored. iOS, tablet,
+large-text, and physical-device keyboard checks remain outstanding.
+
 The isolated browser flow passed signup/login, image loading, full URL
 preservation, clear/save, returning to Profile with initials, reopening with an
 empty field, and invalid-URL feedback. All API requests in that final flow used

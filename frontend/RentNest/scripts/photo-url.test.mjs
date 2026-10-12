@@ -75,6 +75,8 @@ function harness(t, user = {}) {
     'TouchableOpacity', 'Pressable', 'Image', 'ActivityIndicator', 'Modal',
   ].map(name => [name, name]));
   native.Platform = { OS: 'ios', select: options => options.ios ?? options.default };
+  h.platform = native.Platform;
+  h.insets = { top: 24, right: 0, bottom: 34, left: 0 };
   native.StyleSheet = { create: styles => styles };
   native.Alert = { alert: t.mock.fn() };
   h.alert = native.Alert.alert;
@@ -83,6 +85,7 @@ function harness(t, user = {}) {
     'react/jsx-runtime': require('react/jsx-runtime'),
     'react/jsx-dev-runtime': require('react/jsx-dev-runtime'),
     'react-native': native,
+    'react-native-safe-area-context': { useSafeAreaInsets: () => h.insets },
     'expo-constants': {},
     'expo/virtual/env': { env: { EXPO_PUBLIC_API_BASE_URL: 'https://api.qa.invalid' } },
     'expo-router': {
@@ -302,6 +305,33 @@ describe('Shared photo URL helper: backend PhotoUrlValidatorTest fixture parity'
 });
 
 describe('PHOTO-02: mounted signup', () => {
+  for (const platform of ['ios', 'android', 'web']) {
+    test(`signup keeps all fields and actions in one centered scroll layout on ${platform}`, async t => {
+      const h = harness(t);
+      h.platform.OS = platform;
+      const screen = await h.mount('app/SignUpScreen.jsx');
+      const scroll = screen.root.findByType('ScrollView');
+      const keyboard = screen.root.findByType('KeyboardAvoidingView');
+      const initialContentStyle = scroll.props.contentContainerStyle;
+      const contentStyle = Object.assign({}, ...scroll.props.contentContainerStyle);
+      assert.equal(contentStyle.flexGrow, 1);
+      assert.equal(contentStyle.justifyContent, 'center');
+      assert.equal(contentStyle.paddingTop, 24);
+      assert.equal(contentStyle.paddingBottom, 34);
+      assert.equal(scroll.findAllByType('TextInput').length, 5);
+      assert.ok(scroll.findAllByType('TouchableOpacity').includes(signupButton(screen)));
+      assert.match(text({ root: scroll }), /Already have an account\?/);
+      assert.equal(keyboard.children.length, 1);
+      assert.equal(keyboard.props.behavior, platform === 'ios' ? 'padding' : undefined);
+      assert.equal(keyboard.props.keyboardVerticalOffset, platform === 'ios' ? 24 : 0);
+
+      await act(async () => input(screen, 'Photo URL').props.onFocus());
+      assert.deepEqual(scroll.props.contentContainerStyle, initialContentStyle);
+      assert.equal(scroll.findAllByType('TextInput').length, 5);
+      assert.ok(scroll.findAllByType('TouchableOpacity').includes(signupButton(screen)));
+    });
+  }
+
   test('photo uses an inline placeholder without a heading or helper text', async t => {
     const h = harness(t);
     const screen = await h.mount('app/SignUpScreen.jsx');
