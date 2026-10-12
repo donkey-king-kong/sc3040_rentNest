@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import { FontAwesome } from '@expo/vector-icons';
+import { getPhotoUrlError, trimPhotoUrl } from '../config/photoUrl';
 
 const errorIcon = require('../assets/images/errorIcon.png');
 
@@ -12,6 +14,8 @@ const SignUpScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [photoURL, setPhotoURL] = useState('');
+  const [photoError, setPhotoError] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
@@ -21,13 +25,16 @@ const SignUpScreen = () => {
   const emailInputRef = useRef(null);
   const passwordInputRef = useRef(null);
   const phoneInputRef = useRef(null);
+  const photoInputRef = useRef(null);
 
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const handleSignUp = async () => {
     if (pending.current) return;
     setFormError('');
     setFieldErrors({});
+    setPhotoError('');
 
     const cleanEmail = email.trim();
     const missingFields = [];
@@ -70,12 +77,19 @@ const SignUpScreen = () => {
       setFormError('ERROR: Phone number must contain at least 8 digits.');
       return;
     }
+    const invalidPhoto = getPhotoUrlError(photoURL);
+    if (invalidPhoto) {
+      setPhotoError(invalidPhoto);
+      photoInputRef.current?.focus();
+      return;
+    }
 
     pending.current = true;
     setSubmitting(true);
     try {
       await axios.post(`${API_BASE_URL}${ENDPOINTS.SIGNUP}`, {
         email: cleanEmail, password, fullName: fullName.trim(), contact: phoneNumber.trim(),
+        photoURL: trimPhotoUrl(photoURL) || null,
       }, { timeout: 15000 });
       router.replace({ pathname: '/LoginScreen', params: { email: cleanEmail, registered: '1' } });
     } catch (failure) {
@@ -84,6 +98,8 @@ const SignUpScreen = () => {
       if (message === 'Email already exists') {
         setFieldErrors({ email: true });
         setFormError('ERROR: This email is already registered. Log in instead, or use a different email.');
+      } else if (failure.response?.status === 400 && typeof message === 'string' && message.startsWith('Photo URL')) {
+        setPhotoError(message);
       } else if (failure.response) {
         setFormError(`ERROR: ${typeof message === 'string' && message ? message : 'Could not create account.'}`);
       } else if (failure.request) {
@@ -100,11 +116,15 @@ const SignUpScreen = () => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={100} // Adjust this value based on your layout
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
       <ScrollView
-        contentContainerStyle={styles.scrollContainer}
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContainer,
+          { paddingBottom: Math.max(insets.bottom, 24) },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -117,6 +137,7 @@ const SignUpScreen = () => {
           <FontAwesome name="user" size={20} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={fullNameInputRef}
+            editable={!submitting}
             style={styles.input}
             placeholder="Full Name"
             placeholderTextColor="#666"
@@ -136,6 +157,7 @@ const SignUpScreen = () => {
           <FontAwesome name="envelope" size={18} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={emailInputRef}
+            editable={!submitting}
             style={styles.input}
             placeholder="Email address"
             placeholderTextColor="#666"
@@ -157,6 +179,7 @@ const SignUpScreen = () => {
           <FontAwesome name="lock" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={passwordInputRef}
+            editable={!submitting}
             style={styles.input}
             placeholder="Password"
             placeholderTextColor="#666"
@@ -189,6 +212,7 @@ const SignUpScreen = () => {
           <FontAwesome name="phone" size={22} color="#777" style={styles.inputIcon} />
           <TextInput
             ref={phoneInputRef}
+            editable={!submitting}
             style={styles.input}
             placeholder="Phone Number"
             placeholderTextColor="#666"
@@ -202,26 +226,67 @@ const SignUpScreen = () => {
           />
         </Pressable>
 
+        <Pressable
+          style={[
+            styles.inputContainer,
+            photoError && styles.errorInputContainer,
+          ]}
+          onPress={() => photoInputRef.current?.focus()}
+          accessible={false}
+        >
+          <FontAwesome name="link" size={20} color="#777" style={styles.inputIcon} />
+          <TextInput
+            ref={photoInputRef}
+            style={styles.input}
+            accessibilityLabel="Photo URL"
+            accessibilityHint="Paste a public image URL, up to 255 characters. Leave blank to use your initials."
+            aria-describedby="signup-photo-error"
+            aria-invalid={!!photoError}
+            placeholder="Photo URL"
+            placeholderTextColor="#666"
+            keyboardType="url"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!submitting}
+            value={photoURL}
+            onBlur={() => {
+              setPhotoError(getPhotoUrlError(photoURL));
+            }}
+            onChangeText={(text) => {
+              setPhotoURL(text);
+              setPhotoError('');
+              setFormError('');
+            }}
+          />
+        </Pressable>
+        <Text
+          nativeID="signup-photo-error"
+          style={photoError ? styles.photoError : styles.emptyPhotoError}
+          accessibilityRole={photoError ? 'alert' : undefined}
+          accessibilityLiveRegion="polite"
+        >
+          {photoError}
+        </Text>
+
         {formError ? (
           <View style={styles.errorMessageContainer}>
             <Image source={errorIcon} style={styles.errorIcon} />
             <Text style={styles.errorMessageText}>{formError}</Text>
           </View>
         ) : null}
-      </ScrollView>
-
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp} disabled={submitting}>
-          <Text style={styles.primaryButtonText}>{submitting ? 'Creating account…' : 'Sign Up'}</Text>
-        </TouchableOpacity>
-
-        <View style={styles.signinContainer}>
-          <Text style={styles.signinText}>Already have an account?</Text>
-          <TouchableOpacity onPress={() => router.push({ pathname: '/LoginScreen', params: { email: email.trim() } })}>
-            <Text style={styles.signinLink}>Sign In here</Text>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp} disabled={submitting} accessibilityRole="button">
+            <Text style={styles.primaryButtonText}>{submitting ? 'Creating account…' : 'Sign Up'}</Text>
           </TouchableOpacity>
+
+          <View style={styles.signinContainer}>
+            <Text style={styles.signinText}>Already have an account?</Text>
+            <TouchableOpacity disabled={submitting} onPress={() => router.push({ pathname: '/LoginScreen', params: { email: email.trim() } })}>
+              <Text style={styles.signinLink}>Sign In here</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
@@ -229,23 +294,23 @@ const SignUpScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'flex-start',
-    paddingHorizontal: 22,
-    paddingTop: 44,
     backgroundColor: '#F7F8FA',
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'flex-start',
-    paddingTop: 120,
-    paddingBottom: 100, // Added extra padding for bottom space
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+    paddingTop: 24,
   },
   title: {
     fontSize: 38,
     fontWeight: 'bold',
     color: '#101820',
     textAlign: 'center',
-    marginBottom: 58,
+    marginBottom: 32,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -265,6 +330,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E94068',
     backgroundColor: '#FFF1F4',
+  },
+  photoError: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#A91D40',
+    marginTop: 8,
+  },
+  emptyPhotoError: {
+    height: 0,
   },
   inputIcon: {
     width: 28,
@@ -311,7 +385,7 @@ const styles = StyleSheet.create({
     fontSize: 12, // Smaller font size
   },
   buttonContainer: {
-    paddingBottom: 34,
+    marginTop: 12,
     width: '100%'
   },
   primaryButton: {
@@ -333,6 +407,7 @@ const styles = StyleSheet.create({
   },
   signinContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 24,

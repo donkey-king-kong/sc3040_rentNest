@@ -10,6 +10,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "jest --watchAll",
+    "test:photo-url": "node --test scripts/photo-url.test.mjs",
+    "test:pricing-diagnostics": "node --test scripts/pricing-diagnostics.test.mjs",
     "lint": "expo lint"
   },
   "jest": {

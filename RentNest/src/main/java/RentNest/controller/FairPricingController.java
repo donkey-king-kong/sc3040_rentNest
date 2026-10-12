@@ -4,9 +4,19 @@ import RentNest.model.api.FairPriceEstimate;
 import RentNest.model.api.FairPriceExplanation;
 import RentNest.service.FairPriceExplanationService;
 import RentNest.service.FairPricingService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * AI Fair-Pricing Model endpoints.
@@ -25,6 +35,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/pricing")
 public class FairPricingController {
+    private static final Logger log = LoggerFactory.getLogger(FairPricingController.class);
 
     private final FairPricingService fairPricingService;
     private final FairPriceExplanationService fairPriceExplanationService;
@@ -37,16 +48,47 @@ public class FairPricingController {
 
     @GetMapping("/listing/{listingId}")
     public ResponseEntity<FairPriceEstimate> getEstimateForListing(@PathVariable Long listingId) {
-        return fairPricingService.estimateForListing(listingId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return loggedListingRequest(listingId, "estimate",
+                () -> fairPricingService.estimateForListing(listingId), FairPriceEstimate::isAvailable);
     }
 
     @GetMapping("/listing/{listingId}/explanation")
     public ResponseEntity<FairPriceExplanation> getExplanationForListing(@PathVariable Long listingId) {
-        return fairPriceExplanationService.explainListing(listingId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return loggedListingRequest(listingId, "explanation",
+                () -> fairPriceExplanationService.explainListing(listingId), FairPriceExplanation::isAvailable);
+    }
+
+    private <T> ResponseEntity<T> loggedListingRequest(Long listingId, String operation,
+                                                      Supplier<Optional<T>> action, Predicate<T> isAvailable) {
+        Map<String, String> previousContext = MDC.getCopyOfContextMap();
+        String requestId = UUID.randomUUID().toString();
+        long started = System.nanoTime();
+        MDC.put("pricingRequestId", requestId);
+        MDC.put("pricingListingId", String.valueOf(listingId));
+        try {
+            log.info("[PricingAI] event=request_started requestId={} listingId={} operation={}",
+                    requestId, listingId, operation);
+            Optional<T> result = action.get();
+            int status = result.isPresent() ? 200 : 404;
+            boolean available = result.filter(isAvailable).isPresent();
+            long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            if (available) {
+                log.info("[PricingAI] event=request_completed requestId={} listingId={} operation={} httpStatus={} available=true durationMs={}",
+                        requestId, listingId, operation, status, elapsed);
+            } else {
+                log.warn("[PricingAI] event=request_completed requestId={} listingId={} operation={} httpStatus={} available=false durationMs={}",
+                        requestId, listingId, operation, status, elapsed);
+            }
+            return result.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+        } catch (RuntimeException e) {
+            log.error("[PricingAI] event=request_failed requestId={} listingId={} operation={} durationMs={} errorType={}",
+                    requestId, listingId, operation, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
+                    e.getClass().getSimpleName());
+            throw e;
+        } finally {
+            if (previousContext == null) MDC.clear();
+            else MDC.setContextMap(previousContext);
+        }
     }
 
     @GetMapping("/estimate")

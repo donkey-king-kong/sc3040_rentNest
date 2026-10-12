@@ -29,7 +29,7 @@ public class User implements UserDetails {
     @Column
     private String contact;
 
-    @Column
+    @Column(length = 255)
     private String photoURL;
 
     @Column(nullable = false)

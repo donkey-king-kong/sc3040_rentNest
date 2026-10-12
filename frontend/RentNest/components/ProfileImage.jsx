@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
+import { getPhotoUrlError, trimPhotoUrl } from '../config/photoUrl';
 
-const SANITIZER_VERSION = 'profile-url-v1';
+const SANITIZER_VERSION = 'profile-url-v2';
 
 export const normalizeProfileImageUrl = (url) => {
   if (typeof url !== 'string') {
     return '';
+  }
+
+  // Newly validated URLs must retain Unicode, apostrophes, and signed query data.
+  const trimmedUrl = trimPhotoUrl(url);
+  if (trimmedUrl && !getPhotoUrlError(trimmedUrl)) {
+    return trimmedUrl;
   }
 
   const cleanedUrl = url

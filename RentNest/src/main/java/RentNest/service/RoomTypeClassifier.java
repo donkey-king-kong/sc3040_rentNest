@@ -78,7 +78,8 @@ public class RoomTypeClassifier {
 
         Classification result = null;
         if (gemini != null && gemini.isConfigured()) {
-            GeminiClient.Reply reply = gemini.generate(SYSTEM_PROMPT, buildPrompt(title, description), 1024, RESPONSE_SCHEMA);
+            GeminiClient.Reply reply = gemini.generate(GeminiClient.Operation.ROOM_CLASSIFICATION,
+                    SYSTEM_PROMPT, buildPrompt(title, description), 1024, RESPONSE_SCHEMA);
             if (reply.ok()) result = parse(reply.text());
         }
         if (result == null) {

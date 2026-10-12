@@ -1,5 +1,38 @@
 # Frontend
 
+## Profile Photo URLs
+
+Sign Up and Edit Profile include **Photo URL**. Sign Up shows the label inside
+the field; Edit Profile places it last, after Phone Number. Neither screen
+shows helper text below it; validation errors still appear when needed. Paste a public
+HTTP(S) image URL (HTTPS recommended, up to 255 characters). In Edit Profile,
+the avatar previews the draft; select **Update Profile** to save. Clearing the
+field and saving removes the photo and uses initials. Returning to Profile
+reloads saved changes without restarting the app.
+
+The field is optional, and a failed image download does not block saving a
+valid URL. There is no file upload or cropping. Avoid secret links because
+existing avatar diagnostics log URLs.
+
+Run `npm run test:photo-url` from `frontend/RentNest` for focused URL and mounted
+screen tests using mocked services. The command uses Node's test runner with
+the installed Babel/React renderer and does not require the currently missing
+React Native Jest preset. See [profile image guidance](../Documentation/Troubleshooting/profile-images.md)
+for API omission/clearing semantics, fallback behavior, and test limitations.
+
+## AI Pricing Logs
+
+The listing detail screen logs estimate and explanation requests under
+`[PricingAI]`, including listing ID, endpoint, duration, HTTP status, and
+availability. A response with HTTP 200 and `available: false` is logged as a
+warning; failed HTTP/network requests are logged separately. Response bodies,
+authorization headers, and free-text error messages are not included.
+
+See [AI Fair Price Diagnostics](../Documentation/Troubleshooting/price-insights.md#ai-fair-price-diagnostics)
+for backend correlation and examples. Run the dependency-free logger tests from
+`frontend/RentNest` with `npm run test:pricing-diagnostics` on Node 22.7+ or Node 24.
+Retry, timeout, and rendering behavior are unchanged.
+
 ## Property Type Filter
 
 The home screen's advanced-filter dropdown opens in a transparent overlay anchored

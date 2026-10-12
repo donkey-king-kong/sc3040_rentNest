@@ -3,6 +3,9 @@ package RentNest.service;
 import RentNest.model.Listings;
 import RentNest.model.api.FairPriceEstimate;
 import RentNest.model.api.FairPriceExplanation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Service
 public class FairPriceExplanationService {
+    private static final Logger log = LoggerFactory.getLogger(FairPriceExplanationService.class);
 
     static final String NOT_CONFIGURED = "AI explanations are not configured on the server (llm.api-key is not set).";
     static final int MAX_OUTPUT_TOKENS = 2048;
@@ -72,11 +76,15 @@ public class FairPriceExplanationService {
         Listings l = found.get();
 
         if (!gemini.isConfigured()) {
+            log.warn("[PricingAI] event=explanation_skipped requestId={} listingId={} reason=not_configured",
+                    MDC.get("pricingRequestId"), listingId);
             return Optional.of(FairPriceExplanation.unavailable(NOT_CONFIGURED));
         }
 
         FairPriceEstimate estimate = fairPricingService.estimateForListing(l);
         if (!estimate.isAvailable() || estimate.getAskingPrice() == null) {
+            log.warn("[PricingAI] event=explanation_skipped requestId={} listingId={} reason=no_price_verdict",
+                    MDC.get("pricingRequestId"), listingId);
             return Optional.of(FairPriceExplanation.unavailable("There is no fair-price verdict to explain for this listing."));
         }
 
@@ -84,9 +92,13 @@ public class FairPriceExplanationService {
                 + "|" + Objects.hashCode(l.getDescription());
         CacheEntry hit = cache.get(key);
         if (hit != null && System.currentTimeMillis() - hit.createdAt() < CACHE_TTL_MILLIS) {
+            log.info("[PricingAI] event=explanation_cache requestId={} listingId={} cache=hit",
+                    MDC.get("pricingRequestId"), listingId);
             return Optional.of(hit.explanation());
         }
 
+        log.info("[PricingAI] event=explanation_cache requestId={} listingId={} cache={}",
+                MDC.get("pricingRequestId"), listingId, hit == null ? "miss" : "expired");
         FairPriceExplanation result = explain(l, estimate);
         if (result.isAvailable()) {
             cache.put(key, new CacheEntry(System.currentTimeMillis(), result));
@@ -99,7 +111,8 @@ public class FairPriceExplanationService {
         if (!gemini.isConfigured()) {
             return FairPriceExplanation.unavailable(NOT_CONFIGURED);
         }
-        return toExplanation(gemini.generate(SYSTEM_PROMPT, buildPrompt(l, estimate), MAX_OUTPUT_TOKENS, null), gemini.getModel());
+        return toExplanation(gemini.generate(GeminiClient.Operation.PRICE_EXPLANATION,
+                SYSTEM_PROMPT, buildPrompt(l, estimate), MAX_OUTPUT_TOKENS, null), gemini.getModel());
     }
 
     /** Extract the explanation from a Gemini generateContent response. */
