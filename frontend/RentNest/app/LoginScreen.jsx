@@ -66,8 +66,12 @@ const LoginScreen = () => {
       router.replace(cleanEmail === 'admin@gmail.com' ? '/AdminScreen' : '/HomeScreen');
     } catch (failure) {
       if (failure.response) {
-        setFieldErrors({ email: true, password: true });
-        setFormError('ERROR: Invalid email or password.');
+        if (failure.response.status === 403) {
+          setFormError('Your account has been banned. Please contact support.');
+        } else {
+          setFieldErrors({ email: true, password: true });
+          setFormError('ERROR: Invalid email or password.');
+        }
       } else if (failure.request) {
         setFormError('ERROR: Could not connect to the server. Please check your connection.');
       } else {
