@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 
+import java.time.Instant;
+
 @Entity
 @Table(name = "listings")
 public class Listings {
@@ -38,6 +40,23 @@ public class Listings {
     private Double latitude;
     private Double longitude;
 
+    /**
+     * Cached AI-generated listing summary (pillar 3). Regenerated only when
+     * {@code aiSummaryKey} no longer matches the listing's decision-relevant fields, so a
+     * search page costs no model calls once its listings have been summarised.
+     */
+    @Column(name = "ai_summary", length = 600)
+    private String aiSummary;
+
+    @Column(name = "ai_summary_key", length = 64)
+    private String aiSummaryKey;
+
+    @Column(name = "ai_summary_updated_at")
+    private Instant aiSummaryUpdatedAt;
+
+    public boolean isDemo() {
+        return description != null && description.startsWith("FICTIONAL DEMO:");
+    }
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -139,6 +158,20 @@ public class Listings {
         return listingpicture;
     }
 
+    public String getAiSummary() {
+        return aiSummary;
+    }
+
+    @JsonIgnore
+    public String getAiSummaryKey() {
+        return aiSummaryKey;
+    }
+
+    @JsonIgnore
+    public Instant getAiSummaryUpdatedAt() {
+        return aiSummaryUpdatedAt;
+    }
+
     public Double getLatitude() {
         return latitude;
     }
@@ -214,6 +247,18 @@ public class Listings {
 
     public void setListingpicture(String listingpicture) {
         this.listingpicture = listingpicture;
+    }
+
+    public void setAiSummary(String aiSummary) {
+        this.aiSummary = aiSummary;
+    }
+
+    public void setAiSummaryKey(String aiSummaryKey) {
+        this.aiSummaryKey = aiSummaryKey;
+    }
+
+    public void setAiSummaryUpdatedAt(Instant aiSummaryUpdatedAt) {
+        this.aiSummaryUpdatedAt = aiSummaryUpdatedAt;
     }
 
     public void setLatitude(Double latitude) {

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Pressable, Image } from 'react-native';
+import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Pressable, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
@@ -15,6 +15,8 @@ const SignUpScreen = () => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const pending = useRef(false);
   const fullNameInputRef = useRef(null);
   const emailInputRef = useRef(null);
   const passwordInputRef = useRef(null);
@@ -23,10 +25,11 @@ const SignUpScreen = () => {
   const router = useRouter();
 
   const handleSignUp = async () => {
+    if (pending.current) return;
     setFormError('');
     setFieldErrors({});
 
-    // Validation
+    const cleanEmail = email.trim();
     const missingFields = [];
     const nextFieldErrors = {};
 
@@ -34,88 +37,65 @@ const SignUpScreen = () => {
       missingFields.push('full name');
       nextFieldErrors.fullName = true;
     }
-
-    if (!email.trim()) {
+    if (!cleanEmail) {
       missingFields.push('email');
       nextFieldErrors.email = true;
     }
-
     if (!password) {
       missingFields.push('password');
       nextFieldErrors.password = true;
     }
-
     if (!phoneNumber.trim()) {
       missingFields.push('phone number');
       nextFieldErrors.phoneNumber = true;
     }
-
     if (missingFields.length > 0) {
       setFieldErrors(nextFieldErrors);
       setFormError(`ERROR: Please fill in ${missingFields.join(', ')}.`);
       return;
     }
 
-    if (!/\S+@\S+\.\S+/.test(email)) {
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
       setFieldErrors({ email: true });
       setFormError('ERROR: Email format is invalid.');
       return;
     }
-
     if (password.length < 6) {
       setFieldErrors({ password: true });
       setFormError('ERROR: Password must be at least 6 characters long.');
       return;
     }
-
-    if (phoneNumber.length < 8) {
+    if (!/^\d{8,}$/.test(phoneNumber.trim())) {
       setFieldErrors({ phoneNumber: true });
-      setFormError('ERROR: Phone Number must be at least 8 digits long.');
+      setFormError('ERROR: Phone number must contain at least 8 digits.');
       return;
     }
 
+    pending.current = true;
+    setSubmitting(true);
     try {
-      console.log("Attempting signup with:", { email, fullName });
-      // First API call
-      const response = await axios.post(`${API_BASE_URL}${ENDPOINTS.SIGNUP}`, {
-        email,
-        password,
-        fullName,
-        contact: phoneNumber
-      });
-
-      console.log("Response received:", response.status);
-  
-      // If we get here, the signup was successful
-      Alert.alert(
-        'Success',
-        'Account created successfully!'
-      );
-
-      router.push('/LoginScreen');
-
-    } catch (error) {
-      console.error('Detailed signup error:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-  
-      if (error.response) {
-        // Server responded with an error
-        const errorMessage = error.response.data?.message || error.response.data || 'Could not create account';
-        setFormError(`ERROR: ${errorMessage}`);
-      } else if (error.request) {
-        // Request was made but no response received
-        console.error('No response received:', error.request);
+      await axios.post(`${API_BASE_URL}${ENDPOINTS.SIGNUP}`, {
+        email: cleanEmail, password, fullName: fullName.trim(), contact: phoneNumber.trim(),
+      }, { timeout: 15000 });
+      router.replace({ pathname: '/LoginScreen', params: { email: cleanEmail, registered: '1' } });
+    } catch (failure) {
+      const data = failure.response?.data;
+      const message = typeof data === 'string' ? data : data?.message;
+      if (message === 'Email already exists') {
+        setFieldErrors({ email: true });
+        setFormError('ERROR: This email is already registered. Log in instead, or use a different email.');
+      } else if (failure.response) {
+        setFormError(`ERROR: ${typeof message === 'string' && message ? message : 'Could not create account.'}`);
+      } else if (failure.request) {
         setFormError('ERROR: No response from server. Please check your connection.');
       } else {
-        // Error in setting up the request
-        console.error('Request setup error:', error.message);
         setFormError('ERROR: Failed to connect to the server. Please try again.');
       }
-  }
-};
+    } finally {
+      pending.current = false;
+      setSubmitting(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -228,26 +208,16 @@ const SignUpScreen = () => {
             <Text style={styles.errorMessageText}>{formError}</Text>
           </View>
         ) : null}
-
-        {/* <TextInput
-          style={styles.input}
-          placeholder="Enter OTP"
-          placeholderTextColor="#999"
-          keyboardType="phone-pad"
-          onChangeText={(text) => setOtp(text)}
-          value={otp}
-        />
-      </ScrollView> */}
       </ScrollView>
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp}>
-          <Text style={styles.primaryButtonText}>Sign Up</Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleSignUp} disabled={submitting}>
+          <Text style={styles.primaryButtonText}>{submitting ? 'Creating account…' : 'Sign Up'}</Text>
         </TouchableOpacity>
 
         <View style={styles.signinContainer}>
           <Text style={styles.signinText}>Already have an account?</Text>
-          <TouchableOpacity onPress={() => router.push('/LoginScreen')}>
+          <TouchableOpacity onPress={() => router.push({ pathname: '/LoginScreen', params: { email: email.trim() } })}>
             <Text style={styles.signinLink}>Sign In here</Text>
           </TouchableOpacity>
         </View>

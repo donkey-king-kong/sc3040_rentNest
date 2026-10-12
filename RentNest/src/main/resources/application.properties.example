@@ -17,6 +17,35 @@ URA_ACCESSKEY=YOUR_API_KEY
 # Optional: data.gov.sg API key (HDB rental data). Blank works but gets a lower rate limit.
 DATAGOVSG_API_KEY=
 
+# AI recommendations (OpenRouter). Leave the key blank to run the recommendation
+# pipeline entirely on its rule-based path; nothing else needs to change.
+# Get a key at https://openrouter.ai/keys. This key stays on the backend: the Expo app
+# never sees it, because EXPO_PUBLIC_* variables are shipped to the client.
+rentnest.ai.api-key=YOUR_OPENROUTER_KEY
+rentnest.ai.enabled=true
+
+# Pillar 1 - natural-language search text to structured filters.
+rentnest.ai.filter.enabled=true
+rentnest.ai.filter.model=google/gemini-2.5-flash-lite
+
+# Pillar 2 - re-rank of the top deterministically scored candidates.
+rentnest.ai.sorting.enabled=true
+rentnest.ai.sorting.model=google/gemini-2.5-flash-lite
+rentnest.ai.sorting.candidates=20
+
+# Pillar 3 - per-listing summaries, generated once and cached on the listing row.
+rentnest.ai.summary.enabled=true
+rentnest.ai.summary.model=google/gemini-2.5-flash
+# Nearby schools, bus stops and hawker centres geocode every record in the government
+# datasets, so a single lookup takes tens of seconds. Off by default; when on, it runs
+# only on the background summariser thread, once per listing.
+rentnest.ai.summary.include-amenities=false
+rentnest.ai.summary.amenity-radius-meters=1000
+
+# Timeouts. On expiry the request falls back to the rule-based path rather than failing.
+rentnest.ai.connect-timeout-ms=3000
+rentnest.ai.read-timeout-ms=9000
+
 # Gemini LLM API for AI chat summary, Ask AI guardrails and AI fair pricing
 # (room-type detection and price explanations)
 # Put the real key only in application.properties. Do not commit real API keys.
