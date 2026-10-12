@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Image, Alert } from 'react-native';
+
+const notificationBellIcon = require('../assets/images/notificationBell.png');
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NavigationBar from '../components/NavigationBar';
@@ -32,6 +34,7 @@ const CreateListingScreen = () => {
         listingpicture: '',
     });
     const [modalVisible, setModalVisible] = useState(false);
+    const notificationTimeoutRef = useRef(null);
 
     // AI Fair-Pricing Model: suggested range updates as the owner fills in the form
     const { estimate: fairPrice, loading: fairPriceLoading } = useFairPriceEstimate({
@@ -138,14 +141,13 @@ const CreateListingScreen = () => {
             });
             
             setModalVisible(true);
+            notificationTimeoutRef.current = setTimeout(() => {
+                setModalVisible(false);
+                router.replace('/HomeScreen');
+            }, 2000);
         } catch (error) {
             Alert.alert('Error', error.response?.data || 'Failed to create listing');
         }
-    };
-
-    const handleReturnHome = () => {
-        setModalVisible(false);
-        router.replace('/HomeScreen');
     };
 
     return (
@@ -179,6 +181,8 @@ const CreateListingScreen = () => {
                     style={styles.input}
                     placeholder="Enter postal code"
                     placeholderTextColor="#666"
+                    keyboardType="numeric"
+                    maxLength={6}
                     value={listing.postal}
                     onChangeText={(value) => handleInputChange('postal', value)}
                 />
@@ -292,19 +296,18 @@ const CreateListingScreen = () => {
                     <Text style={styles.postButtonText}>Post Listing</Text>
                 </TouchableOpacity>
 
-                {/* Confirmation Modal */}
                 <Modal
-                    transparent={true}
                     visible={modalVisible}
-                    animationType="slide"
+                    transparent
+                    animationType="fade"
+                    statusBarTranslucent
                 >
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalContent}>
-                            <Image source={require('../assets/images/confirmation.png')} style={styles.confirmationImage} />
-                            <Text style={styles.modalText}>Listing Created Successfully!</Text>
-                            <TouchableOpacity style={styles.returnButton} onPress={handleReturnHome}>
-                                <Text style={styles.returnButtonText}>Return to Home</Text>
-                            </TouchableOpacity>
+                    <View style={styles.notificationOverlay} pointerEvents="none">
+                        <View style={styles.notificationCard}>
+                            <View style={styles.notificationIconBox}>
+                                <Image source={notificationBellIcon} style={styles.notificationIcon} />
+                            </View>
+                            <Text style={styles.notificationText}>Listing Created</Text>
                         </View>
                     </View>
                 </Modal>
@@ -410,50 +413,45 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
     },
-    modalContainer: {
+    notificationOverlay: {
         flex: 1,
+        alignItems: 'center',
         justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        paddingHorizontal: 22,
+        backgroundColor: 'rgba(0, 0, 0, 0.35)',
     },
-    modalContent: {
-        backgroundColor: '#fff',
-        padding: 20,
-        borderRadius: 10,
-        alignItems: 'center',
-        width: '80%',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
-        elevation: 5,
-    },
-    confirmationImage: {
-        width: 100,
-        height: 100,
-        marginBottom: 20,
-    },
-    modalText: {
-        fontSize: 18,
-        marginBottom: 20,
-        color: '#000',
-        fontWeight: '500',
-    },
-    returnButton: {
-        backgroundColor: '#000',
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        borderRadius: 8,
-        alignItems: 'center',
+    notificationCard: {
         width: '100%',
+        maxWidth: 360,
+        alignItems: 'center',
+        backgroundColor: 'rgba(45, 45, 45, 0.82)',
+        borderRadius: 28,
+        paddingVertical: 28,
+        paddingHorizontal: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.24,
+        shadowRadius: 22,
+        elevation: 8,
     },
-    returnButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
+    notificationIconBox: {
+        width: 72,
+        height: 72,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(58, 58, 58, 0.72)',
+        marginBottom: 16,
+    },
+    notificationIcon: {
+        width: 34,
+        height: 40,
+        resizeMode: 'contain',
+    },
+    notificationText: {
+        color: '#FFFFFF',
+        fontSize: 22,
+        fontWeight: '800',
     },
 });
 
