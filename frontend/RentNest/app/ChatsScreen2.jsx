@@ -20,6 +20,7 @@ import {API_BASE_URL} from "../config/api";
 import MorphingInfinity from '../components/MorphingInfinity';
 import AvatarOrb from '../components/AvatarOrb';
 import ProfileImage from '../components/ProfileImage';
+import TerminationRequestCard from '../components/TerminationRequestCard';
 
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
@@ -31,7 +32,6 @@ const ChatsScreen2 = () => {
     const { partnerUserId, currentUser} = useLocalSearchParams();
     const [chat, setChat] = useState([]);
     const [rental, setRental] = useState([]);
-    const [request, setRequest] = useState([]);
     const [partner, setPartner] = useState([]);
     const [listing, setListing] = useState([]);
     const [rentalPrice, setRentalPrice] = useState('');
@@ -107,10 +107,6 @@ const ChatsScreen2 = () => {
                     if (msg.rentalId != null) {
                         return getRental(msg.rentalId);
                     }
-                    if (msg.requestId != null) {
-                        console.log("requestid",msg.requestId);
-                        return getRequest(msg.requestId);
-                    }
                     return Promise.resolve();
                 }));
             }
@@ -147,33 +143,6 @@ const ChatsScreen2 = () => {
             setRental(rentalResponse.data); // Store the fetched data in state
         } catch (error) {
             console.error('Error fetching rentals:', error);
-        }
-    }
-
-    const getRequest = async (requestId) => {
-        try {
-            if (requestId == null) {
-                console.log('No requestId found in the chat.');
-                return;
-            }
-
-            const token = await AsyncStorage.getItem('token');
-            if (!token) {
-                console.log('No token found!');
-                router.replace('/LoginScreen');
-                return;
-            }
-            const requestResponse = await axios.get(`${API_BASE_URL}/api/requests/${requestId}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                }
-            });
-            console.log("Request response", requestResponse.data);
-            setRequest(requestResponse.data); // Store the fetched data in state
-        } catch (error) {
-            console.error('Error fetching requests:', error);
         }
     }
 
@@ -717,57 +686,6 @@ const ChatsScreen2 = () => {
         toggleSuccessfulPaymentModal();
     }
 
-    const acceptRequest = async() => {
-        console.log("Request ID" , request.requestID);
-        try {
-            const token = await AsyncStorage.getItem('token');
-            if (!token) {
-                console.log('No token found!');
-                router.replace('/LoginScreen');
-                return;
-            }
-            const terminationRequestBody ={
-                rentalID: request.rentalId,
-                status: "terminated",
-                refundAmount: request.refundAmount,
-            }
-            const terminateRequestResponse = await axios.put(`${API_BASE_URL}/api/requests/${request.requestID}`, terminationRequestBody, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-            });
-            const terminateRentalBody = {
-                listingID: rental.listingId,
-                tenantUserID: partnerUserId,
-                rentalPrice: rental.rentalPrice,
-                depositPrice: rental.depositPrice,
-                rentalDate: rental.rentalDate,
-                leaseExpiry: rental.leaseExpiry,
-                paymentHistory: rental.paymentHistory,
-                status: "terminated",
-            };
-            const terminateRentalResponse = await axios.put(`${API_BASE_URL}/api/rentals/${rental.rentalID}`, terminateRentalBody, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-            });
-            if (terminateRequestResponse.status === 200 && terminateRentalResponse.status === 200) {
-                await getConversation();
-                console.log("Rental Offer Terminated", terminateRequestResponse.data);
-                console.log("Updated Rental Info", terminateRentalResponse.data);
-            } else {
-                console.log('Terminating rental offer:', terminateRequestResponse.data);
-            }
-        }
-        catch (error) {
-            console.error('Error terminating rental offer:', error);
-        }
-    }
-
     const handlePaymentSubmit = async () => {
         try {
             const token = await AsyncStorage.getItem('token');
@@ -821,7 +739,7 @@ const handlePaymentAndAccept = async () => {
                 clearTimeout(notificationTimeoutRef.current);
             }
         };
-    }, [refresh]);
+    }, [refresh, partnerUserId, currentUser]);
 
     // Toggle attachment modal visibility
     const toggleAttachmentModal = () => {
@@ -879,7 +797,6 @@ const handlePaymentAndAccept = async () => {
 
     const isFlagged = chat.length > 0 ? partner.flagged === 1 : false;
     const isAccepted = chat.length > 0 ? isPaymentSuccessfulModalVisible : false;
-    const isTerminationAccepted = chat.length>0 ? rental.status === "terminated" : false;
 
     const AvatarCircle = ({ photoURL, name, size = 30, style }) => {
         const dim = { width: size, height: size, borderRadius: size / 2 };
@@ -984,7 +901,7 @@ const handlePaymentAndAccept = async () => {
                     <View key={first.messageID} style={styles.groupContainer}>
                         <View style={isUser ? styles.bubbleRowRight : styles.bubbleRowLeft}>
                             {!isUser && <AvatarCircle photoURL={partnerProfilePhotoURL} name={partner.name} size={30} style={{ marginRight: 8 }} />}
-                            <View style={rentalIdExists ? styles.rentalOfferBubbleShell : [styles.bubble, styles.bubbleOther, { maxWidth: '80%' }]}>
+                            <View style={rentalIdExists ? styles.rentalOfferBubbleShell : styles.terminationShell}>
                                 {rentalIdExists && (
                                     <View style={styles.rentalOfferMessage}>
                                         <View style={styles.rentalOfferHeader}>
@@ -1010,7 +927,7 @@ const handlePaymentAndAccept = async () => {
                                                         rental.status === 'active' && styles.rentalOfferStatusTextAccepted,
                                                     ]}
                                                 >
-                                                    {rental.status === 'active' ? 'Accepted' : (isRentalOfferSender ? 'Pending' : 'New')}
+                                                    {rental.status === 'terminated' ? 'Lease ended' : rental.status === 'active' ? 'Accepted' : (isRentalOfferSender ? 'Pending' : 'New')}
                                                 </Text>
                                             </View>
                                         </View>
@@ -1043,13 +960,13 @@ const handlePaymentAndAccept = async () => {
                                             <View style={styles.pendingAcceptanceBox}>
                                                 <View style={[styles.pendingStatusDot, rental.status === 'active' && styles.acceptedStatusDot]} />
                                                 <Text style={styles.pendingAcceptanceText}>
-                                                    {rental.status === 'active' ? 'Accepted' : 'Awaiting tenant response'}
+                                                    {rental.status === 'terminated' ? 'Lease ended' : rental.status === 'active' ? 'Accepted' : 'Awaiting tenant response'}
                                                 </Text>
                                             </View>
-                                        ) : rental.status === 'active' ? (
+                                        ) : rental.status === 'active' || rental.status === 'terminated' ? (
                                             <View style={styles.pendingAcceptanceBox}>
                                                 <View style={[styles.pendingStatusDot, styles.acceptedStatusDot]} />
-                                                <Text style={styles.pendingAcceptanceText}>Accepted</Text>
+                                                <Text style={styles.pendingAcceptanceText}>{rental.status === 'terminated' ? 'Lease ended' : 'Accepted'}</Text>
                                             </View>
                                         ) : (
                                             <View style={styles.rentalOfferActionRow}>
@@ -1064,28 +981,7 @@ const handlePaymentAndAccept = async () => {
                                     </View>
                                 )}
                                 {requestIdExists && (
-                                    <View style={styles.rentalOfferMessage}>
-                                        <Text style={styles.rentalOfferTitle}>Termination of Lease Request</Text>
-                                        <Text style={styles.messageText}>Amount to be refunded: ${request.refundAmount}</Text>
-                                        {isUser ? (
-                                            <View style={styles.pendingAcceptanceBox}>
-                                                <Text style={styles.pendingAcceptanceText}>{isTerminationAccepted ? 'Accepted' : 'Pending Acceptance'}</Text>
-                                            </View>
-                                        ) : isTerminationAccepted ? (
-                                            <View style={styles.pendingAcceptanceBox}>
-                                                <Text style={styles.pendingAcceptanceText}>Accepted</Text>
-                                            </View>
-                                        ) : (
-                                            <View style={styles.buttonAlignment}>
-                                                <TouchableOpacity style={styles.pendingRejectBox}>
-                                                    <Text style={styles.rejectText}>Reject</Text>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity onPress={acceptRequest} style={styles.pendingAcceptBox}>
-                                                    <Text style={styles.acceptText}>Accept</Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        )}
-                                    </View>
+                                    <TerminationRequestCard requestId={first.requestId} onDecision={getConversation} />
                                 )}
                             </View>
                         </View>
@@ -2663,6 +2559,11 @@ const styles = StyleSheet.create({
     rentalOfferBubbleShell: {
         width: '88%',
         maxWidth: 420,
+    },
+    terminationShell: {
+        flexShrink: 1,
+        width: '88%',
+        maxWidth: 360,
     },
     rentalOfferMessage: {
         width: '100%',

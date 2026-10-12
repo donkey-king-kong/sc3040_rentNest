@@ -17,9 +17,15 @@ import RentNest.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.server.ResponseStatusException;
+import org.hibernate.Hibernate;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -71,6 +77,7 @@ public class RentalsService {
     // Create a new rental
     @Transactional
     public Rentals createRental(RentalsDTO rentalDTO) {
+        rejectDirectTermination(rentalDTO.getStatus());
         // Validate the input data first
         if (rentalDTO.getListingID() == null || rentalDTO.getTenantUserID() == null || rentalDTO.getRentalPrice() <= 0) {
             throw new IllegalArgumentException("Invalid rental data provided.");
@@ -127,9 +134,18 @@ public class RentalsService {
     // Update a rental
     @Transactional
     public Rentals updateRental(Long rentalID, RentalsDTO updatedRentalDTO) {
-        Optional<Rentals> existingRentalOpt = rentalsRepository.findById(rentalID);
+        Optional<Rentals> existingRentalOpt = rentalsRepository.findByIdForUpdate(rentalID);
         if (existingRentalOpt.isPresent()) {
             Rentals existingRental = existingRentalOpt.get();
+            if (hasProtectedLifecycle(existingRental)) {
+                guardProtectedRentalUpdate(existingRental, updatedRentalDTO);
+                requirePaymentHistoryOwner(existingRental);
+                existingRental.setPaymentHistory(updatedRentalDTO.getPaymentHistory());
+                // The endpoint serializes the owner name after this transaction closes.
+                Hibernate.initialize(existingRental.getListings().getOwner());
+                return rentalsRepository.save(existingRental);
+            }
+            rejectDirectTermination(updatedRentalDTO.getStatus());
 
             // Update only the fields you want to change using the DTO
             existingRental.setTenantUserID(updatedRentalDTO.getTenantUserID());
@@ -153,8 +169,12 @@ public class RentalsService {
     }
 
     // Delete a rental
+    @Transactional
     public void deleteRental(Long rentalID) {
-        rentalsRepository.deleteById(rentalID);
+        rentalsRepository.findByIdForUpdate(rentalID).ifPresent(rental -> {
+            guardTerminationLifecycle(rental);
+            rentalsRepository.delete(rental);
+        });
     }
 
     @Transactional
@@ -243,8 +263,9 @@ public class RentalsService {
     @Transactional
     public Rentals reviewRentalOffer(Long rentalID, RentalsDTO updatedRentalDTO) {
         // Get the rental by rentalID else throw an exception if not found
-        Rentals existingRental = rentalsRepository.findById(rentalID)
+        Rentals existingRental = rentalsRepository.findByIdForUpdate(rentalID)
                 .orElseThrow(() -> new RuntimeException("Rental not found"));
+        guardTerminationLifecycle(existingRental);
 
         // Change the status from "pending" to "active" to accept the contract
         if ("pending".equals(existingRental.getStatus())) {
@@ -306,6 +327,58 @@ public class RentalsService {
         }
         if ("terminated".equals(rental.getStatus()) && rental.getTerminatedAt() == null) {
             rental.setTerminatedAt(now);
+        }
+    }
+
+    private void rejectDirectTermination(String status) {
+        if (status != null && "terminated".equalsIgnoreCase(status.trim())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Use the request decision endpoint to terminate a rental");
+        }
+    }
+
+    private void guardTerminationLifecycle(Rentals rental) {
+        if (hasProtectedLifecycle(rental)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Active, terminated, and request-linked rentals cannot be changed through generic rental mutations");
+        }
+    }
+
+    private boolean hasProtectedLifecycle(Rentals rental) {
+        return "active".equalsIgnoreCase(rental.getStatus()) || "terminated".equalsIgnoreCase(rental.getStatus())
+                || rental.getTerminatedAt() != null
+                || requestsRepository.existsByRentals_RentalID(rental.getRentalID());
+    }
+
+    private void guardProtectedRentalUpdate(Rentals rental, RentalsDTO dto) {
+        if (!Objects.equals(rental.getTenantUserID(), dto.getTenantUserID())
+                || !Objects.equals(rental.getListingId(), dto.getListingID())
+                || !Objects.equals(rental.getRentalPrice(), dto.getRentalPrice())
+                || !Objects.equals(rental.getDepositPrice(), dto.getDepositPrice())
+                || !sameDate(rental.getRentalDate(), dto.getRentalDate())
+                || !sameDate(rental.getLeaseExpiry(), dto.getLeaseExpiry())
+                || !Objects.equals(rental.getStatus(), dto.getStatus())
+                || (dto.getRentalID() != null && !Objects.equals(rental.getRentalID(), dto.getRentalID()))
+                // Server-managed timestamps may be omitted, but cannot be rewritten.
+                || (dto.getCreatedAt() != null && !sameDate(rental.getCreatedAt(), dto.getCreatedAt()))
+                || (dto.getAcceptedAt() != null && !sameDate(rental.getAcceptedAt(), dto.getAcceptedAt()))
+                || (dto.getTerminatedAt() != null && !sameDate(rental.getTerminatedAt(), dto.getTerminatedAt()))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only payment history can be updated for active, terminated, or request-linked rentals");
+        }
+    }
+
+    private boolean sameDate(Date first, Date second) {
+        return first == null ? second == null : second != null && first.getTime() == second.getTime();
+    }
+
+    private void requirePaymentHistoryOwner(Rentals rental) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || !(authentication.getPrincipal() instanceof User user) || user.getUserID() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        if (!Objects.equals(user.getUserID(), rental.getOwnerUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the rental owner can update payment history");
         }
     }
 

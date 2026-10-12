@@ -2,10 +2,12 @@ package RentNest.controller;
 
 import RentNest.model.Requests;
 import RentNest.dto.RequestsDTO;
+import RentNest.dto.TerminationDecisionDTO;
 import RentNest.service.RequestsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -37,7 +39,7 @@ public class RequestsController {
     @GetMapping("/{id}")
     public ResponseEntity<Requests> getRequestById(@PathVariable("id") Long requestID) {
         Requests request = requestsService.getRequestById(requestID)
-                .orElseThrow(() -> new RuntimeException("Request not found with ID: " + requestID));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Request not found with ID: " + requestID));
         return new ResponseEntity<>(request, HttpStatus.OK);
     }
 
@@ -57,11 +59,13 @@ public class RequestsController {
 
     @PostMapping("/terminationrequest/{rentalid}/{refundAmount}")
     public ResponseEntity<String> makeTerminationRequest(@PathVariable("rentalid") Long requestID,@PathVariable("refundAmount") long refundAmount) {
-        try {
-            requestsService.makeTerminationRequest(requestID,refundAmount);
-            return new ResponseEntity<>("Request and Chat History created successfully", HttpStatus.CREATED);
-        } catch (Exception e) {
-            return new ResponseEntity<>("Error: " + e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+        requestsService.makeTerminationRequest(requestID,refundAmount);
+        return new ResponseEntity<>("Request and Chat History created successfully", HttpStatus.CREATED);
+    }
+
+    @PostMapping("/{id}/decision")
+    public ResponseEntity<Requests> decideTermination(@PathVariable("id") Long requestID,
+                                                     @RequestBody TerminationDecisionDTO body) {
+        return ResponseEntity.ok(requestsService.decideTermination(requestID, body.decision()));
     }
 }

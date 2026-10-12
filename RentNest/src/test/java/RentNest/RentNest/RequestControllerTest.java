@@ -3,6 +3,7 @@ package RentNest.RentNest;
 
 import RentNest.controller.RequestsController;
 import RentNest.dto.RequestsDTO;
+import RentNest.dto.TerminationDecisionDTO;
 import RentNest.model.Requests;
 import RentNest.service.RequestsService;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,12 +13,14 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 class RequestControllerTest {
 
@@ -75,11 +78,10 @@ class RequestControllerTest {
         Long requestId = 1L;
         when(requestsService.getRequestById(requestId)).thenReturn(Optional.empty());
 
-        try {
-            requestsController.getRequestById(requestId);
-        } catch (RuntimeException e) {
-            assertEquals("Request not found with ID: " + requestId, e.getMessage());
-        }
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> requestsController.getRequestById(requestId));
+        assertEquals(HttpStatus.NOT_FOUND, error.getStatusCode());
+        assertEquals("Request not found with ID: " + requestId, error.getReason());
 
         verify(requestsService, times(1)).getRequestById(requestId);
     }
@@ -130,12 +132,23 @@ class RequestControllerTest {
         long refundAmount = 1000L;
         String errorMessage = "Failed to process request";
 
-        doThrow(new RuntimeException(errorMessage)).when(requestsService).makeTerminationRequest(rentalId, refundAmount);
-
-        ResponseEntity<String> response = requestsController.makeTerminationRequest(rentalId, refundAmount);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertEquals("Error: " + errorMessage, response.getBody());
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, errorMessage))
+                .when(requestsService).makeTerminationRequest(rentalId, refundAmount);
+        ResponseStatusException error = assertThrows(ResponseStatusException.class,
+                () -> requestsController.makeTerminationRequest(rentalId, refundAmount));
+        assertEquals(HttpStatus.CONFLICT, error.getStatusCode());
+        assertEquals(errorMessage, error.getReason());
         verify(requestsService, times(1)).makeTerminationRequest(rentalId, refundAmount);
+    }
+
+    @Test
+    void testDecisionReturnsAuthoritativeRequest() {
+        Requests request = new Requests();
+        request.setStatus("rejected");
+        when(requestsService.decideTermination(1L, "reject")).thenReturn(request);
+        ResponseEntity<Requests> response = requestsController.decideTermination(1L, new TerminationDecisionDTO("reject"));
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(request, response.getBody());
+        verify(requestsService).decideTermination(1L, "reject");
     }
 }
