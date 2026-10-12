@@ -1,5 +1,18 @@
 # Frontend
 
+## AI Pricing Logs
+
+The listing detail screen logs estimate and explanation requests under
+`[PricingAI]`, including listing ID, endpoint, duration, HTTP status, and
+availability. A response with HTTP 200 and `available: false` is logged as a
+warning; failed HTTP/network requests are logged separately. Response bodies,
+authorization headers, and free-text error messages are not included.
+
+See [AI Fair Price Diagnostics](../Documentation/Troubleshooting/price-insights.md#ai-fair-price-diagnostics)
+for backend correlation and examples. Run the dependency-free logger tests from
+`frontend/RentNest` with `npm run test:pricing-diagnostics` on Node 22.7+ or Node 24.
+Retry, timeout, and rendering behavior are unchanged.
+
 ## Property Type Filter
 
 The home screen's advanced-filter dropdown opens in a transparent overlay anchored

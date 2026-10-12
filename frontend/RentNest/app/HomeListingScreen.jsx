@@ -7,6 +7,7 @@ import {useRouter, useLocalSearchParams} from "expo-router";
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
+import { startPricingRequestLog } from '../config/pricingDiagnostics';
 import { jwtDecode } from 'jwt-decode';
 import MorphingInfinity from '../components/MorphingInfinity';
 import FairPriceCard from '../components/FairPriceCard';
@@ -17,8 +18,6 @@ import ProfileImage from '../components/ProfileImage';
 const notificationBellIcon = require('../assets/images/notificationBell.png');
 
 const HomeListingScreen = () => {
-  console.log('Initializing HomeListingScreen component');
-
   const router = useRouter();
   const { listingId } = useLocalSearchParams();
 
@@ -109,7 +108,7 @@ const HomeListingScreen = () => {
         const listingResponse = await axios.get(`${API_BASE_URL}/api/listings/${listingId}`, {
           headers: authHeaders(tokenValue)
         });
-        console.log('Listing API response:', listingResponse.data);
+        console.info('[HomeListingScreen] Listing loaded', { listingId });
         console.log('[HomeListingScreen] listing image payload:', {
           listingId,
           name: listingResponse.data?.name,
@@ -137,7 +136,6 @@ const HomeListingScreen = () => {
           ownerName: isDemo ? 'Sample Property Owner' : (listingData.ownerName || 'Unknown'),
           ownerPhotoURL: listingData.ownerPhotoURL || 'https://thumbs.dreamstime.com/b/tranquil-caucasian-handsome-brunet-man-blue-long-scarf-posing-wrinkled-face-against-background-square-image-236510369.jpg'
         };
-        console.log('Processed listing data:', defaultListing);
         setListing(defaultListing);
         if (isDemo) {
           setNearbySchools([]); setNearbyHawkerCentres([]); setNearbyBusStops([]);
@@ -146,26 +144,32 @@ const HomeListingScreen = () => {
         }
 
         // AI fair-price estimate (non-blocking: the rest of the page loads while it runs)
+        const estimateLog = startPricingRequestLog('estimate', listingId);
         axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_FOR_LISTING(listingId)}`, {
           headers: authHeaders(tokenValue)
         })
           .then(res => {
+            estimateLog.completed(res);
             setFairPrice(res.data);
             if (!res.data?.available) return;
             // The AI explanation arrives a few seconds after the bands, so fetch it separately.
             setAiExplanationLoading(true);
+            const explanationLog = startPricingRequestLog('explanation', listingId);
             axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_EXPLANATION(listingId)}`, {
               headers: authHeaders(tokenValue)
             })
-              .then(expRes => setAiExplanation(expRes.data))
+              .then(expRes => {
+                explanationLog.completed(expRes);
+                setAiExplanation(expRes.data);
+              })
               .catch(err => {
-                console.error('Error fetching AI price explanation:', err?.message);
+                explanationLog.failed(err);
                 setAiExplanation({ available: false, message: 'Could not reach the AI explanation service.' });
               })
               .finally(() => setAiExplanationLoading(false));
           })
           .catch(err => {
-            console.error('Error fetching fair price:', err?.message);
+            estimateLog.failed(err);
             setFairPrice({ available: false, message: 'Could not reach the pricing service.' });
           })
           .finally(() => setFairPriceLoading(false));

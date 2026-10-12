@@ -3,6 +3,9 @@ package RentNest.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -15,6 +18,9 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Minimal client for Google Gemini's generateContent REST endpoint, shared by the
@@ -26,6 +32,9 @@ import java.io.IOException;
  */
 @Service
 public class GeminiClient {
+    private static final Logger log = LoggerFactory.getLogger(GeminiClient.class);
+
+    public enum Operation { PRICE_EXPLANATION, ROOM_CLASSIFICATION, UNSPECIFIED }
 
     /**
      * A fast "lite" model: room detection and the short price explanation are simple
@@ -72,9 +81,21 @@ public class GeminiClient {
      * @param responseSchema optional Gemini response schema; when given, the reply is JSON matching it
      */
     public Reply generate(String systemPrompt, String userPrompt, int maxOutputTokens, JsonNode responseSchema) {
+        return generate(Operation.UNSPECIFIED, systemPrompt, userPrompt, maxOutputTokens, responseSchema);
+    }
+
+    public Reply generate(Operation operation, String systemPrompt, String userPrompt,
+                          int maxOutputTokens, JsonNode responseSchema) {
+        long started = System.nanoTime();
+        String requestId = MDC.get("pricingRequestId");
+        String listingId = MDC.get("pricingListingId");
         if (!isConfigured()) {
+            log.warn("[PricingAI] event=provider_skipped requestId={} listingId={} operation={} model={} reason=not_configured",
+                    requestId, listingId, operation, model);
             return Reply.failed("AI is not configured on the server (llm.api-key is not set).");
         }
+        log.info("[PricingAI] event=provider_started requestId={} listingId={} operation={} model={}",
+                requestId, listingId, operation, model);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("x-goog-api-key", apiKey);
@@ -82,14 +103,58 @@ public class GeminiClient {
             ResponseEntity<String> response = restTemplate.exchange(GENERATE_URL, HttpMethod.POST,
                     new HttpEntity<>(buildRequestBody(systemPrompt, userPrompt, maxOutputTokens, responseSchema), headers),
                     String.class, model);
-            return parseReply(response.getBody());
+            Reply reply = parseReply(response.getBody());
+            if (reply.ok()) {
+                log.info("[PricingAI] event=provider_completed requestId={} listingId={} operation={} model={} httpStatus={} available=true durationMs={}",
+                        requestId, listingId, operation, model, response.getStatusCode().value(), elapsedMs(started));
+            } else {
+                log.warn("[PricingAI] event=provider_completed requestId={} listingId={} operation={} model={} httpStatus={} available=false durationMs={} reason={}",
+                        requestId, listingId, operation, model, response.getStatusCode().value(), elapsedMs(started), reply.error());
+            }
+            return reply;
         } catch (HttpStatusCodeException e) {
+            log.warn("[PricingAI] event=provider_failed requestId={} listingId={} operation={} model={} httpStatus={} durationMs={} {}",
+                    requestId, listingId, operation, model, e.getStatusCode().value(), elapsedMs(started),
+                    safeProviderError(e.getResponseBodyAsString()));
             if (e.getStatusCode().value() == 429) {
                 return Reply.failed("The AI service is busy. Please try again in a minute.");
             }
             return Reply.failed("The AI service returned an error (HTTP " + e.getStatusCode().value() + ").");
         } catch (ResourceAccessException e) {
+            log.warn("[PricingAI] event=provider_failed requestId={} listingId={} operation={} model={} httpStatus=none durationMs={} reason=transport_error errorType={}",
+                    requestId, listingId, operation, model, elapsedMs(started),
+                    e.getMostSpecificCause().getClass().getSimpleName());
             return Reply.failed("Could not reach the AI service.");
+        }
+    }
+
+    private static long elapsedMs(long started) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+    }
+
+    // Provider messages can echo credentials or listing text. Log only recognized
+    // status values and derived categories, never arbitrary messages or metadata.
+    private static String safeProviderError(String body) {
+        if (body == null || body.length() > 65536) return "providerDetails=omitted";
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode error = root == null ? objectMapper.missingNode() : root.path("error");
+            String status = error.path("status").asText("");
+            if (!Set.of("UNAVAILABLE", "RESOURCE_EXHAUSTED", "INVALID_ARGUMENT", "NOT_FOUND",
+                    "PERMISSION_DENIED", "UNAUTHENTICATED", "INTERNAL", "DEADLINE_EXCEEDED").contains(status)) {
+                status = "UNKNOWN";
+            }
+            String message = error.path("message").asText("").toLowerCase(Locale.ROOT);
+            String reason = "unspecified";
+            if (message.contains("high demand") || message.contains("overload")) reason = "high_demand";
+            else if (message.contains("quota") || message.contains("rate limit")) reason = "quota_or_rate_limit";
+            else if (message.contains("api key") || message.contains("permission")) reason = "credentials_or_permissions";
+            else if (message.contains("model") && (message.contains("not found") || message.contains("not supported"))) reason = "model_unavailable";
+            else if (message.contains("unavailable")) reason = "service_unavailable";
+            String code = error.path("code").isInt() ? Integer.toString(error.path("code").intValue()) : "unknown";
+            return "providerCode=" + code + " providerStatus=" + status + " providerReason=" + reason;
+        } catch (IOException e) {
+            return "providerDetails=unreadable";
         }
     }
 
