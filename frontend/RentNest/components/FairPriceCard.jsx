@@ -72,7 +72,7 @@ const Header = ({ badge, open, onToggle }) => {
   );
 };
 
-/** One-line advice that depends on direction, worded for the person looking at the card. */
+/** Fallback one-line advice (used when the AI analysis is unavailable), worded for the person looking at the card. */
 const adviceFor = (pct, isOwner) => {
   if (pct == null) return null;
   if (Math.abs(pct) < 2) {
@@ -183,7 +183,7 @@ const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact
       <Text style={styles.headline}>{headline}</Text>
       {hasPrice && (
         <Text style={styles.subline}>
-          Asking {money(price)} vs fair rent {money(fairPrice)}{Math.abs(pct) >= 0.5 ? ` (${pctText} ${pct < 0 ? 'below' : 'above'})` : ''}
+          Asking {money(price)} · Fair rent {money(fairPrice)}
         </Text>
       )}
       {roomLabel && (
@@ -222,7 +222,10 @@ const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact
         )}
       </View>
 
-      {advice && <Text style={styles.advice}>{advice}</Text>}
+      {/* The AI analysis ends with a question for the owner; the fixed tip is only the fallback without it. */}
+      {advice && !aiExplanationLoading && !aiExplanation?.available && (
+        <Text style={styles.advice}>{advice}</Text>
+      )}
 
       {aiExplanationLoading && (
         <View style={styles.aiBox}>
