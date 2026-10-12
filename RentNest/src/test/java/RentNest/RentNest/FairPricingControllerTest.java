@@ -72,7 +72,7 @@ public class FairPricingControllerTest {
 
     @Test
     public void testGetExplanationForListingFound() {
-        FairPriceExplanation explanation = FairPriceExplanation.of("Asking rent is 9% above fair rent.", "gemini-3.8-flash");
+        FairPriceExplanation explanation = FairPriceExplanation.of("Asking rent is 9% above fair rent.", "gemini-3.5-flash-lite");
         when(fairPriceExplanationService.explainListing(1L)).thenReturn(Optional.of(explanation));
 
         ResponseEntity<FairPriceExplanation> response = controller.getExplanationForListing(1L);

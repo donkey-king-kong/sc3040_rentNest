@@ -8,8 +8,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
-import FairPriceCard from '../components/FairPriceCard';
-import useFairPriceEstimate from '../hooks/useFairPriceEstimate';
 import { normalizeListingImageUrl } from '../components/ListingImage';
 
 const EditListingScreen = () => {
@@ -67,16 +65,6 @@ const EditListingScreen = () => {
 
         fetchListing();
     }, [listingId]);
-
-    // AI Fair-Pricing Model: suggested range updates as the owner edits the form
-    const { estimate: fairPrice, loading: fairPriceLoading } = useFairPriceEstimate({
-        token,
-        type: listing.type,
-        postal: listing.postal,
-        beds: listing.beds,
-        size: listing.size,
-        floor: listing.floor,
-    });
 
     const handleTypeSelect = (type) => {
         setListing({ ...listing, type });
@@ -233,26 +221,14 @@ const EditListingScreen = () => {
 
                 {/* Listing Price */}
                 <Text style={styles.label}>Listing Price</Text>
-                <View style={styles.priceInputRow}>
-                    <Text style={[styles.priceDollar, !listing.price && styles.priceDollarPlaceholder]}>$</Text>
-                    <TextInput
-                        style={styles.priceInput}
-                        placeholder="0"
-                        placeholderTextColor="#999"
-                        keyboardType="number-pad"
-                        value={formatWithCommas(listing.price)}
-                        onChangeText={handlePriceChange}
-                    />
-                </View>
-                {(fairPrice || fairPriceLoading) && (
-                    <FairPriceCard
-                        compact
-                        estimate={fairPrice}
-                        loading={fairPriceLoading}
-                        askingPrice={listing.price}
-                        onUseSuggested={(mid) => handleInputChange('price', String(mid))}
-                    />
-                )}
+                <TextInput
+                    style={styles.input}
+                    placeholder="Enter price"
+                    placeholderTextColor="#999"
+                    keyboardType="numeric"
+                    value={listing.price.toString()}
+                    onChangeText={(value) => handleInputChange('price', value)}
+                />
 
                 {/* Rooms - Bedroom & Bathroom */}
                 <Text style={styles.label}>Rooms</Text>

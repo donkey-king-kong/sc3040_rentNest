@@ -8,8 +8,6 @@ import NavigationBar from '../components/NavigationBar';
 import { API_BASE_URL } from '../config/api';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
-import FairPriceCard from '../components/FairPriceCard';
-import useFairPriceEstimate from '../hooks/useFairPriceEstimate';
 import { normalizeListingImageUrl } from '../components/ListingImage';
 
 const CreateListingScreen = () => {
@@ -35,16 +33,6 @@ const CreateListingScreen = () => {
     });
     const [modalVisible, setModalVisible] = useState(false);
     const notificationTimeoutRef = useRef(null);
-
-    // AI Fair-Pricing Model: suggested range updates as the owner fills in the form
-    const { estimate: fairPrice, loading: fairPriceLoading } = useFairPriceEstimate({
-        token,
-        type: listing.type,
-        postal: listing.postal,
-        beds: listing.beds,
-        size: listing.size,
-        floor: listing.floor,
-    });
 
     useEffect(() => {
         const loadUserDataAndToken = async () => {
@@ -216,28 +204,14 @@ const CreateListingScreen = () => {
 
                 {/* Listing Price */}
                 <Text style={styles.label}>Listing Price</Text>
-                <View style={styles.priceInputRow}>
-                    <Text style={[styles.priceDollar, !listing.price && styles.priceDollarPlaceholder]}>$</Text>
-                    <TextInput
-                        style={styles.priceInput}
-                        placeholder="0"
-                        placeholderTextColor="#666"
-                        keyboardType="number-pad"
-                        value={formatWithCommas(listing.price)}
-                        onChangeText={handlePriceChange}
-                    />
-                </View>
-                {(fairPrice || fairPriceLoading) ? (
-                    <FairPriceCard
-                        compact
-                        estimate={fairPrice}
-                        loading={fairPriceLoading}
-                        askingPrice={listing.price}
-                        onUseSuggested={(mid) => handleInputChange('price', String(mid))}
-                    />
-                ) : (
-                    <Text style={styles.hint}>Fill in the listing type, postal code and bedrooms to get an AI suggested price range.</Text>
-                )}
+                <TextInput
+                    style={styles.input}
+                    placeholder="Enter price"
+                    placeholderTextColor="#666"
+                    keyboardType="numeric"
+                    value={listing.price}
+                    onChangeText={(value) => handleInputChange('price', value)}
+                />
 
                 {/* Rooms - Bedroom & Bathroom */}
                 <Text style={styles.label}>Rooms</Text>
@@ -371,41 +345,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 2,
         elevation: 2,
-    },
-    priceInputRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 8,
-        marginTop: 8,
-        backgroundColor: '#fff',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-        paddingHorizontal: 12,
-    },
-    priceDollar: {
-        fontSize: 18,
-        color: '#000',
-        paddingVertical: 12,
-        paddingRight: 4,
-    },
-    priceDollarPlaceholder: {
-        color: '#666',
-    },
-    priceInput: {
-        flex: 1,
-        fontSize: 18,
-        color: '#000',
-        paddingVertical: 12,
-    },
-    hint: {
-        fontSize: 12,
-        color: '#666',
-        marginTop: 6,
     },
     typeContainer: {
         flexDirection: 'row',

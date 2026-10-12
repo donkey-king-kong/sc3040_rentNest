@@ -96,8 +96,9 @@ own floor area is ignored because it is the room's. Without a Gemini key, or if 
 The response carries `unitType`, `unitTypeSource` ("AI" / "keywords") and
 `rentShare`, and the card shows "Priced as a master room (detected by AI...)".
 
-The owner Create/Edit form still prices the whole unit; room detection runs on
-saved listings only.
+The card appears only on the listing page. The Create/Edit listing forms do not
+show a fair-price estimate; `GET /api/pricing/estimate` remains available but
+the app no longer calls it.
 
 ## AI explanation layer (Gemini)
 

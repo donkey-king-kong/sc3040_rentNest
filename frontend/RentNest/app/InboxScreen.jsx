@@ -31,21 +31,15 @@ const InboxScreen = () => {
       const email = decoded.sub;
       console.log('[InboxScreen] Token decoded successfully, email:', email);
 
-      // Get current user
-      const userResponse = await axios.get(`${API_BASE_URL}/api/users/${email}`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
+      // Get the current user and the listings in parallel; neither request needs the other.
+      const headers = { "Authorization": `Bearer ${token}` };
+      const [userResponse, listingsResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/users/${email}`, { headers }),
+        axios.get(`${API_BASE_URL}/api/listings`, { headers }),
+      ]);
       console.log("Current User obtained:", userResponse.data);
       setCurrentUser(userResponse.data);
 
-      // Get listings
-      const listingsResponse = await axios.get(`${API_BASE_URL}/api/listings`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      });
       console.log('[InboxScreen] listing image payloads:', listingsResponse.data.map(listing => ({
         listingID: listing.listingID,
         name: listing.name,
