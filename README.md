@@ -152,6 +152,9 @@ npm.cmd test -- --watchAll=false --runInBand
 ```
 
 ## Developer Notes
+
+The owner analytics dashboard shows current listing occupancy; the monthly occupancy graph has been removed.
+
 - [Listing enquiries and offers: required database migration, workflows and tests](Documentation/listing-enquiry-offer-guide.md)
 - [Listing Image Rendering Troubleshoot](Documentation/Troubleshooting/listing-images.md)
 - [Profile Image Handling Troubleshoot](Documentation/Troubleshooting/profile-images.md)

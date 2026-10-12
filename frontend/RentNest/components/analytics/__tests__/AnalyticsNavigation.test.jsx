@@ -65,7 +65,8 @@ it('owner navigation separates topics and uses the fixed year for property analy
   expect(text(tree)).not.toContain('Payments recorded');
   expect(useAnalytics).toHaveBeenLastCalledWith('/owner');
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Occupancy tab')).toHaveLength(0);
-  expect(text(tree)).toContain('Monthly Occupancy');
+  expect(text(tree)).not.toContain('Monthly Occupancy');
+  expect(text(tree)).toContain('Listing Occupancy');
   expect(text(tree)).toContain('Tenancy Length');
   expect(tree.root.findAllByType(require('../AnalyticsKit').StatTile).filter(node => node.props.label === 'Tenants Hosted')).toHaveLength(1);
   const { CountBarChart } = require('../AnalyticsKit');
@@ -475,8 +476,9 @@ it('shows owner unavailable explanations without turning missing averages into z
   expect(tiles.find(node => node.props.label === 'Rating and Reviews').props.metric).toMatchObject({ availability: 'unavailable', value: null, reason: 'No reviews yet.' });
   expect(tiles.find(node => node.props.label === 'Average Tenancy').props.metric).toMatchObject({ availability: 'unavailable', value: null });
   await press(tree, 'About Average Tenancy');
-  expect(text(tree)).toEqual(expect.arrayContaining(['No reviews yet', 'No accepted rentals with valid start and end dates.', 'No listings, so occupancy cannot be calculated.']));
-  expect(tree.root.findAllByType(LineChart).find(node => node.props.title === 'Monthly Occupancy').props.series).toMatchObject({ availability: 'unavailable', points: [] });
+  expect(text(tree)).toEqual(expect.arrayContaining(['No reviews yet', 'No accepted rentals with valid start and end dates.', 'No listings yet']));
+  expect(text(tree)).not.toContain('No listings, so occupancy cannot be calculated.');
+  expect(tree.root.findAllByType(LineChart).filter(node => node.props.title === 'Monthly Occupancy')).toHaveLength(0);
 });
 
 it('shows property unavailable averages and preserves measured zero counts', async () => {
