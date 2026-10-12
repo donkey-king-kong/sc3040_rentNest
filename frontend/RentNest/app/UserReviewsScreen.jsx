@@ -103,16 +103,7 @@ const UserReviewsScreen = () => {
 
                     const data = JSON.parse(rawBody);
                     const reviewList = Array.isArray(data) ? data : [];
-                    const avatars = [
-                        'https://randomuser.me/api/portraits/lego/1.jpg',
-                        'https://randomuser.me/api/portraits/lego/2.jpg',
-                        'https://randomuser.me/api/portraits/lego/3.jpg',
-                        'https://randomuser.me/api/portraits/lego/4.jpg',
-                        'https://randomuser.me/api/portraits/lego/5.jpg',
-                    ];
-
-                    // Use different avatar URLs based on review ID
-                    setReviews(reviewList.map((review, index) => {
+                    setReviews(reviewList.map((review) => {
                         // Try to parse the date, fall back if it's invalid
                         // let formattedDate;
                         // try {
@@ -128,7 +119,7 @@ const UserReviewsScreen = () => {
                             reviewerId: review.reviewerID || review.reviewerId,
                             reviewer: review.reviewerName,
                             // date: formattedDate, // Formatting the date to be more readable
-                            avatar: review.reviewerPhotoURL || review.photoURL || review.avatar || avatars[index % avatars.length],
+                            avatar: review.reviewerPhotoURL || review.photoURL || review.avatar || null,
                             rating: review.rating,
                             title: review.title,
                             content: review.text,

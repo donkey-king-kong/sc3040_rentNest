@@ -1,7 +1,13 @@
 # PostgreSQL
-spring.datasource.url=jdbc:YOUR_DB_CONNECTION_STRING
+# Use port 6543 (transaction mode) with prepareThreshold=0 to avoid prepared-statement
+# errors through PgBouncer. Port 5432 (session mode) exhausts the 30-connection limit.
+spring.datasource.url=jdbc:postgresql://YOUR_SUPABASE_HOST:6543/postgres?sslmode=require&prepareThreshold=0
 spring.datasource.username=YOUR_DB_USERNAME
 spring.datasource.password=YOUR_DB_PASSWORD
+
+# Connection pool — keep small to stay within Supabase's pooler limit
+spring.datasource.hikari.maximum-pool-size=5
+spring.datasource.hikari.minimum-idle=2
 
 # JPA / Hibernate
 # validate: fail startup if the code and the shared database disagree, instead of changing the shared schema.

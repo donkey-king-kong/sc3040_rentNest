@@ -40,7 +40,7 @@ const BanUsersScreen2 = () => {
         name: response.data.name,
         email: response.data.email,
         flagged: response.data.flagged,
-        photoURL: response.data.photoURL || "https://images.healthshots.com/healthshots/en/uploads/2020/12/08182549/positive-person.jpg"
+        photoURL: response.data.photoURL || null
       };
       console.log(transformedData);
 

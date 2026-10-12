@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     },
     star: {
         fontSize: 40,
-        color: '#ccc',
+        color: '#8E8E93',
         marginHorizontal: 2,
     },
     selectedStar: {

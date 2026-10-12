@@ -95,7 +95,7 @@ const ReviewListingScreen2 = () => {
         owner: {
           userID: response.data.ownerId || 0,
           name: response.data.ownerName || 'Unknown Owner',
-          photoURL: response.data.ownerPhotoURL || "https://images.healthshots.com/healthshots/en/uploads/2020/12/08182549/positive-person.jpg"
+          photoURL: response.data.ownerPhotoURL || null
         },
       };
       console.log("Transformed listing:", flaggedListing);
