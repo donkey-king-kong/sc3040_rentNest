@@ -1,24 +1,50 @@
 # Enquiry UI Refinement
 
-Status: implemented with user-requested partial rollback; draft refinement only.
+Status: standalone listing card implemented following the user's latest approval.
 Branch: `listing-enquiries-rental-history`.
 
 ## Final Scope Override
 
-After trying the implementation, the user approved the new pre-send
-"Enquiring about" preview but requested the original sent/received layout.
-This decision supersedes the unified-card design and UI-02 ticket below,
-which remain as the historical proposal.
+After retaining the new pre-send preview and initially restoring the original
+sent layout, the user supplied a new reference and approved a standalone
+listing card above a separate message bubble. This latest approval supersedes
+the unified-card design and UI-02 ticket below, retained as historical context.
 
 - Retained the compact draft, composer spacing, accessible controls and
   keyboard/safe-area handling.
-- Restored the original saved enquiry preview inside the ordinary chat bubble,
-  including View property, Offer this property, timestamps and delivery states.
+- Sent/received enquiries show a standalone name/address card with a full-width
+  outlined "View listing" button, with a minimum 44-point touch target.
+- Enquiry text remains in a separate blue outgoing or grey incoming bubble.
+  Sender alignment, owner Offer this property, timestamps and delivery states
+  remain intact. The card and text still represent one stored message.
+- Deleted listings retain snapshots and unavailable copy without actions.
+- No photo, price, property type, beds, bathrooms or size is added.
 - No data contracts, saved snapshots, backend or database changes.
 - Final regression run: all 76 frontend tests pass, including the restored blue
-  sender bubble, navigation, owner offer selection, draft removal and retry.
-- Earlier unified-card screenshots/review do not certify this reverted version.
+  sender bubble, card/bubble separation, navigation, owner offer selection,
+  draft removal and retry.
+- Earlier unified-card screenshots/review do not certify this final version.
   Native keyboard and accessibility verification remain outstanding.
+- Current isolated Expo web checks passed at 320, 390, 768 and 1440 px with no
+  horizontal page overflow or runtime page errors. Buttons measured 44 px high;
+  received owner action and deleted-listing state passed. Current phone and
+  desktop captures were visually inspected.
+
+### Revised UI-02: Standalone Listing Card
+
+- Owner: Senior Frontend Engineer. Priority: P2.
+- Scope: separate saved listing preview from the enquiry text bubble; change
+  View listing to a full-width outlined button; preserve the approved draft.
+- Dependencies: completed UI-01 and explicit approval of the reference layout.
+- Implementation notes: reuse snapshot props and existing navigation/offer
+  callbacks; render a card and bubble as siblings without creating extra messages.
+- Acceptance: name/address only; card outside the bubble; blue outgoing and grey
+  incoming text; owner action and unavailable state preserved.
+- Validation: QA regression tests pass for separation, both sender directions,
+  navigation, deleted records and offer selection; inspect current rendered web
+  output at phone, intermediate and desktop widths. Report native gaps.
+- Documentation impact: update the feature guide to this final presentation;
+  do not refresh the historical full-source export.
 
 ## Product and Scope
 

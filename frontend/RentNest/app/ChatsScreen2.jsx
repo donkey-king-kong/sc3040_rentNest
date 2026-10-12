@@ -1101,7 +1101,29 @@ const handlePaymentAndAccept = async () => {
                 <View key={`group-${gi}`} style={styles.groupContainer}>
                     {group.map((message, mi) => {
                         const showAvatar = !isUser && mi === 0;
-                        const avatarPlaceholder = !isUser && mi > 0;
+                        const isEnquiry = !!message.listingNameSnapshot;
+                        const bubble = (
+                            <View style={[
+                                styles.bubble, isUser ? styles.bubbleSelf : styles.bubbleOther,
+                                isEnquiry && styles.enquiryTextBubble,
+                                isEnquiry && { alignSelf: isUser ? 'flex-end' : 'flex-start' },
+                            ]}>
+                                <Text style={[styles.bubbleText, isUser && styles.bubbleTextSelf]}>{message.message}</Text>
+                                {message.deliveryStatus === 'sending' && (
+                                    <Text style={styles.sendingText}>Sending...</Text>
+                                )}
+                                {message.deliveryStatus === 'failed' && (
+                                    <View style={styles.failedMessageContainer}>
+                                        <Image source={errorIcon} style={styles.errorIcon} />
+                                        <Text style={styles.failedMessageText}>Failed</Text>
+                                        <TouchableOpacity style={styles.retryButton} onPress={() => retryMessage(message)}>
+                                            <Image source={retryButtonIcon} style={styles.retryIcon} />
+                                            <Text style={styles.retryText}>Retry</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+                            </View>
+                        );
                         return (
                             <View key={message.messageID} style={isUser ? styles.bubbleRowRight : styles.bubbleRowLeft}>
                                 {!isUser && (
@@ -1111,8 +1133,8 @@ const handlePaymentAndAccept = async () => {
                                         <View style={styles.avatarSpacer} />
                                     )
                                 )}
-                                <View style={[styles.bubble, isUser ? styles.bubbleSelf : styles.bubbleOther]}>
-                                    {!!message.listingNameSnapshot && (
+                                {isEnquiry ? (
+                                    <View style={styles.enquiryStack}>
                                         <EnquiryPreview
                                             name={message.listingNameSnapshot}
                                             address={message.listingAddressSnapshot}
@@ -1121,22 +1143,9 @@ const handlePaymentAndAccept = async () => {
                                             onOffer={!isUser && message.listingId && message.deliveryStatus !== 'failed'
                                                 ? () => toggleRentalModal(message.listingId) : undefined}
                                         />
-                                    )}
-                                    <Text style={[styles.bubbleText, isUser && styles.bubbleTextSelf]}>{message.message}</Text>
-                                    {message.deliveryStatus === 'sending' && (
-                                        <Text style={styles.sendingText}>Sending...</Text>
-                                    )}
-                                    {message.deliveryStatus === 'failed' && (
-                                        <View style={styles.failedMessageContainer}>
-                                            <Image source={errorIcon} style={styles.errorIcon} />
-                                            <Text style={styles.failedMessageText}>Failed</Text>
-                                            <TouchableOpacity style={styles.retryButton} onPress={() => retryMessage(message)}>
-                                                <Image source={retryButtonIcon} style={styles.retryIcon} />
-                                                <Text style={styles.retryText}>Retry</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    )}
-                                </View>
+                                        {bubble}
+                                    </View>
+                                ) : bubble}
                             </View>
                         );
                     })}
@@ -1955,6 +1964,8 @@ const handlePaymentAndAccept = async () => {
 
 
 const styles = StyleSheet.create({
+    enquiryStack: { width: 360, maxWidth: '86%', gap: 8 },
+    enquiryTextBubble: { maxWidth: '100%' },
     onDark: { color: '#F0F4F1' },
     errorOnDark: { color: '#FFB4B9' },
     composer: { paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E7ECE8', backgroundColor: '#FFFFFF' },

@@ -74,14 +74,25 @@ Removing it keeps the typed message; opening chat still sends nothing. Composer
 controls have larger touch targets, and the input area accounts for the bottom
 safe area with iOS keyboard avoidance.
 
-Sent and received enquiries retain the original property preview inside their
-chat bubbles, with explicit View property and owner Offer this property actions.
-The proposed unified-card redesign was reverted at the user's request.
+Sent and received enquiries show a standalone name/address card above a separate
+message bubble: blue for outgoing text, grey for incoming text. No photo, price,
+property type, beds, bathrooms or size is added. The card has a full-width
+outlined View listing button with a touch target of at least 44 points, plus
+the unchanged owner Offer this property action. View listing opens the same
+listing details. Deleted listings keep their snapshots and unavailable copy,
+without navigation or offer actions. Card and text remain one stored message.
+This reference-based layout replaces both the original nested preview and the
+earlier rejected unified-card design; the approved draft remains unchanged.
 No additional migration or API change is needed for this presentation update.
 
-The final frontend regression suite passes all 76 tests. Native keyboard,
-landscape, enlarged-text and screen-reader checks remain release validation;
-the earlier web screenshots of the unified card are not final-state evidence.
+The final frontend regression suite passes all 76 tests, including separate
+card/text structure, sender alignment and outlined-button semantics. Current
+Expo web checks with isolated API fixtures passed at 320, 390, 768 and 1440 px:
+no horizontal page overflow or runtime page errors, 44 px button height, owner
+action visible on received enquiries, and deleted-listing navigation hidden.
+Phone and desktop screenshots were inspected for the separate card/bubble layout.
+Native keyboard, landscape, enlarged-text and screen-reader checks remain release
+validation; the earlier unified-card screenshots are not final-state evidence.
 
 ## Data and API Contracts
 

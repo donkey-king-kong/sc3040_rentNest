@@ -81,10 +81,21 @@ test('two saved enquiries and deleted-property snapshots remain distinct', async
   const previews = ui.root.findAllByType(EnquiryPreview);
   expect(previews.map(p => p.props.name)).toEqual(['Bishan flat', 'Removed property']);
   expect(text(ui.toJSON())).toContain('Listing no longer available');
-  expect(buttons(ui).filter(b => text(b) === 'View property')).toHaveLength(1);
+  const viewButtons = buttons(ui).filter(b => text(b) === 'View listing');
+  expect(viewButtons).toHaveLength(1);
+  expect(viewButtons[0].props.accessibilityRole).toBe('button');
+  expect(viewButtons[0].props.style).toMatchObject({ minHeight: 44, width: '100%', borderWidth: 1, backgroundColor: 'transparent' });
   expect(previews[0].props.variant).not.toBe('draft');
-  expect(previews[0].parent.props.style.map(s => s.backgroundColor)).toContain('#2563EB');
-  await press(ui, 'View property');
+  const stack = previews[0].parent;
+  expect(stack.props.style.backgroundColor).toBeUndefined();
+  const messageBubble = stack.children[1];
+  expect(messageBubble.props.style).toEqual(expect.arrayContaining([
+    expect.objectContaining({ backgroundColor: '#2563EB' }),
+    expect.objectContaining({ alignSelf: 'flex-end' }),
+  ]));
+  expect(text(messageBubble)).toBe('First');
+  expect(messageBubble.findAllByType(EnquiryPreview)).toHaveLength(0);
+  await press(ui, 'View listing');
   expect(router.push).toHaveBeenCalledWith({ pathname: '/HomeListingScreen', params: { listingId: 59 } });
 });
 
@@ -96,7 +107,12 @@ test('received enquiry separates navigation from the offer action and preserves 
     message: 'Hi is this available?', date: '2026-10-12' }];
   const ui = await render(<ChatsScreen2 />);
   expect(text(ui.toJSON())).toContain(name);
-  const link = buttons(ui).find(b => text(b) === 'View property');
+  const messageBubble = ui.root.findByType(EnquiryPreview).parent.children[1];
+  expect(messageBubble.props.style).toEqual(expect.arrayContaining([
+    expect.objectContaining({ backgroundColor: '#F0F0F0' }),
+    expect.objectContaining({ alignSelf: 'flex-start' }),
+  ]));
+  const link = buttons(ui).find(b => text(b) === 'View listing');
   expect(text(link)).not.toContain('Offer this property');
   await press(ui, 'Offer this property');
   expect(buttons(ui).filter(b => b.props.accessibilityState?.checked).map(b => b.props.accessibilityLabel))
