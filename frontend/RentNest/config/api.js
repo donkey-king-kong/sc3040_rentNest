@@ -58,6 +58,9 @@ export const ENDPOINTS = {
     TENANT_PAYMENTS: (listingId, tenantId) => `/api/payment/tenant-payments/${listingId}/${tenantId}`,
     REVIEWS: '/api/reviews',
     REVIEW_BY_ID: (id) => `/api/reviews/${id}`,
+    ANALYTICS_OWNER_SUMMARY: '/api/analytics/owner/summary',
+    ANALYTICS_OWNER_LISTING: (listingId) => `/api/analytics/owner/listings/${listingId}`,
+    ANALYTICS_ADMIN_SUMMARY: '/api/analytics/admin/summary',
     // AI Fair-Pricing Model
     PRICING_FOR_LISTING: (listingId) => `/api/pricing/listing/${listingId}`,
     PRICING_EXPLANATION: (listingId) => `/api/pricing/listing/${listingId}/explanation`,

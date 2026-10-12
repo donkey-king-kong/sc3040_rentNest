@@ -68,8 +68,7 @@ Reset Recommendations remain separate actions.
 Android emulator interaction checks and before/after layout comparisons passed.
 Clear was also checked on Android with a retained Tampines search, and focused
 screen/request tests passed for populated, invalid, empty, and cleared filters.
-The standard Jest runner currently requires the missing `@react-native/jest-preset`
-dependency; the focused checks used the installed React renderer with mocked services.
+The standard Jest runner uses the matching `@react-native/jest-preset` development dependency. Run `npm ci` and `npm test -- --runInBand --watchAll=false` from `frontend/RentNest`. The earlier focused checks used the installed React renderer with mocked services.
 Web keyboard behavior and iOS interaction still require platform verification.
 
 ## Lease Termination

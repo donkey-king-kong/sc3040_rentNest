@@ -3,8 +3,8 @@ package RentNest.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
-import java.time.LocalDateTime;
+
+import java.util.Date;
 
 @Entity
 @Table(name = "listings")
@@ -41,9 +41,17 @@ public class Listings {
     public boolean isDemo() {
         return description != null && description.startsWith("FICTIONAL DEMO:");
     }
-    @CreationTimestamp
+    /** When the listing was published. Set by the server on first save; never accepted from requests. */
     @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Date createdAt;
+
+    @PrePersist
+    void recordCreation() {
+        if (createdAt == null) {
+            createdAt = new Date();
+        }
+    }
 
     // Getters
     public Long getListingID() {
@@ -58,6 +66,11 @@ public class Listings {
     @JsonProperty("ownerId")
     public Long getOwnerId() {
         return owner != null ? owner.getUserID() : null;
+    }
+
+    /** True when the given user owns this listing. */
+    public boolean isOwnedBy(User user) {
+        return user != null && user.getUserID() != null && user.getUserID().equals(getOwnerId());
     }
 
     @JsonProperty("ownerName")
@@ -142,16 +155,20 @@ public class Listings {
         return listingpicture;
     }
 
+    public Date getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
+    }
+
     public Double getLatitude() {
         return latitude;
     }
 
     public Double getLongitude() {
         return longitude;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
     }
 
     // Setters

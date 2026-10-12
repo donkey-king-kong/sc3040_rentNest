@@ -9,7 +9,12 @@ function RootStack() {
         headerShown: false,
         contentStyle: { paddingTop: insets.top, backgroundColor: '#F7F8FA' },
       }}
-    />
+    >
+      <Stack.Screen
+        name="AdminScreen"
+        options={{ contentStyle: { paddingTop: insets.top, backgroundColor: '#FFFFFF' } }}
+      />
+    </Stack>
   );
 }
 

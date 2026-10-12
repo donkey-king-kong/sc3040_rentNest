@@ -13,9 +13,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.http.ResponseEntity;
 
 import java.util.Arrays;
 import java.util.Date;
@@ -250,4 +249,18 @@ class ChatHistoryControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("No messages found between user " + userA + " and user " + userB + ".", response.getBody());
     }
+    @Test
+    public void conversationRequiresAuthentication() {
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(1L, 2L, null);
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        verifyNoInteractions(chatHistoryService, userRepository);
+    }
+
+    @Test
+    public void conversationRejectsNonParticipant() {
+        ResponseEntity<?> response = chatHistoryController.getConversationBetweenUsers(1L, 2L, authenticationForUser(3L));
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        verifyNoInteractions(chatHistoryService, userRepository);
+    }
+
 }

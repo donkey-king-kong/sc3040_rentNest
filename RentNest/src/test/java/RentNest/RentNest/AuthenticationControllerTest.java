@@ -19,6 +19,7 @@ import org.springframework.security.core.AuthenticationException;
 
 import java.util.Map;
 
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -69,8 +70,8 @@ class AuthenticationControllerTest {
         ResponseEntity<?> response = authenticationController.register(registerUserDto);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertTrue(response.getBody() instanceof Map);
-        assertEquals("Invalid user details", ((Map<?, ?>) response.getBody()).get("message"));
+        // The controller returns {"message": ...} as JSON, which the sign-up screen reads
+        assertEquals(Map.of("message", "Invalid user details"), response.getBody());
         verify(authenticationService, times(1)).signup(registerUserDto);
     }
 

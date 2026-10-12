@@ -5,7 +5,8 @@ import { jwtDecode } from 'jwt-decode';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import ChatsScreen2 from '../../app/ChatsScreen2';
 import TerminationRequestCard from '../../components/TerminationRequestCard';
-import { render, text, buttons, press } from './helpers';
+import { act } from 'react-test-renderer';
+import { render, text, buttons, press, deferred } from './helpers';
 
 const base = 'https://rentnest.test';
 let messages;
@@ -100,4 +101,37 @@ test.each([11, 22])('terminated offer labels are truthful for viewer %s', async 
   expect(labels).not.toContain('Pending');
   expect(labels).not.toContain('Awaiting tenant response');
   expect(labels).toContain('Lease ended');
+});
+
+test.each([
+  ['pending', 22, 22, true, 'New'],
+  ['pending', 11, 22, false, 'Pending'],
+  ['pending', 22, 33, false, 'New'],
+  ['active', 22, 22, false, 'Accepted'],
+  ['unexpected', 22, 22, false, 'Status unavailable'],
+  [null, 22, 22, false, 'Status unavailable'],
+])('offer %s for viewer %s and tenant %s gates acceptance', async (status, viewer, tenant, accepts, label) => {
+  viewerId = viewer;
+  rental = { ...rental, status, tenantUserID: tenant };
+  messages = [{ messageID: 1, senderId: 11, rentalId: 81, date: '2026-10-12T10:00:00Z' }];
+  const ui = await render(<ChatsScreen2 />);
+  expect(text(ui.toJSON())).toContain(label);
+  expect(buttons(ui).map(text).includes('Accept offer')).toBe(accepts);
+});
+
+test('failed offer loading is safe and can retry before rental details arrive', async () => {
+  const response = deferred();
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(url => url.endsWith('/rentals/81') ? response.promise : originalGet(url));
+  rental = { ...rental, status: 'pending' };
+  messages = [{ messageID: 1, senderId: 11, rentalId: 81, date: '2026-10-12T10:00:00Z' }];
+  const ui = await render(<ChatsScreen2 />);
+  expect(text(ui.toJSON())).toContain('Loading chat history...');
+  await act(async () => { response.reject(new Error('Rental unavailable')); });
+  expect(text(ui.toJSON())).toContain('Loading offer details. Tap to retry.');
+  expect(buttons(ui).map(text)).not.toContain('Accept offer');
+  axios.get.mockImplementation(originalGet);
+  await press(ui, 'Loading offer details. Tap to retry.');
+  expect(text(ui.toJSON())).not.toContain('Loading offer details. Tap to retry.');
+  expect(buttons(ui).map(text)).toContain('Accept offer');
 });

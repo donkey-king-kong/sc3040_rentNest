@@ -153,6 +153,49 @@ protects history against direct SQL deletion.
 
 ## Validation
 
+### Dashboard Branch Integration
+
+The merge of `main` at `5c706d4` into `feature/dashboard-usability-fixes`
+preserves dashboard screens and analytics calculations. Reconciliation decisions:
+
+- Listing AI-summary fields remain removed; listing/user/rental creation dates
+  and rental acceptance/termination dates remain available to analytics.
+- Generic rental creation and lifecycle updates remain blocked. Creation uses
+  the offer endpoint, acceptance uses the recipient workflow, and termination
+  uses an owner request followed by the tenant's decision. Repeated decisions
+  preserve event timestamps. The lifecycle integration test also checks that
+  accepted offers and terminations appear in the owner's monthly analytics.
+- Offer cards use their own rental IDs. Only a pending offer addressed to the
+  current tenant exposes acceptance controls. Unknown statuses cannot be
+  accepted; ended offers say "Lease ended". Failed rental loads show the retry
+  control before any rental fields are accessed.
+- Admin moderation can still delete listings without rental history or current
+  occupancy. Neither admins nor owners can delete rental-backed listings.
+  Editing remains owner-only and cannot transfer ownership.
+- Historical analytics fixtures select rentals by exact ID, not the
+  current-only listing lookup. Existing dashboard calculations are unchanged.
+
+Run the dashboard/component tests separately from the chat suite below, because
+the latter supplies its own native mocks:
+
+```bash
+./node_modules/.bin/jest --watchAll=false --runInBand --testPathPattern=components
+./node_modules/.bin/jest --config jest.termination.config.cjs --runInBand
+```
+
+Merge validation uses disposable H2 databases and mocked frontend APIs. No shared
+database migration is part of this merge resolution. Native-device behavior and
+PostgreSQL migration checks must not be inferred from these test results.
+
+Merge-resolution results (2026-10-12): 438 offline backend tests, 100
+dashboard/component tests, and 83 enquiry/termination tests passed. The initial
+unfiltered Maven run also picked up two configured live OpenRouter checks; both
+failed to obtain usable AI results. They were excluded from the final offline
+run using the backend command below, not counted as passes. No native-device or
+live dashboard walkthrough was performed for this reconciliation.
+
+### Original Feature Validation
+
 Local results (2026-10-12): 223 backend tests and 75 frontend tests passed.
 Paid/live OpenRouter testing was excluded. PostgreSQL migration checks passed
 in a disposable database, which was removed afterward. No application data was

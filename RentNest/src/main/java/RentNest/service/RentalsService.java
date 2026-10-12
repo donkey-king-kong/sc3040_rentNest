@@ -23,6 +23,7 @@ import org.hibernate.Hibernate;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -181,7 +182,7 @@ public class RentalsService {
         rental.setPaymentHistory(null);
         rental.setStatus("pending"); // Set rental status to "pending"
         rental.setListings(listing);
-        setInitialStatusTimestamps(rental);
+        recordStatusChange(rental);
 
         Rentals savedRental = rentalsRepository.save(rental); // Save the rental first and get its ID
 
@@ -251,9 +252,7 @@ public class RentalsService {
         // Change the status from "pending" to "active" to accept the contract
         if ("pending".equals(existingRental.getStatus())) {
             existingRental.setStatus("active");
-            if (existingRental.getAcceptedAt() == null) {
-                existingRental.setAcceptedAt(new Date());
-            }
+            recordStatusChange(existingRental);
         } else {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Rental is not in pending status");
         }
@@ -284,6 +283,20 @@ public class RentalsService {
     public Optional<RentalsDTO> getRentalByListingIdAndTenantId(Long listingID, Long tenantID) {
         return rentalsRepository.findByListings_ListingIDAndTenantUserID(listingID, tenantID)
                 .map(this::toRentalsDTO);  // Map to RentalsDTO if found
+    }
+
+    /**
+     * Records, from the server clock, the first time a rental becomes active (accepted) or terminated.
+     * Existing times are never overwritten, so repeated updates keep the original moment.
+     */
+    static void recordStatusChange(Rentals rental) {
+        String status = rental.getStatus() == null ? "" : rental.getStatus().trim().toLowerCase(Locale.ROOT);
+        if (status.equals("active") && rental.getAcceptedAt() == null) {
+            rental.setAcceptedAt(new Date());
+        }
+        if (status.equals("terminated") && rental.getTerminatedAt() == null) {
+            rental.setTerminatedAt(new Date());
+        }
     }
 
     public List<Long> manageTenants(Long listingID) {
@@ -330,16 +343,6 @@ public class RentalsService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
         }
         return user.getUserID();
-    }
-
-    private void setInitialStatusTimestamps(Rentals rental) {
-        Date now = new Date();
-        if ("active".equals(rental.getStatus()) && rental.getAcceptedAt() == null) {
-            rental.setAcceptedAt(now);
-        }
-        if ("terminated".equals(rental.getStatus()) && rental.getTerminatedAt() == null) {
-            rental.setTerminatedAt(now);
-        }
     }
 
     private void guardTerminationLifecycle(Rentals rental) {

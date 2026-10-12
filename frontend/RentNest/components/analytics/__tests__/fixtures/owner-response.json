@@ -1,0 +1,108 @@
+{
+  "asOf": "2026-09-16T19:16:52.198544800Z",
+  "currency": "SGD",
+  "totalListings": 3,
+  "occupiedListings": 1,
+  "totalViews": 25,
+  "totalRentCollected": 5500,
+  "tenantsHosted": 2,
+  "terminations": 1,
+  "reviewCount": 2,
+  "averageRating": 4.5,
+  "averageRatingUnavailableReason": null,
+  "averageTenancyMonths": 14.5,
+  "averageTenancyUnavailableReason": null,
+  "monthlyOccupancyUnavailableReason": null,
+  "monthlyRent": [
+    {
+      "label": "2026-01",
+      "value": 1500
+    },
+    {
+      "label": "2026-02",
+      "value": 0
+    },
+    {
+      "label": "2026-03",
+      "value": 0
+    }
+  ],
+  "monthlyOccupancy": [
+    {
+      "label": "2026-01",
+      "value": 25
+    },
+    {
+      "label": "2026-02",
+      "value": 40
+    },
+    {
+      "label": "2026-03",
+      "value": 33
+    }
+  ],
+  "monthlyAcceptedOffers": [
+    {
+      "label": "2026-01",
+      "value": 0
+    },
+    {
+      "label": "2026-02",
+      "value": 1
+    },
+    {
+      "label": "2026-03",
+      "value": 0
+    }
+  ],
+  "monthlyTerminations": [
+    {
+      "label": "2026-01",
+      "value": 0
+    },
+    {
+      "label": "2026-02",
+      "value": 0
+    },
+    {
+      "label": "2026-03",
+      "value": 1
+    }
+  ],
+  "monthlyAverageDaysOnMarket": [
+    {
+      "label": "2026-01",
+      "value": null
+    },
+    {
+      "label": "2026-02",
+      "value": 10
+    },
+    {
+      "label": "2026-03",
+      "value": null
+    }
+  ],
+  "tenancyLengths": [
+    {
+      "label": "<3 months",
+      "value": 0
+    },
+    {
+      "label": "3 to <6 months",
+      "value": 1
+    },
+    {
+      "label": "6 to <12 months",
+      "value": 0
+    },
+    {
+      "label": "12 to <24 months",
+      "value": 1
+    },
+    {
+      "label": "24+ months",
+      "value": 0
+    }
+  ]
+}

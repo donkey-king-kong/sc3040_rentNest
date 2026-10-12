@@ -183,13 +183,6 @@ public class ListingsService {
             listing.setDescription(listingDTO.getDescription());
             listing.setListingpicture(listingDTO.getListingpicture());
 
-            // Update owner if necessary (optional, based on your use case)
-            if (listingDTO.getOwnerUserID() != null) {
-                User owner = userRepository.findById(listingDTO.getOwnerUserID())
-                        .orElseThrow(() -> new RuntimeException("Owner not found"));
-                listing.setOwner(owner);
-            }
-
             // Save the updated listing back to the repository
             listingsRepository.save(listing);
             return Optional.of(listing);
@@ -204,7 +197,7 @@ public class ListingsService {
     public void deleteListing(Long id) {
         Listings listing = listingsRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
-        requireOwner(listing);
+        requireOwnerOrAdmin(listing, true);
         if (listing.getTenantId() != null || rentalsRepository.existsByListings_ListingID(id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "A property with rental history cannot be deleted");
         }
@@ -213,12 +206,18 @@ public class ListingsService {
     }
 
     private void requireOwner(Listings listing) {
+        requireOwnerOrAdmin(listing, false);
+    }
+
+    private void requireOwnerOrAdmin(Listings listing, boolean allowAdmin) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof User user)) {
+        if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof User user)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
         }
-        if (!Objects.equals(user.getUserID(), listing.getOwnerId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the listing owner can modify this property");
+        if (!Objects.equals(user.getUserID(), listing.getOwnerId()) && !(allowAdmin && user.isAdmin())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    allowAdmin ? "Only the listing owner or an admin can delete this property"
+                            : "Only the listing owner can modify this property");
         }
     }
 

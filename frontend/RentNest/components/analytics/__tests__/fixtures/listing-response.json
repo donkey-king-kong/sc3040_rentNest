@@ -1,0 +1,55 @@
+{
+  "asOf": "2026-09-16T19:16:52.198544800Z",
+  "currency": "SGD",
+  "listingId": 2,
+  "name": "A2",
+  "type": "HDB",
+  "location": null,
+  "price": 2000,
+  "listingPicture": null,
+  "listedAt": null,
+  "firstAcceptedAt": null,
+  "totalRentalOffers": 1,
+  "acceptedOffers": 1,
+  "tenantsHosted": 1,
+  "rentCollected": 1500,
+  "paymentCount": 1,
+  "totalViews": 0,
+  "uniqueViewers": 0,
+  "acceptanceRate": 100,
+  "averageTenancyMonths": 3,
+  "occupancyRate": 65.6,
+  "daysOnMarket": null,
+  "occupancyStatus": "vacant",
+  "acceptanceRateUnavailableReason": null,
+  "averageTenancyUnavailableReason": null,
+  "daysOnMarketUnavailableReason": "The publication date was not recorded for this listing.",
+  "monthlyRent": [
+    {
+      "label": "2026-01",
+      "value": 1500
+    },
+    {
+      "label": "2026-02",
+      "value": 0
+    },
+    {
+      "label": "2026-03",
+      "value": 0
+    }
+  ],
+  "monthlyOccupancy": [
+    {
+      "label": "2026-01",
+      "status": "vacant"
+    },
+    {
+      "label": "2026-02",
+      "status": "occupied"
+    },
+    {
+      "label": "2026-03",
+      "status": "occupied"
+    }
+  ]
+}
