@@ -1,5 +1,23 @@
 # Frontend
 
+## Profile Photo URLs
+
+Sign Up and Edit Profile now include **Photo URL (optional)**. Paste a public
+HTTP(S) image URL (HTTPS recommended, up to 255 characters). In Edit Profile,
+the avatar previews the draft; select **Update Profile** to save. Clearing the
+field and saving removes the photo and uses initials. Returning to Profile
+reloads saved changes without restarting the app.
+
+The field is optional, and a failed image download does not block saving a
+valid URL. There is no file upload or cropping. Avoid secret links because
+existing avatar diagnostics log URLs.
+
+Run `npm run test:photo-url` from `frontend/RentNest` for focused URL and mounted
+screen tests using mocked services. The command uses Node's test runner with
+the installed Babel/React renderer and does not require the currently missing
+React Native Jest preset. See [profile image guidance](../Documentation/Troubleshooting/profile-images.md)
+for API omission/clearing semantics, fallback behavior, and test limitations.
+
 ## AI Pricing Logs
 
 The listing detail screen logs estimate and explanation requests under

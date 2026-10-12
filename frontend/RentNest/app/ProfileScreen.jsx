@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import NavigationBar from '../components/NavigationBar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,19 +13,22 @@ import ProfileImage from '../components/ProfileImage';
 const ProfileScreen = () => {
   const router = useRouter();
   const [user, setUser] = useState({
-    userID: 1,
+    userID: null,
     name: 'Loading...',
     email: 'Loading...',
     contact: 'Loading...',
-    photoURL: 'https://t3.ftcdn.net/jpg/06/33/54/78/360_F_633547842_AugYzexTpMJ9z1YcpTKUBoqBF0CUCk10.jpg',
+    photoURL: null,
   });
   const [isProfileLoading, setIsProfileLoading] = useState(true);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
+    const controller = new AbortController();
+    let isActive = true;
     const fetchUserData = async () => {
       try {
         setIsProfileLoading(true);
         const token = await AsyncStorage.getItem('token');
+        if (!isActive) return;
         if (!token) {
           router.replace('/LandingScreen');
           return;
@@ -39,32 +42,41 @@ const ProfileScreen = () => {
 
         const decoded = jwtDecode(token);
         const userEmail = decoded.sub;
-        const response = await axios.get(`${API_BASE_URL}/api/users/${userEmail}`, {
-          headers: authHeaders
+        const response = await axios.get(`${API_BASE_URL}/api/users/${encodeURIComponent(userEmail)}`, {
+          headers: authHeaders,
+          signal: controller.signal,
+          timeout: 15000,
         });
+        if (!isActive) return;
 
         if (response.data.userID) {
           await AsyncStorage.setItem('userId', response.data.userID.toString());
         }
+        if (!isActive) return;
 
         setUser({
           userID: response.data.userID,
           name: response.data.name,
           email: response.data.email,
           contact: response.data.contact || 'No contact provided',
-          photoURL: response.data.photoURL || 'https://t3.ftcdn.net/jpg/06/33/54/78/360_F_633547842_AugYzexTpMJ9z1YcpTKUBoqBF0CUCk10.jpg'
+          photoURL: response.data.photoURL ?? null
         });
 
       } catch (error) {
+        if (!isActive || axios.isCancel(error)) return;
         console.error('Error fetching user data:', error);
         router.replace('/LandingScreen');
       } finally {
-        setIsProfileLoading(false);
+        if (isActive) setIsProfileLoading(false);
       }
     };
 
     fetchUserData();
-  }, []);
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [router]));
 
   // Function to navigate to EditProfileScreen
   const handleEditProfile = () => {

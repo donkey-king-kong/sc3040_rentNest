@@ -1,6 +1,7 @@
 package RentNest.controller;
 
 import java.util.Optional;
+import java.util.Map;
 
 import RentNest.dto.ListingsDTO;
 import RentNest.service.ListingsService;
@@ -75,15 +76,20 @@ public class UserController {
 
     // Update user data
     @PutMapping("/id/{userID}")
-    public ResponseEntity<User> updateUser(
+    public ResponseEntity<?> updateUser(
             @PathVariable Long userID,
             @RequestParam String name,
             @RequestParam String email,
-            @RequestParam String contact) {
-        Optional<User> updatedUser = userService.updateUserData(userID, name, email, contact);
+            @RequestParam String contact,
+            @RequestParam(name = "photoURL", required = false) String photoURL) {
+        try {
+            Optional<User> updatedUser = userService.updateUserData(userID, name, email, contact, photoURL);
         
-        return updatedUser.map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+            return updatedUser.map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     // Get Reviews for a User by UserId
