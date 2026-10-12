@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import RentNest.model.Listings;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -13,6 +14,12 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ListingsRepository extends JpaRepository<Listings, Long> {
+    // Load owner and tenant in the same query: the JSON includes their names and photos,
+    // and loading them lazily cost one database round trip per listing.
+    @Override
+    @EntityGraph(attributePaths = {"owner", "tenant"})
+    List<Listings> findAll();
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT l FROM Listings l WHERE l.listingID = :id")
     Optional<Listings> findByIdForUpdate(@Param("id") Long id);
