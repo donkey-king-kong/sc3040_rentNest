@@ -227,14 +227,15 @@ class LifecycleTimestampsIntegrationTest {
     }
 
     @Test
-    void emptyHistoricalPeriodsHaveZeroCountsButNoCompletedDaysOnMarket() throws Exception {
+    void emptyHistoricalPeriodsKeepAllTimeTotalButHaveZeroMonthlyTerminations() throws Exception {
         createLifecycleFixture();
 
         mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"), "2025-06-01T00:00:00+08:00", "2025-12-01T00:00:00+08:00"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.metrics.offersSentCount").doesNotExist())
                 .andExpect(jsonPath("$.metrics.offersAcceptedCount").doesNotExist())
-                .andExpect(jsonPath("$.terminations").value(0))
+                .andExpect(jsonPath("$.terminations").value(1))
+                .andExpect(jsonPath("$.monthlyTerminations[*].value", org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is(0))))
                 .andExpect(jsonPath("$.metrics.averageDaysOnMarket").doesNotExist())
                 .andExpect(jsonPath("$.metrics.newListingCount").doesNotExist());
 

@@ -6,9 +6,11 @@ import MapView, { Marker } from '../components/AppMap';
 import {useRouter, useLocalSearchParams} from "expo-router";
 import axios from "axios";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL, ENDPOINTS } from '../config/api';
 import { jwtDecode } from 'jwt-decode';
 import MorphingInfinity from '../components/MorphingInfinity';
+import FairPriceCard from '../components/FairPriceCard';
+import PriceInsightsChart from '../components/PriceInsightsChart';
 import ListingImage from '../components/ListingImage';
 import ProfileImage from '../components/ProfileImage';
 
@@ -25,6 +27,10 @@ const HomeListingScreen = () => {
   const [nearbyHawkerCentres, setNearbyHawkerCentres] = useState([]);
   const [nearbyBusStops, setNearbyBusStops] = useState([]);
   const [priceInsights, setPriceInsights] = useState([]);
+  const [fairPrice, setFairPrice] = useState(null);
+  const [fairPriceLoading, setFairPriceLoading] = useState(true);
+  const [aiExplanation, setAiExplanation] = useState(null);
+  const [aiExplanationLoading, setAiExplanationLoading] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('Schools');
   const [loading, setLoading] = useState(true);
@@ -70,6 +76,14 @@ const HomeListingScreen = () => {
   useEffect(() => {
     const fetchListingData = async () => {
       try {
+        setLoading(true);
+        setListing(null);
+        setNearbySchools([]);
+        setNearbyHawkerCentres([]);
+        setNearbyBusStops([]);
+        setPriceInsights([]);
+        setReviews([]);
+
         const tokenValue = await AsyncStorage.getItem('token');
         
         if (!tokenValue) {
@@ -117,32 +131,61 @@ const HomeListingScreen = () => {
 
         // Apply default values only if the response data is empty or missing properties
         const listingData = listingResponse.data || {};
+        const isDemo = listingData.demo === true;
         const defaultListing = {
+          isDemo,
           name: listingData.name || 'No Name Available',
           location: listingData.location || 'Location not available',
           price: listingData.price || 0,
           rating: 4.0,
-          pincode: listingData.postal || 489836,
+          pincode: listingData.postal || (isDemo ? 'Not provided' : 489836),
           type: listingData.type || 'Not specified',
           rentalType: 'Room Rental',
-          description: listingData.description || 'No description available',
+          description: isDemo ? (listingData.description || '').replace('FICTIONAL DEMO:', 'SAMPLE LISTING:').replace(/\bdemo\b/gi, 'sample') : (listingData.description || 'No description available'),
           beds: listingData.beds || 0,
           baths: listingData.bathroom || 0,
           size: listingData.size || 1, // Prevent division by zero
           imageURL: listingData.listingpicture,
           ownerUserID: listingData.ownerId || '',
-          ownerName: listingData.ownerName || 'Unknown',
+          ownerName: isDemo ? 'Sample Property Owner' : (listingData.ownerName || 'Unknown'),
           ownerPhotoURL: listingData.ownerPhotoURL || 'https://thumbs.dreamstime.com/b/tranquil-caucasian-handsome-brunet-man-blue-long-scarf-posing-wrinkled-face-against-background-square-image-236510369.jpg'
         };
         console.log('Processed listing data:', defaultListing);
         setListing(defaultListing);
+        if (isDemo) {
+          setNearbySchools([]); setNearbyHawkerCentres([]); setNearbyBusStops([]);
+          setPriceInsights([]); setReviews([]);
+          return; // Fictional demo addresses must not trigger government data lookups.
+        }
 
-        // Show the listing once core details are ready; secondary sections load in the background.
-        setLoading(false);
-        fetchSecondaryListingData(tokenValue, defaultListing.ownerUserID)
-          .catch(error => {
-            console.warn('Secondary listing data failed:', error?.message);
-          });
+        // AI fair-price estimate (non-blocking: the rest of the page loads while it runs)
+        axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_FOR_LISTING(listingId)}`, {
+          headers: authHeaders(tokenValue)
+        })
+          .then(res => {
+            setFairPrice(res.data);
+            if (!res.data?.available) return;
+            // The AI explanation arrives a few seconds after the bands, so fetch it separately.
+            setAiExplanationLoading(true);
+            axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_EXPLANATION(listingId)}`, {
+              headers: authHeaders(tokenValue)
+            })
+              .then(expRes => setAiExplanation(expRes.data))
+              .catch(err => {
+                console.error('Error fetching AI price explanation:', err?.message);
+                setAiExplanation({ available: false, message: 'Could not reach the AI explanation service.' });
+              })
+              .finally(() => setAiExplanationLoading(false));
+          })
+          .catch(err => {
+            console.error('Error fetching fair price:', err?.message);
+            setFairPrice({ available: false, message: 'Could not reach the pricing service.' });
+          })
+          .finally(() => setFairPriceLoading(false));
+
+        // Keep the transition up until the full page data has settled, so
+        // sections do not briefly render misleading empty states.
+        await fetchSecondaryListingData(tokenValue, defaultListing.ownerUserID);
       } catch (error) {
         console.error('Error in fetchListingData:', error);
         console.error('Error details:', { //Remove when demo
@@ -213,18 +256,55 @@ const HomeListingScreen = () => {
         applyNearbyAmenities([]);
       };
 
+      const fetchPriceInsights = async () => {
+        const url = `${API_BASE_URL}/api/gov/rentalprices/${listingId}`;
+        console.info('[PriceInsights] Fetching rental prices', { listingId, url });
+        try {
+          const response = await axios.get(url, requestConfig);
+          const payload = response.data || [];
+          if (!Array.isArray(payload)) {
+            console.warn('[PriceInsights] Unexpected rental prices response shape', {
+              listingId,
+              status: response.status,
+              payloadType: typeof payload,
+              payload,
+            });
+            setPriceInsights([]);
+            return;
+          }
+
+          const uniquePrices = {};
+          payload.forEach(item => {
+            if (!uniquePrices[item.leaseDate] || item.rentPrice > uniquePrices[item.leaseDate].rentPrice) {
+              uniquePrices[item.leaseDate] = item;
+            }
+          });
+          const dedupedPrices = Object.values(uniquePrices);
+          console.info('[PriceInsights] Rental prices fetch completed', {
+            listingId,
+            status: response.status,
+            rawCount: payload.length,
+            dedupedCount: dedupedPrices.length,
+            sample: dedupedPrices.slice(0, 3),
+          });
+          if (dedupedPrices.length === 0) {
+            console.info('[PriceInsights] Rental prices response is empty', { listingId });
+          }
+          setPriceInsights(dedupedPrices);
+        } catch (error) {
+          console.warn('[PriceInsights] Rental prices request failed', {
+            listingId,
+            message: error.message,
+            status: error.response?.status,
+            response: error.response?.data,
+          });
+          throw error;
+        }
+      };
+
       await Promise.allSettled([
         fetchNearbyAmenitiesUntilReady(),
-        axios.get(`${API_BASE_URL}/api/gov/rentalprices/${listingId}`, requestConfig)
-          .then(response => {
-            const uniquePrices = {};
-            (response.data || []).forEach(item => {
-              if (!uniquePrices[item.leaseDate] || item.rentPrice > uniquePrices[item.leaseDate].rentPrice) {
-                uniquePrices[item.leaseDate] = item;
-              }
-            });
-            setPriceInsights(Object.values(uniquePrices));
-          }),
+        fetchPriceInsights(),
         axios.get(`${API_BASE_URL}/api/reviews/byUser/${ownerUserID}`, requestConfig)
           .then(response => {
             const reviewList = Array.isArray(response.data) ? response.data : [];
@@ -415,6 +495,15 @@ const HomeListingScreen = () => {
         {/* Display the apartment type */}
         <Text style={styles.type}>Apartment Type: {listing.type}</Text>
 
+        {/* AI Fair-Pricing Model: how the asking price compares with the market */}
+        <FairPriceCard
+          estimate={fairPrice}
+          loading={fairPriceLoading}
+          askingPrice={listing.price}
+          aiExplanation={aiExplanation}
+          aiExplanationLoading={aiExplanationLoading}
+        />
+
         {/* Gray line above the icons */}
         <View style={styles.line} />
 
@@ -450,6 +539,10 @@ const HomeListingScreen = () => {
         {/* Display listing ID for future backend connection */}
         {/*<Text style={styles.listingId}>Listing ID: {listingId}</Text>*/}
 
+        {listing.isDemo && <Text style={{ color: '#805300', marginVertical: 12 }}>
+          Sample listing. Photo is illustrative; prices and property details are invented for testing. No verified address, nearby amenities or market-price comparison.
+        </Text>}
+        {!listing.isDemo && <>
         {/* Heading for the location section */}
         <Text style={styles.schoolsLabel}>About the Location</Text>
 
@@ -541,23 +634,14 @@ const HomeListingScreen = () => {
           )}
          </View>
          {/* Display Price Insights */}
-                <Text style={styles.header1}>Price Insights</Text>
-                <View style={styles.table}>
-                    <View style={styles.row}>
-                        <Text style={styles.cellHeader}>Lease Date</Text>
-                        <Text style={styles.cellHeader}>Rent Price</Text>
-                    </View>
-                    {priceInsights.map((item) => (
-                      <View key={item.leaseDate} style={styles.row}>
-                        <Text style={styles.cell}>{item.leaseDate}</Text>
-                        <Text style={styles.cell}>${item.rentPrice}</Text>
-                      </View>
-                    ))}
+                <View style={styles.priceInsightsContainer}>
+                  <PriceInsightsChart data={priceInsights} askingPrice={listing.price} fairPrice={fairPrice?.available ? fairPrice.fairPrice : null} />
                 </View>
+        </>}
                 {/* Owner Details Box */}
                       <View style={styles.ownerBox}>
                         <View style={styles.ownerInfo}>
-                          <ProfileImage
+                          {!listing.isDemo && <ProfileImage
                             uri={listing.ownerPhotoURL}
                             name={listing.ownerName}
                             style={styles.ownerImage}
@@ -565,14 +649,14 @@ const HomeListingScreen = () => {
                             screen="HomeListingScreen"
                             userId={listing.ownerId}
                             role="owner"
-                          />
+                          />}
                           <Text style={styles.ownerText}>Posted by: {listing.ownerName}</Text>
                         </View>
                       </View>
 
                       {/* Buttons */}
-                        <TouchableOpacity onPress={handleChat} style={styles.messageButton}>
-                          <Text style={styles.buttonText1}>Message Owner</Text>
+                        <TouchableOpacity disabled={listing.isDemo} onPress={handleChat} style={styles.messageButton}>
+                          <Text style={styles.buttonText1}>{listing.isDemo ? 'Sample listing — enquiries unavailable' : 'Message Owner'}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.reportButton} onPress={handleReportListing}>
                           <Text style={styles.buttonText2}>Report Listing</Text>
@@ -633,6 +717,9 @@ const HomeListingScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  priceInsightsContainer: {
+    marginHorizontal: 0,
+  },
   box: {
     flex: 1,
     backgroundColor: '#fff',
@@ -893,12 +980,6 @@ container: {
     flex: 1,
     textAlign: 'center',
   },
-  header1: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      marginBottom: 10,
-      paddingHorizontal: 20
-    },
 ownerBox: {
     borderWidth: 1,
     borderColor: '#000', // Black outline

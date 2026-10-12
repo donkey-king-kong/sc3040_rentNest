@@ -28,7 +28,7 @@ Snapshot metrics describe stored records or the state at `asOf` and ignore the r
 
 | Scope | Snapshot keys | Period keys |
 |---|---|---|
-| Owner | `totalListings`, `occupiedListings`, `totalViews`, `totalRentCollected`, `tenantsHosted`, `averageTenancyMonths`, `reviewCount`, `averageRating` | `terminations` |
+| Owner | `totalListings`, `occupiedListings`, `totalViews`, `totalRentCollected`, `tenantsHosted`, `averageTenancyMonths`, `reviewCount`, `averageRating`, `terminations` | — |
 | Property | `occupancyStatus`, `totalRentalOffers`, `acceptedOffers`, `acceptanceRate`, `tenantsHosted`, `averageTenancyMonths`, `daysOnMarket` | `rentCollected`, `paymentCount`, `occupancyRate`, `totalViews`, `uniqueViewers` |
 
 `OwnerAnalyticsDTO` supplies `averageRatingUnavailableReason`, `averageTenancyUnavailableReason` and `monthlyOccupancyUnavailableReason`. `PropertyAnalyticsDTO` supplies `acceptanceRateUnavailableReason`, `averageTenancyUnavailableReason` and `daysOnMarketUnavailableReason`. These explanations are null when the corresponding value is available. Property details are direct fields: `listingId`, `name`, `type`, `location`, `price`, `listingPicture`, `listedAt` and `firstAcceptedAt`.
@@ -39,6 +39,8 @@ Snapshot metrics describe stored records or the state at `asOf` and ignore the r
 |---|---|
 | Owner | `monthlyRent`, `monthlyOccupancy`, `monthlyAcceptedOffers`, `monthlyTerminations`, `monthlyAverageDaysOnMarket`, `tenancyLengths` |
 | Property | `monthlyRent`, `monthlyOccupancy` |
+
+Property `monthlyOccupancy` remains in the API response for compatibility, but is not rendered by the property dashboard. The removed calendar is not part of the current UI.
 
 `tenancyLengths` describes accepted rentals across their stored history. Other charts use the requested period. Monthly event counts include zero months; days-on-market months without qualifying acceptances have null values. Owner monthly occupancy is null with an explanation when there are no listings.
 
@@ -51,6 +53,7 @@ The response includes asOf and currency. Monthly chart lists are monthlyRent, mo
 ## Definitions
 
 - Rent totals sum recorded rent amounts by billing month, not transaction time. Deposits are excluded and refunds are not deducted. The platform total includes all recorded rent regardless of the requested period.
+- Owner termination totals include all recorded termination history for currently owned listings; the monthly termination chart uses the requested period.
 - Owner total views count recorded visits to currently owned properties, including repeats and excluding self-visits. Property views and unique viewers use the requested period.
 - Reviews and ratings are about the owner, not individual properties. No reviews produces an unavailable average rating.
 - Property accepted offers count records marked `active` or `terminated`. Monthly acceptance counts use `acceptedAt`; undated acceptances cannot appear in a monthly bucket.
