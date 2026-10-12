@@ -198,7 +198,7 @@ const RentalInfoOwner = () => {
 
               <TouchableOpacity
                   style={styles.transparentButton}
-                  onPress={() => router.push({pathname: '/EditListingScreen', params: { listingId }})}
+                  onPress={() => router.replace({pathname: '/EditListingScreen', params: { listingId }})}
               >
                 <FontAwesome name="edit" style={[styles.icon, styles.lighterIcon]} />
                 <Text style={styles.buttonText}>Edit Listing</Text>

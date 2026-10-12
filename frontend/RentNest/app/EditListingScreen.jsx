@@ -86,6 +86,17 @@ const EditListingScreen = () => {
         setListing({ ...listing, [field]: value });
     };
 
+    const formatWithCommas = (val) => {
+        const digits = String(val).replace(/\D/g, '');
+        if (!digits) return '';
+        return Number(digits).toLocaleString('en-US');
+    };
+
+    const handlePriceChange = (text) => {
+        const digits = text.replace(/\D/g, '');
+        setListing({ ...listing, price: digits });
+    };
+
     const handleUpdateListing = async () => {
         // Validation checks
         if (!listing.name) return Alert.alert('Validation Error', 'Name is required.');
@@ -132,7 +143,7 @@ const EditListingScreen = () => {
             setModalVisible(true);
             notificationTimeoutRef.current = setTimeout(() => {
                 setModalVisible(false);
-                router.push({ pathname: '/RentalInfoOwnerScreen', params: { listingId } });
+                router.replace({ pathname: '/RentalInfoOwnerScreen', params: { listingId } });
             }, 2000);
         } catch (error) {
             console.error('Error updating listing:', error);
@@ -222,14 +233,17 @@ const EditListingScreen = () => {
 
                 {/* Listing Price */}
                 <Text style={styles.label}>Listing Price</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="Enter price"
-                    placeholderTextColor="#999"
-                    keyboardType="numeric"
-                    value={listing.price.toString()}
-                    onChangeText={(value) => handleInputChange('price', value)}
-                />
+                <View style={styles.priceInputRow}>
+                    <Text style={[styles.priceDollar, !listing.price && styles.priceDollarPlaceholder]}>$</Text>
+                    <TextInput
+                        style={styles.priceInput}
+                        placeholder="0"
+                        placeholderTextColor="#999"
+                        keyboardType="number-pad"
+                        value={formatWithCommas(listing.price)}
+                        onChangeText={handlePriceChange}
+                    />
+                </View>
                 {(fairPrice || fairPriceLoading) && (
                     <FairPriceCard
                         compact
@@ -397,6 +411,31 @@ const styles = StyleSheet.create({
         padding: 10,
         marginTop: 5,
         fontSize: 16,
+    },
+    priceInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 5,
+        marginTop: 5,
+        paddingHorizontal: 10,
+        backgroundColor: '#fff',
+    },
+    priceDollar: {
+        fontSize: 16,
+        color: '#000',
+        paddingVertical: 10,
+        paddingRight: 4,
+    },
+    priceDollarPlaceholder: {
+        color: '#999',
+    },
+    priceInput: {
+        flex: 1,
+        fontSize: 16,
+        color: '#000',
+        paddingVertical: 10,
     },
     typeContainer: {
         flexDirection: 'row',

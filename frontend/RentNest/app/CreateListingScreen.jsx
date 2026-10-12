@@ -93,6 +93,17 @@ const CreateListingScreen = () => {
         setListing({ ...listing, [field]: value });
     };
 
+    const formatWithCommas = (val) => {
+        const digits = String(val).replace(/\D/g, '');
+        if (!digits) return '';
+        return Number(digits).toLocaleString('en-US');
+    };
+
+    const handlePriceChange = (text) => {
+        const digits = text.replace(/\D/g, '');
+        setListing({ ...listing, price: digits });
+    };
+
     const handlePostListing = async () => {
         if (!token) return Alert.alert('Error', 'You must be logged in to create a listing.');
         if (!listing.ownerUserID) return Alert.alert('Error', 'You must be logged in to create a listing.');
@@ -205,14 +216,17 @@ const CreateListingScreen = () => {
 
                 {/* Listing Price */}
                 <Text style={styles.label}>Listing Price</Text>
-                <TextInput
-                    style={styles.input}
-                    placeholder="Enter price"
-                    placeholderTextColor="#666"
-                    keyboardType="numeric"
-                    value={listing.price}
-                    onChangeText={(value) => handleInputChange('price', value)}
-                />
+                <View style={styles.priceInputRow}>
+                    <Text style={[styles.priceDollar, !listing.price && styles.priceDollarPlaceholder]}>$</Text>
+                    <TextInput
+                        style={styles.priceInput}
+                        placeholder="0"
+                        placeholderTextColor="#666"
+                        keyboardType="number-pad"
+                        value={formatWithCommas(listing.price)}
+                        onChangeText={handlePriceChange}
+                    />
+                </View>
                 {(fairPrice || fairPriceLoading) ? (
                     <FairPriceCard
                         compact
@@ -357,6 +371,36 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 2,
         elevation: 2,
+    },
+    priceInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 8,
+        marginTop: 8,
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+        paddingHorizontal: 12,
+    },
+    priceDollar: {
+        fontSize: 18,
+        color: '#000',
+        paddingVertical: 12,
+        paddingRight: 4,
+    },
+    priceDollarPlaceholder: {
+        color: '#666',
+    },
+    priceInput: {
+        flex: 1,
+        fontSize: 18,
+        color: '#000',
+        paddingVertical: 12,
     },
     hint: {
         fontSize: 12,
