@@ -65,11 +65,14 @@ it('owner navigation separates topics and uses the fixed year for property analy
   expect(text(tree)).not.toContain('Payments recorded');
   expect(useAnalytics).toHaveBeenLastCalledWith('/owner');
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Occupancy tab')).toHaveLength(0);
-  expect(text(tree)).toContain('Monthly Occupancy');
+  expect(text(tree)).not.toContain('Monthly Occupancy');
+  expect(text(tree)).toContain('Listing Occupancy');
   expect(text(tree)).toContain('Tenancy Length');
   expect(tree.root.findAllByType(require('../AnalyticsKit').StatTile).filter(node => node.props.label === 'Tenants Hosted')).toHaveLength(1);
-  const { CountBarChart } = require('../AnalyticsKit');
-  expect(tree.root.findAllByType(CountBarChart)).toHaveLength(1);
+  const { PieChart } = require('../AnalyticsKit');
+  const tenancyChart = tree.root.findAllByType(PieChart).find(node => node.props.title === 'Tenancy Length');
+  expect(tenancyChart.props.totalMetric.value).toBe(2);
+  expect(text({ root: tenancyChart })).toEqual(expect.arrayContaining(['Total Tenancies', '3 to <6 months', '12 to <24 months', '1 (50.0%)', '0 (0.0%)']));
   expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Tenancy Length' && node.props.onPress)).toHaveLength(0);
   expect(text(tree)).toContain('Monthly Rent Recorded');
   await press(tree, 'Overview tab');
@@ -87,6 +90,20 @@ it('owner navigation separates topics and uses the fixed year for property analy
   expect(mockPush).toHaveBeenCalledWith({ pathname: '/ListingAnalyticsScreen', params: { listingId: 2 } });
   await press(tree, 'Overview tab');
   expect(useAnalytics).toHaveBeenLastCalledWith('/owner');
+});
+
+it.each([
+  ['empty', [], 'No accepted tenancies yet'],
+  ['zero counts', [{ label: '<3 months', value: 0 }], 'No accepted tenancies yet'],
+  ['unavailable', null, 'Not available'],
+])('tenancy length pie handles %s data', async (_state, tenancyLengths, expectedText) => {
+  useAnalytics.mockReturnValue({ data: { ...ownerResponse, tenancyLengths }, loading: false });
+  const tree = await render(OwnerAnalyticsScreen);
+  const { PieChart } = require('../AnalyticsKit');
+  const chart = tree.root.findAllByType(PieChart).find(node => node.props.title === 'Tenancy Length');
+  expect(text({ root: chart })).toContain(expectedText);
+  expect(chart.props.totalMetric.value).toBe(tenancyLengths === null ? null : 0);
+  await act(async () => tree.unmount());
 });
 
 it('admin overview displays account status', async () => {
@@ -274,7 +291,7 @@ it('owner displays rental charts and occupancy details', async () => {
   const tree = await render(OwnerAnalyticsScreen);
   expect(text(tree)).toContain('Occupied Listings');
   const { PieChart } = require('../AnalyticsKit');
-  const occupancy = tree.root.findByType(PieChart);
+  const occupancy = tree.root.findAllByType(PieChart).find(node => node.props.title === 'Listing Occupancy');
   expect(occupancy.props.series.points).toEqual([{ bucket: 'Occupied Listings', value: 2 }, { bucket: 'Vacant Listings', value: 1 }]);
   expect(occupancy.props.totalMetric.value).toBe(3);
   expect(text(tree)).not.toContain('Offers sent');
@@ -475,8 +492,9 @@ it('shows owner unavailable explanations without turning missing averages into z
   expect(tiles.find(node => node.props.label === 'Rating and Reviews').props.metric).toMatchObject({ availability: 'unavailable', value: null, reason: 'No reviews yet.' });
   expect(tiles.find(node => node.props.label === 'Average Tenancy').props.metric).toMatchObject({ availability: 'unavailable', value: null });
   await press(tree, 'About Average Tenancy');
-  expect(text(tree)).toEqual(expect.arrayContaining(['No reviews yet', 'No accepted rentals with valid start and end dates.', 'No listings, so occupancy cannot be calculated.']));
-  expect(tree.root.findAllByType(LineChart).find(node => node.props.title === 'Monthly Occupancy').props.series).toMatchObject({ availability: 'unavailable', points: [] });
+  expect(text(tree)).toEqual(expect.arrayContaining(['No reviews yet', 'No accepted rentals with valid start and end dates.', 'No listings yet']));
+  expect(text(tree)).not.toContain('No listings, so occupancy cannot be calculated.');
+  expect(tree.root.findAllByType(LineChart).filter(node => node.props.title === 'Monthly Occupancy')).toHaveLength(0);
 });
 
 it('shows property unavailable averages and preserves measured zero counts', async () => {

@@ -242,12 +242,14 @@ export const InfoTooltip = ({ label, metric, accessibilityLabel = 'About ' + lab
   }, [visible]);
   const bubble = <View accessibilityRole="text" onLayout={event => setTooltipHeight(event.nativeEvent.layout.height)}
     onHoverIn={keepOpen} onHoverOut={leave}
-    style={[styles.infoTooltip, dark && styles.darkInfoTooltip, { left, top, width: tooltipWidth, maxHeight: height - 24 }]}>
-    <View style={[styles.tooltipPointer, dark && styles.darkTooltipPointer, { left: Math.max(12, Math.min(position.x + position.width / 2 - left - 5, tooltipWidth - 22)),
-      ...(top === below ? { top: -5 } : { bottom: -5 }) }]} />
-    <ScrollView><Text style={[styles.tooltipTitle, dark && styles.darkTooltipTitle]}>{label}</Text>
-      <Text style={[styles.tooltipBody, dark && styles.darkTooltipBody]}>{metric?.definition || 'Calculation details are not recorded.'}</Text>
-      {metric?.reason ? <Text style={[styles.tooltipBody, dark && styles.darkTooltipBody]}>{metric.reason}</Text> : null}
+    style={[styles.infoTooltip, { left, top, width: tooltipWidth, maxHeight: height - 24 }]}>
+    <View style={[styles.tooltipPointer, { left: Math.max(12, Math.min(position.x + position.width / 2 - left - 5, tooltipWidth - 22)),
+      ...(top === below
+        ? { top: -5, borderTopWidth: 1, borderLeftWidth: 1 }
+        : { bottom: -5, borderBottomWidth: 1, borderRightWidth: 1 }) }]} />
+    <ScrollView><Text style={styles.tooltipTitle}>{label}</Text>
+      <Text style={styles.tooltipBody}>{metric?.definition || 'Calculation details are not recorded.'}</Text>
+      {metric?.reason ? <Text style={styles.tooltipBody}>{metric.reason}</Text> : null}
     </ScrollView>
   </View>;
   return <>
@@ -628,15 +630,12 @@ const styles = StyleSheet.create({
   chartHeading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   chartInfoButton: { width: 24, height: 24, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   scope: { fontSize: 12, lineHeight: 18, color: COLORS.inkSecondary, marginTop: 4 },
-  infoTooltip: { position: 'absolute', backgroundColor: COLORS.surface, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border,
-    padding: 12, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
-  tooltipPointer: { position: 'absolute', width: 10, height: 10, backgroundColor: COLORS.surface, transform: [{ rotate: '45deg' }] },
-  tooltipTitle: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: COLORS.ink, marginBottom: 4 },
-  tooltipBody: { fontSize: 13, lineHeight: 19, color: COLORS.inkSecondary },
-  darkInfoTooltip: { backgroundColor: '#333333', borderColor: '#4A4A4A' },
-  darkTooltipPointer: { backgroundColor: '#333333' },
-  darkTooltipTitle: { color: '#FFFFFF' },
-  darkTooltipBody: { color: '#F2F2F2' },
+  infoTooltip: { position: 'absolute', backgroundColor: COLORS.surface, borderRadius: 12, borderWidth: 1, borderColor: '#D0D5DD',
+    padding: 16, shadowColor: '#101828', shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 },
+  tooltipPointer: { position: 'absolute', width: 10, height: 10, backgroundColor: COLORS.surface,
+    borderColor: '#D0D5DD', transform: [{ rotate: '45deg' }] },
+  tooltipTitle: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: COLORS.ink, marginBottom: 8 },
+  tooltipBody: { fontSize: 13, lineHeight: 20, color: '#475467', marginBottom: 4 },
   pie: { width: 180, height: 180, alignSelf: 'center', marginVertical: 8 },
   metricRow: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   metricRowMain: { flexDirection: 'row', alignItems: 'center', gap: 16 },

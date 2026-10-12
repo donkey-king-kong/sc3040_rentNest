@@ -1,21 +1,23 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Modal, Text } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ModerationListState, { moderationLoadError } from '../ModerationListState';
 import BanUserScreen from '../../app/BanUserScreen';
+import BanUserScreen3 from '../../app/BanUserScreen3';
 import ProcessReviewsScreen from '../../app/ProcessReviewsScreen';
 import AdminScreen from '../../app/AdminScreen';
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 
 jest.mock('axios');
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 jest.mock('../../config/api', () => ({ API_BASE_URL: 'http://test.local', ENDPOINTS: {} }));
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn(), setParams: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn(), setParams: jest.fn() }),
   useLocalSearchParams: () => ({}),
 }));
 
@@ -34,6 +36,28 @@ beforeEach(async () => {
   jest.clearAllMocks();
   await AsyncStorage.clear();
   await AsyncStorage.setItem('token', 'test-token');
+});
+
+describe('ban success confirmation', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it.each(['automatic dismissal', 'native dismissal'])('returns to admin using %s', async action => {
+    let tree;
+    await act(async () => { tree = create(<BanUserScreen3 />); });
+    expect(renderedText(tree)).toContain('User Banned');
+    if (action === 'native dismissal') {
+      await act(async () => tree.root.findByType(Modal).props.onRequestClose());
+    } else {
+      await act(async () => jest.advanceTimersByTime(1999));
+      expect(mockReplace).not.toHaveBeenCalled();
+      await act(async () => jest.advanceTimersByTime(1));
+    }
+    expect(mockReplace).toHaveBeenCalledWith('/AdminScreen');
+    await act(async () => tree.unmount());
+    await act(async () => jest.runOnlyPendingTimers());
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('ModerationListState', () => {

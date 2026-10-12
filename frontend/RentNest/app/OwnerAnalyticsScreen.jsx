@@ -9,7 +9,6 @@ import { ENDPOINTS } from '../config/api';
 import {
   COLORS,
   BarChart,
-  CountBarChart,
   ErrorState,
   LineChart,
   PieChart,
@@ -82,7 +81,6 @@ const OwnerAnalyticsScreen = () => {
   const totalTenancies = displayMetric(validTenancyLengths ? data.tenancyLengths.reduce((sum, point) => sum + Number(point.value), 0) : null,
     'count', 'Total tenancies included in these groups.', 'Tenancy lengths are not available.');
   const monthlyRent = displayChart(data.monthlyRent, data.currency, 'Rent grouped by the month paid for. Excludes deposits; refunds are not deducted.');
-  const monthlyOccupancy = displayChart(data.monthlyOccupancy, 'percent', 'Percentage of time your current listings were occupied each month over the past 12 months.', data.monthlyOccupancyUnavailableReason);
   const monthlyAcceptedOffers = displayChart(data.monthlyAcceptedOffers, 'count', 'Offers accepted each month. Offers without an acceptance date are left out.');
   const monthlyTerminations = displayChart(data.monthlyTerminations, 'count', 'Rentals terminated each month. Rentals without a termination date are left out.');
   const monthlyDaysOnMarket = displayChart(data.monthlyAverageDaysOnMarket, 'days', 'Average days from publication to first acceptance, grouped by acceptance month. Months without data are blank.');
@@ -130,7 +128,6 @@ const OwnerAnalyticsScreen = () => {
           </Section>
           <ActivitySection title={null} loading={loading}>
             <Section><LineChart title="Monthly Rent Recorded" series={monthlyRent} showEveryMonth emptyText="No rent recorded in the past 12 months" /></Section>
-            <Section><LineChart title="Monthly Occupancy" series={monthlyOccupancy} showEveryMonth emptyText="No occupancy in the past 12 months" maxValue={100} /></Section>
             <Section>
               <LineChart title="Monthly Rental Activity" series={monthlyAcceptedOffers}
                 seriesLabel="Offers Accepted" comparisonSeries={monthlyTerminations}
@@ -143,8 +140,8 @@ const OwnerAnalyticsScreen = () => {
             </Section>
           </ActivitySection>
           <Section>
-            <CountBarChart title="Tenancy Length" series={tenancyLengths} totalMetric={totalTenancies}
-              totalLabel="Total Tenancies" showReadout={false} emptyText="No accepted tenancies yet" />
+            <PieChart title="Tenancy Length" series={tenancyLengths} totalMetric={totalTenancies}
+              metricLabel="Total Tenancies" totalLabel="Tenancies" emptyText="No accepted tenancies yet" />
           </Section>
           </>}
         </> : null}
