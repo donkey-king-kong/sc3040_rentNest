@@ -2,7 +2,9 @@
 
 ## Profile Photo URLs
 
-Sign Up and Edit Profile now include **Photo URL (optional)**. Paste a public
+Sign Up and Edit Profile include **Photo URL**. Sign Up shows the label inside
+the field; Edit Profile places it last, after Phone Number. Neither screen
+shows helper text below it; validation errors still appear when needed. Paste a public
 HTTP(S) image URL (HTTPS recommended, up to 255 characters). In Edit Profile,
 the avatar previews the draft; select **Update Profile** to save. Clearing the
 field and saving removes the photo and uses initials. Returning to Profile

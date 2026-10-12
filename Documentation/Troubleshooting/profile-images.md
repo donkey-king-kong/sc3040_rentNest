@@ -10,9 +10,16 @@ Use `frontend/RentNest/components/ProfileImage.jsx` for profile/avatar images in
 
 ## Set Or Remove A Photo
 
-- **Sign Up:** enter a URL in **Photo URL (optional)**, or leave it blank.
-- **Edit Profile:** the field contains the stored URL. Paste a replacement to
+- **Sign Up:** enter a URL in the **Photo URL** field, or leave it blank.
+  The name appears as an inline placeholder, without a separate heading.
+- **Edit Profile:** **Photo URL** is the last field, after Phone Number, and
+  contains the stored URL. Paste a replacement to
   preview it, then choose **Update Profile**. A photo-only edit enables saving.
+- Long photo URLs show their beginning when loaded or unfocused. Cursor movement
+  is unrestricted while editing, and the full value is retained. The photo
+  container clips its contents to the same rounded shape as the other fields.
+- Both screens omit the "(optional)" label suffix and visible helper text.
+  The field remains optional; validation errors and accessible hints remain.
 - Clear the field and save to remove the photo and use your initials.
 - Returning to Profile refreshes the saved details. Leaving without saving
   does not persist the draft. A failed save keeps your changes for retry.
@@ -110,6 +117,20 @@ The focused suite covers signup validation/payloads, save locking and failures,
 photo-only edits, clearing, saved baselines, unchanged legacy URLs, focus refresh,
 stale results, and image-error recovery. It also mirrors the backend validator
 fixtures. It does not replace browser/native rendering or live-database checks.
+
+After the field presentation update, all 81 focused tests passed, including
+inline signup labeling, removal of visible helper text, and Photo URL appearing
+last in Edit Profile. Isolated web layout checks at 390x900 and 1440x900 passed
+for both screens, with no runtime page errors or photo input clipping. Screenshots
+were inspected; native keyboard and screen-reader checks were not performed.
+
+The rounded-clipping and URL-prefix follow-up passes all 82 focused tests.
+At 390x900 and 1440x900, browser checks moved the cursor to the end, blurred the
+field, and confirmed selection and horizontal scroll returned to zero without
+changing the URL. Before-change Android captures reproduced the square corners
+and trailing URL. Post-change Android visual confirmation is still outstanding:
+the emulator session changed screens, and the isolated debugger fixture could
+not connect. Web captures do not certify the Android shadow fix.
 
 The isolated browser flow passed signup/login, image loading, full URL
 preservation, clear/save, returning to Profile with initials, reopening with an

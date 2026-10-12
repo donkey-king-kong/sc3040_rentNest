@@ -240,7 +240,8 @@ async function press(button) {
 }
 
 function assertPhotoInput(screen) {
-  const { props } = input(screen, 'Photo URL (optional)');
+  const { props } = input(screen, 'Photo URL');
+  assert.equal(props.placeholder, 'Photo URL');
   assert.equal(props.keyboardType, 'url');
   assert.equal(props.autoCapitalize, 'none');
   assert.equal(props.autoCorrect, false);
@@ -301,11 +302,21 @@ describe('Shared photo URL helper: backend PhotoUrlValidatorTest fixture parity'
 });
 
 describe('PHOTO-02: mounted signup', () => {
+  test('photo uses an inline placeholder without a heading or helper text', async t => {
+    const h = harness(t);
+    const screen = await h.mount('app/SignUpScreen.jsx');
+    assertPhotoInput(screen);
+    assert.doesNotMatch(text(screen), /Photo URL|Paste a public image URL|HTTPS recommended/);
+    assert.equal(input(screen, 'Photo URL').props['aria-describedby'], 'signup-photo-error');
+    assert.equal(screen.root.findAllByProps({ nativeID: 'signup-photo-help' }).length, 0);
+    assert.equal(screen.root.findAllByType('TextInput').at(-1), input(screen, 'Photo URL'));
+  });
+
   test('submits the full trimmed URL and existing fields, then redirects to login', async t => {
     const h = harness(t);
     const screen = await signupForm(h);
     assertPhotoInput(screen);
-    await change(screen, 'Photo URL (optional)', ` \t${FULL_PHOTO}\u00a0`);
+    await change(screen, 'Photo URL', ` \t${FULL_PHOTO}\u00a0`);
     await press(signupButton(screen));
     assert.equal(h.axios.post.mock.callCount(), 1);
     assert.deepEqual(h.axios.post.mock.calls[0].arguments, [
@@ -325,7 +336,7 @@ describe('PHOTO-02: mounted signup', () => {
     test(`optional ${JSON.stringify(value)} submits null`, async t => {
       const h = harness(t);
       const screen = await signupForm(h);
-      await change(screen, 'Photo URL (optional)', value);
+      await change(screen, 'Photo URL', value);
       await press(signupButton(screen));
       assert.equal(h.axios.post.mock.callCount(), 1);
       assert.equal(h.axios.post.mock.calls[0].arguments[1].photoURL, null);
@@ -337,18 +348,18 @@ describe('PHOTO-02: mounted signup', () => {
     test(`invalid photo blocks repeated submit: ${value.slice(0, 50)}`, async t => {
       const h = harness(t);
       const screen = await signupForm(h);
-      await change(screen, 'Photo URL (optional)', value);
-      await act(async () => input(screen, 'Photo URL (optional)').props.onBlur());
+      await change(screen, 'Photo URL', value);
+      await act(async () => input(screen, 'Photo URL').props.onBlur());
       assert.match(text(screen), /Enter a full http/);
       await press(signupButton(screen));
       await press(signupButton(screen));
       assert.equal(h.axios.post.mock.callCount(), 0);
       assert.equal(h.router.replace.mock.callCount(), 0);
-      assert.equal(input(screen, 'Photo URL (optional)').props.value, value);
-      assert.ok(h.focusCalls.includes('Photo URL (optional)'));
+      assert.equal(input(screen, 'Photo URL').props.value, value);
+      assert.ok(h.focusCalls.includes('Photo URL'));
       assert.equal(screen.root.findAllByType('Text').some(node =>
         node.props.accessibilityRole === 'alert'), true);
-      await change(screen, 'Photo URL (optional)', OLD_PHOTO);
+      await change(screen, 'Photo URL', OLD_PHOTO);
       assert.doesNotMatch(text(screen), /Enter a full http/);
       await press(signupButton(screen));
       assert.equal(h.axios.post.mock.callCount(), 1);
@@ -360,7 +371,7 @@ describe('PHOTO-02: mounted signup', () => {
     const pending = deferred();
     h.axios.post.mock.mockImplementation(() => pending.promise);
     const screen = await signupForm(h);
-    await change(screen, 'Photo URL (optional)', FULL_PHOTO);
+    await change(screen, 'Photo URL', FULL_PHOTO);
     const submit = signupButton(screen).props.onPress;
     let attempts;
     await act(async () => { attempts = [submit(), submit()]; });
@@ -388,11 +399,11 @@ describe('PHOTO-02: mounted signup', () => {
       const h = harness(t);
       h.axios.post.mock.mockImplementation(async () => { throw failure; });
       const screen = await signupForm(h);
-      await change(screen, 'Photo URL (optional)', FULL_PHOTO);
+      await change(screen, 'Photo URL', FULL_PHOTO);
       await press(signupButton(screen));
       assert.match(text(screen), message);
       assert.equal(h.router.replace.mock.callCount(), 0);
-      assert.equal(input(screen, 'Photo URL (optional)').props.value, FULL_PHOTO);
+      assert.equal(input(screen, 'Photo URL').props.value, FULL_PHOTO);
       assert.equal(signupButton(screen).props.disabled, false);
       assert.ok(screen.root.findAllByType('TextInput').every(node => node.props.editable));
       h.axios.post.mock.mockImplementation(async () => ({ data: {} }));
@@ -419,22 +430,60 @@ describe('PHOTO-02: mounted signup', () => {
 });
 
 describe('PHOTO-03: mounted Edit Profile', () => {
+  test('photo is the last field with a plain label and no helper text', async t => {
+    const h = harness(t);
+    const screen = await h.mount('app/EditProfileScreen.jsx');
+    assertPhotoInput(screen);
+    const labels = screen.root.findAllByType('Text')
+      .filter(node => ['Full Name', 'Email Address', 'Phone Number', 'Photo URL'].includes(node.children[0]))
+      .map(node => node.children[0]);
+    assert.deepEqual(labels, ['Full Name', 'Email Address', 'Phone Number', 'Photo URL']);
+    assert.equal(screen.root.findAllByType('TextInput').at(-1), input(screen, 'Photo URL'));
+    assert.doesNotMatch(text(screen), /optional|Paste a public image URL|Clear this field/);
+    assert.equal(input(screen, 'Photo URL').props['aria-describedby'], 'edit-photo-error');
+    assert.equal(screen.root.findAllByProps({ nativeID: 'edit-photo-help' }).length, 0);
+  });
+
+  test('photo clips to the shared rounded field shape and shows the URL start only at rest', async t => {
+    const h = harness(t, { photoURL: FULL_PHOTO });
+    const screen = await h.mount('app/EditProfileScreen.jsx');
+    const photo = () => input(screen, 'Photo URL');
+    const photoStyle = Object.assign({}, ...photo().parent.props.style.filter(Boolean));
+    const phoneStyle = Object.assign({}, ...input(screen, 'Phone Number').parent.props.style.filter(Boolean));
+    assert.equal(photoStyle.overflow, 'hidden');
+    for (const key of ['borderRadius', 'height', 'elevation', 'shadowColor', 'shadowOpacity']) {
+      assert.equal(photoStyle[key], phoneStyle[key]);
+    }
+    assert.deepEqual(photo().props.selection, { start: 0, end: 0 });
+    await act(async () => photo().props.onFocus());
+    assert.equal(photo().props.selection, undefined);
+    const edited = `${FULL_PHOTO}-edited`;
+    await change(screen, 'Photo URL', edited);
+    assert.equal(photo().props.selection, undefined);
+    assert.equal(photo().props.value, edited);
+    await act(async () => photo().props.onBlur());
+    assert.deepEqual(photo().props.selection, { start: 0, end: 0 });
+    assert.equal(photo().props.value, edited);
+    await press(saveButton(screen));
+    assert.equal(h.axios.put.mock.calls[0].arguments[2].params.photoURL, edited);
+  });
+
   test('photo-only add enables save, revert disables it, and preview preserves the complete URI', async t => {
     const h = harness(t, { photoURL: null });
     const screen = await h.mount('app/EditProfileScreen.jsx');
     assertPhotoInput(screen);
-    assert.equal(input(screen, 'Photo URL (optional)').props.value, '');
+    assert.equal(input(screen, 'Photo URL').props.value, '');
     assert.equal(saveButton(screen).props.disabled, true);
     assert.deepEqual(imageUri(screen), []);
     assert.match(text(screen), /AL/);
-    await change(screen, 'Photo URL (optional)', FULL_PHOTO);
+    await change(screen, 'Photo URL', FULL_PHOTO);
     assert.equal(saveButton(screen).props.disabled, false);
     assert.deepEqual(imageUri(screen), [FULL_PHOTO]);
-    await change(screen, 'Photo URL (optional)', '');
+    await change(screen, 'Photo URL', '');
     assert.equal(saveButton(screen).props.disabled, true);
     await press(saveButton(screen));
     assert.equal(h.axios.put.mock.callCount(), 0);
-    await change(screen, 'Photo URL (optional)', ` ${FULL_PHOTO} `);
+    await change(screen, 'Photo URL', ` ${FULL_PHOTO} `);
     await press(saveButton(screen));
     const [url, body, config] = h.axios.put.mock.calls[0].arguments;
     assert.equal(url, `${h.api.API_BASE_URL}/api/users/id/42`);
@@ -447,7 +496,7 @@ describe('PHOTO-03: mounted Edit Profile', () => {
     assert.equal(config.timeout, 15000);
     assert.equal(config.signal.aborted, false);
     assert.equal(new URLSearchParams(config.params).get('photoURL'), FULL_PHOTO);
-    assert.equal(input(screen, 'Photo URL (optional)').props.value, FULL_PHOTO);
+    assert.equal(input(screen, 'Photo URL').props.value, FULL_PHOTO);
     assert.equal(saveButton(screen).props.disabled, true);
     assert.equal(screen.root.findByType('Modal').props.visible, true);
     await press(saveButton(screen));
@@ -457,17 +506,17 @@ describe('PHOTO-03: mounted Edit Profile', () => {
   test('clear sends explicit empty photo and resets to null/initials on save and reopen', async t => {
     const h = harness(t);
     const screen = await h.mount('app/EditProfileScreen.jsx');
-    await change(screen, 'Photo URL (optional)', ' \u2003 ');
+    await change(screen, 'Photo URL', ' \u2003 ');
     assert.equal(saveButton(screen).props.disabled, false);
     assert.deepEqual(imageUri(screen), []);
     await press(saveButton(screen));
     assert.equal(h.axios.put.mock.calls[0].arguments[2].params.photoURL, '');
     assert.equal(h.user.photoURL, null);
-    assert.equal(input(screen, 'Photo URL (optional)').props.value, '');
+    assert.equal(input(screen, 'Photo URL').props.value, '');
     assert.equal(saveButton(screen).props.disabled, true);
     await screen.unmount();
     const reopened = await h.mount('app/EditProfileScreen.jsx');
-    assert.equal(input(reopened, 'Photo URL (optional)').props.value, '');
+    assert.equal(input(reopened, 'Photo URL').props.value, '');
     assert.deepEqual(imageUri(reopened), []);
     assert.equal(saveButton(reopened).props.disabled, true);
   });
@@ -480,15 +529,15 @@ describe('PHOTO-03: mounted Edit Profile', () => {
     const screen = await h.mount('app/EditProfileScreen.jsx');
     await change(screen, 'Full Name', 'Draft Name');
     await change(screen, 'Phone Number', '88776655');
-    await change(screen, 'Photo URL (optional)', 'https://example.com/draft');
+    await change(screen, 'Photo URL', 'https://example.com/draft');
     await press(saveButton(screen));
     assert.equal(input(screen, 'Full Name').props.value, 'Server Name');
     assert.equal(input(screen, 'Phone Number').props.value, '99887766');
-    assert.equal(input(screen, 'Photo URL (optional)').props.value, FULL_PHOTO);
+    assert.equal(input(screen, 'Photo URL').props.value, FULL_PHOTO);
     assert.equal(saveButton(screen).props.disabled, true);
     for (const [label, value] of [
       ['Full Name', 'Another Name'], ['Phone Number', '87654321'],
-      ['Photo URL (optional)', OLD_PHOTO],
+      ['Photo URL', OLD_PHOTO],
     ]) {
       const saved = input(screen, label).props.value;
       await change(screen, label, value);
@@ -502,7 +551,7 @@ describe('PHOTO-03: mounted Edit Profile', () => {
     const legacy = '`https://example.com/legacy.jpg`';
     const h = harness(t, { photoURL: legacy });
     const screen = await h.mount('app/EditProfileScreen.jsx');
-    assert.equal(input(screen, 'Photo URL (optional)').props.value, legacy);
+    assert.equal(input(screen, 'Photo URL').props.value, legacy);
     assert.deepEqual(imageUri(screen), ['https://example.com/legacy.jpg']);
     assert.equal(saveButton(screen).props.disabled, true);
     assert.doesNotMatch(text(screen), /Enter a full http/);
@@ -518,16 +567,16 @@ describe('PHOTO-03: mounted Edit Profile', () => {
     test(`invalid changed photo blocks save: ${invalid.slice(0, 50)}`, async t => {
       const h = harness(t);
       const screen = await h.mount('app/EditProfileScreen.jsx');
-      await change(screen, 'Photo URL (optional)', invalid);
+      await change(screen, 'Photo URL', invalid);
       assert.match(text(screen), /Enter a full http/);
-      assert.equal(input(screen, 'Photo URL (optional)').props['aria-invalid'], true);
+      assert.equal(input(screen, 'Photo URL').props['aria-invalid'], true);
       assert.equal(screen.root.findByProps({ nativeID: 'edit-photo-error' }).props.role, 'alert');
       assert.deepEqual(imageUri(screen), []);
       await press(saveButton(screen));
       assert.equal(h.axios.put.mock.callCount(), 0);
       assert.equal(h.user.photoURL, OLD_PHOTO);
-      assert.ok(h.focusCalls.includes('Photo URL (optional)'));
-      await change(screen, 'Photo URL (optional)', OLD_PHOTO);
+      assert.ok(h.focusCalls.includes('Photo URL'));
+      await change(screen, 'Photo URL', OLD_PHOTO);
       assert.doesNotMatch(text(screen), /Enter a full http/);
       assert.equal(saveButton(screen).props.disabled, true);
     });
@@ -543,12 +592,12 @@ describe('PHOTO-03: mounted Edit Profile', () => {
       const screen = await h.mount('app/EditProfileScreen.jsx');
       await change(screen, 'Full Name', 'Grace Hopper');
       await change(screen, 'Phone Number', '99887766');
-      await change(screen, 'Photo URL (optional)', FULL_PHOTO);
+      await change(screen, 'Photo URL', FULL_PHOTO);
       await press(saveButton(screen));
       assert.match(text(screen), expected);
       assert.equal(input(screen, 'Full Name').props.value, 'Grace Hopper');
       assert.equal(input(screen, 'Phone Number').props.value, '99887766');
-      assert.equal(input(screen, 'Photo URL (optional)').props.value, FULL_PHOTO);
+      assert.equal(input(screen, 'Photo URL').props.value, FULL_PHOTO);
       assert.equal(h.user.photoURL, OLD_PHOTO);
       assert.equal(saveButton(screen).props.disabled, false);
       assert.ok(screen.root.findAllByType('TextInput').every(node => node.props.editable));
@@ -563,7 +612,7 @@ describe('PHOTO-03: mounted Edit Profile', () => {
   test('duplicate save is locked before token retrieval; pending request disables fields and Back', async t => {
     const h = harness(t);
     const screen = await h.mount('app/EditProfileScreen.jsx');
-    await change(screen, 'Photo URL (optional)', FULL_PHOTO);
+    await change(screen, 'Photo URL', FULL_PHOTO);
     const token = deferred();
     const response = deferred();
     h.asyncStorage.getItem.mock.mockImplementation(() => token.promise);
@@ -592,13 +641,13 @@ describe('PHOTO-03: mounted Edit Profile', () => {
   test('unsaved Back leaves persistence unchanged and refocus restores the saved draft', async t => {
     const h = harness(t);
     const screen = await h.mount('app/EditProfileScreen.jsx');
-    await change(screen, 'Photo URL (optional)', FULL_PHOTO);
+    await change(screen, 'Photo URL', FULL_PHOTO);
     await press(screen.root.findByProps({ accessibilityLabel: 'Back' }));
     assert.equal(h.router.back.mock.callCount(), 1);
     assert.equal(h.axios.put.mock.callCount(), 0);
     await screen.blur();
     await screen.focus();
-    assert.equal(input(screen, 'Photo URL (optional)').props.value, OLD_PHOTO);
+    assert.equal(input(screen, 'Photo URL').props.value, OLD_PHOTO);
     assert.equal(saveButton(screen).props.disabled, true);
   });
 
@@ -607,7 +656,7 @@ describe('PHOTO-03: mounted Edit Profile', () => {
     const response = deferred();
     h.axios.put.mock.mockImplementation(() => response.promise);
     const screen = await h.mount('app/EditProfileScreen.jsx');
-    await change(screen, 'Photo URL (optional)', FULL_PHOTO);
+    await change(screen, 'Photo URL', FULL_PHOTO);
     let saving;
     await act(async () => { saving = saveButton(screen).props.onPress(); });
     const signal = h.axios.put.mock.calls[0].arguments[2].signal;
@@ -619,7 +668,7 @@ describe('PHOTO-03: mounted Edit Profile', () => {
       response.resolve({ data: { ...initialUser, photoURL: FULL_PHOTO } });
       await saving;
     });
-    assert.equal(input(screen, 'Photo URL (optional)').props.value, h.user.photoURL);
+    assert.equal(input(screen, 'Photo URL').props.value, h.user.photoURL);
     assert.equal(saveButton(screen).props.disabled, true);
     assert.equal(screen.root.findByType('Modal').props.visible, false);
   });
@@ -712,8 +761,8 @@ describe('PHOTO-03: focus reload and stale-response protection', () => {
     for (const photo of [FULL_PHOTO, '']) {
       await profile.blur();
       const edit = await h.mount('app/EditProfileScreen.jsx');
-      assert.equal(input(edit, 'Photo URL (optional)').props.value, h.user.photoURL ?? '');
-      await change(edit, 'Photo URL (optional)', photo);
+      assert.equal(input(edit, 'Photo URL').props.value, h.user.photoURL ?? '');
+      await change(edit, 'Photo URL', photo);
       await press(saveButton(edit));
       await edit.unmount();
       await profile.focus();
@@ -723,7 +772,7 @@ describe('PHOTO-03: focus reload and stale-response protection', () => {
       assert.match(text(profile), /91234567/);
     }
     const reopened = await h.mount('app/EditProfileScreen.jsx');
-    assert.equal(input(reopened, 'Photo URL (optional)').props.value, '');
+    assert.equal(input(reopened, 'Photo URL').props.value, '');
     assert.equal(saveButton(reopened).props.disabled, true);
     assert.equal(h.axios.put.mock.callCount(), 2);
     assert.equal(h.axios.get.mock.callCount(), 6);
@@ -779,7 +828,7 @@ describe('PHOTO-03: shared mounted ProfileImage', () => {
   test('broken preview does not block saving a syntactically valid photo', async t => {
     const h = harness(t);
     const screen = await h.mount('app/EditProfileScreen.jsx');
-    await change(screen, 'Photo URL (optional)', FULL_PHOTO);
+    await change(screen, 'Photo URL', FULL_PHOTO);
     const image = screen.root.findAllByType('Image').find(node => node.props.source?.uri);
     await act(async () => image.props.onError({ nativeEvent: { error: '404' } }));
     assert.deepEqual(imageUri(screen), []);

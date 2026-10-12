@@ -221,7 +221,6 @@ const SignUpScreen = () => {
           />
         </Pressable>
 
-        <Text style={styles.photoLabel}>Photo URL (optional)</Text>
         <Pressable
           style={[
             styles.inputContainer,
@@ -236,11 +235,11 @@ const SignUpScreen = () => {
           <TextInput
             ref={photoInputRef}
             style={styles.input}
-            accessibilityLabel="Photo URL (optional)"
+            accessibilityLabel="Photo URL"
             accessibilityHint="Paste a public image URL, up to 255 characters. Leave blank to use your initials."
-            aria-describedby="signup-photo-help signup-photo-error"
+            aria-describedby="signup-photo-error"
             aria-invalid={!!photoError}
-            placeholder="https://"
+            placeholder="Photo URL"
             placeholderTextColor="#666"
             keyboardType="url"
             autoCapitalize="none"
@@ -259,9 +258,6 @@ const SignUpScreen = () => {
             }}
           />
         </Pressable>
-        <Text nativeID="signup-photo-help" style={styles.photoHint}>
-          Paste a public image URL. Leave blank to use your initials. HTTPS recommended; up to 255 characters.
-        </Text>
         <Text
           nativeID="signup-photo-error"
           style={photoError ? styles.photoError : styles.emptyPhotoError}
@@ -335,24 +331,12 @@ const styles = StyleSheet.create({
     borderColor: '#E94068',
     backgroundColor: '#FFF1F4',
   },
-  photoLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#101820',
-    marginBottom: 12,
-  },
   photoInputContainer: {
-    marginBottom: 8,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   focusedInputContainer: {
     borderColor: '#237957',
-  },
-  photoHint: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#555',
   },
   photoError: {
     fontSize: 14,

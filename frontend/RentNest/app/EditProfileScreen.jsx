@@ -20,7 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
-import { trimPhotoUrl, getPhotoUrlError, PHOTO_URL_MAX_LENGTH } from '../config/photoUrl';
+import { trimPhotoUrl, getPhotoUrlError } from '../config/photoUrl';
 import { FontAwesome } from '@expo/vector-icons';
 import MorphingInfinity from '../components/MorphingInfinity';
 import ProfileImage from '../components/ProfileImage';
@@ -289,52 +289,6 @@ const EditProfileScreen = () => {
             />
           </View>
 
-          <Text style={styles.label}>Photo URL (optional)</Text>
-          <Pressable
-            style={[
-              styles.inputContainer,
-              focusedField === 'photoURL' && styles.focusedInputContainer,
-              !!photoError && styles.errorInputContainer,
-            ]}
-            onPress={() => photoInputRef.current?.focus()}
-            disabled={isSaving}
-          >
-            <TextInput
-              ref={photoInputRef}
-              style={styles.input}
-              value={photoURL}
-              editable={!isSaving}
-              accessibilityLabel="Photo URL (optional)"
-              accessibilityHint="Paste a public image URL. Clear this field to remove your saved photo and use your initials."
-              aria-describedby="edit-photo-help edit-photo-error"
-              aria-invalid={!!photoError}
-              placeholder="https://example.com/photo.jpg"
-              placeholderTextColor="#707070"
-              keyboardType="url"
-              autoCapitalize="none"
-              autoCorrect={false}
-              onFocus={() => setFocusedField('photoURL')}
-              onBlur={() => setFocusedField(null)}
-              onChangeText={(text) => {
-                setPhotoURL(text);
-                setSaveError('');
-              }}
-            />
-            <FontAwesome name="link" size={22} color="#777" style={styles.inputIcon} />
-          </Pressable>
-          <Text nativeID="edit-photo-help" style={styles.helperText}>
-            Paste a public image URL (HTTPS recommended, up to {PHOTO_URL_MAX_LENGTH} characters).
-            {' '}Clear this field to remove your saved photo and use your initials.
-          </Text>
-          <Text
-            nativeID="edit-photo-error"
-            style={photoError ? styles.errorText : styles.emptyErrorText}
-            accessibilityLiveRegion="polite"
-            role={photoError ? 'alert' : undefined}
-          >
-            {photoError}
-          </Text>
-
           <Text style={styles.label}>Full Name</Text>
           <Pressable
             style={[styles.inputContainer, focusedField === 'name' && styles.focusedInputContainer, fieldErrors.name && styles.errorInputContainer]}
@@ -391,6 +345,51 @@ const EditProfileScreen = () => {
             />
             <FontAwesome name="phone" size={22} color="#777" style={styles.inputIcon} />
           </Pressable>
+
+          <Text style={styles.label}>Photo URL</Text>
+          <Pressable
+            style={[
+              styles.inputContainer,
+              styles.photoInputContainer,
+              focusedField === 'photoURL' && styles.focusedInputContainer,
+              !!photoError && styles.errorInputContainer,
+            ]}
+            onPress={() => photoInputRef.current?.focus()}
+            disabled={isSaving}
+          >
+            <TextInput
+              ref={photoInputRef}
+              style={styles.input}
+              value={photoURL}
+              editable={!isSaving}
+              accessibilityLabel="Photo URL"
+              accessibilityHint="Paste a public image URL. Clear this field to remove your saved photo and use your initials."
+              aria-describedby="edit-photo-error"
+              aria-invalid={!!photoError}
+              placeholder="Photo URL"
+              placeholderTextColor="#707070"
+              keyboardType="url"
+              autoCapitalize="none"
+              autoCorrect={false}
+              // Show the URL prefix at rest without controlling the editing cursor.
+              selection={focusedField === 'photoURL' ? undefined : { start: 0, end: 0 }}
+              onFocus={() => setFocusedField('photoURL')}
+              onBlur={() => setFocusedField(null)}
+              onChangeText={(text) => {
+                setPhotoURL(text);
+                setSaveError('');
+              }}
+            />
+            <FontAwesome name="link" size={22} color="#777" style={styles.inputIcon} />
+          </Pressable>
+          <Text
+            nativeID="edit-photo-error"
+            style={photoError ? styles.errorText : styles.emptyErrorText}
+            accessibilityLiveRegion="polite"
+            role={photoError ? 'alert' : undefined}
+          >
+            {photoError}
+          </Text>
 
           {!!saveError && (
             <Text style={styles.errorText} role="alert" accessibilityLiveRegion="polite">
@@ -513,15 +512,12 @@ const styles = StyleSheet.create({
     borderColor: '#E94068',
     backgroundColor: '#FFF1F4',
   },
+  photoInputContainer: {
+    overflow: 'hidden',
+  },
   focusedInputContainer: {
     borderWidth: 2,
     borderColor: '#101820',
-  },
-  helperText: {
-    marginTop: 10,
-    color: '#555555',
-    fontSize: 14,
-    lineHeight: 20,
   },
   errorText: {
     marginTop: 10,
