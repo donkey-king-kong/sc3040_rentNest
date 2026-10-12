@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
@@ -14,12 +14,15 @@ const ReviewListingsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const router = useRouter();
-  const { refresh } = useLocalSearchParams();
+  const requestVersion = useRef(0);
 
-  const getFlaggedListings = async () => {
+  const getFlaggedListings = useCallback(async () => {
+    const version = ++requestVersion.current;
+    setRefreshing(true);
     setLoadError(null);
     try {
       const token = await AsyncStorage.getItem('token');
+      if (version !== requestVersion.current) return;
       
       if (!token) {
         console.log('No token found!');
@@ -55,23 +58,23 @@ const ReviewListingsScreen = () => {
           description: listing.description
         };
       }));
+      if (version !== requestVersion.current) return;
       setListingsData(listingsWithOwners);
     } catch (error) {
+      if (version !== requestVersion.current) return;
       console.error("An error occurred:", error);
       setListingsData([]);
       setLoadError(moderationLoadError(error, 'listings'));
+    } finally {
+      if (version === requestVersion.current) setRefreshing(false);
     }
-  };
+  }, [router]);
 
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    await getFlaggedListings();
-    setRefreshing(false);
-  }, []);
-
-  useEffect(() => {
-    getFlaggedListings();
-  }, [refresh]); // Refresh when the refresh parameter changes
+  useFocusEffect(useCallback(() => {
+    void getFlaggedListings();
+    // A response started before leaving must not overwrite the refreshed list on return.
+    return () => { requestVersion.current += 1; };
+  }, [getFlaggedListings]));
 
   // Search function to filter listings by owner name or listing name
   const filterListings = (listings, query) => {
@@ -118,7 +121,7 @@ const ReviewListingsScreen = () => {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
+            onRefresh={getFlaggedListings}
           />
         }
         renderItem={({ item }) => (
