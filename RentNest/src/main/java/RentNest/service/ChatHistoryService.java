@@ -84,7 +84,7 @@ public class ChatHistoryService {
         }
         Listings listing = null;
         if (dto.getListingID() != null) {
-            listing = listingsRepository.findByIdForUpdate(dto.getListingID())
+            listing = listingsRepository.findByIdForUpdateWithOwner(dto.getListingID())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
             if (!Objects.equals(listing.getOwnerId(), dto.getReceiverID())) {
                 throw new IllegalArgumentException("The recipient must own the enquired-about listing");

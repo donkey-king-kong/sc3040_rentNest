@@ -24,6 +24,10 @@ public interface ListingsRepository extends JpaRepository<Listings, Long> {
     @Query("SELECT l FROM Listings l WHERE l.listingID = :id")
     Optional<Listings> findByIdForUpdate(@Param("id") Long id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM Listings l JOIN FETCH l.owner WHERE l.listingID = :id")
+    Optional<Listings> findByIdForUpdateWithOwner(@Param("id") Long id);
+
     @Query("SELECT l FROM Listings l JOIN FETCH l.owner o WHERE o.userID = :ownerId " +
             "AND o.flagged = 0 AND l.flagged = false AND l.tenant IS NULL " +
             "AND NOT EXISTS (SELECT r FROM Rentals r WHERE r.listings = l AND r.status IN ('pending', 'active')) " +

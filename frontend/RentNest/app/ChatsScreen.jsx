@@ -137,9 +137,12 @@ const ChatsScreen = () => {
             senderPhotoURL: msg.senderPhotoURL,
             receiverPhotoURL: msg.receiverPhotoURL
           });
-          
+
           // Determine chat partner ID
           const chatPartnerId = msg.senderId === currentUser.userID ? msg.receiverId : msg.senderId;
+
+          // Skip messages where the partner no longer exists (deleted user)
+          if (chatPartnerId == null) return;
           
           // If this chat partner hasn't been seen or this message is newer
           if (!chatPartnerMap.has(chatPartnerId) || 
