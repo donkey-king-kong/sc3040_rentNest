@@ -22,6 +22,8 @@ public interface RentalsRepository extends JpaRepository<Rentals, Long> {
 
     boolean existsByListings_ListingID(Long listingID);
 
+    boolean existsByListings_ListingIDAndStatus(Long listingID, String status);
+
     @Query("SELECT r.tenantUserID FROM Rentals r WHERE r.listings.listingID = :listingID AND r.status = 'active'")
     List<Long> findTenantUserIDsByListingID(@Param("listingID") Long listingID);
 

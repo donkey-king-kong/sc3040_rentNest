@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, useWindowDimensions, Modal, ScrollView, Platform } from 'react-native';
 import { FontAwesome } from 'react-native-vector-icons';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
@@ -25,6 +25,8 @@ export const COLORS = {
 
 // Categorical palette in fixed order (validated): identity is never color alone, labels always accompany it
 export const CATEGORY_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#8b5bb5', '#687782'];
+
+export const InfoTooltipThemeContext = createContext('light');
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -202,6 +204,7 @@ const visibleScopeFor = (metric, scope) => {
   return ['Now', 'All time', 'Period'].includes(label) ? null : label;
 };
 export const InfoTooltip = ({ label, metric, accessibilityLabel = 'About ' + label }) => {
+  const dark = useContext(InfoTooltipThemeContext) === 'dark';
   const anchor = useRef(null);
   const closeTimer = useRef(null);
   const [visible, setVisible] = useState(false);

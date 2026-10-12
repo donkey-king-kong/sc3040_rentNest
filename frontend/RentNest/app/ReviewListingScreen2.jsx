@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,6 +12,8 @@ const ReviewListingScreen2 = () => {
   const { listingid } = useLocalSearchParams();
 
   const [listingData, setListingData] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const deletePending = useRef(false);
 
   const handleIgnore = async () => {
     try {
@@ -32,8 +34,7 @@ const ReviewListingScreen2 = () => {
         },
       });
 
-      // Go back and trigger refresh
-      router.setParams({ refresh: 'true' });
+      // The flagged-list screen refreshes when it regains focus.
       router.back();
     } catch (error) {
       console.error("Failed to update listing flag:", error);
@@ -41,6 +42,9 @@ const ReviewListingScreen2 = () => {
   };
 
   const handleDelete = async () => {
+    if (deletePending.current) return;
+    deletePending.current = true;
+    setDeleting(true);
     try {
       const token = await AsyncStorage.getItem('token');
       
@@ -53,6 +57,7 @@ const ReviewListingScreen2 = () => {
       // First, delete the listing
       console.log(`Executing DELETE ${API_BASE_URL}/api/listings/${listingid}`);
       await axios.delete(`${API_BASE_URL}/api/listings/${listingid}`, {
+        timeout: 15000,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
@@ -60,10 +65,19 @@ const ReviewListingScreen2 = () => {
         },
       });
 
-      // Then navigate to ReviewListingScreen3
-      router.push('/ReviewListingScreen3');
+      // Replace the deleted property's review page with the standard success notification.
+      router.replace('/ReviewListingScreen3');
     } catch (error) {
-      console.error("Failed to delete listing:", error);
+      const serverMessage = error.response?.data?.message;
+      const message = typeof serverMessage === 'string' && serverMessage.trim()
+        ? serverMessage
+        : error.response
+          ? "Couldn't delete this listing. Refresh and try again."
+          : "Couldn't reach the server. Check your connection and try again.";
+      Alert.alert('Unable to delete listing', message);
+    } finally {
+      deletePending.current = false;
+      setDeleting(false);
     }
   };
 
@@ -120,7 +134,7 @@ const ReviewListingScreen2 = () => {
 
   return (
     <View style={styles.container}>
-      <AdminHeader title="Review Flagged Listing" onBack={() => router.replace('/ReviewListingScreen?refresh=true')} backLabel="Back to listings" inset />
+      <AdminHeader title="Review Flagged Listing" onBack={() => router.replace('/ReviewListingScreen')} backLabel="Back to listings" inset />
 
       <View style={styles.listingBox}>
         {/* Flag Image at the top right corner */}
@@ -161,14 +175,18 @@ const ReviewListingScreen2 = () => {
         <TouchableOpacity
           style={[styles.button, styles.ignoreButton]}
           onPress={handleIgnore} // Call handleIgnore function
+          disabled={deleting}
+          accessibilityState={{ disabled: deleting }}
         >
           <Text style={styles.buttonText}>Dismiss Report</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.deleteButton]}
           onPress={handleDelete} // Call handleDelete function
+          disabled={deleting}
+          accessibilityState={{ disabled: deleting, busy: deleting }}
         >
-          <Text style={styles.buttonText}>Delete Listing</Text>
+          <Text style={styles.buttonText}>{deleting ? 'Deleting…' : 'Delete Listing'}</Text>
         </TouchableOpacity>
       </View>
     </View>

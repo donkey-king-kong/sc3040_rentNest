@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 /**
  * Editing and deleting listings and reviews through the real security filter chain, against a
@@ -109,16 +110,16 @@ class OwnershipAuthorizationIntegrationTest {
     }
 
     @Test
-    void adminCannotDeleteListingWithRentalHistory() throws Exception {
+    void adminCanDeleteVacantListingWithRentalHistory() throws Exception {
         Rentals rental = new Rentals();
         rental.setListings(listing);
         rental.setTenantUserID(otherUser.getUserID());
         rental.setStatus("terminated");
         rental = rentalsRepository.save(rental);
         mockMvc.perform(delete("/api/listings/" + listing.getListingID()).header("Authorization", bearer(admin)))
-                .andExpect(status().isConflict());
-        assertTrue(listingsRepository.existsById(listing.getListingID()));
-        assertTrue(rentalsRepository.existsById(rental.getRentalID()));
+                .andExpect(status().isNoContent());
+        assertFalse(listingsRepository.existsById(listing.getListingID()));
+        assertFalse(rentalsRepository.existsById(rental.getRentalID()));
     }
 
     @Test
@@ -126,7 +127,8 @@ class OwnershipAuthorizationIntegrationTest {
         listing.setTenant(otherUser);
         listingsRepository.save(listing);
         mockMvc.perform(delete("/api/listings/" + listing.getListingID()).header("Authorization", bearer(admin)))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Unable to delete this listing because a tenant is occupying the property."));
         assertTrue(listingsRepository.existsById(listing.getListingID()));
     }
 
