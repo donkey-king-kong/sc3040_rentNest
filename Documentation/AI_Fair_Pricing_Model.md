@@ -103,15 +103,16 @@ saved listings only.
 
 The statistical model cannot read free text. After the bands load on a listing
 page, the app calls a second endpoint that sends Google Gemini
-(`gemini-3.8-flash` by default) the model's output, the listing's attributes
-and the owner's description. Gemini writes 2–4 sentences on how the asking rent
-compares with the fair rent, whether features in the description (renovation,
-furnishing, view) could justify a premium, and one thing the tenant should
-check. The description is passed as untrusted data, and the model is told not
+(`gemini-3.5-flash-lite` by default) the model's output, the listing's attributes
+and the owner's description. The card already shows the fair rent, asking rent
+and verdict, so Gemini does not restate them: it writes 2–3 sentences on whether
+features in the description (renovation, furnishing, view) could justify a
+premium, ending with one question for the owner. When the AI is unavailable the
+card shows a short fallback tip instead. The description is passed as untrusted data, and the model is told not
 to invent facts.
 
 - Configure with `GEMINI_API_KEY` (in `application.properties` or the
-  environment); get a key from Google AI Studio. `GEMINI_MODEL` overrides the
+  environment); get a key from Google AI Studio. `pricing.ai.model` overrides the
   model. Without a key the card shows "AI explanations are not configured" and
   everything else works as before.
 - Calls the REST `generateContent` endpoint via `RestTemplate`; no SDK needed.
@@ -119,7 +120,7 @@ to invent facts.
 
 ```
 GET /api/pricing/listing/{listingId}/explanation
-{ "available": true, "explanation": "...", "model": "gemini-3.8-flash" }
+{ "available": true, "explanation": "...", "model": "gemini-3.5-flash-lite" }
 ```
 
 ## What the model does not see
