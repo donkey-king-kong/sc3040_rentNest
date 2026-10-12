@@ -47,7 +47,7 @@ const ProcessReviews2 = () => {
           userID: response.data.reviewerID,
           name: response.data.reviewerName,
           email: response.data.reviewerEmail,
-          photoURL: response.data.reviewerPhotoURL || "https://images.healthshots.com/healthshots/en/uploads/2020/12/08182549/positive-person.jpg",
+          photoURL: response.data.reviewerPhotoURL || null,
         },
         flagged: response.data.flagged,
       };

@@ -42,7 +42,7 @@ const BanUsersScreen = () => {
         name: user.name,
         email: user.email,
         flagged: user.flagged,
-        photoURL: user.photoURL || "https://images.healthshots.com/healthshots/en/uploads/2020/12/08182549/positive-person.jpg" // Default photo if none provided
+        photoURL: user.photoURL || null
       }));
       console.log(transformedData)
 
