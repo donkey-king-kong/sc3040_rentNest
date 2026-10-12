@@ -60,4 +60,4 @@ pricing.demo-data.enabled=true
 
 # AI fair pricing model (room detection and price explanation). A fast lite model keeps
 # the card responsive (~1 s per call); set a larger model here if needed.
-pricing.ai.model=gemini-3.1-flash-lite
+pricing.ai.model=gemini-3.5-flash-lite
