@@ -1,62 +1,68 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router'; // Use useRouter for navigation
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Image, Modal } from 'react-native';
+import { useRouter } from 'expo-router';
+
+const notificationBellIcon = require('../assets/images/notificationBell.png');
 
 const ReviewListingScreen3 = () => {
-  const router = useRouter(); // Get the router object
+  const router = useRouter();
+
+  useEffect(() => {
+    const timeout = setTimeout(() => router.replace('/AdminScreen'), 2000);
+    return () => clearTimeout(timeout);
+  }, [router]);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.message}>Listing Deleted!</Text>
-      <Image source={require('../assets/images/confirmation.png')} style={styles.confirmationImage} />
-
-      {/* Spacer to push button to the bottom */}
-      <View style={styles.spacer} />
-
-      <TouchableOpacity
-        style={styles.returnButton}
-        onPress={() => router.replace('/AdminScreen')} // Navigate back to AdminScreen
-      >
-        <Text style={styles.buttonText}>Return to Admin Screen</Text>
-      </TouchableOpacity>
+      <Modal visible transparent animationType="fade" statusBarTranslucent
+        onRequestClose={() => router.replace('/AdminScreen')}>
+        <View style={styles.notificationOverlay} pointerEvents="none">
+          <View style={styles.notificationCard}>
+            <View style={styles.notificationIconBox}>
+              <Image source={notificationBellIcon} style={styles.notificationIcon} accessible={false} />
+            </View>
+            <Text style={styles.notificationText} accessibilityRole="alert">Listing Deleted</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: '#F7F8FA' },
+  notificationOverlay: {
     flex: 1,
-    justifyContent: 'flex-start', // Align items to the top
     alignItems: 'center',
-    padding: 25,
-    backgroundColor: '#f9f9f9',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
   },
-  message: {
-    fontSize: 28, // Increased font size
-    fontWeight: 'bold',
-    marginVertical: 20, // Space between message and image
+  notificationCard: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    backgroundColor: 'rgba(45, 45, 45, 0.82)',
+    borderRadius: 28,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    elevation: 8,
   },
-  confirmationImage: {
-    width: 100,
-    height: 100, // Adjust the size as needed
-    marginVertical: 10, // Space around the image
+  notificationIconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(58, 58, 58, 0.72)',
+    marginBottom: 16,
   },
-  spacer: {
-    flex: 1, // This will push the button to the bottom of the screen
-  },
-  returnButton: {
-    backgroundColor: 'black',
-    paddingVertical: 15,
-    paddingHorizontal: 70,
-    borderRadius: 5,
-    marginBottom: 20, // Space from bottom
-  },
-  buttonText: {
-      fontSize: 15,
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
+  notificationIcon: { width: 34, height: 40, resizeMode: 'contain' },
+  notificationText: { color: '#FFFFFF', fontSize: 22, fontWeight: '800' },
 });
 
 export default ReviewListingScreen3;

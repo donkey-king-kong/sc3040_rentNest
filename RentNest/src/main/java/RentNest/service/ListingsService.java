@@ -7,6 +7,7 @@ import RentNest.model.User;
 import RentNest.dto.UserDTO;
 import RentNest.repository.UserRepository;
 import RentNest.repository.RentalsRepository;
+import RentNest.repository.ListingDeletionRepository;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -27,6 +28,7 @@ public class ListingsService {
     private final GeocodingService geocodingService;
     private final NearbyAmenitiesService nearbyAmenitiesService;
     private final RentalsRepository rentalsRepository;
+    private final ListingDeletionRepository listingDeletionRepository;
 
     // Mapping Listings to ListingsDTO
     public ListingsDTO toListingsDTO(Listings listings) {
@@ -66,12 +68,14 @@ public class ListingsService {
                            UserRepository userRepository,
                            GeocodingService geocodingService,
                            NearbyAmenitiesService nearbyAmenitiesService,
-                           RentalsRepository rentalsRepository) {
+                           RentalsRepository rentalsRepository,
+                           ListingDeletionRepository listingDeletionRepository) {
         this.listingsRepository = listingsRepository;
         this.userRepository = userRepository;
         this.geocodingService = geocodingService;
         this.nearbyAmenitiesService = nearbyAmenitiesService;
         this.rentalsRepository = rentalsRepository;
+        this.listingDeletionRepository = listingDeletionRepository;
     }
 
     // Retrieve all listings
@@ -198,9 +202,11 @@ public class ListingsService {
         Listings listing = listingsRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
         requireOwnerOrAdmin(listing, true);
-        if (listing.getTenantId() != null || rentalsRepository.existsByListings_ListingID(id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "A property with rental history cannot be deleted");
+        if (listing.getTenantId() != null || rentalsRepository.existsByListings_ListingIDAndStatus(id, "active")) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Unable to delete this listing because a tenant is occupying the property.");
         }
+        listingDeletionRepository.deleteDependents(listing);
         listingsRepository.delete(listing);
         listingsRepository.flush();
     }

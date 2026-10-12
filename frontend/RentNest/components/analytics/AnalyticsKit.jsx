@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, useWindowDimensions, Modal, ScrollView, Platform } from 'react-native';
 import { FontAwesome } from 'react-native-vector-icons';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
@@ -25,6 +25,8 @@ export const COLORS = {
 
 // Categorical palette in fixed order (validated): identity is never color alone, labels always accompany it
 export const CATEGORY_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#8b5bb5', '#687782'];
+
+export const InfoTooltipThemeContext = createContext('light');
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -202,6 +204,7 @@ const visibleScopeFor = (metric, scope) => {
   return ['Now', 'All time', 'Period'].includes(label) ? null : label;
 };
 export const InfoTooltip = ({ label, metric, accessibilityLabel = 'About ' + label }) => {
+  const dark = useContext(InfoTooltipThemeContext) === 'dark';
   const anchor = useRef(null);
   const closeTimer = useRef(null);
   const [visible, setVisible] = useState(false);
@@ -239,12 +242,12 @@ export const InfoTooltip = ({ label, metric, accessibilityLabel = 'About ' + lab
   }, [visible]);
   const bubble = <View accessibilityRole="text" onLayout={event => setTooltipHeight(event.nativeEvent.layout.height)}
     onHoverIn={keepOpen} onHoverOut={leave}
-    style={[styles.infoTooltip, { left, top, width: tooltipWidth, maxHeight: height - 24 }]}>
-    <View style={[styles.tooltipPointer, { left: Math.max(12, Math.min(position.x + position.width / 2 - left - 5, tooltipWidth - 22)),
+    style={[styles.infoTooltip, dark && styles.darkInfoTooltip, { left, top, width: tooltipWidth, maxHeight: height - 24 }]}>
+    <View style={[styles.tooltipPointer, dark && styles.darkTooltipPointer, { left: Math.max(12, Math.min(position.x + position.width / 2 - left - 5, tooltipWidth - 22)),
       ...(top === below ? { top: -5 } : { bottom: -5 }) }]} />
-    <ScrollView><Text style={styles.tooltipTitle}>{label}</Text>
-      <Text style={styles.tooltipBody}>{metric?.definition || 'Calculation details are not recorded.'}</Text>
-      {metric?.reason ? <Text style={styles.tooltipBody}>{metric.reason}</Text> : null}
+    <ScrollView><Text style={[styles.tooltipTitle, dark && styles.darkTooltipTitle]}>{label}</Text>
+      <Text style={[styles.tooltipBody, dark && styles.darkTooltipBody]}>{metric?.definition || 'Calculation details are not recorded.'}</Text>
+      {metric?.reason ? <Text style={[styles.tooltipBody, dark && styles.darkTooltipBody]}>{metric.reason}</Text> : null}
     </ScrollView>
   </View>;
   return <>
@@ -630,6 +633,10 @@ const styles = StyleSheet.create({
   tooltipPointer: { position: 'absolute', width: 10, height: 10, backgroundColor: COLORS.surface, transform: [{ rotate: '45deg' }] },
   tooltipTitle: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: COLORS.ink, marginBottom: 4 },
   tooltipBody: { fontSize: 13, lineHeight: 19, color: COLORS.inkSecondary },
+  darkInfoTooltip: { backgroundColor: '#333333', borderColor: '#4A4A4A' },
+  darkTooltipPointer: { backgroundColor: '#333333' },
+  darkTooltipTitle: { color: '#FFFFFF' },
+  darkTooltipBody: { color: '#F2F2F2' },
   pie: { width: 180, height: 180, alignSelf: 'center', marginVertical: 8 },
   metricRow: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   metricRowMain: { flexDirection: 'row', alignItems: 'center', gap: 16 },

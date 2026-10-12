@@ -9,6 +9,7 @@ import {
   BarChart,
   CountBarChart,
   ErrorState,
+  InfoTooltipThemeContext,
   LineChart,
   PieChart,
   Section,
@@ -97,7 +98,7 @@ const AdminAnalyticsScreen = () => {
   const monthlyDaysOnMarket = chart(data.monthlyAverageDaysOnMarket, 'days', 'Average days from publication to first acceptance, grouped by acceptance month. Months without data are blank.');
 
   return (
-    <>
+    <InfoTooltipThemeContext.Provider value="dark">
       {header}
       <AnalyticsLayout compactTabs error={error}>
           <Section title="Overview" action={<RefreshControl onRefresh={retry} loading={loading} asOf={data.asOf} />}>{!loading && <><TileRow>
@@ -137,7 +138,7 @@ const AdminAnalyticsScreen = () => {
           </Section>
           </>}
       </AnalyticsLayout>
-    </>
+    </InfoTooltipThemeContext.Provider>
   );
 };
 

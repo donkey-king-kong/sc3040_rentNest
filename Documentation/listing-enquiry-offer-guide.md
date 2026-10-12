@@ -146,10 +146,16 @@ same tenant rents the same property again.
 Stale tenant-overview links verify active status, owner and tenant before showing
 tenancy actions, so an old tenant link cannot terminate a subsequent tenancy.
 
-Authorized deletion of an enquiry-only property preserves messages/snapshots;
-its amenity cache and listing views follow existing database cascade rules.
-Any rental history or occupied listing blocks deletion. The rental FK also
-protects history against direct SQL deletion.
+Authorized permanent deletion is blocked while a tenant is assigned or an active
+rental exists. The API returns 409 with an occupied-property explanation, which
+the admin review screen displays to the user.
+For a vacant property, rental records alone do not block deletion. Its linked
+rentals, payments and termination requests are removed in the same transaction
+as the listing. Those records consequently no longer contribute to analytics.
+Conversation text and existing listing snapshots are retained, with removed
+listing/rental/request links detached. Amenity caches and listing views follow
+the existing database cascade rules. Any cleanup failure rolls back all changes.
+The rental FK still prevents uncoordinated direct SQL deletion.
 
 ## Validation
 
@@ -169,9 +175,10 @@ preserves dashboard screens and analytics calculations. Reconciliation decisions
   current tenant exposes acceptance controls. Unknown statuses cannot be
   accepted; ended offers say "Lease ended". Failed rental loads show the retry
   control before any rental fields are accessed.
-- Admin moderation can still delete listings without rental history or current
-  occupancy. Neither admins nor owners can delete rental-backed listings.
-  Editing remains owner-only and cannot transfer ownership.
+- Admin moderation and owner deletion permit vacant listings with historical or
+  pending rentals, cleaning linked records as described above. Current tenants
+  and active rentals remain protected. Editing remains owner-only and cannot
+  transfer ownership.
 - Historical analytics fixtures select rentals by exact ID, not the
   current-only listing lookup. Existing dashboard calculations are unchanged.
 
