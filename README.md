@@ -157,6 +157,8 @@ The owner analytics dashboard shows current listing occupancy; the monthly occup
 Tenancy Length uses a pie chart with each length group's count and percentage of total tenancies in the legend.
 Analytics information tooltips use white cards with a border, shadow, and improved spacing.
 
+After a successful user ban, admins see a "User Banned" notification matching the Profile Updated popup, with a translucent charcoal card and white tick icon. It returns to the admin screen after two seconds or on native back dismissal.
+
 - [Listing enquiries and offers: required database migration, workflows and tests](Documentation/listing-enquiry-offer-guide.md)
 - [Listing Image Rendering Troubleshoot](Documentation/Troubleshooting/listing-images.md)
 - [Profile Image Handling Troubleshoot](Documentation/Troubleshooting/profile-images.md)
