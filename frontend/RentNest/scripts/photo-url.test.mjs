@@ -325,7 +325,8 @@ describe('PHOTO-02: mounted signup', () => {
       assert.equal(keyboard.props.behavior, platform === 'ios' ? 'padding' : undefined);
       assert.equal(keyboard.props.keyboardVerticalOffset, platform === 'ios' ? 24 : 0);
 
-      await act(async () => input(screen, 'Photo URL').props.onFocus());
+      await press(input(screen, 'Photo URL').parent);
+      await act(async () => input(screen, 'Photo URL').props.onBlur());
       assert.deepEqual(scroll.props.contentContainerStyle, initialContentStyle);
       assert.equal(scroll.findAllByType('TextInput').length, 5);
       assert.ok(scroll.findAllByType('TouchableOpacity').includes(signupButton(screen)));
@@ -340,6 +341,28 @@ describe('PHOTO-02: mounted signup', () => {
     assert.equal(input(screen, 'Photo URL').props['aria-describedby'], 'signup-photo-error');
     assert.equal(screen.root.findAllByProps({ nativeID: 'signup-photo-help' }).length, 0);
     assert.equal(screen.root.findAllByType('TextInput').at(-1), input(screen, 'Photo URL'));
+  });
+
+  test('photo matches other field borders and retains validation on blur', async t => {
+    const h = harness(t);
+    const screen = await h.mount('app/SignUpScreen.jsx');
+    const photo = () => input(screen, 'Photo URL');
+    const style = node => Object.assign({}, ...node.parent.props.style.filter(Boolean));
+    const normalStyle = style(input(screen, 'Phone Number'));
+    assert.deepEqual(style(photo()), normalStyle);
+    assert.equal(photo().props.onFocus, undefined);
+    await press(photo().parent);
+    await act(async () => photo().props.onBlur());
+    assert.deepEqual(style(photo()), normalStyle);
+    await change(screen, 'Photo URL', '/invalid.jpg');
+    await act(async () => photo().props.onBlur());
+    assert.equal(photo().props['aria-invalid'], true);
+    assert.equal(style(photo()).borderColor, '#E94068');
+    assert.equal(screen.root.findByProps({ nativeID: 'signup-photo-error' }).props.accessibilityRole, 'alert');
+    await change(screen, 'Photo URL', FULL_PHOTO);
+    await act(async () => photo().props.onBlur());
+    assert.equal(photo().props['aria-invalid'], false);
+    assert.deepEqual(style(photo()), normalStyle);
   });
 
   test('submits the full trimmed URL and existing fields, then redirects to login', async t => {

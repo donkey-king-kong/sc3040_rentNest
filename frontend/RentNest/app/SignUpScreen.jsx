@@ -16,7 +16,6 @@ const SignUpScreen = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [photoURL, setPhotoURL] = useState('');
   const [photoError, setPhotoError] = useState('');
-  const [photoFocused, setPhotoFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
@@ -230,8 +229,6 @@ const SignUpScreen = () => {
         <Pressable
           style={[
             styles.inputContainer,
-            styles.photoInputContainer,
-            photoFocused && styles.focusedInputContainer,
             photoError && styles.errorInputContainer,
           ]}
           onPress={() => photoInputRef.current?.focus()}
@@ -252,9 +249,7 @@ const SignUpScreen = () => {
             autoCorrect={false}
             editable={!submitting}
             value={photoURL}
-            onFocus={() => setPhotoFocused(true)}
             onBlur={() => {
-              setPhotoFocused(false);
               setPhotoError(getPhotoUrlError(photoURL));
             }}
             onChangeText={(text) => {
@@ -335,13 +330,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E94068',
     backgroundColor: '#FFF1F4',
-  },
-  photoInputContainer: {
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  focusedInputContainer: {
-    borderColor: '#237957',
   },
   photoError: {
     fontSize: 14,

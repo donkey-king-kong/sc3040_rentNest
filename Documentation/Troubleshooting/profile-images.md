@@ -140,6 +140,11 @@ scrolls on shorter screens. Navigation supplies the top safe area; the column
 keeps bottom safe-area padding. iOS uses keyboard padding with the actual top
 inset, while Android relies on window resizing instead of an extra height offset.
 
+Photo URL uses the same normal container styling as the other sign-up fields,
+without a photo-only green focus border. The text caret remains visible, and
+invalid URLs still produce the validation border and error message on blur.
+Edit Profile focus styling is unchanged.
+
 All 85 focused tests pass, including layout structure and focus stability for
 iOS, Android, and web configurations. Browser checks at 390x900, 320x640, and
 1440x900 verified centering where space permits, unchanged field-to-button spacing
@@ -148,6 +153,11 @@ occurred. Android Expo Go captures confirmed centering and focus without losing
 fields. The emulator did not display its software keyboard, so IME-open behavior
 is not certified; its original keyboard setting was restored. iOS, tablet,
 large-text, and physical-device keyboard checks remain outstanding.
+
+After removing the sign-up photo focus border, all 86 focused tests pass,
+including field-style parity, validation on blur, and recovery after correction.
+An Android Expo Go capture confirms the focused photo field shows its caret
+without the green perimeter highlight.
 
 The isolated browser flow passed signup/login, image loading, full URL
 preservation, clear/save, returning to Profile with initials, reopening with an
