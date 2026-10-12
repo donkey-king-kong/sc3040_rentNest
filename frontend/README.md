@@ -68,6 +68,84 @@ Reset Recommendations remain separate actions.
 Android emulator interaction checks and before/after layout comparisons passed.
 Clear was also checked on Android with a retained Tampines search, and focused
 screen/request tests passed for populated, invalid, empty, and cleared filters.
-The standard Jest runner currently requires the missing `@react-native/jest-preset`
-dependency; the focused checks used the installed React renderer with mocked services.
+The standard Jest runner uses the matching `@react-native/jest-preset` development dependency. Run `npm ci` and `npm test -- --runInBand --watchAll=false` from `frontend/RentNest`. The earlier focused checks used the installed React renderer with mocked services.
 Web keyboard behavior and iOS interaction still require platform verification.
+
+## Lease Termination
+
+Approved work is on `rental-termination`, branched from `main`. See the
+[workflow plan](../Documentation/termination-workflow-plan.md) for tickets and scope.
+Automated termination checks passed; platform validation limits are recorded below.
+
+### Owner and Tenant Guide
+
+1. As the owner, open Inbox -> property -> Manage Tenant -> tenant
+   (Tenant Overview) -> Terminate Lease.
+2. Choose **Refund tenant** and enter a positive whole-dollar SGD amount, or choose
+   **No refund**, which submits `0`. Cents and negative or invalid amounts are not
+   supported. The existing API stores the amount as Java `long`; the form also
+   rejects values outside JavaScript's safe integer range.
+3. Submit the request, then review its card in the tenant chat. Submission leaves
+   the lease active while awaiting the tenant's response.
+4. As the tenant, open the conversation and choose **Accept** or **Reject** on the
+   pending request. Accept ends the lease immediately. Reject leaves it active.
+   Owners cannot accept or reject their own request; tenants cannot initiate one.
+
+Each card loads its own request with server-derived rental details, shows the persisted outcome,
+and provides loading, retry, error, and in-progress states. Decision controls are
+unavailable after acceptance or rejection. A displayed refund is an agreed amount,
+not evidence of a transfer: this flow neither processes money nor creates a payment row.
+
+### API and Limits
+
+- Creation retains `POST /api/requests/terminationrequest/{rentalid}/{refundAmount}`.
+  The server checks the authenticated rental owner, active lease, valid amount, and
+  absence of any retained request, then creates the request and chat message atomically.
+- Decisions use `POST /api/requests/{id}/decision` with `{"decision":"accept"}` or
+  `{"decision":"reject"}`. Only the rental tenant can decide; request reads are
+  restricted to rental participants.
+- Acceptance atomically persists request status `terminated`, rental status
+  `terminated`, and rental `terminatedAt`, without replacing the tenant identity.
+  Rejection persists request status `rejected` without changing the rental.
+- Repeating the same completed decision returns the outcome; conflicting decisions
+  or duplicate creation are rejected. Busy controls also guard repeated taps.
+- The unchanged schema allows **one retained request per rental, even after rejection**.
+  A rejected request cannot be replaced by a new proposal in this scope.
+- No tenant initiation, scheduling, refund table or settlement tracking, billing,
+  re-letting, multi-request redesign, or existing-data repair is included.
+
+### Termination Validation Checklist
+
+The checked items below passed automated tests with mocked frontend HTTP and isolated backend H2.
+They do not assert that native end-to-end writes were exercised.
+
+- [x] Owner submits a positive whole-dollar refund and No refund `0`.
+- [x] Invalid, fractional, negative and oversized amounts cannot be submitted.
+- [x] Tenant acceptance persists across reload, ends the correct lease immediately,
+  and preserves tenant identity; rejection persists and leaves the lease active.
+- [x] Owner/nonparticipant decisions and non-owner creation are denied.
+- [x] Repeated taps, retries, conflicting decisions and creation after rejection
+  cannot produce a second request or inconsistent state.
+- [x] Request-only messages and multiple cards use their own request details.
+- [ ] Loading, failures, retry, narrow layouts and accessible controls work.
+- [ ] Neither decision creates a payment row; existing offers, chat and rent
+  payment flows pass regression checks.
+
+Run the focused frontend suite from `frontend/RentNest`:
+
+```bash
+./node_modules/.bin/jest --config jest.termination.config.cjs --runInBand
+```
+
+All 62 tests passed. The scoped configuration uses mocked native components and avoids
+the existing default Jest preset dependency issue. Backend Java 21 validation passed
+215 tests, including 47 termination tests; two unrelated OpenRouter live tests were
+excluded after TLS certificate failures.
+
+Read-only browser checks confirmed the owner route, whole-dollar validation, and an
+existing Accepted card. Browser screenshot capture failed; the Android session had API
+errors loading chats. Native card visuals, narrow/large-text layouts, and iOS remain
+unverified. No shared database records were changed during validation.
+
+Restart/deploy the updated backend with this frontend: decisions now require the new
+endpoint rather than the former generic request/rental PUTs.

@@ -1,8 +1,6 @@
 package RentNest.RentNest;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,16 +12,7 @@ import RentNest.service.JwtService;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:context;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.datasource.username=sa", "spring.datasource.password=",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
-        "security.jwt.secret-key=dGVzdC1vbmx5LXNlY3JldC1rZXktMzItYnl0ZXMtbG9uZw==",
-        "security.jwt.expiration-time=3600000",
-        "LTADATAMALL_ACCOUNTKEY=dummy", "URA_ACCESSKEY=dummy"
-})
-@AutoConfigureMockMvc
+@RentNestIntegrationTest
 @Transactional
 class RentNestApplicationTests {
     @Autowired MockMvc mvc;

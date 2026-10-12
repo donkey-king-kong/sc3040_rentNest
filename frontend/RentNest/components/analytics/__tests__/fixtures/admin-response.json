@@ -1,0 +1,75 @@
+{
+  "asOf": "2026-04-01T00:00:00Z",
+  "currency": "SGD",
+  "registeredUsers": 8,
+  "totalListings": 4,
+  "totalRentCollected": 6500,
+  "totalRentalOffers": 4,
+  "pendingRentals": 2,
+  "activeRentals": 1,
+  "upcomingRentals": 0,
+  "expiredRentals": 0,
+  "terminatedRentals": 1,
+  "unclassifiedRentals": 0,
+  "propertyOwners": 2,
+  "currentTenants": 1,
+  "expiredTenants": 0,
+  "terminatedTenants": 1,
+  "blockedUsers": 1,
+  "monthlyRent": [
+    {
+      "label": "2026-01",
+      "value": 3500
+    },
+    {
+      "label": "2026-02",
+      "value": 1000
+    },
+    {
+      "label": "2026-03",
+      "value": 2000
+    }
+  ],
+  "monthlyAcceptedOffers": [
+    {
+      "label": "2026-01",
+      "value": 0
+    },
+    {
+      "label": "2026-02",
+      "value": 2
+    },
+    {
+      "label": "2026-03",
+      "value": 1
+    }
+  ],
+  "monthlyTerminations": [
+    {
+      "label": "2026-01",
+      "value": 0
+    },
+    {
+      "label": "2026-02",
+      "value": 0
+    },
+    {
+      "label": "2026-03",
+      "value": 1
+    }
+  ],
+  "monthlyAverageDaysOnMarket": [
+    {
+      "label": "2026-01",
+      "value": null
+    },
+    {
+      "label": "2026-02",
+      "value": 10
+    },
+    {
+      "label": "2026-03",
+      "value": 14
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
@@ -29,6 +30,11 @@ public class RentalsController {
         this.rentalsService = rentalsService;
     }
 
+    @GetMapping("/offer-options")
+    public List<RentalsService.OfferOption> getOfferOptions(@RequestParam Long recipientID) {
+        return rentalsService.getOfferOptions(recipientID);
+    }
+
     // Create a new rental
     @PostMapping
     public ResponseEntity<?> createRental(@RequestBody RentalsDTO rentalDTO) {
@@ -37,6 +43,8 @@ public class RentalsController {
             return new ResponseEntity<>(createdRental, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             return new ResponseEntity<>("Error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -115,6 +123,10 @@ public class RentalsController {
             return new ResponseEntity<>(createdRental, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (DataAccessException e) {
+            throw e;
         } catch (RuntimeException e) {
             return new ResponseEntity<>("Error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -151,6 +163,10 @@ public class RentalsController {
             return new ResponseEntity<>(reviewedRental, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (DataAccessException e) {
+            throw e;
         } catch (RuntimeException e) {
             return new ResponseEntity<>("Error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }

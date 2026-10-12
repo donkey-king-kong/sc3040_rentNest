@@ -19,9 +19,13 @@ const TenantOverview = () => {
   const [payments, setPayments] = useState([]);
   const [outstandingPayments, setOutstandingPayments] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [tenancyError, setTenancyError] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
+      setRental(null);
+      setTenancyError('');
       try {
         const token = await AsyncStorage.getItem('token');
         if (!token) {
@@ -45,7 +49,15 @@ const TenantOverview = () => {
           `${API_BASE_URL}${ENDPOINTS.RENTALS}/listing/${listingId}`,
           { headers }
         );
-        setRental(rentalResponse.data);
+        const currentRental = rentalResponse.data;
+        if (currentRental.status !== 'active'
+            || Number(currentRental.tenantUserID) !== Number(tenantId)
+            || Number(currentRental.ownerUserId) !== Number(meResponse.data.userID)) {
+          setTenancyError('This is no longer the active tenancy for this property. Return to the property to view its current tenant.');
+          setLoading(false);
+          return;
+        }
+        setRental(currentRental);
 
         try {
           const paymentsResponse = await axios.get(
@@ -129,7 +141,7 @@ const TenantOverview = () => {
         <TouchableOpacity onPress={() => router.back()} style={{ position: 'absolute', top: 20, left: 20 }}>
           <FontAwesome name="chevron-left" size={18} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.loadingText}>Failed to load tenant information.</Text>
+        <Text style={styles.loadingText}>{tenancyError || 'Failed to load tenant information.'}</Text>
       </View>
     );
   }

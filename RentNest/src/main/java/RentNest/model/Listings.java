@@ -3,10 +3,8 @@ package RentNest.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
-import org.hibernate.annotations.CreationTimestamp;
-import java.time.LocalDateTime;
 
-import java.time.Instant;
+import java.util.Date;
 
 @Entity
 @Table(name = "listings")
@@ -40,26 +38,20 @@ public class Listings {
     private Double latitude;
     private Double longitude;
 
-    /**
-     * Cached AI-generated listing summary (pillar 3). Regenerated only when
-     * {@code aiSummaryKey} no longer matches the listing's decision-relevant fields, so a
-     * search page costs no model calls once its listings have been summarised.
-     */
-    @Column(name = "ai_summary", length = 600)
-    private String aiSummary;
-
-    @Column(name = "ai_summary_key", length = 64)
-    private String aiSummaryKey;
-
-    @Column(name = "ai_summary_updated_at")
-    private Instant aiSummaryUpdatedAt;
-
     public boolean isDemo() {
         return description != null && description.startsWith("FICTIONAL DEMO:");
     }
-    @CreationTimestamp
+    /** When the listing was published. Set by the server on first save; never accepted from requests. */
     @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Date createdAt;
+
+    @PrePersist
+    void recordCreation() {
+        if (createdAt == null) {
+            createdAt = new Date();
+        }
+    }
 
     // Getters
     public Long getListingID() {
@@ -74,6 +66,11 @@ public class Listings {
     @JsonProperty("ownerId")
     public Long getOwnerId() {
         return owner != null ? owner.getUserID() : null;
+    }
+
+    /** True when the given user owns this listing. */
+    public boolean isOwnedBy(User user) {
+        return user != null && user.getUserID() != null && user.getUserID().equals(getOwnerId());
     }
 
     @JsonProperty("ownerName")
@@ -158,18 +155,12 @@ public class Listings {
         return listingpicture;
     }
 
-    public String getAiSummary() {
-        return aiSummary;
+    public Date getCreatedAt() {
+        return createdAt;
     }
 
-    @JsonIgnore
-    public String getAiSummaryKey() {
-        return aiSummaryKey;
-    }
-
-    @JsonIgnore
-    public Instant getAiSummaryUpdatedAt() {
-        return aiSummaryUpdatedAt;
+    public void setCreatedAt(Date createdAt) {
+        this.createdAt = createdAt;
     }
 
     public Double getLatitude() {
@@ -178,10 +169,6 @@ public class Listings {
 
     public Double getLongitude() {
         return longitude;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
     }
 
     // Setters
@@ -247,18 +234,6 @@ public class Listings {
 
     public void setListingpicture(String listingpicture) {
         this.listingpicture = listingpicture;
-    }
-
-    public void setAiSummary(String aiSummary) {
-        this.aiSummary = aiSummary;
-    }
-
-    public void setAiSummaryKey(String aiSummaryKey) {
-        this.aiSummaryKey = aiSummaryKey;
-    }
-
-    public void setAiSummaryUpdatedAt(Instant aiSummaryUpdatedAt) {
-        this.aiSummaryUpdatedAt = aiSummaryUpdatedAt;
     }
 
     public void setLatitude(Double latitude) {

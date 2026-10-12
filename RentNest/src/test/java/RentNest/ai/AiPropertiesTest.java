@@ -27,17 +27,13 @@ class AiPropertiesTest {
                 "rentnest.ai.read-timeout-ms", "4500",
                 "rentnest.ai.filter.model", "openai/gpt-5-nano",
                 "rentnest.ai.sorting.candidates", "7",
-                "rentnest.ai.sorting.enabled", "false",
-                "rentnest.ai.summary.include-amenities", "true",
-                "rentnest.ai.summary.amenity-radius-meters", "750"));
+                "rentnest.ai.sorting.enabled", "false"));
 
         assertEquals("sk-or-test", properties.getApiKey());
         assertEquals(4500, properties.getReadTimeoutMs());
         assertEquals("openai/gpt-5-nano", properties.getFilter().getModel());
         assertEquals(7, properties.getSorting().getCandidates());
         assertFalse(properties.getSorting().isEnabled());
-        assertTrue(properties.getSummary().isIncludeAmenities());
-        assertEquals(750, properties.getSummary().getAmenityRadiusMeters());
     }
 
     @Test void defaultsLeaveEveryFeatureOffUntilAKeyIsConfigured() {
@@ -47,8 +43,15 @@ class AiPropertiesTest {
         assertEquals("", properties.getApiKey());
         assertFalse(new OpenRouterClient(properties).isEnabled(),
                 "no key must mean no model calls, whatever the feature switches say");
-        assertFalse(properties.getSummary().isIncludeAmenities(),
-                "the slow government-data lookups must stay off by default");
         assertEquals(20, properties.getSorting().getCandidates());
+    }
+
+    @Test void obsoleteSummarySettingsCannotReenableRemovedFeature() {
+        AiProperties properties = bind(Map.of(
+                "rentnest.ai.summary.enabled", "true",
+                "rentnest.ai.summary.model", "obsolete-model"));
+        assertTrue(java.util.Arrays.stream(AiProperties.class.getMethods())
+                .noneMatch(method -> method.getName().equals("getSummary")));
+        assertEquals("google/gemini-2.5-flash-lite", properties.getFilter().getModel());
     }
 }

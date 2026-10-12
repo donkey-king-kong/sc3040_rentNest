@@ -22,7 +22,7 @@ import static RentNest.recommendation.RecommendationResponse.Filters;
 import static RentNest.recommendation.RecommendationResponse.Item;
 
 /**
- * Recommendation pipeline. AI assists three stages and decides none of them outright:
+ * Recommendation pipeline. AI assists filtering and ordering, not listing summaries:
  *
  * <ol>
  *   <li><b>Filter</b> – {@link AiQueryParser} turns the search phrase into structured
@@ -30,8 +30,8 @@ import static RentNest.recommendation.RecommendationResponse.Item;
  *   <li><b>Sort</b> – eligible listings are scored deterministically (rent 40, property
  *       type 25, location 25, bedrooms 10) against viewing history, then {@link AiReranker}
  *       re-orders only the leading candidates.</li>
- *   <li><b>Summarise</b> – {@link ListingSummaryService} supplies a cached per-listing
- *       summary, or the factual template until one has been generated.</li>
+ *   <li><b>Summarise</b> – listing fields supply a factual template with no model calls
+ *       or persisted summary cache.</li>
  * </ol>
  *
  * Each stage degrades independently: with no API key the whole pipeline still runs and
@@ -48,14 +48,11 @@ public class RecommendationService {
     private final ListingsRepository repository;
     private final AiQueryParser queryParser;
     private final AiReranker reranker;
-    private final ListingSummaryService summaries;
-
     public RecommendationService(ListingsRepository repository, AiQueryParser queryParser,
-                                 AiReranker reranker, ListingSummaryService summaries) {
+                                 AiReranker reranker) {
         this.repository = repository;
         this.queryParser = queryParser;
         this.reranker = reranker;
-        this.summaries = summaries;
     }
 
     @Transactional(readOnly = true)
@@ -110,7 +107,7 @@ public class RecommendationService {
                 notices(parsed, reranked.applied(), personalized, profile),
                 ranked.size(),
                 page,
-                new Ai(filterMode(parsed), sortingMode(reranked.applied()), summaryMode(page)));
+                new Ai(filterMode(parsed), sortingMode(reranked.applied()), "off"));
     }
 
     private List<String> validateTypes(List<String> requested) {
@@ -152,13 +149,7 @@ public class RecommendationService {
         return reranked ? "ai" : "similarity";
     }
 
-    private String summaryMode(List<Item> page) {
-        if (!summaries.isEnabled()) return "off";
-        return page.stream().anyMatch(item -> ListingSummaryService.Summary.AI.equals(item.summarySource()))
-                ? "ai" : "pending";
-    }
-
-    /** Adds the market comparison, the cached summary and any AI re-ranking reason. */
+    /** Adds the market comparison and any AI re-ranking reason to the factual template. */
     private List<Item> enrich(List<Item> page, Map<Long, Listings> matched,
                               List<Listings> pool, Map<Long, String> rerankReasons) {
         List<Item> enriched = new ArrayList<>(page.size());
@@ -167,8 +158,6 @@ public class RecommendationService {
             if (listing == null) { enriched.add(item); continue; }
 
             MarketStats market = MarketStats.forListing(listing, pool);
-            ListingSummaryService.Summary summary = summaries.summaryFor(listing, market, item.summary());
-
             List<String> reasons = new ArrayList<>();
             String why = rerankReasons.get(item.listingID());
             if (why != null) reasons.add(why);
@@ -176,7 +165,7 @@ public class RecommendationService {
 
             enriched.add(new Item(item.listingID(), item.name(), item.location(), item.type(),
                     item.price(), item.beds(), item.bathroom(), item.size(), item.listingpicture(),
-                    item.score(), List.copyOf(reasons), summary.text(), summary.source(),
+                    item.score(), List.copyOf(reasons), item.summary(), "template",
                     market.note(item.price()), item.demo(), listing.getDescription()));
         }
         return List.copyOf(enriched);
@@ -229,7 +218,7 @@ public class RecommendationService {
                 + (l.getSize() == null ? "" : " · " + l.getSize() + " sq ft");
         return new Item(l.getListingID(), l.getName(), l.getLocation(), l.getType(), l.getPrice(),
                 l.getBeds(), l.getBathroom(), l.getSize(), l.getListingpicture(), score,
-                List.copyOf(reasons), summary, ListingSummaryService.Summary.TEMPLATE, "", l.isDemo());
+                List.copyOf(reasons), summary, "template", "", l.isDemo());
     }
 
     private static ResponseStatusException bad(String message) {

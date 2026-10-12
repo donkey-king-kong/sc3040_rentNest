@@ -1,6 +1,6 @@
 // Previous imports remain unchanged
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Modal, ActivityIndicator} from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import MapView, { Marker } from '../components/AppMap';
 import {useRouter, useLocalSearchParams} from "expo-router";
@@ -113,6 +113,19 @@ const HomeListingScreen = () => {
           listingId,
           name: listingResponse.data?.name,
           listingpicture: listingResponse.data?.listingpicture,
+        });
+
+        // Record that this listing was opened, for the owner's view analytics.
+        // Fire and forget: the page must still work if this fails, and the backend ignores
+        // an owner viewing their own listing.
+        axios.post(`${API_BASE_URL}/api/listings/${listingId}/views`, {}, {
+          headers: {
+            'Authorization': `Bearer ${tokenValue}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        }).catch((viewError) => {
+          console.log('Could not record listing view:', viewError.message);
         });
 
         // Apply default values only if the response data is empty or missing properties
@@ -405,6 +418,7 @@ const HomeListingScreen = () => {
     try {
       setIsReportingListing(true);
       const reportStorageKey = getReportStorageKey();
+      // axios.put(url, body, config): headers belong in the third argument
       await axios.put(`${API_BASE_URL}/api/listings/setFlag/${listingId}/true`, {}, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -419,6 +433,8 @@ const HomeListingScreen = () => {
       showListingNotification('Listing Reported');
     } catch (err) {
       console.error(`Error reporting listing: ${err.message}`);
+      setModalVisible(false);
+      showListingNotification('Report not sent. Please try again.');
     } finally {
       setIsReportingListing(false);
     }
@@ -433,7 +449,9 @@ const HomeListingScreen = () => {
   };
 
   const handleChat = () => {
-    router.push(`/ChatsScreen2?partnerUserId=${listing.ownerUserID}&currentUser=${currentUserID}`);
+    router.push({ pathname: '/ChatsScreen2', params: {
+      partnerUserId: listing.ownerUserID, currentUser: currentUserID, enquiryListingId: listingId,
+    } });
   };
 
   // Memoize the price per square foot calculation
@@ -445,7 +463,17 @@ const HomeListingScreen = () => {
   // Memoize the nearby places data
   const { data } = useMemo(() => getNearbyPlaces(), [getNearbyPlaces]);
 
-  if (loading || !listing) {
+  if (!loading && !listing) {
+    return <View style={styles.loadingScreen}>
+      <Text style={styles.loadingText}>Listing unavailable</Text>
+      <Text>This listing may have been removed or could not be loaded.</Text>
+      <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} style={{ padding: 16 }}>
+        <Text>Back to conversation</Text>
+      </TouchableOpacity>
+    </View>;
+  }
+
+  if (loading) {
     return (
       <View style={styles.loadingScreen}>
         <MorphingInfinity size={86} color="#2FA84F" />

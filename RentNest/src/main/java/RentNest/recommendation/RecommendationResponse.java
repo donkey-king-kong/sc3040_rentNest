@@ -10,13 +10,13 @@ public record RecommendationResponse(String mode, Filters filters, List<String> 
                           Integer minBeds, List<String> types) {}
 
     /**
-     * Which path actually served each of the three AI features on this request, so the UI
+     * Which path actually served each recommendation stage on this request, so the UI
      * can label what the tenant is looking at and a fallback is never passed off as AI.
      *
      * @param filter    {@code "ai"}, {@code "rules"} or {@code "off"}
      * @param sorting   {@code "ai"} when the model re-ranked, otherwise {@code "similarity"} or {@code "off"}
-     * @param summaries {@code "ai"} when at least one card carries a generated summary,
-     *                  {@code "pending"} while they are still being generated, else {@code "off"}
+     * @param summaries always {@code "off"}; retained for API compatibility.
+     *                  Listing summaries are factual templates, not AI-generated.
      */
     public record Ai(String filter, String sorting, String summaries) {}
 
