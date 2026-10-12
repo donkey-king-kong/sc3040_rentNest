@@ -1164,7 +1164,7 @@ const handlePaymentAndAccept = async () => {
     const partnerProfilePhotoURL = partner.photoURL || partner.profilePhotoURL || partner.profilePicture || partner.avatar;
 
     return (
-        <View style={[styles.container, { flex: 1 }]}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.container, { flex: 1 }]}>
             <StatusBar barStyle={isSummaryModalVisible ? 'light-content' : 'dark-content'} />
             {/* Header row 1: back + avatar + name + Reviews */}
             <View style={styles.nameHeaderContainer}>
@@ -1308,21 +1308,24 @@ const handlePaymentAndAccept = async () => {
                 </View>
             )}
 
+            <View style={[styles.composer, { paddingBottom: Math.max(safeAreaInsets.bottom, 8) }]}>
             {!!chatError && <Text accessibilityRole="alert" style={styles.inlineError}>{chatError}</Text>}
             {enquiryLoading && <Text style={styles.propertyAddress}>Loading property attachment...</Text>}
-            {enquiry && <View style={styles.composerPreview}><EnquiryPreview
+            {enquiry && <EnquiryPreview variant="draft"
                 name={enquiry.name} address={enquiry.address} onRemove={() => setEnquiry(null)}
-            /></View>}
+            />}
             <View style={styles.inputContainer}>
-                <TouchableOpacity style={styles.inputIconButton} onPress={toggleRentalModal}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send rental offer" style={styles.inputIconButton} onPress={toggleRentalModal}>
                     <FontAwesome name="paperclip" size={20} color="#555" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.inputIconButton} onPress={toggleFlagModal}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Report conversation" style={styles.inputIconButton} onPress={toggleFlagModal}>
                     <FontAwesome name={isFlagged ? 'flag' : 'flag-o'} size={20} color={isFlagged ? '#E94068' : '#555'} />
                 </TouchableOpacity>
                 <TextInput
                     style={styles.input}
                     placeholder="Enter Message"
+                    accessibilityLabel="Message"
+                    placeholderTextColor="#626A66"
                     value={newMessage}
                     maxLength={255}
                     onChangeText={setNewMessage}
@@ -1333,6 +1336,7 @@ const handlePaymentAndAccept = async () => {
                 <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send message" disabled={enquiryLoading} style={styles.sendButton} onPress={sendMessage}>
                     <FontAwesome name="send" size={16} color="#fff" />
                 </TouchableOpacity>
+            </View>
             </View>
 
             {isAskAiModalVisible && (
@@ -1945,7 +1949,7 @@ const handlePaymentAndAccept = async () => {
                     </View>
                 </View>
             </Modal>
-        </View>
+        </KeyboardAvoidingView>
     );
 };
 
@@ -1953,7 +1957,7 @@ const handlePaymentAndAccept = async () => {
 const styles = StyleSheet.create({
     onDark: { color: '#F0F4F1' },
     errorOnDark: { color: '#FFB4B9' },
-    composerPreview: { paddingHorizontal: 4 },
+    composer: { paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E7ECE8', backgroundColor: '#FFFFFF' },
     inlineError: { color: '#A32632', fontSize: 14, lineHeight: 20, paddingVertical: 10 },
     propertyName: { color: '#193A2E', fontSize: 15, fontWeight: '600', flexShrink: 1 },
     propertyAddress: { color: '#41574C', fontSize: 13, lineHeight: 19, marginVertical: 5 },
@@ -2173,21 +2177,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 8,
         paddingVertical: 8,
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-        backgroundColor: '#fafafa',
+        backgroundColor: '#FFFFFF',
         gap: 6,
     },
     inputIconButton: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: '#F0F0F0',
         alignItems: 'center',
         justifyContent: 'center',
     },
     input: {
         flex: 1,
+        minWidth: 0,
         height: 40,
         borderRadius: 20,
         paddingHorizontal: 16,
@@ -2195,9 +2198,9 @@ const styles = StyleSheet.create({
         fontSize: 15,
     },
     sendButton: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: '#101820',
         alignItems: 'center',
         justifyContent: 'center',

@@ -67,6 +67,22 @@ actions.
   fields. Failed submission preserves the entered fields and refreshes options.
   Rent and deposit use positive whole-dollar amounts.
 
+## Enquiry Presentation Update
+
+The composer now uses a compact "Enquiring about" name/address attachment.
+Removing it keeps the typed message; opening chat still sends nothing. Composer
+controls have larger touch targets, and the input area accounts for the bottom
+safe area with iOS keyboard avoidance.
+
+Sent and received enquiries retain the original property preview inside their
+chat bubbles, with explicit View property and owner Offer this property actions.
+The proposed unified-card redesign was reverted at the user's request.
+No additional migration or API change is needed for this presentation update.
+
+The final frontend regression suite passes all 76 tests. Native keyboard,
+landscape, enlarged-text and screen-reader checks remain release validation;
+the earlier web screenshots of the unified card are not final-state evidence.
+
 ## Data and API Contracts
 
 `chathistory` adds nullable `listingid`, `listing_name_snapshot` and

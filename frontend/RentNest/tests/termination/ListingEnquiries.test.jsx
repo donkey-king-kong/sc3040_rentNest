@@ -48,6 +48,8 @@ test('opening prepares a preview without sending and a sent enquiry carries its 
   const ui = await render(<ChatsScreen2 />);
   expect(axios.post).not.toHaveBeenCalled();
   expect(ui.root.findAllByType(EnquiryPreview)).toHaveLength(1);
+  expect(ui.root.findByType(EnquiryPreview).props.variant).toBe('draft');
+  expect(text(ui.toJSON())).toContain('Enquiring about');
   await type(ui, 'Enter Message', 'Can I view this flat?');
   await press(ui, 'Send message');
   expect(axios.post.mock.calls[0][1]).toMatchObject({ listingID: 59, rentalID: null, requestID: null });
@@ -58,8 +60,9 @@ test('opening prepares a preview without sending and a sent enquiry carries its 
 
 test('removing attachment sends plain text and switching conversation clears the draft', async () => {
   const ui = await render(<ChatsScreen2 />);
-  await press(ui, 'Remove property attachment');
   await type(ui, 'Enter Message', 'Hello');
+  await press(ui, 'Remove property attachment');
+  expect(ui.root.findAllByType('TextInput').find(i => i.props.placeholder === 'Enter Message').props.value).toBe('Hello');
   await press(ui, 'Send message');
   expect(axios.post.mock.calls[0][1].listingID).toBeNull();
   params = { currentUser: '22', partnerUserId: '33' };
@@ -79,6 +82,25 @@ test('two saved enquiries and deleted-property snapshots remain distinct', async
   expect(previews.map(p => p.props.name)).toEqual(['Bishan flat', 'Removed property']);
   expect(text(ui.toJSON())).toContain('Listing no longer available');
   expect(buttons(ui).filter(b => text(b) === 'View property')).toHaveLength(1);
+  expect(previews[0].props.variant).not.toBe('draft');
+  expect(previews[0].parent.props.style.map(s => s.backgroundColor)).toContain('#2563EB');
+  await press(ui, 'View property');
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/HomeListingScreen', params: { listingId: 59 } });
+});
+
+test('received enquiry separates navigation from the offer action and preserves full snapshot text', async () => {
+  params = { currentUser: '11', partnerUserId: '22' };
+  const name = 'Spacious Jurong East Flat - 105';
+  messages = [{ messageID: 1, senderId: 22, listingId: 59, listingNameSnapshot: name,
+    listingAddressSnapshot: '105 JURONG EAST STREET 13, Singapore 600105',
+    message: 'Hi is this available?', date: '2026-10-12' }];
+  const ui = await render(<ChatsScreen2 />);
+  expect(text(ui.toJSON())).toContain(name);
+  const link = buttons(ui).find(b => text(b) === 'View property');
+  expect(text(link)).not.toContain('Offer this property');
+  await press(ui, 'Offer this property');
+  expect(buttons(ui).filter(b => b.props.accessibilityState?.checked).map(b => b.props.accessibilityLabel))
+    .toEqual(['Bishan flat, Bishan Street 12']);
 });
 
 test('offer form lists all eligible owned properties and requires explicit selection', async () => {
