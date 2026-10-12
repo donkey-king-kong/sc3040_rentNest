@@ -38,10 +38,10 @@ public class GeminiClient {
 
     /**
      * A fast "lite" model: room detection and the short price explanation are simple
-     * tasks. Measured Oct 2026: about 1 s per call vs about 10 s for gemini-3.8-flash,
+     * tasks. Measured Oct 2026: about 1-2 s per call vs about 10 s for gemini-3.8-flash,
      * with consistent room-type answers.
      */
-    public static final String DEFAULT_MODEL = "gemini-3.1-flash-lite";
+    public static final String DEFAULT_MODEL = "gemini-3.5-flash-lite";
     static final String GENERATE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
 
     private static final ObjectMapper objectMapper = new ObjectMapper();

@@ -320,7 +320,7 @@ const HomeListingScreen = () => {
               user: {
                 userID: review.reviewerID ?? review.reviewerId ?? review.userId,
                 name: review.reviewerName || review.userName || 'Anonymous',
-                photoURL: review.reviewerPhotoURL || review.userPhotoURL || 'https://via.placeholder.com/50'
+                photoURL: review.reviewerPhotoURL || review.userPhotoURL || null
               },
               flagged: review.flagged || false
             }));
