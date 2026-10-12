@@ -6,8 +6,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
-import FairPriceCard from '../components/FairPriceCard';
-import useFairPriceEstimate from '../hooks/useFairPriceEstimate';
 import { normalizeListingImageUrl } from '../components/ListingImage';
 
 const EditListingScreen = () => {
@@ -63,16 +61,6 @@ const EditListingScreen = () => {
 
         fetchListing();
     }, [listingId]);
-
-    // AI Fair-Pricing Model: suggested range updates as the owner edits the form
-    const { estimate: fairPrice, loading: fairPriceLoading } = useFairPriceEstimate({
-        token,
-        type: listing.type,
-        postal: listing.postal,
-        beds: listing.beds,
-        size: listing.size,
-        floor: listing.floor,
-    });
 
     const handleTypeSelect = (type) => {
         setListing({ ...listing, type });
@@ -223,15 +211,6 @@ const EditListingScreen = () => {
                     value={listing.price.toString()}
                     onChangeText={(value) => handleInputChange('price', value)}
                 />
-                {(fairPrice || fairPriceLoading) && (
-                    <FairPriceCard
-                        compact
-                        estimate={fairPrice}
-                        loading={fairPriceLoading}
-                        askingPrice={listing.price}
-                        onUseSuggested={(mid) => handleInputChange('price', String(mid))}
-                    />
-                )}
 
                 {/* Rooms - Bedroom & Bathroom */}
                 <Text style={styles.label}>Rooms</Text>
