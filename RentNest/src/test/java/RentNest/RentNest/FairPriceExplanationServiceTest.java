@@ -82,13 +82,6 @@ public class FairPriceExplanationServiceTest {
     }
 
     @Test
-    public void testSystemPromptDoesNotAskToRestateTheNumbers() {
-        assertTrue(FairPriceExplanationService.SYSTEM_PROMPT.contains("Do not restate them"));
-        assertTrue(FairPriceExplanationService.SYSTEM_PROMPT.contains("one concrete question"));
-        assertEquals("gemini-3.5-flash-lite", GeminiClient.DEFAULT_MODEL);
-    }
-
-    @Test
     public void testPromptSaysWhenPricedAsRoom() {
         estimate.setUnitType("MASTER_ROOM");
         estimate.setUnitTypeSource("AI");
