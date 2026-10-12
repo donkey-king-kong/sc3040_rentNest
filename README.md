@@ -154,6 +154,7 @@ npm.cmd test -- --watchAll=false --runInBand
 ## Developer Notes
 
 The owner analytics dashboard shows current listing occupancy; the monthly occupancy graph has been removed.
+Tenancy Length uses a pie chart with each length group's count and percentage of total tenancies in the legend.
 
 - [Listing enquiries and offers: required database migration, workflows and tests](Documentation/listing-enquiry-offer-guide.md)
 - [Listing Image Rendering Troubleshoot](Documentation/Troubleshooting/listing-images.md)

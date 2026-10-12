@@ -9,7 +9,6 @@ import { ENDPOINTS } from '../config/api';
 import {
   COLORS,
   BarChart,
-  CountBarChart,
   ErrorState,
   LineChart,
   PieChart,
@@ -141,8 +140,8 @@ const OwnerAnalyticsScreen = () => {
             </Section>
           </ActivitySection>
           <Section>
-            <CountBarChart title="Tenancy Length" series={tenancyLengths} totalMetric={totalTenancies}
-              totalLabel="Total Tenancies" showReadout={false} emptyText="No accepted tenancies yet" />
+            <PieChart title="Tenancy Length" series={tenancyLengths} totalMetric={totalTenancies}
+              metricLabel="Total Tenancies" totalLabel="Tenancies" emptyText="No accepted tenancies yet" />
           </Section>
           </>}
         </> : null}
