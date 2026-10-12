@@ -182,3 +182,28 @@ test('changing request ID ignores a late response from the previous request', as
   expect(text(ui.toJSON())).not.toContain('Test lease');
   expect(buttons(ui).map(text)).toEqual(['Refresh status']);
 });
+
+test('preloaded request renders immediately while the background refresh is pending', async () => {
+  const refresh = deferred();
+  axios.get.mockImplementation(url =>
+    url.includes('/api/users/') ? Promise.resolve({ data: viewer }) : refresh.promise);
+  const ui = await render(<TerminationRequestCard requestId={71} initialRequest={request} viewerId="22" />);
+  expect(text(ui.toJSON())).not.toContain('Loading request');
+  expect(text(ui.toJSON())).toContain('9,300');
+  expect(buttons(ui).map(text)).toContain('Accept termination');
+  await act(async () => { refresh.resolve({ data: { ...request, status: 'rejected' } }); });
+  expect(text(ui.toJSON())).toContain('Rejected');
+});
+
+test('a background refresh resolving after a decision cannot overwrite it', async () => {
+  const refresh = deferred();
+  axios.get.mockImplementation(url =>
+    url.includes('/api/users/') ? Promise.resolve({ data: viewer }) : refresh.promise);
+  const ui = await render(<TerminationRequestCard requestId={71} initialRequest={request} viewerId={22} />);
+  await press(ui, 'Accept termination');
+  await press(ui, 'Confirm termination');
+  expect(text(ui.toJSON())).toContain('Accepted');
+  await act(async () => { refresh.resolve({ data: { ...request } }); });
+  expect(text(ui.toJSON())).toContain('Accepted');
+  expect(text(ui.toJSON())).not.toContain('Pending');
+});
