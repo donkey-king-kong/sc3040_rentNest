@@ -186,6 +186,7 @@ const EditListingScreen = () => {
                         placeholderTextColor="#999"
                         value={listing.postal ? listing.postal.toString() : ''}
                         keyboardType="numeric"
+                        maxLength={6}
                         onChangeText={(value) => handleInputChange('postal', parseInt(value) || '')}
                     />
 
