@@ -4,13 +4,25 @@ import java.util.List;
 import java.util.Optional;
 
 import RentNest.model.Listings;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ListingsRepository extends JpaRepository<Listings, Long> {
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM Listings l WHERE l.listingID = :id")
+    Optional<Listings> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("SELECT l FROM Listings l JOIN FETCH l.owner o WHERE o.userID = :ownerId " +
+            "AND o.flagged = 0 AND l.flagged = false AND l.tenant IS NULL " +
+            "AND NOT EXISTS (SELECT r FROM Rentals r WHERE r.listings = l AND r.status IN ('pending', 'active')) " +
+            "ORDER BY l.name, l.listingID")
+    List<Listings> findOfferCandidates(@Param("ownerId") Long ownerId);
+
     @Query("SELECT l FROM Listings l JOIN FETCH l.owner o WHERE l.tenant IS NULL " +
             "AND l.flagged = false AND o.flagged = 0 AND o.userID <> :userId")
     List<Listings> findRecommendationCandidates(@Param("userId") Long userId);

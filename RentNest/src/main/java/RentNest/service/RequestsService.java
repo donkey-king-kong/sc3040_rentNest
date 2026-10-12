@@ -7,6 +7,7 @@ import RentNest.repository.RequestsRepository;
 import RentNest.model.Rentals;
 import RentNest.dto.RentalsDTO;
 import RentNest.repository.RentalsRepository;
+import RentNest.repository.ListingsRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
@@ -27,6 +28,7 @@ public class RequestsService {
     private final RequestsRepository requestsRepository;
     private final RentalsRepository rentalsRepository;
     private final ChatHistoryService chatHistoryService;
+    private final ListingsRepository listingsRepository;
 
     // Mapping Requests to RequestsDTO
     public RequestsDTO toRequestsDTO(Requests requests) {
@@ -46,10 +48,12 @@ public class RequestsService {
     }
 
     @Autowired
-    public RequestsService(RequestsRepository requestsRepository, RentalsRepository rentalsRepository, ChatHistoryService chatHistoryService) {
+    public RequestsService(RequestsRepository requestsRepository, RentalsRepository rentalsRepository, ChatHistoryService chatHistoryService,
+                           ListingsRepository listingsRepository) {
         this.requestsRepository = requestsRepository;
         this.rentalsRepository = rentalsRepository;
         this.chatHistoryService = chatHistoryService;
+        this.listingsRepository = listingsRepository;
     }
 
     // Legacy writes cannot bypass the termination commands.
@@ -153,6 +157,10 @@ public class RequestsService {
         }
         requireActive(rental);
         if ("accept".equals(decision)) {
+            if (!Objects.equals(rental.getListings().getTenantId(), rental.getTenantUserID())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Listing occupancy requires reconciliation");
+            }
+            rental.getListings().setTenant(null);
             rental.setStatus("terminated");
             rental.setTerminatedAt(new Date());
             rentalsRepository.save(rental);
@@ -162,6 +170,10 @@ public class RequestsService {
     }
 
     private Rentals lockedRental(Long rentalId) {
+        Long listingId = rentalsRepository.findListingIdByRentalID(rentalId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Rental not found"));
+        listingsRepository.findByIdForUpdate(listingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
         return rentalsRepository.findByIdForUpdate(rentalId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Rental not found"));
     }

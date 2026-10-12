@@ -174,6 +174,49 @@ class TerminationWorkflowTest {
     }
 
     @Test
+    void terminationReleasesOccupancyAndOldDecisionCannotClearNewTenant() {
+        Long requestId = createRequest(0);
+        authenticate(tenant);
+        service.decideTermination(requestId, "accept");
+        assertNull(tx.execute(status -> listings.findById(listingId).orElseThrow().getTenantId()));
+        assertTrue(rentalsService.getRentalByListingId(listingId).isEmpty());
+        assertTrue(rentalsService.getRentalByListingIdAndTenantId(listingId, tenant.getUserID()).isEmpty());
+
+        Long nextRentalId = tx.execute(status -> {
+            Listings listing = listings.findById(listingId).orElseThrow();
+            listing.setTenant(stranger);
+            Rentals next = new Rentals();
+            next.setListings(listing);
+            next.setTenantUserID(stranger.getUserID());
+            next.setStatus("active");
+            return rentals.save(next).getRentalID();
+        });
+        service.decideTermination(requestId, "accept");
+        assertEquals(stranger.getUserID(), tx.execute(status -> listings.findById(listingId).orElseThrow().getTenantId()));
+        assertEquals(nextRentalId, rentalsService.getRentalByListingId(listingId).orElseThrow().getRentalID());
+        assertEquals(tenant.getUserID(), rentals.findById(rentalId).orElseThrow().getTenantUserID());
+        assertEquals(2, rentals.count());
+    }
+
+    @Test
+    void repeatTenantLookupReturnsOnlyTheNewActiveTenancy() {
+        Long requestId = createRequest(0);
+        authenticate(tenant);
+        service.decideTermination(requestId, "accept");
+        Long nextRentalId = tx.execute(status -> {
+            Listings listing = listings.findById(listingId).orElseThrow();
+            listing.setTenant(tenant);
+            Rentals next = new Rentals();
+            next.setListings(listing);
+            next.setTenantUserID(tenant.getUserID());
+            next.setStatus("active");
+            return rentals.save(next).getRentalID();
+        });
+        assertEquals(nextRentalId, rentalsService.getRentalByListingIdAndTenantId(
+                listingId, tenant.getUserID()).orElseThrow().getRentalID());
+    }
+
+    @Test
     void rejectionLeavesRentalActiveAndRetainsImmutableRequest() {
         Long requestId = createRequest(9300);
         authenticate(tenant);

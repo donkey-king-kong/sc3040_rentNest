@@ -30,6 +30,25 @@ public class ChatHistory {
     @JoinColumn(name = "requestid", referencedColumnName = "requestid")
     private Requests request;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "listingid")
+    private Listings listing;
+
+    @Column(name = "listing_name_snapshot", columnDefinition = "TEXT")
+    private String listingNameSnapshot;
+
+    @Column(name = "listing_address_snapshot", columnDefinition = "TEXT")
+    private String listingAddressSnapshot;
+
+    @JsonIgnore
+    public Listings getListing() { return listing; }
+    public Long getListingId() { return listing == null ? null : listing.getListingID(); }
+    public String getListingNameSnapshot() { return listingNameSnapshot; }
+    public String getListingAddressSnapshot() { return listingAddressSnapshot; }
+    public void setListing(Listings listing) { this.listing = listing; }
+    public void setListingNameSnapshot(String value) { this.listingNameSnapshot = value; }
+    public void setListingAddressSnapshot(String value) { this.listingAddressSnapshot = value; }
+
     private String message;
     private Date date;
 

@@ -12,12 +12,19 @@ import RentNest.repository.RequestsRepository;
 import RentNest.model.User;
 import RentNest.dto.UserDTO;
 import RentNest.repository.UserRepository;
+import RentNest.repository.ListingsRepository;
+import RentNest.model.Listings;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
+import java.util.Date;
 
 @Service
 public class ChatHistoryService {
@@ -26,6 +33,7 @@ public class ChatHistoryService {
     private final UserRepository userRepository;
     private final RentalsRepository rentalsRepository;
     private final RequestsRepository requestsRepository;
+    private final ListingsRepository listingsRepository;
 
     // Mapping ChatHistory to ChatHistoryDTO
     public ChatHistoryDTO toChatHistoryDTO(ChatHistory chatHistory) {
@@ -42,18 +50,58 @@ public class ChatHistoryService {
 
         chatHistoryDTO.setSender(chatHistory.getSender().getUserID());
         chatHistoryDTO.setReceiver(chatHistory.getReceiver().getUserID());
-        chatHistoryDTO.setRental(chatHistory.getRental().getRentalID());
-        chatHistoryDTO.setRequest(chatHistory.getRequest().getRequestID());
+        chatHistoryDTO.setRental(chatHistory.getRentalId());
+        chatHistoryDTO.setRequest(chatHistory.getRequestId());
+        chatHistoryDTO.setListingID(chatHistory.getListingId());
 
         return chatHistoryDTO;
     }
 
     @Autowired
-    public ChatHistoryService(ChatHistoryRepository chatHistoryRepository, UserRepository userRepository, RentalsRepository rentalsRepository, RequestsRepository requestsRepository) {
+    public ChatHistoryService(ChatHistoryRepository chatHistoryRepository, UserRepository userRepository, RentalsRepository rentalsRepository, RequestsRepository requestsRepository,
+                              ListingsRepository listingsRepository) {
         this.chatHistoryRepository = chatHistoryRepository;
         this.userRepository = userRepository;
         this.rentalsRepository = rentalsRepository;
         this.requestsRepository = requestsRepository;
+        this.listingsRepository = listingsRepository;
+    }
+
+    // Public messages cannot manufacture system rental/request cards.
+    @Transactional
+    public ChatHistory sendMessage(ChatHistoryDTO dto) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof User actor)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        if (dto == null || dto.getReceiverID() == null || Objects.equals(dto.getReceiverID(), actor.getUserID())
+                || dto.getMessage() == null || dto.getMessage().isBlank() || dto.getMessage().length() > 255
+                || dto.getRentalID() != null || dto.getRequestID() != null) {
+            throw new IllegalArgumentException("Provide a message of 1-255 characters and a different recipient");
+        }
+        if (dto.getSenderID() != null && !Objects.equals(actor.getUserID(), dto.getSenderID())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Sender must match your account");
+        }
+        Listings listing = null;
+        if (dto.getListingID() != null) {
+            listing = listingsRepository.findByIdForUpdate(dto.getListingID())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
+            if (!Objects.equals(listing.getOwnerId(), dto.getReceiverID())) {
+                throw new IllegalArgumentException("The recipient must own the enquired-about listing");
+            }
+            if (listing.isFlagged() || listing.getOwner().getFlagged() != 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Listing is unavailable");
+            }
+        }
+        dto.setSender(actor.getUserID());
+        dto.setDate(new Date());
+        ChatHistory chat = createChatHistory(dto);
+        if (listing != null) {
+            chat.setListing(listing);
+            chat.setListingNameSnapshot(listing.getName() == null ? "Property " + listing.getListingID() : listing.getName());
+            chat.setListingAddressSnapshot(listing.getLocation());
+        }
+        return chatHistoryRepository.save(chat);
     }
 
     // Create a new chat history entry

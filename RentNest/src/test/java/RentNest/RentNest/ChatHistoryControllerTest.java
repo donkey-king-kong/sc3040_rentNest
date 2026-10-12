@@ -63,7 +63,7 @@ class ChatHistoryControllerTest {
         chatHistory.setMessageID(1L);
         chatHistory.setMessage("Hello");
 
-        when(chatHistoryService.createChatHistory(chatHistoryDTO)).thenReturn(chatHistory);
+        when(chatHistoryService.sendMessage(chatHistoryDTO)).thenReturn(chatHistory);
 
         // When
         ResponseEntity<?> response = chatHistoryController.createChatHistory(chatHistoryDTO);

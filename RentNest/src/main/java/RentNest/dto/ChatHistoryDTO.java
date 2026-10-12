@@ -8,6 +8,7 @@ public class ChatHistoryDTO {
     private Long senderID;
     private Long rentalID;
     private Long requestID;
+    private Long listingID;
     private String message;
     private Date date;
 
@@ -15,6 +16,9 @@ public class ChatHistoryDTO {
     public Long getMessageID() {
         return messageID;
     }
+
+    public Long getListingID() { return listingID; }
+    public void setListingID(Long listingID) { this.listingID = listingID; }
 
     public Long getReceiverID() {
         return receiverID;

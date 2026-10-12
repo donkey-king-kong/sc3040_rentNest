@@ -17,10 +17,20 @@ public interface RentalsRepository extends JpaRepository<Rentals, Long> {
     @Query("SELECT r FROM Rentals r WHERE r.rentalID = :rentalID")
     Optional<Rentals> findByIdForUpdate(@Param("rentalID") Long rentalID);
 
-    @Query("SELECT r.tenantUserID FROM Rentals r WHERE r.listings.listingID = :listingID")
+    @Query("SELECT r.listings.listingID FROM Rentals r WHERE r.rentalID = :rentalID")
+    Optional<Long> findListingIdByRentalID(@Param("rentalID") Long rentalID);
+
+    boolean existsByListings_ListingID(Long listingID);
+
+    @Query("SELECT r.tenantUserID FROM Rentals r WHERE r.listings.listingID = :listingID AND r.status = 'active'")
     List<Long> findTenantUserIDsByListingID(@Param("listingID") Long listingID);
 
-    Optional<Rentals> findByListings_ListingID(Long listingID);
+    @Query("SELECT r FROM Rentals r JOIN FETCH r.listings l JOIN FETCH l.owner " +
+            "WHERE l.listingID = :listingID AND r.status IN ('pending', 'active')")
+    Optional<Rentals> findByListings_ListingID(@Param("listingID") Long listingID);
     
-    Optional<Rentals> findByListings_ListingIDAndTenantUserID(Long listingID, Long tenantID);
+    @Query("SELECT r FROM Rentals r JOIN FETCH r.listings l JOIN FETCH l.owner " +
+            "WHERE l.listingID = :listingID AND r.tenantUserID = :tenantID AND r.status = 'active'")
+    Optional<Rentals> findByListings_ListingIDAndTenantUserID(
+            @Param("listingID") Long listingID, @Param("tenantID") Long tenantID);
 }

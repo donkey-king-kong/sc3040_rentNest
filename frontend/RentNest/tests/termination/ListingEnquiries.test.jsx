@@ -1,0 +1,150 @@
+import React from 'react';
+import { act } from 'react-test-renderer';
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import ChatsScreen2 from '../../app/ChatsScreen2';
+import EnquiryPreview from '../../components/EnquiryPreview';
+import { render, text, buttons, press, button, deferred } from './helpers';
+
+let params, messages, options, rentals, router;
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.spyOn(console, 'log').mockImplementation(() => {});
+  params = { currentUser: '22', partnerUserId: '11', enquiryListingId: '59' };
+  messages = [];
+  options = [
+    { listingId: 59, name: 'Bishan flat', address: 'Bishan Street 12', enquired: true },
+    { listingId: 60, name: 'Tampines flat', address: 'Tampines Avenue 4', enquired: false },
+  ];
+  rentals = {
+    81: { rentalID: 81, listingId: 59, listingName: 'Bishan flat', listingLocation: 'Bishan Street 12', ownerUserId: 11, tenantUserID: 22, status: 'pending', rentalPrice: 3000, depositPrice: 3000 },
+    82: { rentalID: 82, listingId: 60, listingName: 'Tampines flat', listingLocation: 'Tampines Avenue 4', ownerUserId: 11, tenantUserID: 22, status: 'pending', rentalPrice: 5000, depositPrice: 5000 },
+  };
+  router = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
+  useRouter.mockReturnValue(router);
+  useLocalSearchParams.mockImplementation(() => params);
+  AsyncStorage.getItem.mockResolvedValue('test-token');
+  axios.get.mockImplementation(async url => {
+    if (url.includes('/chathistory/conversation')) return { data: messages };
+    if (url.includes('/offer-options')) return { data: options };
+    if (url.includes('/rentals/')) return { data: rentals[url.split('/').pop()] };
+    if (url.includes('/users/id/')) return { data: { name: 'Chat partner', userID: Number(params.partnerUserId) } };
+    if (url.includes('/listings/')) return { data: { name: 'Bishan flat', location: 'Bishan Street 12', ownerId: 11 } };
+    throw new Error(url);
+  });
+  axios.post.mockImplementation(async (url, body) => ({ status: 201, data: {
+    messageID: 100, senderId: Number(params.currentUser), message: body.message,
+    listingId: body.listingID, listingNameSnapshot: body.listingID ? 'Bishan flat' : null,
+    listingAddressSnapshot: body.listingID ? 'Bishan Street 12' : null,
+  } }));
+});
+
+async function type(ui, placeholder, value) {
+  await act(async () => { ui.root.findAllByType('TextInput').find(input => input.props.placeholder === placeholder).props.onChangeText(value); });
+}
+
+test('opening prepares a preview without sending and a sent enquiry carries its listing ID', async () => {
+  const ui = await render(<ChatsScreen2 />);
+  expect(axios.post).not.toHaveBeenCalled();
+  expect(ui.root.findAllByType(EnquiryPreview)).toHaveLength(1);
+  await type(ui, 'Enter Message', 'Can I view this flat?');
+  await press(ui, 'Send message');
+  expect(axios.post.mock.calls[0][1]).toMatchObject({ listingID: 59, rentalID: null, requestID: null });
+  const preview = ui.root.findAllByType(EnquiryPreview)[0];
+  expect(preview.props.onRemove).toBeUndefined();
+  expect(preview.props.name).toBe('Bishan flat');
+});
+
+test('removing attachment sends plain text and switching conversation clears the draft', async () => {
+  const ui = await render(<ChatsScreen2 />);
+  await press(ui, 'Remove property attachment');
+  await type(ui, 'Enter Message', 'Hello');
+  await press(ui, 'Send message');
+  expect(axios.post.mock.calls[0][1].listingID).toBeNull();
+  params = { currentUser: '22', partnerUserId: '33' };
+  await act(async () => ui.update(<ChatsScreen2 />));
+  expect(ui.root.findAllByType(EnquiryPreview)).toHaveLength(0);
+  expect(ui.root.findAllByType('TextInput').find(i => i.props.placeholder === 'Enter Message').props.value).toBe('');
+});
+
+test('two saved enquiries and deleted-property snapshots remain distinct', async () => {
+  params.enquiryListingId = undefined;
+  messages = [
+    { messageID: 1, senderId: 22, listingId: 59, listingNameSnapshot: 'Bishan flat', message: 'First', date: '2026-10-12' },
+    { messageID: 2, senderId: 22, listingId: null, listingNameSnapshot: 'Removed property', listingAddressSnapshot: 'Old address', message: 'Second', date: '2026-10-12' },
+  ];
+  const ui = await render(<ChatsScreen2 />);
+  const previews = ui.root.findAllByType(EnquiryPreview);
+  expect(previews.map(p => p.props.name)).toEqual(['Bishan flat', 'Removed property']);
+  expect(text(ui.toJSON())).toContain('Listing no longer available');
+  expect(buttons(ui).filter(b => text(b) === 'View property')).toHaveLength(1);
+});
+
+test('offer form lists all eligible owned properties and requires explicit selection', async () => {
+  params = { currentUser: '11', partnerUserId: '22' };
+  const ui = await render(<ChatsScreen2 />);
+  await act(async () => buttons(ui).find(b => b.props.style?.marginRight === undefined &&
+    b.findAllByType('FontAwesome').some(icon => icon.props.name === 'paperclip')).props.onPress());
+  expect(text(ui.toJSON())).toContain('Enquired-about properties');
+  expect(text(ui.toJSON())).toContain('Other properties you own');
+  expect(button(ui, 'Send offer').props.disabled).toBe(true);
+  await press(ui, 'Tampines flat, Tampines Avenue 4');
+  const fields = ui.root.findAllByType('TextInput');
+  await act(async () => {
+    fields.find(i => i.props.value === '' && i.props.keyboardType === 'numeric').props.onChangeText('5000');
+  });
+  expect(buttons(ui).filter(b => b.props.accessibilityState?.checked).map(b => b.props.accessibilityLabel))
+    .toEqual(['Tampines flat, Tampines Avenue 4']);
+});
+
+test('each offer card and acceptance dialog uses its own property and amount', async () => {
+  params.enquiryListingId = undefined;
+  messages = [81, 82].map((id, index) => ({ messageID: index + 1, senderId: 11, rentalId: id, date: '2026-10-12' }));
+  const ui = await render(<ChatsScreen2 />);
+  expect(text(ui.toJSON())).toContain('Bishan flat');
+  expect(text(ui.toJSON())).toContain('Tampines flat');
+  const acceptButtons = buttons(ui).filter(b => text(b) === 'Accept offer');
+  await act(async () => acceptButtons[0].props.onPress());
+  expect(ui.root.findAllByType('Text').filter(t => text(t) === 'Bishan flat')).toHaveLength(2);
+  expect(ui.root.findAllByType('Text').filter(t => text(t) === 'Tampines flat')).toHaveLength(1);
+});
+
+test('late enquiry options cannot preselect a reopened general offer form', async () => {
+  params = { currentUser: '11', partnerUserId: '22' };
+  messages = [{ messageID: 1, senderId: 22, listingId: 59, listingNameSnapshot: 'Bishan flat', message: 'Viewing?', date: '2026-10-12' }];
+  const pending = deferred();
+  const originalGet = axios.get.getMockImplementation();
+  let optionCalls = 0;
+  axios.get.mockImplementation(url => url.includes('/offer-options') && optionCalls++ === 0
+    ? pending.promise : originalGet(url));
+  const ui = await render(<ChatsScreen2 />);
+  let firstOpening;
+  await act(async () => { firstOpening = button(ui, 'Offer this property').props.onPress(); });
+  await press(ui, 'Close rental offer');
+  await act(async () => buttons(ui).find(b =>
+    b.findAllByType('FontAwesome').some(icon => icon.props.name === 'paperclip')).props.onPress());
+  await act(async () => { pending.resolve({ data: options }); await firstOpening; });
+  expect(buttons(ui).filter(b => b.props.accessibilityState?.checked)).toHaveLength(0);
+});
+
+test('fractional amounts explain why sending is disabled', async () => {
+  params = { currentUser: '11', partnerUserId: '22' };
+  const ui = await render(<ChatsScreen2 />);
+  await act(async () => buttons(ui).find(b =>
+    b.findAllByType('FontAwesome').some(icon => icon.props.name === 'paperclip')).props.onPress());
+  await act(async () => ui.root.findAllByType('TextInput').find(input =>
+    input.props.accessibilityLabel === 'Monthly rent').props.onChangeText('3000.50'));
+  expect(text(ui.toJSON())).toContain('Enter a positive whole-dollar amount');
+  expect(button(ui, 'Send offer').props.disabled).toBe(true);
+});
+
+test('failed enquiries retry with the same property reference', async () => {
+  axios.post.mockRejectedValueOnce(new Error('offline'));
+  const ui = await render(<ChatsScreen2 />);
+  await type(ui, 'Enter Message', 'Viewing?');
+  await press(ui, 'Send message');
+  expect(text(ui.toJSON())).toContain('Failed');
+  await press(ui, 'Retry');
+  expect(axios.post.mock.calls.map(call => call[1].listingID)).toEqual([59, 59]);
+});

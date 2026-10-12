@@ -30,6 +30,11 @@ public class RentalsController {
         this.rentalsService = rentalsService;
     }
 
+    @GetMapping("/offer-options")
+    public List<RentalsService.OfferOption> getOfferOptions(@RequestParam Long recipientID) {
+        return rentalsService.getOfferOptions(recipientID);
+    }
+
     // Create a new rental
     @PostMapping
     public ResponseEntity<?> createRental(@RequestBody RentalsDTO rentalDTO) {
@@ -120,6 +125,8 @@ public class RentalsController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         } catch (ResponseStatusException e) {
             throw e;
+        } catch (DataAccessException e) {
+            throw e;
         } catch (RuntimeException e) {
             return new ResponseEntity<>("Error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -157,6 +164,8 @@ public class RentalsController {
         } catch (IllegalArgumentException e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         } catch (ResponseStatusException e) {
+            throw e;
+        } catch (DataAccessException e) {
             throw e;
         } catch (RuntimeException e) {
             return new ResponseEntity<>("Error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);

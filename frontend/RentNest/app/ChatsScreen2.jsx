@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Dimensions, Animated, StatusBar, ActivityIndicator} from 'react-native';
+import {View, Text, StyleSheet, Image, TouchableOpacity, FlatList, Modal, TextInput, ScrollView, Dimensions, Animated, StatusBar, ActivityIndicator, KeyboardAvoidingView, Platform} from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import { FontAwesome } from '@expo/vector-icons';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import MorphingInfinity from '../components/MorphingInfinity';
 import AvatarOrb from '../components/AvatarOrb';
 import ProfileImage from '../components/ProfileImage';
 import TerminationRequestCard from '../components/TerminationRequestCard';
+import EnquiryPreview from '../components/EnquiryPreview';
 
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
@@ -29,9 +30,23 @@ const notificationBellIcon = require('../assets/images/notificationBell.png');
 const ChatsScreen2 = () => {
     const router = useRouter();
     const safeAreaInsets = useSafeAreaInsets();
-    const { partnerUserId, currentUser} = useLocalSearchParams();
+    const { partnerUserId, currentUser, enquiryListingId } = useLocalSearchParams();
     const [chat, setChat] = useState([]);
-    const [rental, setRental] = useState([]);
+    const [rentalsById, setRentalsById] = useState({});
+    const [activeRentalId, setActiveRentalId] = useState(null);
+    const rental = rentalsById[activeRentalId] || {};
+    const [enquiry, setEnquiry] = useState(null);
+    const [enquiryLoading, setEnquiryLoading] = useState(false);
+    const [chatError, setChatError] = useState('');
+    const [offerError, setOfferError] = useState('');
+    const [paymentError, setPaymentError] = useState('');
+    const [optionsLoading, setOptionsLoading] = useState(false);
+    const [selectedListingId, setSelectedListingId] = useState(null);
+    const [isSendingOffer, setSendingOffer] = useState(false);
+    const messageBusy = useRef(false);
+    const offerBusy = useRef(false);
+    const offerSession = useRef(0);
+    const conversationGeneration = useRef(0);
     const [partner, setPartner] = useState([]);
     const [listing, setListing] = useState([]);
     const [rentalPrice, setRentalPrice] = useState('');
@@ -78,6 +93,7 @@ const ChatsScreen2 = () => {
     const { refresh } = useLocalSearchParams();
 
     const getConversation = async () => {
+        const generation = conversationGeneration.current;
         try {
             console.log('[getConversation] Partner User ID:', partnerUserId);
             console.log('[getConversation] Current User ID:', currentUser);
@@ -101,11 +117,12 @@ const ChatsScreen2 = () => {
             });
             console.log("Conversations response", chatResponse.data);
             const chatData = Array.isArray(chatResponse.data) ? chatResponse.data : [];
+            if (generation !== conversationGeneration.current) return;
             setChat(chatData); // Store the fetched data in state
             if (chatData.length > 0) {
                 await Promise.all(chatData.map((msg) => {
                     if (msg.rentalId != null) {
-                        return getRental(msg.rentalId);
+                        return getRental(msg.rentalId, generation);
                     }
                     return Promise.resolve();
                 }));
@@ -119,7 +136,7 @@ const ChatsScreen2 = () => {
         }
     };
 
-    const getRental = async (rentalId) => {
+    const getRental = async (rentalId, generation = conversationGeneration.current) => {
         try {
             if (rentalId == null) {
                 console.log('No rentalId found in the chat.');
@@ -140,21 +157,26 @@ const ChatsScreen2 = () => {
                 }
             });
             console.log("Rental response", rentalResponse.data);
-            setRental(rentalResponse.data); // Store the fetched data in state
+            if (generation === conversationGeneration.current) {
+                setRentalsById(previous => ({ ...previous, [rentalId]: rentalResponse.data }));
+            }
         } catch (error) {
             console.error('Error fetching rentals:', error);
         }
     }
 
-    const getListing = async() => {
+    const getListing = async(session = offerSession.current) => {
+        const generation = conversationGeneration.current;
+        const isCurrent = () => session === offerSession.current && generation === conversationGeneration.current;
+        setOptionsLoading(true);
         try{
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 console.log('No token found!');
                 router.replace('/LoginScreen');
-                return;
+                throw new Error('Sign in again to view available properties');
             }
-            const listingResponse = await axios.get(`${API_BASE_URL}/api/listings/user/${currentUser}/listingIDs`, {
+            const listingResponse = await axios.get(`${API_BASE_URL}/api/rentals/offer-options?recipientID=${partnerUserId}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Accept': 'application/json',
@@ -162,11 +184,16 @@ const ChatsScreen2 = () => {
                 }
             });
             console.log("Listing response " + listingResponse.data);
-            setListing(listingResponse.data);
-            setLoading(false);
+            const options = Array.isArray(listingResponse.data) ? listingResponse.data : [];
+            if (isCurrent()) setListing(options);
+            return options;
         }catch (error) {
-            console.error('Error fetching listings:', error);
-        }
+            if (isCurrent()) {
+                setListing([]);
+                setOfferError('Could not load your available properties. Close and reopen the form to retry.');
+            }
+            return [];
+        } finally { if (isCurrent()) setOptionsLoading(false); }
     }
 
     const getPartner = async () => {
@@ -298,7 +325,7 @@ const ChatsScreen2 = () => {
         return existingSenderMessage?.senderPhotoURL || null;
     };
 
-    const buildOptimisticMessage = (messageText, tempMessageId) => ({
+    const buildOptimisticMessage = (messageText, tempMessageId, attachment) => ({
         messageID: tempMessageId,
         receiverId: Number(partnerUserId),
         receiverName: partner.name,
@@ -306,14 +333,18 @@ const ChatsScreen2 = () => {
         senderId: Number(currentUser),
         senderName: 'You',
         senderPhotoURL: getSenderPhotoURL(),
-        rentalId: chat.rentalId || null,
-        requestId: chat.requestId || null,
+        rentalId: null,
+        requestId: null,
+        listingId: attachment?.listingId || null,
+        listingNameSnapshot: attachment?.name || null,
+        listingAddressSnapshot: attachment?.address || null,
         message: messageText,
         date: new Date().toISOString(),
         deliveryStatus: 'sending',
     });
 
-    const sendMessageToBackend = async(messageText, tempMessageId) => {
+    const sendMessageToBackend = async(messageText, tempMessageId, listingId = null) => {
+        const generation = conversationGeneration.current;
         const token = await AsyncStorage.getItem('token');
         if (!token) {
             console.log('No token found!');
@@ -326,8 +357,9 @@ const ChatsScreen2 = () => {
         const body = {
             receiverID: partnerUserId,
             senderID: currentUser,
-            rentalID: chat.rentalId || null,
-            requestID: chat.requestId || null,
+            rentalID: null,
+            requestID: null,
+            listingID: listingId,
             message: messageText,
             date: new Date().toISOString(),
         };
@@ -339,6 +371,7 @@ const ChatsScreen2 = () => {
             },
         });
 
+        if (generation !== conversationGeneration.current) return;
         if (sendChatResponse.status === 201){
             setChat((previousChat) => previousChat.map((message) => (
                 message.messageID === tempMessageId
@@ -346,40 +379,40 @@ const ChatsScreen2 = () => {
                     : message
             )));
         }else{
-            console.log('Sending Message:', sendChatResponse.data);
-            setChat((previousChat) => previousChat.map((message) => (
-                message.messageID === tempMessageId
-                    ? { ...message, deliveryStatus: 'failed' }
-                    : message
-            )));
+            throw new Error('Message was not saved');
         }
     };
 
     const sendMessage = async() => {
         const messageText = newMessage.trim();
-        if (messageText === ''){
+        if (messageText === '' || messageBusy.current || enquiryLoading){
             return;
         }
-
+        messageBusy.current = true;
+        const attachment = enquiry;
+        const generation = conversationGeneration.current;
         const tempMessageId = `temp-${Date.now()}`;
-        const optimisticMessage = buildOptimisticMessage(messageText, tempMessageId);
+        const optimisticMessage = buildOptimisticMessage(messageText, tempMessageId, attachment);
         setNewMessage('');
         setChat((previousChat) => [...previousChat, optimisticMessage]);
 
         try{
-            await sendMessageToBackend(messageText, tempMessageId);
-        }
-        catch (error) {
+            await sendMessageToBackend(messageText, tempMessageId, attachment?.listingId);
+            if (generation === conversationGeneration.current) setEnquiry(null);
+        } catch (error) {
             console.error('Error sending message:', error);
             setChat((previousChat) => previousChat.map((message) => (
                 message.messageID === tempMessageId
                     ? { ...message, deliveryStatus: 'failed' }
                     : message
             )));
-        }
+        } finally { messageBusy.current = false; }
     }
 
     const retryMessage = async(messageToRetry) => {
+        if (messageBusy.current) return;
+        messageBusy.current = true;
+        const generation = conversationGeneration.current;
         const retryMessageId = `temp-${Date.now()}`;
         setChat((previousChat) => previousChat.map((message) => (
             message.messageID === messageToRetry.messageID
@@ -388,7 +421,10 @@ const ChatsScreen2 = () => {
         )));
 
         try {
-            await sendMessageToBackend(messageToRetry.message, retryMessageId);
+            await sendMessageToBackend(messageToRetry.message, retryMessageId, messageToRetry.listingId);
+            if (generation === conversationGeneration.current) {
+                setEnquiry(previous => previous?.listingId === messageToRetry.listingId ? null : previous);
+            }
         } catch (error) {
             console.error('Error retrying message:', error);
             setChat((previousChat) => previousChat.map((message) => (
@@ -396,7 +432,7 @@ const ChatsScreen2 = () => {
                     ? { ...message, deliveryStatus: 'failed' }
                     : message
             )));
-        }
+        } finally { messageBusy.current = false; }
     };
 
     const getChatSummaryCacheKey = () => {
@@ -605,20 +641,20 @@ const ChatsScreen2 = () => {
             if (!token) {
                 console.log('No token found!');
                 router.replace('/LoginScreen');
-                return;
+                throw new Error('Sign in again before sending an offer');
             }
             const _startDate = parseDMY(rentalDate);
             const _endDate = parseDMY(leaseExpiry);
             if (rentalPrice.trim() !== '' && rentalDeposit.trim() !== '' && _startDate && _endDate && _endDate > _startDate){
                 const rentalBody = {
                     rentalDTO: {
-                        listingID: listing[0],
+                        listingID: selectedListingId,
                         tenantUserID: partnerUserId,
                         rentalPrice: rentalPrice,
                         depositPrice: rentalDeposit,
                         rentalDate: _startDate.toISOString(),
                         leaseExpiry: _endDate.toISOString(),
-                        paymentHistory: "First payment made on " + new Date().toISOString(),
+                        paymentHistory: null,
                         status: "pending",
                     },
                     chatHistoryDTO: {
@@ -634,15 +670,12 @@ const ChatsScreen2 = () => {
                         'Content-Type': 'application/json'
                     },
                 });
-                if (sendRentalResponse.status === 200){
-                    // refresh is handled in handleSendOffer after modal closes
-                }else{
-                    console.log('Creating Rental:', sendRentalResponse.data);
-                }
+                if (sendRentalResponse.status !== 201) throw new Error('Offer was not saved');
             }
         }
         catch (error) {
             console.error('Error sending message:', error);
+            throw error;
         }
     }
 
@@ -653,7 +686,7 @@ const ChatsScreen2 = () => {
             if (!token) {
                 console.log('No token found!');
                 router.replace('/LoginScreen');
-                return;
+                throw new Error('Sign in again before accepting an offer');
             }
             const updatedRentalBody = {
                 listingID: rental.listingId,
@@ -677,13 +710,13 @@ const ChatsScreen2 = () => {
                 await getConversation();
                 console.log("Rental Offer Accepted", acceptOfferResponse.data);
             } else {
-                console.log('Accepting rental offer:', acceptOfferResponse.data);
+                throw new Error('Offer could not be accepted');
             }
         }
         catch (error) {
             console.error('Error accepting rental offer:', error);
+            throw error;
         }
-        toggleSuccessfulPaymentModal();
     }
 
     const handlePaymentSubmit = async () => {
@@ -692,7 +725,7 @@ const ChatsScreen2 = () => {
             if (!token) {
                 console.log('No token found!');
                 router.replace('/LoginScreen');
-                return;
+                throw new Error('Sign in again before recording payment');
             }
 
             const paymentData = {
@@ -712,26 +745,40 @@ const ChatsScreen2 = () => {
             if (response.status === 200) {
                 console.log('Payment Successful', response.status, response.data)
             } else {
-                console.error('Payment failed:', response.data);
+                throw new Error('Payment could not be recorded');
             }
         } catch (error) {
             console.error('Error processing payment:', error);
+            throw error;
         }
     };
 
 const handlePaymentAndAccept = async () => {
+    if (isPayingDeposit || !rental.rentalID) return;
     setIsPayingDeposit(true);
+    setPaymentError('');
     try {
         await handlePaymentSubmit();
         await acceptRentalOffer();
         toggleSuccessfulPaymentModal();
         await getConversation();
+    } catch (error) {
+        setPaymentError('Could not complete this offer. Check its status before retrying; a payment record may already exist.');
     } finally {
         setIsPayingDeposit(false);
     }
 };
 
     useEffect(() => {
+        conversationGeneration.current += 1;
+        offerSession.current += 1;
+        setChat([]);
+        setRentalsById({});
+        setActiveRentalId(null);
+        setEnquiry(null);
+        setNewMessage('');
+        setRentalModalVisible(false);
+        setPaymentModalVisible(false);
         getConversation();
 
         return () => {
@@ -741,21 +788,56 @@ const handlePaymentAndAccept = async () => {
         };
     }, [refresh, partnerUserId, currentUser]);
 
+    useEffect(() => {
+        let cancelled = false;
+        setEnquiry(null);
+        setChatError('');
+        if (!enquiryListingId) { setEnquiryLoading(false); return; }
+        setEnquiryLoading(true);
+        (async () => {
+            try {
+                const token = await AsyncStorage.getItem('token');
+                const response = await axios.get(`${API_BASE_URL}/api/listings/${enquiryListingId}`,
+                    { headers: { Authorization: `Bearer ${token}` } });
+                const property = response.data;
+                if (Number(property.ownerId) !== Number(partnerUserId) || Number(partnerUserId) === Number(currentUser)) {
+                    throw new Error('This property does not belong to the chat recipient.');
+                }
+                if (!cancelled) setEnquiry({ listingId: Number(enquiryListingId), name: property.name, address: property.location });
+            } catch (error) {
+                if (!cancelled) setChatError('This listing is unavailable for an enquiry. You can still send a plain message.');
+            } finally { if (!cancelled) setEnquiryLoading(false); }
+        })();
+        return () => { cancelled = true; };
+    }, [enquiryListingId, partnerUserId, currentUser]);
+
     // Toggle attachment modal visibility
     const toggleAttachmentModal = () => {
         setAttachmentModalVisible(!isAttachmentModalVisible);
     };
 
     // Toggle rental modal visibility
-    const toggleRentalModal = async () => {
-        await getListing();
+    const toggleRentalModal = async (preselectedId = null) => {
+        const session = ++offerSession.current;
+        const generation = conversationGeneration.current;
+        setOfferError('');
+        setSelectedListingId(null);
+        setAttachmentModalVisible(false);
         setRentalPrice('');
         setRentalDeposit('');
         setRentalDate('');
         setLeaseExpiry('');
         setRentalModalVisible(true);
+        const options = await getListing(session);
+        if (session !== offerSession.current || generation !== conversationGeneration.current) return;
+        if (typeof preselectedId === 'number') {
+            if (options.some(option => option.listingId === preselectedId)) setSelectedListingId(preselectedId);
+            else setOfferError('That property is no longer available. Select another property.');
+        }
     }
     const closeRentalModal = () => {
+        if (offerBusy.current) return;
+        offerSession.current += 1;
         setRentalModalVisible(false);
     };
 
@@ -777,8 +859,12 @@ const handlePaymentAndAccept = async () => {
     }
 
     // Toggle payment modal visibility
-    const togglePaymentModal = () => {
+    const togglePaymentModal = (rentalId = null) => {
+        if (isPayingDeposit) return;
         if (!isPaymentModalVisible) {
+            if (typeof rentalId !== 'number') return;
+            setActiveRentalId(rentalId);
+            setPaymentError('');
             setCardNumber('');
             setCardExpiry('');
             setCardCvv('');
@@ -855,15 +941,27 @@ const handlePaymentAndAccept = async () => {
         const start = parseDMY(rentalDate);
         const end = parseDMY(leaseExpiry);
         const validDates = !!start && !!end && end > start;
-        return allFilled && validPrice && validDeposit && validDates;
-    }, [rentalPrice, rentalDeposit, rentalDate, leaseExpiry]);
+        return allFilled && validPrice && validDeposit && validDates
+            && Number.isSafeInteger(Number(rentalPrice)) && Number.isSafeInteger(Number(rentalDeposit))
+            && listing.some(option => option.listingId === selectedListingId) && !optionsLoading && !isSendingOffer;
+    }, [rentalPrice, rentalDeposit, rentalDate, leaseExpiry, selectedListingId, listing, optionsLoading, isSendingOffer]);
 
     const handleSendOffer = async () => {
-        if (!canSendOffer) return;
-        await sendRentalOffer();
-        closeRentalModal();
-        await getConversation();
-        setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
+        if (!canSendOffer || offerBusy.current) return;
+        offerBusy.current = true;
+        setSendingOffer(true);
+        setOfferError('');
+        const session = offerSession.current;
+        try {
+            await sendRentalOffer();
+            if (session !== offerSession.current) return;
+            setRentalModalVisible(false);
+            await getConversation();
+        } catch (error) {
+            if (session !== offerSession.current) return;
+            setOfferError(error.response?.data?.message || (typeof error.response?.data === 'string' ? error.response.data : 'Offer could not be sent. Check availability and try again.'));
+            await getListing(session);
+        } finally { offerBusy.current = false; setSendingOffer(false); }
     };
 
     const renderMessage = () => {
@@ -878,7 +976,7 @@ const handlePaymentAndAccept = async () => {
         const groups = [];
         chat.forEach((message) => {
             const last = groups[groups.length - 1];
-            if (last && last[0].senderId === message.senderId && !message.rentalId && !message.requestId && !last[0].rentalId && !last[0].requestId) {
+            if (last && last[0].senderId === message.senderId && !message.listingNameSnapshot && !last[0].listingNameSnapshot && !message.rentalId && !message.requestId && !last[0].rentalId && !last[0].requestId) {
                 last.push(message);
             } else {
                 groups.push([message]);
@@ -887,13 +985,19 @@ const handlePaymentAndAccept = async () => {
 
         return groups.map((group, gi) => {
             const first = group[0];
+            const rental = rentalsById[first.rentalId];
             const isUser = Number(first.senderId) === Number(currentUser);
-            const isOwner = Number(currentUser) === Number(rental.ownerUserId);
             const rentalIdExists = first.rentalId != null;
             const requestIdExists = first.requestId != null;
             const isRentalOfferSender = rentalIdExists && Number(first.senderId) === Number(currentUser);
             const lastMsg = group[group.length - 1];
             const timestamp = new Date(lastMsg.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            if (rentalIdExists && !rental) {
+                return <TouchableOpacity key={first.messageID} onPress={() => getRental(first.rentalId)} accessibilityRole="button">
+                    <Text style={styles.groupTimestamp}>Loading offer details. Tap to retry.</Text>
+                </TouchableOpacity>;
+            }
 
             // Special card messages (rental offer / termination)
             if (rentalIdExists || requestIdExists) {
@@ -932,6 +1036,8 @@ const handlePaymentAndAccept = async () => {
                                             </View>
                                         </View>
                                         <View style={styles.rentalOfferBody}>
+                                            <Text style={styles.propertyName}>{rental.listingName || 'Rental property'}</Text>
+                                            <Text style={styles.propertyAddress}>{rental.listingLocation}</Text>
                                             <View style={styles.rentalOfferDetailRow}>
                                                 <View style={styles.rentalOfferDetailLabelGroup}>
                                                     <FontAwesome name="dollar" size={16} color="#8F8F96" style={styles.rentalOfferDetailIcon} />
@@ -973,7 +1079,7 @@ const handlePaymentAndAccept = async () => {
                                                 <TouchableOpacity style={styles.pendingRejectBox}>
                                                     <Text style={styles.rejectText}>Decline</Text>
                                                 </TouchableOpacity>
-                                                <TouchableOpacity onPress={togglePaymentModal} style={styles.pendingAcceptBox}>
+                                                <TouchableOpacity onPress={() => togglePaymentModal(first.rentalId)} style={styles.pendingAcceptBox}>
                                                     <Text style={styles.acceptText}>Accept offer</Text>
                                                 </TouchableOpacity>
                                             </View>
@@ -1006,6 +1112,16 @@ const handlePaymentAndAccept = async () => {
                                     )
                                 )}
                                 <View style={[styles.bubble, isUser ? styles.bubbleSelf : styles.bubbleOther]}>
+                                    {!!message.listingNameSnapshot && (
+                                        <EnquiryPreview
+                                            name={message.listingNameSnapshot}
+                                            address={message.listingAddressSnapshot}
+                                            unavailable={!message.listingId}
+                                            onOpen={() => router.push({ pathname: '/HomeListingScreen', params: { listingId: message.listingId } })}
+                                            onOffer={!isUser && message.listingId && message.deliveryStatus !== 'failed'
+                                                ? () => toggleRentalModal(message.listingId) : undefined}
+                                        />
+                                    )}
                                     <Text style={[styles.bubbleText, isUser && styles.bubbleTextSelf]}>{message.message}</Text>
                                     {message.deliveryStatus === 'sending' && (
                                         <Text style={styles.sendingText}>Sending...</Text>
@@ -1192,6 +1308,11 @@ const handlePaymentAndAccept = async () => {
                 </View>
             )}
 
+            {!!chatError && <Text accessibilityRole="alert" style={styles.inlineError}>{chatError}</Text>}
+            {enquiryLoading && <Text style={styles.propertyAddress}>Loading property attachment...</Text>}
+            {enquiry && <View style={styles.composerPreview}><EnquiryPreview
+                name={enquiry.name} address={enquiry.address} onRemove={() => setEnquiry(null)}
+            /></View>}
             <View style={styles.inputContainer}>
                 <TouchableOpacity style={styles.inputIconButton} onPress={toggleRentalModal}>
                     <FontAwesome name="paperclip" size={20} color="#555" />
@@ -1203,12 +1324,13 @@ const handlePaymentAndAccept = async () => {
                     style={styles.input}
                     placeholder="Enter Message"
                     value={newMessage}
+                    maxLength={255}
                     onChangeText={setNewMessage}
                     onSubmitEditing={sendMessage}
                     blurOnSubmit={false}
                     returnKeyType="send"
                 />
-                <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Send message" disabled={enquiryLoading} style={styles.sendButton} onPress={sendMessage}>
                     <FontAwesome name="send" size={16} color="#fff" />
                 </TouchableOpacity>
             </View>
@@ -1303,7 +1425,7 @@ const handlePaymentAndAccept = async () => {
                             </TouchableOpacity>
                         </View>
                         <View style={styles.rentalOfferOption}>
-                            <TouchableOpacity onPress={toggleRentalModal} style={styles.rentalOfferButton}>
+                            <TouchableOpacity onPress={() => toggleRentalModal()} style={styles.rentalOfferButton}>
                                 <Image source={sendRentalOfferIcon} style={styles.rentalIcon} />
                                 <Text>Rental Offer</Text>
                             </TouchableOpacity>
@@ -1318,15 +1440,16 @@ const handlePaymentAndAccept = async () => {
                 visible={isRentalModalVisible}
                 onRequestClose={closeRentalModal}
             >
-                <View style={styles.modalOverlay}>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
                     <View style={styles.rentalOfferModal}>
+                        <ScrollView keyboardShouldPersistTaps="handled">
                         {/* Header */}
                         <View style={styles.rentalOfferModalHeader}>
                             <View style={styles.rentalOfferTitleRow}>
                                 <FontAwesome name="file-text-o" size={16} color="#fff" style={{ marginRight: 8 }} />
                                 <Text style={styles.rentalOfferModalTitle}>Send rental offer</Text>
                             </View>
-                            <TouchableOpacity onPress={closeRentalModal}>
+                            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close rental offer" onPress={closeRentalModal} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
                                 <FontAwesome name="times" size={18} color="#aaa" />
                             </TouchableOpacity>
                         </View>
@@ -1336,10 +1459,39 @@ const handlePaymentAndAccept = async () => {
                             Once accepted, a rental agreement is created and you can start collecting rent.
                         </Text>
 
+                        <Text style={[styles.propertyName, styles.onDark]}>Property to offer</Text>
+                        <Text style={[styles.propertyAddress, styles.onDark]}>Offer to {partner.name}</Text>
+                        {optionsLoading && <ActivityIndicator accessibilityLabel="Loading available properties" />}
+                        {!optionsLoading && listing.length === 0 && <Text style={[styles.propertyAddress, styles.onDark]}>No available properties. Properties with a pending offer or active rental cannot be offered.</Text>}
+                        <ScrollView style={styles.propertyOptions} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                            {[true, false].map(enquired => {
+                                const options = listing.filter(option => option.enquired === enquired);
+                                return options.length > 0 && <View key={String(enquired)}>
+                                    <Text style={styles.propertyGroup}>{enquired ? 'Enquired-about properties' : 'Other properties you own'}</Text>
+                                    {options.map(option => (
+                                        <TouchableOpacity key={option.listingId} accessibilityRole="radio"
+                                            accessibilityState={{ checked: selectedListingId === option.listingId }}
+                                            aria-checked={selectedListingId === option.listingId}
+                                            accessibilityLabel={`${option.name}, ${option.address}`}
+                                            disabled={isSendingOffer}
+                                            onPress={() => setSelectedListingId(option.listingId)}
+                                            style={[styles.propertyOption, selectedListingId === option.listingId && styles.propertyOptionSelected]}>
+                                            <FontAwesome name={selectedListingId === option.listingId ? 'dot-circle-o' : 'circle-o'} size={20} color="#265D4B" />
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.propertyName}>{option.name}</Text>
+                                                <Text style={styles.propertyAddress}>{option.address}</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>;
+                            })}
+                        </ScrollView>
+                        {!!offerError && <Text accessibilityRole="alert" style={[styles.inlineError, styles.errorOnDark]}>{offerError}</Text>}
+
                         {/* Row 1: Rent / Deposit */}
                         {(() => {
-                            const priceInvalid = rentalPrice.trim() !== '' && (isNaN(Number(rentalPrice)) || Number(rentalPrice) <= 0);
-                            const depositInvalid = rentalDeposit.trim() !== '' && (isNaN(Number(rentalDeposit)) || Number(rentalDeposit) <= 0);
+                            const priceInvalid = rentalPrice.trim() !== '' && (!Number.isSafeInteger(Number(rentalPrice)) || Number(rentalPrice) <= 0);
+                            const depositInvalid = rentalDeposit.trim() !== '' && (!Number.isSafeInteger(Number(rentalDeposit)) || Number(rentalDeposit) <= 0);
                             return (
                                 <View style={styles.rentalOfferRow}>
                                     <View style={styles.rentalOfferFieldHalf}>
@@ -1347,6 +1499,8 @@ const handlePaymentAndAccept = async () => {
                                         <View style={[styles.rentalOfferInputRow, priceInvalid && styles.rentalOfferDateInputError]}>
                                             <Text style={styles.rentalOfferCurrencyPrefix}>$</Text>
                                             <TextInput
+                                                accessibilityLabel="Monthly rent"
+                                                aria-label="Monthly rent"
                                                 style={styles.rentalOfferInput}
                                                 placeholder="0"
                                                 placeholderTextColor="#666"
@@ -1365,7 +1519,7 @@ const handlePaymentAndAccept = async () => {
                                         </View>
                                         {priceInvalid && (
                                             <View style={styles.rentalOfferTooltip}>
-                                                <Text style={styles.rentalOfferTooltipText}>Must be a positive number</Text>
+                                                <Text accessibilityRole="alert" style={styles.rentalOfferTooltipText}>Enter a positive whole-dollar amount within the supported range.</Text>
                                             </View>
                                         )}
                                     </View>
@@ -1375,6 +1529,8 @@ const handlePaymentAndAccept = async () => {
                                             <Text style={styles.rentalOfferCurrencyPrefix}>$</Text>
                                             <TextInput
                                                 ref={depositInputRef}
+                                                accessibilityLabel="Rental deposit"
+                                                aria-label="Rental deposit"
                                                 style={styles.rentalOfferInput}
                                                 placeholder="0"
                                                 placeholderTextColor="#666"
@@ -1393,7 +1549,7 @@ const handlePaymentAndAccept = async () => {
                                         </View>
                                         {depositInvalid && (
                                             <View style={styles.rentalOfferTooltip}>
-                                                <Text style={styles.rentalOfferTooltipText}>Must be a positive number</Text>
+                                                <Text accessibilityRole="alert" style={styles.rentalOfferTooltipText}>Enter a positive whole-dollar amount within the supported range.</Text>
                                             </View>
                                         )}
                                     </View>
@@ -1488,6 +1644,9 @@ const handlePaymentAndAccept = async () => {
                             return (
                                 <View style={styles.rentalOfferPreview}>
                                     <Text style={styles.rentalOfferPreviewLabel}>OFFER PREVIEW</Text>
+                                    <Text style={styles.rentalOfferPreviewLine}>{listing.find(option => option.listingId === selectedListingId)?.name || 'Select a property'}</Text>
+                                    <Text style={styles.rentalOfferPreviewLine}>{listing.find(option => option.listingId === selectedListingId)?.address}</Text>
+                                    <Text style={styles.rentalOfferPreviewLine}>Recipient: {partner.name}</Text>
                                     {(hasPrice || hasDeposit) && (
                                         <Text style={styles.rentalOfferPreviewLine}>
                                             {hasPrice ? `$${fmtCurrency(price)}/mo` : ''}
@@ -1510,10 +1669,11 @@ const handlePaymentAndAccept = async () => {
                             onPress={handleSendOffer}
                             disabled={!canSendOffer}
                         >
-                            <Text style={styles.rentalOfferSendButtonText}>Send offer</Text>
+                            <Text style={styles.rentalOfferSendButtonText}>{isSendingOffer ? 'Sending offer...' : 'Send offer'}</Text>
                         </TouchableOpacity>
+                        </ScrollView>
                     </View>
-                </View>
+                </KeyboardAvoidingView>
             </Modal>
 
             <Modal
@@ -1582,6 +1742,9 @@ const handlePaymentAndAccept = async () => {
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.payModalContent}>
+                        <Text style={[styles.propertyName, styles.onDark]}>{rental.listingName}</Text>
+                        <Text style={[styles.propertyAddress, styles.onDark]}>{rental.listingLocation}</Text>
+                        {!!paymentError && <Text accessibilityRole="alert" style={[styles.inlineError, styles.errorOnDark]}>{paymentError}</Text>}
                         {/* Header */}
                         <View style={styles.payModalHeader}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1788,6 +1951,16 @@ const handlePaymentAndAccept = async () => {
 
 
 const styles = StyleSheet.create({
+    onDark: { color: '#F0F4F1' },
+    errorOnDark: { color: '#FFB4B9' },
+    composerPreview: { paddingHorizontal: 4 },
+    inlineError: { color: '#A32632', fontSize: 14, lineHeight: 20, paddingVertical: 10 },
+    propertyName: { color: '#193A2E', fontSize: 15, fontWeight: '600', flexShrink: 1 },
+    propertyAddress: { color: '#41574C', fontSize: 13, lineHeight: 19, marginVertical: 5 },
+    propertyGroup: { color: '#33463E', fontSize: 13, fontWeight: '600', marginTop: 14, marginBottom: 6 },
+    propertyOptions: { maxHeight: 190, marginBottom: 12, marginTop: 8, paddingHorizontal: 10, backgroundColor: '#FFFFFF', borderRadius: 8 },
+    propertyOption: { flexDirection: 'row', gap: 10, alignItems: 'center', minHeight: 54, padding: 10, borderWidth: 1, borderColor: '#CDD8D1', borderRadius: 8, marginBottom: 6 },
+    propertyOptionSelected: { backgroundColor: '#EDF5F0', borderColor: '#265D4B' },
     container: {
         flex: 1,
         paddingHorizontal: 16,
@@ -2800,6 +2973,9 @@ const styles = StyleSheet.create({
 
     // Rental offer modal (new design)
     rentalOfferModal: {
+        maxHeight: '90%',
+        width: '92%',
+        maxWidth: 540,
         backgroundColor: '#1C1C1E',
         borderRadius: 16,
         padding: 20,
@@ -2835,6 +3011,7 @@ const styles = StyleSheet.create({
     },
     rentalOfferFieldHalf: {
         flex: 1,
+        minWidth: 0,
     },
     rentalOfferFieldLabel: {
         color: '#ccc',
@@ -2857,6 +3034,7 @@ const styles = StyleSheet.create({
     },
     rentalOfferInput: {
         flex: 1,
+        minWidth: 0,
         color: '#fff',
         fontSize: 15,
     },
@@ -2867,6 +3045,7 @@ const styles = StyleSheet.create({
     },
     rentalOfferDateInput: {
         flex: 1,
+        minWidth: 0,
         backgroundColor: '#2C2C2E',
         borderRadius: 10,
         paddingHorizontal: 12,

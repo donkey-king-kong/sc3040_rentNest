@@ -429,7 +429,9 @@ const HomeListingScreen = () => {
   };
 
   const handleChat = () => {
-    router.push(`/ChatsScreen2?partnerUserId=${listing.ownerUserID}&currentUser=${currentUserID}`);
+    router.push({ pathname: '/ChatsScreen2', params: {
+      partnerUserId: listing.ownerUserID, currentUser: currentUserID, enquiryListingId: listingId,
+    } });
   };
 
   // Memoize the price per square foot calculation
@@ -441,7 +443,17 @@ const HomeListingScreen = () => {
   // Memoize the nearby places data
   const { data } = useMemo(() => getNearbyPlaces(), [getNearbyPlaces]);
 
-  if (loading || !listing) {
+  if (!loading && !listing) {
+    return <View style={styles.loadingScreen}>
+      <Text style={styles.loadingText}>Listing unavailable</Text>
+      <Text>This listing may have been removed or could not be loaded.</Text>
+      <TouchableOpacity accessibilityRole="button" onPress={() => router.back()} style={{ padding: 16 }}>
+        <Text>Back to conversation</Text>
+      </TouchableOpacity>
+    </View>;
+  }
+
+  if (loading) {
     return (
       <View style={styles.loadingScreen}>
         <MorphingInfinity size={86} color="#2FA84F" />

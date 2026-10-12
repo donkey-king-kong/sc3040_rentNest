@@ -9,6 +9,10 @@ import java.util.List;
 
 @Repository
 public interface ChatHistoryRepository extends JpaRepository<ChatHistory, Long> {
+    @Query("SELECT DISTINCT ch.listing.listingID FROM ChatHistory ch " +
+            "WHERE ch.sender.userID = :sender AND ch.receiver.userID = :receiver AND ch.listing IS NOT NULL")
+    List<Long> findEnquiredListingIds(Long sender, Long receiver);
+
     // Get chat history from rentalID
     List<ChatHistory> findByRental_RentalID(Long rentalID);
 
@@ -25,6 +29,7 @@ public interface ChatHistoryRepository extends JpaRepository<ChatHistory, Long> 
     @Query("SELECT ch FROM ChatHistory ch " +
             "JOIN FETCH ch.sender " +
             "JOIN FETCH ch.receiver " +
+            "LEFT JOIN FETCH ch.listing " +
             "LEFT JOIN FETCH ch.rental rental " +
             "LEFT JOIN FETCH rental.listings rentalListing " +
             "LEFT JOIN FETCH rentalListing.owner " +
