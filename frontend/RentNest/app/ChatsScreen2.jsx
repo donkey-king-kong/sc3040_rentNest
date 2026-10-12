@@ -33,6 +33,7 @@ const ChatsScreen2 = () => {
     const { partnerUserId, currentUser, enquiryListingId } = useLocalSearchParams();
     const [chat, setChat] = useState([]);
     const [rentalsById, setRentalsById] = useState({});
+    const [requestsById, setRequestsById] = useState({});
     const [activeRentalId, setActiveRentalId] = useState(null);
     const rental = rentalsById[activeRentalId] || {};
     const [enquiry, setEnquiry] = useState(null);
@@ -57,7 +58,7 @@ const ChatsScreen2 = () => {
     const [isRentalModalVisible, setRentalModalVisible] = useState(false)
     const [isFlagModalVisible, setFlagModalVisible] = useState(false)
     const [isReportingUser, setReportingUser] = useState(false)
-    const [userReportNotificationMessage, setUserReportNotificationMessage] = useState('')
+    const [chatNotificationMessage, setChatNotificationMessage] = useState('')
     const [newMessage, setNewMessage] = useState('');
     const [isPaymentModalVisible, setPaymentModalVisible] = useState(false)
     const [isPaymentSuccessfulModalVisible, setPaymentSuccessfulModalVisible] = useState(false)
@@ -124,6 +125,9 @@ const ChatsScreen2 = () => {
                     if (msg.rentalId != null) {
                         return getRental(msg.rentalId, generation);
                     }
+                    if (msg.requestId != null) {
+                        return getTerminationRequest(msg.requestId, generation);
+                    }
                     return Promise.resolve();
                 }));
             }
@@ -162,6 +166,23 @@ const ChatsScreen2 = () => {
             }
         } catch (error) {
             console.error('Error fetching rentals:', error);
+        }
+    }
+
+    // Preloaded like rentals so termination cards render with the chat instead of loading afterwards.
+    const getTerminationRequest = async (requestId, generation = conversationGeneration.current) => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            if (!token) return;
+            const response = await axios.get(`${API_BASE_URL}/api/requests/${requestId}`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (generation === conversationGeneration.current) {
+                setRequestsById(previous => ({ ...previous, [requestId]: response.data }));
+            }
+        } catch (error) {
+            // The card loads the request itself when it was not preloaded.
+            console.error('Error fetching termination request:', error);
         }
     }
 
@@ -227,13 +248,13 @@ const ChatsScreen2 = () => {
         return `reportedUser:${currentUser}:${partnerUserId}`;
     };
 
-    const showUserReportNotification = (message) => {
-        setUserReportNotificationMessage(message);
+    const showChatNotification = (message) => {
+        setChatNotificationMessage(message);
         if (notificationTimeoutRef.current) {
             clearTimeout(notificationTimeoutRef.current);
         }
         notificationTimeoutRef.current = setTimeout(() => {
-            setUserReportNotificationMessage('');
+            setChatNotificationMessage('');
         }, 2000);
     };
 
@@ -283,7 +304,7 @@ const ChatsScreen2 = () => {
                     const alreadyReported = await AsyncStorage.getItem(reportStorageKey);
                     if (alreadyReported === 'true') {
                         setFlagModalVisible(false);
-                        showUserReportNotification('User Already Reported');
+                        showChatNotification('User Already Reported');
                         return;
                     }
                 } catch (error) {
@@ -303,7 +324,7 @@ const ChatsScreen2 = () => {
                     await AsyncStorage.setItem(reportStorageKey, 'true');
                 }
                 setFlagModalVisible(false);
-                showUserReportNotification('User Reported');
+                showChatNotification('User Reported');
                 await getPartner();
             }else{
                 console.error('Flagging failed:', flaggedResponse.data)
@@ -774,6 +795,7 @@ const handlePaymentAndAccept = async () => {
         offerSession.current += 1;
         setChat([]);
         setRentalsById({});
+        setRequestsById({});
         setActiveRentalId(null);
         setEnquiry(null);
         setNewMessage('');
@@ -1095,7 +1117,15 @@ const handlePaymentAndAccept = async () => {
                                     </View>
                                 )}
                                 {requestIdExists && (
-                                    <TerminationRequestCard requestId={first.requestId} onDecision={getConversation} />
+                                    <TerminationRequestCard
+                                        requestId={first.requestId}
+                                        initialRequest={requestsById[first.requestId]}
+                                        viewerId={currentUser}
+                                        onDecision={(decision) => {
+                                            if (decision === 'accept') showChatNotification('Termination Accepted');
+                                            getConversation();
+                                        }}
+                                    />
                                 )}
                             </View>
                         </View>
@@ -1742,7 +1772,7 @@ const handlePaymentAndAccept = async () => {
             <Modal
                 animationType="fade"
                 transparent={true}
-                visible={!!userReportNotificationMessage}
+                visible={!!chatNotificationMessage}
                 statusBarTranslucent
             >
                 <View style={styles.notificationOverlay} pointerEvents="none">
@@ -1750,7 +1780,7 @@ const handlePaymentAndAccept = async () => {
                         <View style={styles.notificationIconBox}>
                             <Image source={notificationBellIcon} style={styles.notificationIcon} />
                         </View>
-                        <Text style={styles.notificationText}>{userReportNotificationMessage}</Text>
+                        <Text style={styles.notificationText}>{chatNotificationMessage}</Text>
                     </View>
                 </View>
             </Modal>

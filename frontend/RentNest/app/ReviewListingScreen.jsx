@@ -52,7 +52,7 @@ const ReviewListingsScreen = () => {
           owner: {
             userID: listing.ownerID,
             name: listing.ownerName || 'Unknown Owner',
-            photoURL: listing.ownerPhotoURL || "https://images.healthshots.com/healthshots/en/uploads/2020/12/08182549/positive-person.jpg"
+            photoURL: listing.ownerPhotoURL || null
           },
           type: listing.type,
           description: listing.description

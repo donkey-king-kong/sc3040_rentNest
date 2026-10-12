@@ -69,7 +69,7 @@ const ChatsScreen = () => {
           userID: userResponse.data.userID,
           name: userResponse.data.name,
           email: userResponse.data.email,
-          photoURL: userResponse.data.photoURL || "https://images.healthshots.com/healthshots/en/uploads/2020/12/08182549/positive-person.jpg"
+          photoURL: userResponse.data.photoURL || null
         };
         console.log('[ChatsScreen] Current user data retrieved:', userData);
         setCurrentUser(userData);
@@ -172,9 +172,7 @@ const ChatsScreen = () => {
     const isCurrentUserSender = item.senderId === currentUser.userID;
     const chatPartnerName = isCurrentUserSender ? item.receiverName : item.senderName;
     const chatPartnerId = isCurrentUserSender ? item.receiverId : item.senderId;
-    const chatPartnerPhotoURL = isCurrentUserSender ? 
-      (item.receiverPhotoURL || "https://images.healthshots.com/healthshots/en/uploads/2020/12/08182549/positive-person.jpg") : 
-      (item.senderPhotoURL || "https://images.healthshots.com/healthshots/en/uploads/2020/12/08182549/positive-person.jpg");
+    const chatPartnerPhotoURL = isCurrentUserSender ? item.receiverPhotoURL || null : item.senderPhotoURL || null;
     
     console.log('[ChatsScreen] Rendering chat item:', {
       messageId: item.messageID,
