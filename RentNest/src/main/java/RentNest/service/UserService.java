@@ -74,13 +74,22 @@ public class UserService {
 
     // Update user data
     public Optional<User> updateUserData(Long userID, String name, String email, String contact) {
+        return updateUserData(userID, name, email, contact, null);
+    }
+
+    public Optional<User> updateUserData(Long userID, String name, String email, String contact, String photoURL) {
         Optional<User> userOptional = userRepository.findById(userID);
         
         if (userOptional.isPresent()) {
+            String normalizedPhotoURL = PhotoUrlValidator.normalize(photoURL);
             User user = userOptional.get();
             user.setName(name)
                 .setEmail(email)
                 .setContact(contact);
+            // Null means omitted; a supplied blank value explicitly clears the photo.
+            if (photoURL != null) {
+                user.setPhotoURL(normalizedPhotoURL);
+            }
             return Optional.of(userRepository.save(user));
         }
         

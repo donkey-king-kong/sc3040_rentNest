@@ -131,22 +131,42 @@ class LifecycleTimestampsIntegrationTest {
         assertRecent(accepted.getAcceptedAt(), before);
         assertNull(accepted.getTerminatedAt());
 
-        // Terminated, the way the chat screen does it
+        // Generic updates cannot bypass the tenant's termination decision.
         String terminateBody = "{\"listingID\":" + listing.getListingID() + ",\"tenantUserID\":" + tenant.getUserID()
                 + ",\"rentalPrice\":2000,\"rentalDate\":\"2026-09-01\",\"leaseExpiry\":\"2026-09-17\",\"status\":\"terminated\"}";
         mockMvc.perform(put("/api/rentals/" + rentalId).header("Authorization", bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON).content(terminateBody))
+                .andExpect(status().isConflict());
+        assertNull(rentalsRepository.findById(rentalId).orElseThrow().getTerminatedAt());
+
+        // Owner requests termination; the tenant accepts through the current chat workflow.
+        mockMvc.perform(post("/api/requests/terminationrequest/" + rentalId + "/0")
+                        .header("Authorization", bearer(owner)))
+                .andExpect(status().isCreated());
+        Long requestId = requestsRepository.findAll().get(0).getRequestID();
+        assertNull(rentalsRepository.findById(rentalId).orElseThrow().getTerminatedAt());
+        mockMvc.perform(post("/api/requests/" + requestId + "/decision")
+                        .header("Authorization", bearer(tenant))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"accept\"}"))
                 .andExpect(status().isOk());
         Date terminatedAt = rentalsRepository.findById(rentalId).orElseThrow().getTerminatedAt();
         assertRecent(terminatedAt, before);
 
-        // Saving the terminated rental again keeps the original times
-        mockMvc.perform(put("/api/rentals/" + rentalId).header("Authorization", bearer(owner))
-                        .contentType(MediaType.APPLICATION_JSON).content(terminateBody))
+        // Retrying the decision keeps the original event times.
+        mockMvc.perform(post("/api/requests/" + requestId + "/decision")
+                        .header("Authorization", bearer(tenant))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"decision\":\"accept\"}"))
                 .andExpect(status().isOk());
         Rentals afterRepeat = rentalsRepository.findById(rentalId).orElseThrow();
         assertEquals(terminatedAt.getTime(), afterRepeat.getTerminatedAt().getTime());
         assertEquals(accepted.getAcceptedAt().getTime(), afterRepeat.getAcceptedAt().getTime());
+        assertEquals(offered.getCreatedAt().getTime(), afterRepeat.getCreatedAt().getTime());
+        mockMvc.perform(asUser(owner, get("/api/analytics/owner/summary"),
+                        before.minusSeconds(1).toString(), Instant.now().plusSeconds(1).toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.terminations").value(1))
+                .andExpect(jsonPath("$.monthlyAcceptedOffers[0].value").value(1))
+                .andExpect(jsonPath("$.monthlyTerminations[0].value").value(1));
     }
 
     // ---------- Analytics built on the timestamps ----------

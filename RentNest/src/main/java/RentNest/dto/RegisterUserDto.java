@@ -5,6 +5,7 @@ public class RegisterUserDto {
     private String password;
     private String fullName;
     private String contact;
+    private String photoURL;
 
     public String getEmail() {
         return email;
@@ -39,5 +40,13 @@ public class RegisterUserDto {
 
     public void setContact(String contact) {
         this.contact = contact;
+    }
+
+    public String getPhotoURL() {
+        return photoURL;
+    }
+
+    public void setPhotoURL(String photoURL) {
+        this.photoURL = photoURL;
     }
 }

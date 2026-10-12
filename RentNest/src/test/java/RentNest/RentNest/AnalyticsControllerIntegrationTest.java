@@ -60,6 +60,7 @@ class AnalyticsControllerIntegrationTest {
     private User admin;
     private Listings listingA2;
     private Listings listingB1;
+    private Long rentalA2Id;
 
     @BeforeEach
     void setUp() {
@@ -87,8 +88,9 @@ class AnalyticsControllerIntegrationTest {
 
         // A1: active 12-month contract
         Rentals rentalA1 = rental(listingA1, tenant1, "active", "2026-01-01T00:00:00+08:00", "2027-01-01T00:00:00+08:00");
-        // A2: terminated; the app overwrites leaseExpiry with the termination date
+        // A2: legacy terminated fixture with its end date stored in leaseExpiry.
         Rentals rentalA2 = rental(listingA2, tenant2, "terminated", "2026-02-01T00:00:00+08:00", "2026-05-01T00:00:00+08:00");
+        rentalA2Id = rentalA2.getRentalID();
         // A3: pending offer with mixed-case status, to check status normalisation
         rental(listingA3, tenant2, "Pending", "2026-03-01T00:00:00+08:00", "2027-03-01T00:00:00+08:00");
         // B1: pending offer
@@ -278,7 +280,7 @@ class AnalyticsControllerIntegrationTest {
 
     @Test
     void ownerRentTotalIncludesOlderPaymentsAndIgnoresRangeWithoutChangingChartsOrPropertyTotals() throws Exception {
-        Rentals ownerRental = rentalsRepository.findByListings_ListingID(listingA2.getListingID()).orElseThrow();
+        Rentals ownerRental = rentalsRepository.findById(rentalA2Id).orElseThrow();
         Rentals otherRental = rentalsRepository.findByListings_ListingID(listingB1.getListingID()).orElseThrow();
         payment(ownerRental, 700L, "2024-01-01T00:00:00+08:00");
         payment(otherRental, 900L, "2024-01-01T00:00:00+08:00");

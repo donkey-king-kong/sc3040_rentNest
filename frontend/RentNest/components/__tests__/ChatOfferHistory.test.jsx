@@ -13,7 +13,9 @@ jest.mock('../../config/api', () => ({ API_BASE_URL: 'http://test.local' }));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), back: jest.fn() }),
   useLocalSearchParams: () => mockRouteParams,
+  useFocusEffect: callback => require('react').useEffect(callback, [callback]),
 }));
+jest.mock('jwt-decode', () => ({ jwtDecode: () => ({ sub: 'viewer@test.local' }) }));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -40,6 +42,7 @@ const renderConversation = async ({ status = 'pending', currentUser = 3, tenantU
     }
     if (url.includes('/requests/8')) return { data: { requestID: 8, rentalId: 15, status: 'terminated', refundAmount: 9300 } };
     if (url.includes('/users/id/')) return { data: { userID: currentUser === 1 ? 3 : 1, name: 'Chat partner', photoURL: null } };
+    if (url.includes('/users/viewer%40test.local')) return { data: { userID: currentUser } };
     throw new Error('Unexpected mocked endpoint');
   });
   let tree;
@@ -82,8 +85,8 @@ it.each([1, 3])('shows an active offer as accepted for participant %s', async cu
 
 it.each([1, 3])('shows terminated history without new offer actions for participant %s', async currentUser => {
   const tree = await renderConversation({ status: 'terminated', currentUser, withTermination: true });
-  expect(text(tree).filter(value => value === 'Terminated')).toHaveLength(2);
-  expect(text(tree)).toEqual(expect.arrayContaining(['Accepted', 'The viewing went well.', '$4,650', '$9,300', 'Amount to be refunded: $9300']));
+  expect(text(tree).filter(value => value === 'Lease ended')).toHaveLength(2);
+  expect(text(tree)).toEqual(expect.arrayContaining(['Accepted', 'The viewing went well.', '$4,650', '$9,300', 'Refund to tenant']));
   expect(text(tree)).not.toContain('Awaiting tenant response');
   expect(text(tree)).not.toContain('New');
   expect(buttons(tree)).not.toContain('Accept offer');
@@ -113,6 +116,6 @@ it('does not reuse another rental state to expose acceptance', async () => {
 
 it('does not expose acceptance when the rental request fails', async () => {
   const tree = await renderConversation({ rentalFails: true });
-  expect(text(tree)).toContain('Status unavailable');
+  expect(text(tree)).toContain('Loading offer details. Tap to retry.');
   expect(buttons(tree)).not.toContain('Accept offer');
 });

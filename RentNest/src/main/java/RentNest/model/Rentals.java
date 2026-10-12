@@ -14,7 +14,7 @@ public class Rentals {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long rentalID;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "listingid", referencedColumnName = "listingid")
     private Listings listings;
 

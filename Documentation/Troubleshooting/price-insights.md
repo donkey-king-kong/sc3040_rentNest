@@ -2,6 +2,85 @@
 
 Use this guide when the listing page shows an empty Price Insights card, the chart does not appear, or it is unclear whether the issue is missing data, a backend error, or stale frontend code.
 
+## AI Fair Price Diagnostics
+
+The numerical fair-price estimate and its AI explanation are separate requests.
+Their logs use `[PricingAI]`, not the historical rental chart's `[PriceInsights]`.
+An estimate can succeed while the explanation fails.
+
+On the frontend, each request logs `request_started` and then `request_completed`
+or `request_failed`, including listing ID, operation, endpoint, timestamp, duration,
+and a local `attemptId`. Completion logs include the actual HTTP status and the
+payload's `available` flag. HTTP 200 with `available: false` is a warning, not a
+transport error. Rejected requests include a recognized Axios error code and an
+HTTP status, or null when no HTTP response was received.
+
+On the backend, listing estimate/explanation requests have a generated `requestId`.
+That ID follows the synchronous controller, explanation cache, and Gemini logs;
+it is not sent to the client. Match frontend and backend logs by listing ID,
+operation, and time, then use the backend request ID to follow provider calls.
+Frontend attempt IDs and backend request IDs are separate identifiers.
+
+For example, one upstream failure can produce these backend lines:
+
+```text
+[PricingAI] event=request_started requestId=example-41 listingId=41 operation=explanation
+[PricingAI] event=explanation_cache requestId=example-41 listingId=41 cache=miss
+[PricingAI] event=provider_failed requestId=example-41 listingId=41 operation=PRICE_EXPLANATION model=gemini-3.1-flash-lite httpStatus=503 durationMs=12000 providerCode=503 providerStatus=UNAVAILABLE providerReason=high_demand
+[PricingAI] event=request_completed requestId=example-41 listingId=41 operation=explanation httpStatus=200 available=false durationMs=12100
+```
+
+The frontend then warns with `event: request_completed`, `httpStatus: 200`, and
+`available: false`. This means the backend answered, but could not provide an
+explanation; it does not mean the frontend received HTTP 503.
+
+- `provider_started` without a completion/failure shows a call still pending or an
+  interrupted process. It does not prove a provider outage.
+- Provider operations distinguish `PRICE_EXPLANATION` from `ROOM_CLASSIFICATION`.
+- `explanation_cache` reports `hit`, `miss`, or `expired`. Only successful
+  explanations are cached. A hit alone does not establish current provider health.
+- `provider_failed` reports model, upstream HTTP status, and elapsed time.
+  Transport errors use `httpStatus=none` and an exception class such as
+  `SocketTimeoutException`, without logging the exception's free-text message.
+- Provider details are restricted to a numeric error code, an allowlisted status,
+  and a derived reason: `high_demand`, `quota_or_rate_limit`,
+  `credentials_or_permissions`, `model_unavailable`, `service_unavailable`, or
+  `unspecified`. A category describes the provider's message, not an independently
+  verified root cause. Unknown statuses are `UNKNOWN`; unreadable or oversized
+  bodies are omitted. Arbitrary provider messages and metadata are not logged.
+- Keys, authorization headers, prompts, listing descriptions, and generated
+  explanations are excluded from these diagnostics. Do not enable HTTP wire/body
+  logging to investigate this flow.
+- Pricing uses `pricing.ai.model`, defaulting to `gemini-3.1-flash-lite`.
+  The chat setting `llm.model` does not select the pricing model.
+
+This logging change does not add retries, timeout configuration, a retry button,
+cache-policy changes, or a new API response contract. Existing servers must load
+the updated code before these events appear; creating a worktree does not update
+another session's running application.
+
+### Focused Tests
+
+From `RentNest/`, with Java 21 selected:
+
+```bash
+mvn -Dtest=PricingDiagnosticsTest,FairPriceExplanationServiceTest,FairPricingControllerTest,RoomPricingTest test
+```
+
+These tests mock the provider and repositories; they do not require database
+credentials or call the live AI service. On macOS, select Java 21 for this command
+with `JAVA_HOME="$(/usr/libexec/java_home -v 21)" mvn ...` if Maven uses a newer JDK
+unsupported by Mockito's Byte Buddy version.
+
+From `frontend/RentNest/`, using Node 22.7+ (or Node 24):
+
+```bash
+npm run test:pricing-diagnostics
+```
+
+The frontend logger tests use Node's built-in test runner and do not require Expo
+or Jest to start. They validate diagnostics, not device rendering.
+
 ## Expected Logs
 
 When the feature is running correctly, clicking a listing should produce frontend logs like:

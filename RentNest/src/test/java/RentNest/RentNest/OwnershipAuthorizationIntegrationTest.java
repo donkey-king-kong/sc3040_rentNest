@@ -1,6 +1,7 @@
 package RentNest.RentNest;
 
 import RentNest.model.Listings;
+import RentNest.model.Rentals;
 import RentNest.model.Reviews;
 import RentNest.model.User;
 import RentNest.repository.ChatHistoryRepository;
@@ -15,7 +16,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -97,10 +102,32 @@ class OwnershipAuthorizationIntegrationTest {
     }
 
     @Test
-    void adminCanDeleteAnyListing() throws Exception {
+    void adminCanDeleteListingWithoutRentalHistory() throws Exception {
         mockMvc.perform(delete("/api/listings/" + listing.getListingID()).header("Authorization", bearer(admin)))
                 .andExpect(status().isNoContent());
         assertFalse(listingsRepository.existsById(listing.getListingID()));
+    }
+
+    @Test
+    void adminCannotDeleteListingWithRentalHistory() throws Exception {
+        Rentals rental = new Rentals();
+        rental.setListings(listing);
+        rental.setTenantUserID(otherUser.getUserID());
+        rental.setStatus("terminated");
+        rental = rentalsRepository.save(rental);
+        mockMvc.perform(delete("/api/listings/" + listing.getListingID()).header("Authorization", bearer(admin)))
+                .andExpect(status().isConflict());
+        assertTrue(listingsRepository.existsById(listing.getListingID()));
+        assertTrue(rentalsRepository.existsById(rental.getRentalID()));
+    }
+
+    @Test
+    void adminCannotDeleteOccupiedListing() throws Exception {
+        listing.setTenant(otherUser);
+        listingsRepository.save(listing);
+        mockMvc.perform(delete("/api/listings/" + listing.getListingID()).header("Authorization", bearer(admin)))
+                .andExpect(status().isConflict());
+        assertTrue(listingsRepository.existsById(listing.getListingID()));
     }
 
     @Test
@@ -243,8 +270,16 @@ class OwnershipAuthorizationIntegrationTest {
     void servicesRejectReassignmentEvenWithoutControllerChecks() {
         RentNest.dto.ListingsDTO listingDto = new RentNest.dto.ListingsDTO();
         listingDto.setOwnerUserID(otherUser.getUserID());
-        org.junit.jupiter.api.Assertions.assertThrows(SecurityException.class,
-                () -> listingsService.updateListing(listing.getListingID(), listingDto));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(owner, null, owner.getAuthorities()));
+        try {
+            ResponseStatusException failure = org.junit.jupiter.api.Assertions.assertThrows(ResponseStatusException.class,
+                    () -> listingsService.updateListing(listing.getListingID(), listingDto));
+            assertEquals(HttpStatus.CONFLICT, failure.getStatusCode());
+            assertEquals(owner.getUserID(), listingsRepository.findById(listing.getListingID()).orElseThrow().getOwnerId());
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
         RentNest.dto.ReviewsDTO reviewDto = new RentNest.dto.ReviewsDTO();
         org.junit.jupiter.api.Assertions.assertThrows(SecurityException.class,
                 () -> reviewsService.updateReview(review.getReviewid(), reviewDto, admin));

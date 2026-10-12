@@ -9,17 +9,22 @@ import RentNest.repository.ChatHistoryRepository;
 import RentNest.model.Listings;
 import RentNest.dto.ListingsDTO;
 import RentNest.repository.ListingsRepository;
-import RentNest.model.Requests;
 import RentNest.repository.RequestsRepository;
 import RentNest.model.User;
 import RentNest.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.server.ResponseStatusException;
+import org.hibernate.Hibernate;
 
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -28,7 +33,6 @@ public class RentalsService {
     private final RentalsRepository rentalsRepository;
     private final ListingsRepository listingsRepository;
     private final ChatHistoryRepository chatHistoryRepository;
-    private final ChatHistoryService chatHistoryService;
     private final RequestsRepository requestsRepository;
 
     // Mapping Rentals to RentalsDTO
@@ -59,39 +63,18 @@ public class RentalsService {
     }
 
     @Autowired
-    public RentalsService(RentalsRepository rentalsRepository, ListingsRepository listingsRepository, UserRepository userRepository, ChatHistoryRepository chatHistoryRepository, ChatHistoryService chatHistoryService, RequestsRepository requestsRepository) {
+    public RentalsService(RentalsRepository rentalsRepository, ListingsRepository listingsRepository, UserRepository userRepository, ChatHistoryRepository chatHistoryRepository, RequestsRepository requestsRepository) {
         this.rentalsRepository = rentalsRepository;
         this.listingsRepository = listingsRepository;
         this.userRepository = userRepository;
         this.chatHistoryRepository = chatHistoryRepository;
-        this.chatHistoryService = chatHistoryService;
         this.requestsRepository = requestsRepository;
     }
 
     // Create a new rental
     @Transactional
     public Rentals createRental(RentalsDTO rentalDTO) {
-        // Validate the input data first
-        if (rentalDTO.getListingID() == null || rentalDTO.getTenantUserID() == null || rentalDTO.getRentalPrice() <= 0) {
-            throw new IllegalArgumentException("Invalid rental data provided.");
-        }
-
-        // Fetch the listing by listingID from the ListingsRepository
-        Listings listing = listingsRepository.findById(rentalDTO.getListingID()).orElseThrow(()-> new RuntimeException("Listing not found"));
-
-        // Create new rental entry
-        Rentals rental = new Rentals();
-        rental.setTenantUserID(rentalDTO.getTenantUserID());
-        rental.setRentalPrice(rentalDTO.getRentalPrice());
-        rental.setDepositPrice(rentalDTO.getDepositPrice());
-        rental.setRentalDate(rentalDTO.getRentalDate());
-        rental.setLeaseExpiry(rentalDTO.getLeaseExpiry());
-        rental.setPaymentHistory(rentalDTO.getPaymentHistory());
-        rental.setStatus(rentalDTO.getStatus());
-        rental.setListings(listing);
-        recordStatusChange(rental);
-
-        return rentalsRepository.save(rental);
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Use the rental offer endpoint to create a rental");
     }
 //    Example:
 //    *** MAKE SURE THE listingID ALREADY EXIST BEFORE YOU TEST
@@ -127,63 +110,67 @@ public class RentalsService {
     // Update a rental
     @Transactional
     public Rentals updateRental(Long rentalID, RentalsDTO updatedRentalDTO) {
-        Optional<Rentals> existingRentalOpt = rentalsRepository.findById(rentalID);
+        lockListingForRental(rentalID);
+        Optional<Rentals> existingRentalOpt = rentalsRepository.findByIdForUpdate(rentalID);
         if (existingRentalOpt.isPresent()) {
             Rentals existingRental = existingRentalOpt.get();
-
-            // Update only the fields you want to change using the DTO
-            existingRental.setTenantUserID(updatedRentalDTO.getTenantUserID());
-            existingRental.setRentalPrice(updatedRentalDTO.getRentalPrice());
-            existingRental.setDepositPrice(updatedRentalDTO.getDepositPrice());
-            existingRental.setRentalDate(updatedRentalDTO.getRentalDate());
-            existingRental.setLeaseExpiry(updatedRentalDTO.getLeaseExpiry());
-            existingRental.setPaymentHistory(updatedRentalDTO.getPaymentHistory());
-            existingRental.setStatus(updatedRentalDTO.getStatus());
-            recordStatusChange(existingRental);
-
-            // Fetch the listing by listingID from the ListingsRepository
-            Listings listing = listingsRepository.findById(updatedRentalDTO.getListingID())
-                    .orElseThrow(() -> new RuntimeException("Listing not found"));
-
-            existingRental.setListings(listing);
-
-            return rentalsRepository.save(existingRental);
+            if (updatedRentalDTO != null) {
+                guardProtectedRentalUpdate(existingRental, updatedRentalDTO);
+                requirePaymentHistoryOwner(existingRental);
+                existingRental.setPaymentHistory(updatedRentalDTO.getPaymentHistory());
+                // The endpoint serializes the owner name after this transaction closes.
+                Hibernate.initialize(existingRental.getListings().getOwner());
+                return rentalsRepository.save(existingRental);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rental update is required");
         } else {
             return null; // or throw an exception if not found
         }
     }
 
     // Delete a rental
+    @Transactional
     public void deleteRental(Long rentalID) {
-        rentalsRepository.deleteById(rentalID);
+        throw new ResponseStatusException(HttpStatus.CONFLICT, "Rental history cannot be deleted through this endpoint");
     }
 
     @Transactional
     public Rentals createRentalOffer(RentalsDTO rentalDTO, ChatHistoryDTO chatHistoryDTO, Long senderID, Long receiverID) {
-        // Validate the input data for rental
-        if (rentalDTO.getListingID() == null || rentalDTO.getTenantUserID() == null || rentalDTO.getRentalPrice() <= 0) {
+        Long actor = currentUserId();
+        if (!Objects.equals(actor, senderID)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Sender must be the authenticated owner");
+        }
+        if (rentalDTO == null || rentalDTO.getListingID() == null
+                || receiverID == null || Objects.equals(actor, receiverID)
+                || !Objects.equals(receiverID, rentalDTO.getTenantUserID())
+                || rentalDTO.getRentalPrice() == null || rentalDTO.getRentalPrice() <= 0
+                || rentalDTO.getDepositPrice() == null || rentalDTO.getDepositPrice() <= 0
+                || rentalDTO.getRentalDate() == null || rentalDTO.getLeaseExpiry() == null
+                || !rentalDTO.getLeaseExpiry().after(rentalDTO.getRentalDate())
+                || (rentalDTO.getStatus() != null && !"pending".equals(rentalDTO.getStatus()))) {
             throw new IllegalArgumentException("Invalid rental data provided.");
         }
-
-        // Fetch the listing by listingID from ListingsRepository
-        Listings listing = listingsRepository.findById(rentalDTO.getListingID())
-                .orElseThrow(() -> new RuntimeException("Listing not found"));
+        if (chatHistoryDTO != null && (chatHistoryDTO.getRentalID() != null
+                || chatHistoryDTO.getRequestID() != null)) {
+            throw new IllegalArgumentException("An offer cannot link an existing rental or request");
+        }
+        Listings listing = listingsRepository.findByIdForUpdate(rentalDTO.getListingID())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
+        if (!Objects.equals(actor, listing.getOwnerId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the listing owner can send an offer");
+        }
+        if (listing.getTenantId() != null || listing.isFlagged() || listing.getOwner().getFlagged() != 0
+                || rentalsRepository.findByListings_ListingID(listing.getListingID()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This property is no longer available for an offer");
+        }
 
         // Fetch the tenant (receiver) by receiverID from UserRepository
         User receiver = userRepository.findById(receiverID)
-                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Receiver not found"));
 
         // Fetch the sender by senderID from UserRepository
         User sender = userRepository.findById(senderID)
                 .orElseThrow(() -> new RuntimeException("Sender not found"));
-
-        // Check if chatHistoryDTO has a non-null requestID
-        Requests requests = null;
-        if (chatHistoryDTO.getRequestID() != null) {
-            // Fetch the request if applicable (from chatHistoryDTO)
-            requests = requestsRepository.findById(chatHistoryDTO.getRequestID())
-                    .orElseThrow(() -> new RuntimeException("Request not found"));
-        }
 
         // Create and save the new rental entry (set tenantUserID correctly)
         Rentals rental = new Rentals();
@@ -192,7 +179,7 @@ public class RentalsService {
         rental.setDepositPrice(rentalDTO.getDepositPrice());
         rental.setRentalDate(rentalDTO.getRentalDate());
         rental.setLeaseExpiry(rentalDTO.getLeaseExpiry());
-        rental.setPaymentHistory(rentalDTO.getPaymentHistory());
+        rental.setPaymentHistory(null);
         rental.setStatus("pending"); // Set rental status to "pending"
         rental.setListings(listing);
         recordStatusChange(rental);
@@ -207,8 +194,8 @@ public class RentalsService {
         chatHistory.setMessage("Rental Offer"); // You can customize the message if needed
 
         // Set the request only if it's not null
-        chatHistory.setRequest(requests);
-        chatHistory.setDate(chatHistoryDTO.getDate());
+        chatHistory.setRequest(null);
+        chatHistory.setDate(new Date());
 
         chatHistoryRepository.save(chatHistory); // Save the chat history
 
@@ -243,24 +230,35 @@ public class RentalsService {
 
     @Transactional
     public Rentals reviewRentalOffer(Long rentalID, RentalsDTO updatedRentalDTO) {
+        Long actor = currentUserId();
+        Listings listing = lockListingForRental(rentalID);
         // Get the rental by rentalID else throw an exception if not found
-        Rentals existingRental = rentalsRepository.findById(rentalID)
+        Rentals existingRental = rentalsRepository.findByIdForUpdate(rentalID)
                 .orElseThrow(() -> new RuntimeException("Rental not found"));
+        if (!Objects.equals(actor, existingRental.getTenantUserID())
+                || Objects.equals(actor, existingRental.getOwnerUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the offer recipient can accept");
+        }
+        if (updatedRentalDTO == null
+                || (updatedRentalDTO.getTenantUserID() != null && !Objects.equals(actor, updatedRentalDTO.getTenantUserID()))
+                || (updatedRentalDTO.getListingID() != null && !Objects.equals(listing.getListingID(), updatedRentalDTO.getListingID()))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Offer participants and property cannot be replaced");
+        }
+        guardTerminationLifecycle(existingRental);
+        if (listing.getTenantId() != null || listing.isFlagged() || listing.getOwner().getFlagged() != 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This property is no longer available");
+        }
 
         // Change the status from "pending" to "active" to accept the contract
         if ("pending".equals(existingRental.getStatus())) {
             existingRental.setStatus("active");
             recordStatusChange(existingRental);
         } else {
-            throw new RuntimeException("Rental is not in pending status");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Rental is not in pending status");
         }
 
         // Fetch the associated listing using the listingID from the rental contract
-        Listings listing = listingsRepository.findById(existingRental.getListings().getListingID())
-                .orElseThrow(() -> new RuntimeException("Listing not found"));
-
-        // Get the tenant user by tenantUserID from the DTO
-        User tenantUser = userRepository.findById(updatedRentalDTO.getTenantUserID())
+        User tenantUser = userRepository.findById(existingRental.getTenantUserID())
                 .orElseThrow(() -> new RuntimeException("Tenant user not found"));
 
         // Update the tenant in the listing to reflect the accepted contract
@@ -310,6 +308,87 @@ public class RentalsService {
             throw new IllegalArgumentException("No tenants found for listingID: " + listingID);
         }
         return tenantIDs;
+    }
+
+    public record OfferOption(Long listingId, String name, String address, Integer price, boolean enquired) {}
+
+    @Transactional(readOnly = true)
+    public List<OfferOption> getOfferOptions(Long recipientID) {
+        Long actor = currentUserId();
+        if (recipientID == null || Objects.equals(actor, recipientID)) {
+            throw new IllegalArgumentException("Select a different offer recipient");
+        }
+        if (!userRepository.existsById(recipientID)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipient not found");
+        }
+        var enquired = new java.util.HashSet<>(chatHistoryRepository.findEnquiredListingIds(recipientID, actor));
+        return listingsRepository.findOfferCandidates(actor).stream()
+                .map(l -> new OfferOption(l.getListingID(), l.getName(), l.getLocation(), l.getPrice(),
+                        enquired.contains(l.getListingID())))
+                .sorted(java.util.Comparator.comparing(OfferOption::enquired).reversed())
+                .toList();
+    }
+
+    // All lifecycle writers lock listing first, then rental, avoiding lock inversion.
+    private Listings lockListingForRental(Long rentalId) {
+        Long listingId = rentalsRepository.findListingIdByRentalID(rentalId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Rental not found"));
+        return listingsRepository.findByIdForUpdate(listingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
+    }
+
+    private Long currentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof User user)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return user.getUserID();
+    }
+
+    private void guardTerminationLifecycle(Rentals rental) {
+        if (hasProtectedLifecycle(rental)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Active, terminated, and request-linked rentals cannot be changed through generic rental mutations");
+        }
+    }
+
+    private boolean hasProtectedLifecycle(Rentals rental) {
+        return "active".equalsIgnoreCase(rental.getStatus()) || "terminated".equalsIgnoreCase(rental.getStatus())
+                || rental.getTerminatedAt() != null
+                || requestsRepository.existsByRentals_RentalID(rental.getRentalID());
+    }
+
+    private void guardProtectedRentalUpdate(Rentals rental, RentalsDTO dto) {
+        if (!Objects.equals(rental.getTenantUserID(), dto.getTenantUserID())
+                || !Objects.equals(rental.getListingId(), dto.getListingID())
+                || !Objects.equals(rental.getRentalPrice(), dto.getRentalPrice())
+                || !Objects.equals(rental.getDepositPrice(), dto.getDepositPrice())
+                || !sameDate(rental.getRentalDate(), dto.getRentalDate())
+                || !sameDate(rental.getLeaseExpiry(), dto.getLeaseExpiry())
+                || !Objects.equals(rental.getStatus(), dto.getStatus())
+                || (dto.getRentalID() != null && !Objects.equals(rental.getRentalID(), dto.getRentalID()))
+                // Server-managed timestamps may be omitted, but cannot be rewritten.
+                || (dto.getCreatedAt() != null && !sameDate(rental.getCreatedAt(), dto.getCreatedAt()))
+                || (dto.getAcceptedAt() != null && !sameDate(rental.getAcceptedAt(), dto.getAcceptedAt()))
+                || (dto.getTerminatedAt() != null && !sameDate(rental.getTerminatedAt(), dto.getTerminatedAt()))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only payment history can be updated for active, terminated, or request-linked rentals");
+        }
+    }
+
+    private boolean sameDate(Date first, Date second) {
+        return first == null ? second == null : second != null && first.getTime() == second.getTime();
+    }
+
+    private void requirePaymentHistoryOwner(Rentals rental) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || !(authentication.getPrincipal() instanceof User user) || user.getUserID() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        if (!Objects.equals(user.getUserID(), rental.getOwnerUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the rental owner can update payment history");
+        }
     }
 
 }
