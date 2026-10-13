@@ -1,10 +1,9 @@
-import React, {useEffect, useState} from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
-import {API_BASE_URL} from "../config/api";
+import { detailKey } from '../config/rentalDetails';
+import { useRentalDetail } from '../config/useRentalDetail';
 import MorphingInfinity from '../components/MorphingInfinity';
 import ListingImage from '../components/ListingImage';
 import ProfileImage from '../components/ProfileImage';
@@ -12,57 +11,8 @@ import ProfileImage from '../components/ProfileImage';
 const RentalInfoOwner = () => {
   const router = useRouter();
   const { listingId, refresh } = useLocalSearchParams();
-  const [refreshing, setRefreshing] = useState(false);
-  const [listing, setListing] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Fetch listing details
-  const getListingID = async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        console.log('No token found!');
-        router.replace('/LoginScreen');
-        return;
-      }
-      const response = await axios.get(`${API_BASE_URL}/api/listings/${listingId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-      });
-
-      const listingData = response.data;
-      console.log('[RentalInfoOwnerScreen] listing image payload:', {
-        listingId,
-        name: listingData?.name,
-        listingpicture: listingData?.listingpicture,
-      });
-      if (!listingData.tenantId) {
-        listingData.tenantId = 0;
-        listingData.tenantName = 'No Tenant yet...';
-        listingData.tenantPhotoURL = null;
-      }
-
-      setListing(listingData);
-    } catch (error) {
-      console.error('Error fetching listing:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Refresh function
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    await getListingID();
-    setRefreshing(false);
-  }, []);
-
-  useEffect(() => {
-    getListingID();
-  }, [refresh]);
+  const detail = useRentalDetail(detailKey('property', listingId), true, refresh);
+  const listing = detail.data;
 
   const handleTenantPress = (tenantId, listingId) => {
     router.push({pathname: '/TenantOverview', params: { tenantId, listingId }});
@@ -74,23 +24,46 @@ const RentalInfoOwner = () => {
     }
   };
 
-  if (isLoading) {
+  if (!detail.verified && !detail.error) {
     return (
       <View style={styles.loadingContainer}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={() => router.back()}
+          style={styles.loadingBackButton}
+        >
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </TouchableOpacity>
         <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading rental info...</Text>
+        <Text accessibilityLiveRegion="polite" style={styles.loadingText}>
+          Loading rental info...
+        </Text>
       </View>
     );
   }
 
   return (
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1 }}
+        refreshControl={<RefreshControl refreshing={detail.loading && !!listing} onRefresh={() => detail.refresh()} />}>
         <View style={styles.titleRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" style={styles.backButton} onPress={() => router.back()}>
             <FontAwesome name="chevron-left" size={18} color="#101820" />
           </TouchableOpacity>
           <Text style={styles.title}>Rental Info</Text>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh rental info" disabled={detail.loading}
+            onPress={() => detail.refresh()} style={styles.refreshButton}>
+            <Text style={styles.refreshText}>{detail.loading && listing ? 'Refreshing...' : 'Refresh'}</Text>
+          </TouchableOpacity>
         </View>
+        {detail.error ? <View>
+          <Text accessibilityRole="alert" style={styles.errorText}>{detail.error}</Text>
+          <TouchableOpacity accessibilityRole="button" disabled={detail.loading} style={styles.refreshButton}
+            onPress={() => detail.refresh()}><Text style={styles.refreshText}>Retry</Text></TouchableOpacity>
+        </View> : null}
+        {listing && detail.stale ? <Text accessibilityLiveRegion="polite" style={styles.statusText}>
+          Showing saved details. {detail.loading ? 'Checking for updates...' : 'Refresh to confirm the current tenancy.'}
+        </Text> : null}
 
         {/* Image */}
         {listing && (
@@ -99,6 +72,7 @@ const RentalInfoOwner = () => {
                 uri={listing.listingpicture}
                 style={styles.image}
                 screen="RentalInfoOwnerScreen"
+                diagnostics={false}
                 listingId={listing.listingID}
                 listingName={listing.name}
                 width={600}
@@ -124,6 +98,7 @@ const RentalInfoOwner = () => {
                   style={styles.ownerPhoto}
                   textStyle={styles.profilePhotoInitials}
                   screen="RentalInfoOwnerScreen"
+                  diagnostics={false}
                   userId={listing.ownerId}
                   role="owner"
                 />
@@ -137,7 +112,7 @@ const RentalInfoOwner = () => {
               <View style={styles.detailsRow}>
                 <View>
                   <Text style={styles.detailsLabel}>Current Tenants:</Text>
-                  <Text style={styles.detailsValue}>{listing.tenantId === 0 ? 'No current tenant' : listing.tenantName}</Text>
+                  <Text style={styles.detailsValue}>{!listing.tenantId ? 'No current tenant' : listing.tenantName}</Text>
                 </View>
                 <View style={styles.rightAligned}>
                   <Text style={styles.detailsLabel}>Monthly Rental Payment:</Text>
@@ -152,9 +127,13 @@ const RentalInfoOwner = () => {
 
               {/* Manage Tenants */}
               <Text style={styles.sectionTitle}>Manage Tenant</Text>
-              {listing.tenantId !== 0 ? (
+              {listing.tenantId ? (
                 <TouchableOpacity
-                    style={styles.transparentButton}
+                    style={[styles.transparentButton, !detail.verified && styles.disabled]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Manage tenant ${listing.tenantName || ''}`}
+                    disabled={!detail.verified}
+                    accessibilityState={{ disabled: !detail.verified }}
                     onPress={() => handleTenantPress(listing.tenantId, listing.listingID)}
                 >
                   <ProfileImage
@@ -163,6 +142,7 @@ const RentalInfoOwner = () => {
                     style={styles.tenantPhoto}
                     textStyle={styles.profilePhotoInitials}
                     screen="RentalInfoOwnerScreen"
+                    diagnostics={false}
                     userId={listing.tenantId}
                     role="tenant"
                   />
@@ -177,10 +157,11 @@ const RentalInfoOwner = () => {
                     style={styles.tenantPhoto}
                     textStyle={styles.profilePhotoInitials}
                     screen="RentalInfoOwnerScreen"
+                    diagnostics={false}
                     userId={listing.tenantId}
                     role="tenant"
                   />
-                  <Text style={[styles.buttonText, { color: '#999' }]}>No current tenant</Text>
+                  <Text style={[styles.buttonText, { color: '#666' }]}>No current tenant</Text>
                 </View>
               )}
 
@@ -197,7 +178,11 @@ const RentalInfoOwner = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                  style={styles.transparentButton}
+                  disabled={!detail.verified}
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit Listing"
+                  accessibilityState={{ disabled: !detail.verified }}
+                  style={[styles.transparentButton, !detail.verified && styles.disabled]}
                   onPress={() => router.replace({pathname: '/EditListingScreen', params: { listingId }})}
               >
                 <FontAwesome name="edit" style={[styles.icon, styles.lighterIcon]} />
@@ -220,13 +205,24 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F8FA',
   },
   loadingText: {
     marginTop: 24,
     color: '#101820',
     fontSize: 18,
     fontWeight: '700',
+  },
+  loadingBackButton: {
+    position: 'absolute',
+    top: 48,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
   },
   titleRow: {
     flexDirection: 'row',
@@ -243,9 +239,15 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   title: {
+    flex: 1,
     fontSize: 24,
     fontWeight: 'bold',
   },
+  refreshButton: { minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' },
+  refreshText: { color: '#205C43', fontSize: 14, fontWeight: '600' },
+  errorText: { color: '#9B263D', fontSize: 16, lineHeight: 24 },
+  statusText: { color: '#555', fontSize: 14, marginBottom: 12 },
+  disabled: { opacity: 0.5 },
   image: {
     width: '100%',
     height: 200,

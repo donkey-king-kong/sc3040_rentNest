@@ -121,7 +121,7 @@ Use a fixed history cutoff of 12 October 2026, not the SQL execution date.
 ## Proposed Assignment Schedule
 
 Participant names and property details remain those in
-`enquiry-discussions-preview.md`. IDs below identify the same assignments.
+[enquiry-discussions-preview.md](../Database/Enquiries/enquiry-discussions-preview.md). IDs below identify the same assignments.
 Lengths are a frozen, varied selection within 12-36 months, not values that
 will be randomized again on rerun. All leases remain unexpired at the cutoff.
 
@@ -272,13 +272,13 @@ schema ambiguity or changes since the supplied snapshots.
 
 ## Delivery Results
 
-- HIST-1 complete: `historical-rentals.json` and
-  `historical-rentals-preview.md` preserve every source message ID and all six
+- HIST-1 complete: [historical-rentals.json](../Database/Rentals/historical-rentals.json) and
+  [historical-rentals-preview.md](../Database/Rentals/historical-rentals-preview.md) preserve every source message ID and all six
   listing-115 messages. The 204 redated messages include 78 timing-related text
   changes. Validation confirmed all assignments, context, message lengths,
   account chronology, 17 acceptance months, 12-36-month terms, and no expired
   leases at the cutoff.
-- HIST-2 complete: `seed-historical-rentals.sql` defaults to dry run. It updates
+- HIST-2 complete: [seed-historical-rentals.sql](../Database/Rentals/seed-historical-rentals.sql) defaults to dry run. It updates
   only the approved existing fields, creates 35 rentals/35 offers/225 payments,
   and verifies S$1,031,250 in payment history. Exact completed runs are no-ops;
   changed or partial states are refused.
@@ -286,7 +286,7 @@ schema ambiguity or changes since the supplied snapshots.
   execution, reruns, drift, partial/duplicate records, schema safeguards,
   generated IDs, trigger side effects, timestamp types, malformed monthly
   schedules, future events, and lock contention. Scratch databases were dropped.
-- HIST-3 complete: `historical-rentals-guide.md` documents backup, dry-run/apply
+- HIST-3 complete: [historical-rentals-guide.md](../Database/Rentals/historical-rentals-guide.md) documents backup, dry-run/apply
   settings, expected results, independent queries, app checks, recovery, payment
   semantics, checksums, and the superseded enquiry script.
 - Role responsibilities and QA gates were handled in the current session;

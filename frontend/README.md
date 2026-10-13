@@ -1,5 +1,95 @@
 # Frontend
 
+## Chat and Listing Detail Performance
+
+Restart/deploy the backend before using the optimized chat endpoints. The Chats
+tab now calls authenticated `GET /api/chathistory/summaries` instead of downloading
+every message. Conversations use
+`GET /api/chathistory/conversations/{partnerId}` and initially load the latest 50
+messages; **Load older messages** retrieves earlier pages. Session-only caches keep
+saved rows visible during focus refresh, and chat mutations invalidate them.
+
+Conversation headers and messages render before rental/termination card details.
+Listing details fetch the viewer and property concurrently, then load
+amenities, reviews, history, and pricing concurrently behind the initial loading
+screen. The complete listing appears after every initial section has loaded or
+failed. Later retries keep the listing visible. Fair-price estimate and
+explanation start together; backend request coalescing prevents duplicate
+classification/estimate work.
+
+Chat logs use `[Chat]` and `X-Chat-Request-Id`. Navigation cancellations are
+informational `request_cancelled` events; genuine request failures remain
+warnings. Set `EXPO_PUBLIC_CHAT_DIAGNOSTICS=false` and restart Expo to suppress
+informational frontend events. Pricing Gemini calls use
+`pricing.ai.connect-timeout-ms` and `pricing.ai.read-timeout-ms`.
+
+Run `npm run test:chat-listing-performance` from `frontend/RentNest`. See the
+[chat and listing performance guide](../Documentation/Troubleshooting/chat-listing-performance.md)
+for API contracts, cache behavior, measurements, and diagnostic fields.
+
+## Owner Rental Details
+
+Restart/deploy the backend before using the updated Rental Info and Tenant Overview
+screens. They now use `/api/owner/...` detail endpoints: one property request, then
+one tenant-summary request and one combined payment request when opening a tenant.
+The tenant profile and lease appear without waiting for payments.
+
+Both screens retain Back during loading, support refresh/retry, and label saved
+data during revalidation. Payment errors have a separate retry and never imply
+zero outstanding. Management actions require freshly verified ownership/tenancy.
+Login/logout and relevant listing/rental/payment mutations reset the memory cache.
+
+Logs use `[RentalDetail]` and `X-Rental-Request-Id`; set
+`EXPO_PUBLIC_RENTAL_DIAGNOSTICS=false` to suppress frontend info logs after an Expo
+restart/rebuild. Run `npm run test:rental-details` from `frontend/RentNest`.
+See the [rental detail performance guide](../Documentation/Troubleshooting/rental-detail-performance.md)
+for contracts, preserved billing rules, paired measurements, backend controls,
+and native validation limits.
+
+## Inbox Loading and Logs
+
+Restart/deploy the backend before this frontend. Inbox uses the authenticated
+`GET /api/listings/inbox` endpoint rather than downloading every listing.
+It caches only the current session's properties in memory, keeps cards visible
+during background refresh, and supports pull-to-refresh plus Refresh/Retry.
+Login/logout clear the cache; property and rental changes invalidate it.
+Changes from another device appear on the next refresh or focus.
+
+Frontend and backend logs share the `[Inbox]` prefix and `X-Inbox-Request-Id`.
+They report request/query duration, status, row count, cache use, and failures
+without tokens or property payloads. Set `EXPO_PUBLIC_INBOX_DIAGNOSTICS=false`
+and restart/rebuild Expo to suppress frontend informational logs; warnings remain.
+
+Run `npm run test:inbox` from `frontend/RentNest`. See the
+[Inbox performance and diagnostics guide](../Documentation/Troubleshooting/inbox-performance.md)
+for backend logging controls, timing interpretation, measured improvements,
+safe regression commands, deployment requirements, and Android validation limits.
+
+## Startup Routing
+
+The root stack explicitly starts at `index`, which redirects to `LandingScreen`
+with **Log In** and **Sign Up**. Keep `index` registered before `AdminScreen` in
+`app/_layout.jsx` so native startup does not fall back to the admin screen.
+Explicit deep links still open their requested routes.
+
+Restarting Expo or closing Expo Go does not clear the token stored by
+AsyncStorage. Default startup shows Landing without checking or deleting that
+token; use Log out to end the saved session. Login still selects the appropriate
+dashboard after authentication.
+
+Run the focused configuration regression tests from `frontend/RentNest`:
+
+```bash
+node --test scripts/startup-routing.test.mjs
+```
+
+Verified on Android Expo Go: signed-out cold launch opens Landing, both landing
+buttons open their respective forms, Back from Login returns to Landing, and an
+explicit Login deep link remains supported. The three automated tests cover the
+initial screen, unconditional landing redirect, and retained admin styling.
+Authenticated cold launch, post-login dashboards, web, and iOS were not
+retested for this change.
+
 ## Profile Photo URLs
 
 Sign Up and Edit Profile include **Photo URL**. Sign Up shows the label inside
@@ -31,7 +121,9 @@ authorization headers, and free-text error messages are not included.
 See [AI Fair Price Diagnostics](../Documentation/Troubleshooting/price-insights.md#ai-fair-price-diagnostics)
 for backend correlation and examples. Run the dependency-free logger tests from
 `frontend/RentNest` with `npm run test:pricing-diagnostics` on Node 22.7+ or Node 24.
-Retry, timeout, and rendering behavior are unchanged.
+The listing screen now has a pricing retry, starts estimate and explanation
+concurrently, and renders core property content without waiting for pricing.
+Provider timeouts are configured on the backend.
 
 ## Property Type Filter
 
@@ -74,7 +166,7 @@ Web keyboard behavior and iOS interaction still require platform verification.
 ## Lease Termination
 
 Approved work is on `rental-termination`, branched from `main`. See the
-[workflow plan](../Documentation/termination-workflow-plan.md) for tickets and scope.
+[workflow plan](../Documentation/Plans/termination-workflow-plan.md) for tickets and scope.
 Automated termination checks passed; platform validation limits are recorded below.
 
 ### Owner and Tenant Guide

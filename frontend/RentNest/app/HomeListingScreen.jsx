@@ -16,6 +16,14 @@ import ListingImage from '../components/ListingImage';
 import ProfileImage from '../components/ProfileImage';
 
 const notificationBellIcon = require('../assets/images/notificationBell.png');
+const PRICING_REQUEST_TIMEOUT_MS = 25_000;
+
+const isPricingTimeout = (error, startedAt) => error?.code === 'ECONNABORTED'
+  || error?.code === 'ETIMEDOUT'
+  || (
+    error?.code === 'ERR_NETWORK'
+    && Date.now() - startedAt >= PRICING_REQUEST_TIMEOUT_MS * 0.95
+  );
 
 const HomeListingScreen = () => {
   const router = useRouter();
@@ -31,8 +39,18 @@ const HomeListingScreen = () => {
   const [aiExplanation, setAiExplanation] = useState(null);
   const [aiExplanationLoading, setAiExplanationLoading] = useState(false);
   const [reviews, setReviews] = useState([]);
+  const [amenitiesLoading, setAmenitiesLoading] = useState(false);
+  const [amenitiesError, setAmenitiesError] = useState('');
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState('');
+  const [priceInsightsLoading, setPriceInsightsLoading] = useState(false);
+  const [priceInsightsError, setPriceInsightsError] = useState('');
+  const [secondaryRevision, setSecondaryRevision] = useState(0);
+  const [pricingRevision, setPricingRevision] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('Schools');
   const [loading, setLoading] = useState(true);
+  const [initialPricingSettled, setInitialPricingSettled] = useState(false);
+  const [initialSecondarySettled, setInitialSecondarySettled] = useState(false);
   const [token, setToken] = useState('');
   const [currentUserID, setCurrentUserID] = useState('');
   const [mapRegion, setMapRegion] = useState({
@@ -73,273 +91,233 @@ const HomeListingScreen = () => {
   }, [selectedCategory, nearbySchools, nearbyHawkerCentres, nearbyBusStops]);
 
   useEffect(() => {
-    const fetchListingData = async () => {
+    const controller = new AbortController();
+    const loadCore = async () => {
+      setLoading(true);
+      setListing(null);
+      setFairPrice(null);
+      setAiExplanation(null);
+      setInitialPricingSettled(false);
+      setInitialSecondarySettled(false);
       try {
-        setLoading(true);
-        setListing(null);
-        setNearbySchools([]);
-        setNearbyHawkerCentres([]);
-        setNearbyBusStops([]);
-        setPriceInsights([]);
-        setReviews([]);
-
         const tokenValue = await AsyncStorage.getItem('token');
-        
         if (!tokenValue) {
           router.replace('/LoginScreen');
           return;
         }
-
         setToken(tokenValue);
-        // const decodeToken = tokenValue;
-
-        // Fetch currentUser details
-        const decoded = jwtDecode(tokenValue);
-        const userEmail = decoded.sub;
-
-        const response = await axios.get(`${API_BASE_URL}/api/users/${userEmail}`, {
-          headers: authHeaders(tokenValue)
-        });
-
-        setCurrentUserID(response.data.userID);
-
-        // Fetch listing details
-        console.log('Making listing API request...');
-        const listingResponse = await axios.get(`${API_BASE_URL}/api/listings/${listingId}`, {
-          headers: authHeaders(tokenValue)
-        });
-        console.info('[HomeListingScreen] Listing loaded', { listingId });
-        console.log('[HomeListingScreen] listing image payload:', {
-          listingId,
-          name: listingResponse.data?.name,
-          listingpicture: listingResponse.data?.listingpicture,
-        });
-
-        // Record that this listing was opened, for the owner's view analytics.
-        // Fire and forget: the page must still work if this fails, and the backend ignores
-        // an owner viewing their own listing.
-        axios.post(`${API_BASE_URL}/api/listings/${listingId}/views`, {}, {
-          headers: {
-            'Authorization': `Bearer ${tokenValue}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        }).catch((viewError) => {
-          console.log('Could not record listing view:', viewError.message);
-        });
-
-        // Apply default values only if the response data is empty or missing properties
-        const listingData = listingResponse.data || {};
-        const isDemo = listingData.demo === true;
-        const defaultListing = {
+        const userEmail = jwtDecode(tokenValue).sub;
+        const config = { headers: authHeaders(tokenValue), signal: controller.signal, timeout: 15_000 };
+        const [userResponse, listingResponse] = await Promise.all([
+          axios.get(`${API_BASE_URL}/api/users/${userEmail}`, config),
+          axios.get(`${API_BASE_URL}/api/listings/${listingId}`, config),
+        ]);
+        if (controller.signal.aborted) return;
+        setCurrentUserID(userResponse.data.userID);
+        const data = listingResponse.data || {};
+        const isDemo = data.demo === true;
+        setListing({
           isDemo,
-          name: listingData.name || 'No Name Available',
-          location: listingData.location || 'Location not available',
-          price: listingData.price || 0,
+          name: data.name || 'No Name Available',
+          location: data.location || 'Location not available',
+          price: data.price || 0,
           rating: 4.0,
-          pincode: listingData.postal || (isDemo ? 'Not provided' : 489836),
-          type: listingData.type || 'Not specified',
+          pincode: data.postal || (isDemo ? 'Not provided' : 489836),
+          type: data.type || 'Not specified',
           rentalType: 'Room Rental',
-          description: isDemo ? (listingData.description || '').replace('FICTIONAL DEMO:', 'SAMPLE LISTING:').replace(/\bdemo\b/gi, 'sample') : (listingData.description || 'No description available'),
-          beds: listingData.beds || 0,
-          baths: listingData.bathroom || 0,
-          size: listingData.size || 1, // Prevent division by zero
-          imageURL: listingData.listingpicture,
-          ownerUserID: listingData.ownerId || '',
-          ownerName: isDemo ? 'Sample Property Owner' : (listingData.ownerName || 'Unknown'),
-          ownerPhotoURL: listingData.ownerPhotoURL || 'https://thumbs.dreamstime.com/b/tranquil-caucasian-handsome-brunet-man-blue-long-scarf-posing-wrinkled-face-against-background-square-image-236510369.jpg'
-        };
-        setListing(defaultListing);
-        if (isDemo) {
-          setNearbySchools([]); setNearbyHawkerCentres([]); setNearbyBusStops([]);
-          setPriceInsights([]); setReviews([]);
-          return; // Fictional demo addresses must not trigger government data lookups.
-        }
-
-        // AI fair-price estimate (non-blocking: the rest of the page loads while it runs)
-        const estimateLog = startPricingRequestLog('estimate', listingId);
-        axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_FOR_LISTING(listingId)}`, {
-          headers: authHeaders(tokenValue)
-        })
-          .then(res => {
-            estimateLog.completed(res);
-            setFairPrice(res.data);
-            if (!res.data?.available) return;
-            // The AI explanation arrives a few seconds after the bands, so fetch it separately.
-            setAiExplanationLoading(true);
-            const explanationLog = startPricingRequestLog('explanation', listingId);
-            axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_EXPLANATION(listingId)}`, {
-              headers: authHeaders(tokenValue)
-            })
-              .then(expRes => {
-                explanationLog.completed(expRes);
-                setAiExplanation(expRes.data);
-              })
-              .catch(err => {
-                explanationLog.failed(err);
-                setAiExplanation({ available: false, message: 'Could not reach the AI explanation service.' });
-              })
-              .finally(() => setAiExplanationLoading(false));
-          })
-          .catch(err => {
-            estimateLog.failed(err);
-            setFairPrice({ available: false, message: 'Could not reach the pricing service.' });
-          })
-          .finally(() => setFairPriceLoading(false));
-
-        // Keep the transition up until the full page data has settled, so
-        // sections do not briefly render misleading empty states.
-        await fetchSecondaryListingData(tokenValue, defaultListing.ownerUserID);
-      } catch (error) {
-        console.error('Error in fetchListingData:', error);
-        console.error('Error details:', { //Remove when demo
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status
+          description: isDemo
+            ? (data.description || '').replace('FICTIONAL DEMO:', 'SAMPLE LISTING:').replace(/\bdemo\b/gi, 'sample')
+            : (data.description || 'No description available'),
+          beds: data.beds || 0,
+          baths: data.bathroom || 0,
+          size: data.size || 1,
+          imageURL: data.listingpicture,
+          ownerUserID: data.ownerId || '',
+          ownerName: isDemo ? 'Sample Property Owner' : (data.ownerName || 'Unknown'),
+          ownerPhotoURL: data.ownerPhotoURL || null,
         });
+        axios.post(`${API_BASE_URL}/api/listings/${listingId}/views`, {}, {
+          headers: authHeaders(tokenValue),
+        }).catch(() => {});
+      } catch (error) {
+        if (!controller.signal.aborted && error?.response?.status === 401) {
+          router.replace('/LoginScreen');
+        }
       } finally {
-        console.log('Fetch operation completed, setting loading to false');
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
+    loadCore();
+    return () => controller.abort();
+  }, [authHeaders, listingId, router]);
 
-    const fetchSecondaryListingData = async (tokenValue, ownerUserID) => {
-      const headers = authHeaders(tokenValue);
-      const requestConfig = { headers, timeout: 20000 };
-      const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  useEffect(() => {
+    if (!listing || !token) return;
+    if (listing.isDemo) {
+      setFairPriceLoading(false);
+      setAiExplanationLoading(false);
+      setInitialPricingSettled(true);
+      return;
+    }
+    const controller = new AbortController();
+    const headers = authHeaders(token);
+    setFairPriceLoading(true);
+    setAiExplanationLoading(true);
+    setFairPrice(null);
+    setAiExplanation(null);
+    const estimateStartedAt = Date.now();
+    const explanationStartedAt = Date.now();
+    const estimateLog = startPricingRequestLog(
+      'estimate', listingId, PRICING_REQUEST_TIMEOUT_MS,
+    );
+    const explanationLog = startPricingRequestLog(
+      'explanation', listingId, PRICING_REQUEST_TIMEOUT_MS,
+    );
+    const estimateRequest = axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_FOR_LISTING(listingId)}`, {
+      headers, signal: controller.signal, timeout: PRICING_REQUEST_TIMEOUT_MS,
+    }).then(response => {
+      estimateLog.completed(response);
+      setFairPrice(response.data);
+    }).catch(error => {
+      if (!controller.signal.aborted) {
+        estimateLog.failed(error);
+        setFairPrice({
+          available: false,
+          message: isPricingTimeout(error, estimateStartedAt)
+            ? 'Pricing is taking longer than expected. Retry pricing; the result may be ready now.'
+            : 'Could not reach the pricing service.',
+        });
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted) setFairPriceLoading(false);
+    });
+    const explanationRequest = axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_EXPLANATION(listingId)}`, {
+      headers, signal: controller.signal, timeout: PRICING_REQUEST_TIMEOUT_MS,
+    }).then(response => {
+      explanationLog.completed(response);
+      setAiExplanation(response.data);
+    }).catch(error => {
+      if (!controller.signal.aborted) {
+        explanationLog.failed(error);
+        setAiExplanation({
+          available: false,
+          message: isPricingTimeout(error, explanationStartedAt)
+            ? 'The AI explanation is taking longer than expected. Please retry.'
+            : 'Could not reach the AI explanation service.',
+        });
+      }
+    }).finally(() => {
+      if (!controller.signal.aborted) setAiExplanationLoading(false);
+    });
+    Promise.allSettled([estimateRequest, explanationRequest]).then(() => {
+      if (!controller.signal.aborted) setInitialPricingSettled(true);
+    });
+    return () => controller.abort();
+  }, [authHeaders, listing, listingId, pricingRevision, token]);
 
-      const applyNearbyAmenities = (amenities) => {
-        setNearbySchools(amenities
-          .filter(item => item.amenity_type === 'school')
-          .map(item => ({
-            schoolName: item.name,
-            latitude: item.latitude,
-            longitude: item.longitude,
-            distanceMeters: item.distance_meters
-          })));
-        setNearbyHawkerCentres(amenities
-          .filter(item => item.amenity_type === 'hawker_centre')
-          .map(item => ({
-            nameOfCentre: item.name,
-            latitude: item.latitude,
-            longitude: item.longitude,
-            distanceMeters: item.distance_meters
-          })));
-        setNearbyBusStops(amenities
-          .filter(item => item.amenity_type === 'bus_stop')
-          .map(item => ({
-            description: item.name,
-            latitude: item.latitude,
-            longitude: item.longitude,
-            distanceMeters: item.distance_meters
-          })));
-      };
-
-      const fetchNearbyAmenitiesUntilReady = async () => {
-        for (let attempt = 0; attempt < 30; attempt += 1) {
-          const response = await axios.get(`${API_BASE_URL}/api/gov/nearby-amenities/${listingId}`, requestConfig);
+  useEffect(() => {
+    if (!listing || !token) return;
+    if (listing.isDemo) {
+      setInitialSecondarySettled(true);
+      return;
+    }
+    const controller = new AbortController();
+    const config = { headers: authHeaders(token), signal: controller.signal, timeout: 20_000 };
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const applyAmenities = amenities => {
+      setNearbySchools(amenities.filter(item => item.amenity_type === 'school').map(item => ({
+        schoolName: item.name, latitude: item.latitude, longitude: item.longitude,
+        distanceMeters: item.distance_meters,
+      })));
+      setNearbyHawkerCentres(amenities.filter(item => item.amenity_type === 'hawker_centre').map(item => ({
+        nameOfCentre: item.name, latitude: item.latitude, longitude: item.longitude,
+        distanceMeters: item.distance_meters,
+      })));
+      setNearbyBusStops(amenities.filter(item => item.amenity_type === 'bus_stop').map(item => ({
+        description: item.name, latitude: item.latitude, longitude: item.longitude,
+        distanceMeters: item.distance_meters,
+      })));
+    };
+    const loadAmenities = async () => {
+      setAmenitiesLoading(true);
+      setAmenitiesError('');
+      try {
+        for (let attempt = 0; attempt < 30 && !controller.signal.aborted; attempt += 1) {
+          const response = await axios.get(
+            `${API_BASE_URL}/api/gov/nearby-amenities/${listingId}`, config,
+          );
           const payload = response.data || {};
           const amenities = Array.isArray(payload) ? payload : (payload.amenities || []);
           const status = Array.isArray(payload) ? 'READY' : payload.status;
-
           if (status === 'READY' || amenities.length > 0) {
-            applyNearbyAmenities(amenities);
+            applyAmenities(amenities);
             return;
           }
-
           if (status !== 'LOADING') {
-            console.log('Nearby amenities unavailable:', status);
-            applyNearbyAmenities([]);
+            applyAmenities([]);
             return;
           }
-
-          await wait(2000);
+          await wait(2_000);
         }
-
-        console.log('Nearby amenities are still loading after timeout; showing empty state');
-        applyNearbyAmenities([]);
-      };
-
-      const fetchPriceInsights = async () => {
-        const url = `${API_BASE_URL}/api/gov/rentalprices/${listingId}`;
-        console.info('[PriceInsights] Fetching rental prices', { listingId, url });
-        try {
-          const response = await axios.get(url, requestConfig);
-          const payload = response.data || [];
-          if (!Array.isArray(payload)) {
-            console.warn('[PriceInsights] Unexpected rental prices response shape', {
-              listingId,
-              status: response.status,
-              payloadType: typeof payload,
-              payload,
-            });
-            setPriceInsights([]);
-            return;
-          }
-
-          const uniquePrices = {};
-          payload.forEach(item => {
-            if (!uniquePrices[item.leaseDate] || item.rentPrice > uniquePrices[item.leaseDate].rentPrice) {
-              uniquePrices[item.leaseDate] = item;
-            }
-          });
-          const dedupedPrices = Object.values(uniquePrices);
-          console.info('[PriceInsights] Rental prices fetch completed', {
-            listingId,
-            status: response.status,
-            rawCount: payload.length,
-            dedupedCount: dedupedPrices.length,
-            sample: dedupedPrices.slice(0, 3),
-          });
-          if (dedupedPrices.length === 0) {
-            console.info('[PriceInsights] Rental prices response is empty', { listingId });
-          }
-          setPriceInsights(dedupedPrices);
-        } catch (error) {
-          console.warn('[PriceInsights] Rental prices request failed', {
-            listingId,
-            message: error.message,
-            status: error.response?.status,
-            response: error.response?.data,
-          });
-          throw error;
-        }
-      };
-
-      await Promise.allSettled([
-        fetchNearbyAmenitiesUntilReady(),
-        fetchPriceInsights(),
-        axios.get(`${API_BASE_URL}/api/reviews/byUser/${ownerUserID}`, requestConfig)
-          .then(response => {
-            const reviewList = Array.isArray(response.data) ? response.data : [];
-            const formattedReviews = reviewList.map(review => ({
-              reviewId: review.reviewID ?? review.reviewid ?? review.id,
-              rating: review.rating,
-              title: review.title || 'Review',
-              text: review.text,
-              user: {
-                userID: review.reviewerID ?? review.reviewerId ?? review.userId,
-                name: review.reviewerName || review.userName || 'Anonymous',
-                photoURL: review.reviewerPhotoURL || review.userPhotoURL || null
-              },
-              flagged: review.flagged || false
-            }));
-            setReviews(formattedReviews);
-          })
-      ]).then(results => {
-        results.forEach((result, index) => {
-          if (result.status === 'rejected') {
-            const status = result.reason?.response?.status;
-            if (status !== 404) {
-              console.warn(`Secondary listing request ${index} failed:`, result.reason?.message);
-            }
+        if (!controller.signal.aborted) setAmenitiesError('Nearby places are still being prepared.');
+      } catch {
+        if (!controller.signal.aborted) setAmenitiesError('Nearby places could not be loaded.');
+      } finally {
+        if (!controller.signal.aborted) setAmenitiesLoading(false);
+      }
+    };
+    const loadPrices = async () => {
+      setPriceInsightsLoading(true);
+      setPriceInsightsError('');
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/gov/rentalprices/${listingId}`, config);
+        const unique = {};
+        (Array.isArray(response.data) ? response.data : []).forEach(item => {
+          if (!unique[item.leaseDate] || item.rentPrice > unique[item.leaseDate].rentPrice) {
+            unique[item.leaseDate] = item;
           }
         });
-      });
+        setPriceInsights(Object.values(unique));
+      } catch {
+        if (!controller.signal.aborted) setPriceInsightsError('Rental price history could not be loaded.');
+      } finally {
+        if (!controller.signal.aborted) setPriceInsightsLoading(false);
+      }
     };
-
-    fetchListingData();
-  }, [authHeaders, listingId, router]);
+    const loadReviews = async () => {
+      setReviewsLoading(true);
+      setReviewsError('');
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/reviews/byUser/${listing.ownerUserID}`, config,
+        );
+        setReviews((Array.isArray(response.data) ? response.data : []).map(review => ({
+          reviewId: review.reviewID ?? review.reviewid ?? review.id,
+          rating: review.rating,
+          title: review.title || 'Review',
+          text: review.text,
+          user: {
+            userID: review.reviewerID ?? review.reviewerId ?? review.userId,
+            name: review.reviewerName || review.userName || 'Anonymous',
+            photoURL: review.reviewerPhotoURL || review.userPhotoURL || null,
+          },
+          flagged: review.flagged || false,
+        })));
+      } catch {
+        if (!controller.signal.aborted) setReviewsError('Reviews could not be loaded.');
+      } finally {
+        if (!controller.signal.aborted) setReviewsLoading(false);
+      }
+    };
+    Promise.allSettled([
+      loadAmenities(),
+      loadPrices(),
+      loadReviews(),
+    ]).then(() => {
+      if (!controller.signal.aborted) setInitialSecondarySettled(true);
+    });
+    return () => controller.abort();
+  }, [authHeaders, listing, listingId, secondaryRevision, token]);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [isReportingListing, setIsReportingListing] = useState(false);
@@ -473,16 +451,25 @@ const HomeListingScreen = () => {
     </View>;
   }
 
-  if (loading) {
+  const initialListingLoading = loading
+    || (listing && (!initialPricingSettled || !initialSecondarySettled));
+
+  if (initialListingLoading) {
     return (
       <View style={styles.loadingScreen}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={() => router.back()}
+          style={styles.loadingBackButton}
+        >
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </TouchableOpacity>
         <MorphingInfinity size={86} color="#2FA84F" />
         <Text style={styles.loadingText}>Loading listing...</Text>
       </View>
     );
   }
-
-  console.log('Rendering main component');
 
   return (
     <ScrollView style={styles.box}>
@@ -495,6 +482,7 @@ const HomeListingScreen = () => {
           listingName={listing.name}
           width={600}
           height={400}
+          diagnostics={false}
         />
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <FontAwesome name="chevron-left" size={18} color="#101820" />
@@ -518,6 +506,7 @@ const HomeListingScreen = () => {
           askingPrice={listing.price}
           aiExplanation={aiExplanation}
           aiExplanationLoading={aiExplanationLoading}
+          onRetry={() => setPricingRevision(value => value + 1)}
         />
 
         {/* Gray line above the icons */}
@@ -577,23 +566,38 @@ const HomeListingScreen = () => {
         </View>
 
         {/* Map to show nearby places */}
-        <MapView
-          style={styles.map}
-          region={mapRegion} // Update to use the mapRegion state
-        >
-          {data.map((place, index) => (
-            <Marker
-              key={index}
-              coordinate={{
-                latitude: place.latitude,
-                longitude: place.longitude,
-              }}
-              title={selectedCategory === 'Schools' ? place.schoolName :
-                     selectedCategory === 'Hawker Centres' ? place.nameOfCentre :
-                     place.description}
-            />
-          ))}
-        </MapView>
+        {amenitiesLoading && data.length === 0 ? (
+          <View style={styles.sectionStatus}>
+            <ActivityIndicator size="small" color="#2FA84F" />
+            <Text style={styles.sectionStatusText}>Loading nearby places...</Text>
+          </View>
+        ) : amenitiesError ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={() => setSecondaryRevision(value => value + 1)}
+            style={styles.sectionStatus}
+          >
+            <Text style={styles.sectionErrorText}>{amenitiesError} Tap to retry.</Text>
+          </TouchableOpacity>
+        ) : (
+          <MapView
+            style={styles.map}
+            region={mapRegion}
+          >
+            {data.map((place, index) => (
+              <Marker
+                key={index}
+                coordinate={{
+                  latitude: place.latitude,
+                  longitude: place.longitude,
+                }}
+                title={selectedCategory === 'Schools' ? place.schoolName :
+                       selectedCategory === 'Hawker Centres' ? place.nameOfCentre :
+                       place.description}
+              />
+            ))}
+          </MapView>
+        )}
 
         {/* Display nearby places in boxes */}
          <View style={styles.placesContainer}>
@@ -605,14 +609,27 @@ const HomeListingScreen = () => {
                          </Text>
                      </View>
                  ))
-             ) : (
+             ) : !amenitiesLoading && !amenitiesError ? (
                  <Text style={styles.noPlaces}>No places nearby.</Text>
-              )}
+              ) : null}
           </View>
 
       <View style={styles.reviewsContainer}>
         <Text style={styles.reviewsHeader}>Reviews</Text>
-          {reviews.length > 0 ? (
+          {reviewsLoading && reviews.length === 0 ? (
+            <View style={styles.sectionStatus}>
+              <ActivityIndicator size="small" color="#2FA84F" />
+              <Text style={styles.sectionStatusText}>Loading reviews...</Text>
+            </View>
+          ) : reviewsError ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => setSecondaryRevision(value => value + 1)}
+              style={styles.sectionStatus}
+            >
+              <Text style={styles.sectionErrorText}>{reviewsError} Tap to retry.</Text>
+            </TouchableOpacity>
+          ) : reviews.length > 0 ? (
            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollContainer}>
              {reviews.map((review) => (
               <View key={review.reviewId} style={styles.reviewBox}>
@@ -637,6 +654,7 @@ const HomeListingScreen = () => {
                     screen="HomeListingScreen"
                     userId={review.user.userID}
                     role="reviewer"
+                    diagnostics={false}
                   />
                   <Text style={styles.userName}>{review.user.name}</Text>
                 </View>
@@ -651,7 +669,22 @@ const HomeListingScreen = () => {
          </View>
          {/* Display Price Insights */}
                 <View style={styles.priceInsightsContainer}>
-                  <PriceInsightsChart data={priceInsights} askingPrice={listing.price} fairPrice={fairPrice?.available ? fairPrice.fairPrice : null} />
+                  {priceInsightsLoading && priceInsights.length === 0 ? (
+                    <View style={styles.sectionStatus}>
+                      <ActivityIndicator size="small" color="#2FA84F" />
+                      <Text style={styles.sectionStatusText}>Loading rental price history...</Text>
+                    </View>
+                  ) : priceInsightsError ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      onPress={() => setSecondaryRevision(value => value + 1)}
+                      style={styles.sectionStatus}
+                    >
+                      <Text style={styles.sectionErrorText}>{priceInsightsError} Tap to retry.</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <PriceInsightsChart data={priceInsights} askingPrice={listing.price} fairPrice={fairPrice?.available ? fairPrice.fairPrice : null} />
+                  )}
                 </View>
         </>}
                 {/* Owner Details Box */}
@@ -665,6 +698,7 @@ const HomeListingScreen = () => {
                             screen="HomeListingScreen"
                             userId={listing.ownerId}
                             role="owner"
+                            diagnostics={false}
                           />}
                           <Text style={styles.ownerText}>Posted by: {listing.ownerName}</Text>
                         </View>
@@ -756,6 +790,39 @@ const styles = StyleSheet.create({
     color: '#101820',
     fontSize: 18,
     fontWeight: '700',
+  },
+  loadingBackButton: {
+    position: 'absolute',
+    top: 48,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  sectionStatus: {
+    minHeight: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    marginVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#F7F8FA',
+  },
+  sectionStatusText: {
+    marginTop: 8,
+    color: '#4D5651',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  sectionErrorText: {
+    color: '#7D251D',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   imageWrapper: {
     position: 'relative',

@@ -181,16 +181,16 @@ staged merge changes have been altered by this task.
   Message 209 remains the existing opening for listing 115.
 - DISC-1 QA: assignment, ownership, role, message-length, listing-fact, and
   creation-date checks passed. Conversation text is in
-  `enquiry-discussions-preview.md`; exact records are in
-  `enquiry-discussions.json`.
-- DISC-2 complete: `seed-enquiry-discussions.sql` defaults to a non-persistent
+  [enquiry-discussions-preview.md](../Database/Enquiries/enquiry-discussions-preview.md); exact records are in
+  [enquiry-discussions.json](../Database/Enquiries/enquiry-discussions.json).
+- DISC-2 complete: [seed-enquiry-discussions.sql](../Database/Enquiries/seed-enquiry-discussions.sql) defaults to a non-persistent
   dry run; apply mode inserts chat rows only. It performs its checks under
   short-lived locks and detects completed or partial batches.
 - DISC-2 QA: 21 checks passed in an isolated local PostgreSQL 18.6 database,
   including first application, reruns, drift, conflicting history, active and
   pending rentals, identity collisions, trigger side-effect rollback, and
   timezone-aware column compatibility. The disposable database was removed.
-- DISC-3 complete: `enquiry-discussions-guide.md` contains run instructions,
+- DISC-3 complete: [enquiry-discussions-guide.md](../Database/Enquiries/enquiry-discussions-guide.md) contains run instructions,
   refusal handling, verification, backup notes, and native spot checks.
 - Remaining deployment checks: target Supabase dry run and post-insert app check.
   No shared database rows were inserted, and no offer was sent.

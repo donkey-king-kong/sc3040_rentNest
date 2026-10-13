@@ -90,6 +90,7 @@ const ProfileImage = ({
   screen,
   userId,
   role,
+  diagnostics = true,
   resizeMode = 'cover',
 }) => {
   const normalizedUrl = useMemo(() => normalizeProfileImageUrl(uri), [uri]);
@@ -100,7 +101,7 @@ const ProfileImage = ({
   useEffect(() => {
     setImageUri(normalizedUrl);
     setHasImageError(false);
-    console.log('[ProfileImage] prepared', getImageDebugContext({
+    if (diagnostics) console.log('[ProfileImage] prepared', getImageDebugContext({
       screen,
       userId,
       name,
@@ -108,10 +109,10 @@ const ProfileImage = ({
       originalUrl: uri,
       imageUri: normalizedUrl,
     }));
-  }, [name, normalizedUrl, role, screen, uri, userId]);
+  }, [diagnostics, name, normalizedUrl, role, screen, uri, userId]);
 
   const handleLoad = () => {
-    console.log('[ProfileImage] loaded', getImageDebugContext({
+    if (diagnostics) console.log('[ProfileImage] loaded', getImageDebugContext({
       screen,
       userId,
       name,
@@ -123,7 +124,7 @@ const ProfileImage = ({
 
   const handleError = (error) => {
     const nativeError = error?.nativeEvent?.error || error?.nativeEvent || error?.message || 'Unknown image load error';
-    console.log('[ProfileImage] failed', {
+    if (diagnostics) console.log('[ProfileImage] failed', {
       ...getImageDebugContext({
         screen,
         userId,

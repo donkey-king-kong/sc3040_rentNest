@@ -8,12 +8,16 @@ The numerical fair-price estimate and its AI explanation are separate requests.
 Their logs use `[PricingAI]`, not the historical rental chart's `[PriceInsights]`.
 An estimate can succeed while the explanation fails.
 
-On the frontend, each request logs `request_started` and then `request_completed`
-or `request_failed`, including listing ID, operation, endpoint, timestamp, duration,
-and a local `attemptId`. Completion logs include the actual HTTP status and the
-payload's `available` flag. HTTP 200 with `available: false` is a warning, not a
-transport error. Rejected requests include a recognized Axios error code and an
-HTTP status, or null when no HTTP response was received.
+On the frontend, each request logs `request_started` and then `request_completed`,
+`request_timed_out`, or `request_failed`, including listing ID, operation,
+endpoint, timestamp, duration, and a local `attemptId`. Completion logs include
+the actual HTTP status and the payload's `available` flag. HTTP 200 with
+`available: false` is an informational handled state, not a transport error.
+Rejected requests include a recognized Axios error code and an
+HTTP status, or null when no HTTP response was received. Handled failures use
+informational logs so Expo does not turn a recoverable pricing state into a
+LogBox error. A request ending near the 25-second frontend deadline is logged as
+`request_timed_out`; the card explains that Retry may find the completed result.
 
 On the backend, listing estimate/explanation requests have a generated `requestId`.
 That ID follows the synchronous controller, explanation cache, and Gemini logs;
@@ -30,7 +34,7 @@ For example, one upstream failure can produce these backend lines:
 [PricingAI] event=request_completed requestId=example-41 listingId=41 operation=explanation httpStatus=200 available=false durationMs=12100
 ```
 
-The frontend then warns with `event: request_completed`, `httpStatus: 200`, and
+The frontend then logs `event: request_completed`, `httpStatus: 200`, and
 `available: false`. This means the backend answered, but could not provide an
 explanation; it does not mean the frontend received HTTP 503.
 
@@ -51,13 +55,18 @@ explanation; it does not mean the frontend received HTTP 503.
 - Keys, authorization headers, prompts, listing descriptions, and generated
   explanations are excluded from these diagnostics. Do not enable HTTP wire/body
   logging to investigate this flow.
-- Pricing uses `pricing.ai.model`, defaulting to `gemini-3.1-flash-lite`.
+- Pricing uses `pricing.ai.model`, defaulting to `gemini-3.5-flash-lite`.
   The chat setting `llm.model` does not select the pricing model.
 
-This logging change does not add retries, timeout configuration, a retry button,
-cache-policy changes, or a new API response contract. Existing servers must load
-the updated code before these events appear; creating a worktree does not update
-another session's running application.
+Pricing calls now use `pricing.ai.connect-timeout-ms` (default 2000) and
+`pricing.ai.read-timeout-ms` (default 8000). Comparable-data calls to OneMap,
+data.gov.sg, and URA use `pricing.data.connect-timeout-ms` (default 2000) and
+`pricing.data.read-timeout-ms` (default 6000), so a cold external lookup cannot
+wait indefinitely. The frontend allows 25 seconds for the combined cold request.
+The listing screen offers Retry after an unavailable estimate, and
+estimate/explanation work is cached and coalesced by listing state. Existing
+servers must load the updated code before these controls appear; creating a
+worktree does not update another session's running application.
 
 ### Focused Tests
 

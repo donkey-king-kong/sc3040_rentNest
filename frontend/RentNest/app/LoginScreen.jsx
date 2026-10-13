@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import { API_BASE_URL, ENDPOINTS } from '../config/api';
+import { inboxStore } from '../config/inbox';
 import { FontAwesome } from '@expo/vector-icons';
 
 const errorIcon = require('../assets/images/errorIcon.png');
@@ -55,6 +56,7 @@ const LoginScreen = () => {
         throw new Error('Invalid response format');
       }
 
+      inboxStore.clear('login');
       await AsyncStorage.setItem('token', response.data.token);
       if (response.data.userId) {
         await AsyncStorage.setItem('userId', String(response.data.userId));

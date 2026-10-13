@@ -19,7 +19,7 @@ and sizes have 22; HDB prices have 36 distinct values and sizes have 18.
 Larger Orchard-area condos occupy the upper condo price range. A few larger
 Bishan/Ang Mo Kio HDB examples exercise the upper HDB range.
 
-Review `listing-variation-preview.csv` for the exact values, titles and
+Review [listing-variation-preview.csv](listing-variation-preview.csv) for the exact values, titles and
 descriptions by listing ID. Every description matches its revised room counts
 and square footage. Titles with old bedroom counts or HDB room-count labels
 are revised; misleading "Spacious"/"Compact"/"Cosy" labels are adjusted where
@@ -29,12 +29,12 @@ needed. We do not infer an official HDB flat model from a synthetic bedroom coun
 
 1. Retain a fresh backup of the current database.
 2. Stop backend/app writes and confirm the intended test Supabase project.
-3. Run the entire `update-listing-variations.sql` in SQL Editor.
+3. Run the entire [update-listing-variations.sql](update-listing-variations.sql) in SQL Editor.
 4. Require successful completion through COMMIT and retain the 68-row results.
 5. Run the read-only checks below and reload the app.
 
-Do NOT rerun `listing-reseed.sql` or `demo-listings-50.sql`. Those are fresh-import
-scripts, not update scripts. Do NOT rerun `update-demo-listing-descriptions.sql`
+Do NOT rerun [listing-reseed.sql](listing-reseed.sql) or [demo-listings-50.sql](demo-listings-50.sql). Those are fresh-import
+scripts, not update scripts. Do NOT rerun [update-demo-listing-descriptions.sql](update-demo-listing-descriptions.sql)
 after this revision; it is a historical description-only step with old numeric
 values. This update uses the latest export, in which those description changes
 had already been applied.
@@ -83,14 +83,14 @@ Expect the ranges and counts in the table above. Landed ID 66 remains
 `Bukit Timah Terrace House`, SGD 9,500/month, 4 bedrooms, 3 bathrooms, 2,200 sq ft.
 The original 69 records remain 69; this update inserts or deletes nothing.
 
-Rerun `database-read-only-audit.sql`. In the app, check price/bed/bath/size
+Rerun [database-read-only-audit.sql](../Audits/database-read-only-audit.sql). In the app, check price/bed/bath/size
 filters and matching card/detail descriptions. Nearby amenities are unchanged
 because locations are unchanged. Government/AI pricing estimates can differ
 from the synthetic asking prices; the update does not rewrite pricing services.
 
 ## Fresh Import Sources
 
-`listing-reseed.sql`, `demo-listings-50.sql`, and `demo-listings-50-data.json`
+[listing-reseed.sql](listing-reseed.sql), [demo-listings-50.sql](demo-listings-50.sql), and [demo-listings-50-data.json](demo-listings-50-data.json)
 now contain the same revised property profiles for future clean test databases.
 The landed source remains unchanged. A fresh seed allocates new listing IDs;
 this exported-ID update is not intended to be run against those new IDs.

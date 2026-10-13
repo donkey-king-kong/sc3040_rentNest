@@ -100,11 +100,11 @@ Approved by the user, with the explicit amendment to unflag all imported listing
 
 ## Preparation Results
 
-- SEED-1: Complete. `listing-reseed.sql` generated from the local restored backup.
+- SEED-1: Complete. [listing-reseed.sql](../Database/Listings/listing-reseed.sql) generated from the local restored backup.
 - Local QA: Passed successful import/property preservation, unchanged retained
   tables, nonconsecutive user IDs, insufficient users, every nonempty-table
   guard, replay refusal, and rollback after an injected mid-import error.
-- SEED-3: Preparation handoff complete in `listing-reseed-guide.md`.
+- SEED-3: Preparation handoff complete in [listing-reseed-guide.md](../Database/Listings/listing-reseed-guide.md).
 - SEED-2: User confirmed Supabase import and expected ownership/count results.
   App/amenity checks remain pending.
 - No Supabase writes or external amenity calls were made. The local source
