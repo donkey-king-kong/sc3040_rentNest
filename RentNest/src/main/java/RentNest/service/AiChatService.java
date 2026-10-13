@@ -90,6 +90,18 @@ public class AiChatService {
             return awaitSummary(existing);
         }
 
+        List<ChatHistory> substantiveMessages = conversation.stream()
+                .filter(m -> m.getMessage() != null && !m.getMessage().isBlank())
+                .toList();
+        if (substantiveMessages.isEmpty()) {
+            log.info("[AIChat] event=summary_skipped requestId={} reason=no_text_messages messageCount={}",
+                    requestId(), conversation.size());
+            return new AiChatSummaryResponseDTO(
+                    "There are no messages to summarise yet. Send a message to start the conversation.",
+                    false
+            );
+        }
+
         try {
             String systemInstruction = """
                 You are the RentNest chat assistant for a rental housing app.
@@ -137,6 +149,17 @@ public class AiChatService {
                     TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - summaryStarted), completion.text());
             ownedFuture.complete(response);
             return response;
+        } catch (AiChatProviderException failure) {
+            if (failure.getKind() == AiChatProviderException.Kind.INVALID_RESPONSE) {
+                log.warn("[AIChat] event=summary_fallback requestId={} reason=invalid_response messageCount={}",
+                        requestId(), conversation.size());
+                AiChatSummaryResponseDTO fallback = new AiChatSummaryResponseDTO(
+                        generatePlaceholderSummary(conversation), true);
+                ownedFuture.complete(fallback);
+                return fallback;
+            }
+            ownedFuture.completeExceptionally(failure);
+            throw failure;
         } catch (RuntimeException failure) {
             ownedFuture.completeExceptionally(failure);
             throw failure;
@@ -520,9 +543,15 @@ public class AiChatService {
                     || !root.path("next_steps").isTextual()
                     || root.path("next_steps").asText().isBlank()
                     || !root.path("sections").isArray()) {
+                log.warn("[AIChat] event=invalid_summary requestId={} reason=missing_fields raw={}",
+                        requestId(), summary);
                 throw new IllegalArgumentException("Missing required summary fields");
             }
+        } catch (AiChatProviderException failure) {
+            throw failure;
         } catch (Exception failure) {
+            log.warn("[AIChat] event=invalid_summary requestId={} reason=parse_error raw={}",
+                    requestId(), summary);
             throw new AiChatProviderException(
                     AiChatProviderException.Kind.INVALID_RESPONSE,
                     "AI provider returned an invalid summary",
