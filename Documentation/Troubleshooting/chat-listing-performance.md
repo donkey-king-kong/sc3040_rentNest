@@ -107,6 +107,11 @@ pricing.ai.connect-timeout-ms=2000
 pricing.ai.read-timeout-ms=8000
 ```
 
+Comparable-data calls use a 2-second connect timeout and 6-second read timeout.
+The frontend waits up to 25 seconds for each cold pricing request. If that
+deadline is reached, the existing inline Retry state appears without an Expo
+LogBox; the backend may finish and cache the result for the retry.
+
 Room classification falls back to existing keyword behavior after provider
 failure. Explanation failure is shown as unavailable and can be retried. Pricing
 rules, comparable selection, bands, and the configured model are unchanged.

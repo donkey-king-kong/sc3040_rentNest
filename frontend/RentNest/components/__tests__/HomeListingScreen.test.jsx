@@ -108,7 +108,9 @@ it('waits for pricing and secondary requests before displaying the listing', asy
   await render();
   expect(hasText('Fast property')).toBe(false);
   expect(hasText('Loading listing...')).toBe(true);
-  expect(axios.get.mock.calls.filter(([url]) => isPricing(url))).toHaveLength(2);
+  const pricingCalls = axios.get.mock.calls.filter(([url]) => isPricing(url));
+  expect(pricingCalls).toHaveLength(2);
+  pricingCalls.forEach(([, config]) => expect(config.timeout).toBe(25_000));
   await act(async () => {
     pricingPending.resolve({ status: 200, data: { available: true } });
     secondaryPending.resolve({ status: 200, data: [] });
@@ -130,4 +132,19 @@ it('exposes a retry after pricing fails', async () => {
   pricingPending = deferred();
   await act(async () => card.props.onRetry());
   expect(axios.get.mock.calls.filter(([url]) => isPricing(url))).toHaveLength(4);
+});
+
+it('shows actionable retry copy when the cold pricing request times out', async () => {
+  pricingPending.promise.catch(() => {});
+  await render();
+  await act(async () => {
+    secondaryPending.resolve({ status: 200, data: [] });
+    pricingPending.reject({ code: 'ECONNABORTED' });
+  });
+  const card = tree.root.findByType('FairPriceCard');
+  expect(card.props.estimate).toEqual({
+    available: false,
+    message: 'Pricing is taking longer than expected. Retry pricing; the result may be ready now.',
+  });
+  expect(card.props.onRetry).toEqual(expect.any(Function));
 });

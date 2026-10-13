@@ -81,3 +81,6 @@ pricing.ai.model=gemini-3.5-flash-lite
 # to keywords and the explanation returns an unavailable response with Retry.
 pricing.ai.connect-timeout-ms=2000
 pricing.ai.read-timeout-ms=8000
+# Bound OneMap, data.gov.sg and URA calls used to build comparable rental data.
+pricing.data.connect-timeout-ms=2000
+pricing.data.read-timeout-ms=6000

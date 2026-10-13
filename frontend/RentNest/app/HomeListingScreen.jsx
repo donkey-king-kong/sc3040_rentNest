@@ -16,6 +16,14 @@ import ListingImage from '../components/ListingImage';
 import ProfileImage from '../components/ProfileImage';
 
 const notificationBellIcon = require('../assets/images/notificationBell.png');
+const PRICING_REQUEST_TIMEOUT_MS = 25_000;
+
+const isPricingTimeout = (error, startedAt) => error?.code === 'ECONNABORTED'
+  || error?.code === 'ETIMEDOUT'
+  || (
+    error?.code === 'ERR_NETWORK'
+    && Date.now() - startedAt >= PRICING_REQUEST_TIMEOUT_MS * 0.95
+  );
 
 const HomeListingScreen = () => {
   const router = useRouter();
@@ -157,30 +165,46 @@ const HomeListingScreen = () => {
     setAiExplanationLoading(true);
     setFairPrice(null);
     setAiExplanation(null);
-    const estimateLog = startPricingRequestLog('estimate', listingId);
-    const explanationLog = startPricingRequestLog('explanation', listingId);
+    const estimateStartedAt = Date.now();
+    const explanationStartedAt = Date.now();
+    const estimateLog = startPricingRequestLog(
+      'estimate', listingId, PRICING_REQUEST_TIMEOUT_MS,
+    );
+    const explanationLog = startPricingRequestLog(
+      'explanation', listingId, PRICING_REQUEST_TIMEOUT_MS,
+    );
     const estimateRequest = axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_FOR_LISTING(listingId)}`, {
-      headers, signal: controller.signal, timeout: 15_000,
+      headers, signal: controller.signal, timeout: PRICING_REQUEST_TIMEOUT_MS,
     }).then(response => {
       estimateLog.completed(response);
       setFairPrice(response.data);
     }).catch(error => {
       if (!controller.signal.aborted) {
         estimateLog.failed(error);
-        setFairPrice({ available: false, message: 'Could not reach the pricing service.' });
+        setFairPrice({
+          available: false,
+          message: isPricingTimeout(error, estimateStartedAt)
+            ? 'Pricing is taking longer than expected. Retry pricing; the result may be ready now.'
+            : 'Could not reach the pricing service.',
+        });
       }
     }).finally(() => {
       if (!controller.signal.aborted) setFairPriceLoading(false);
     });
     const explanationRequest = axios.get(`${API_BASE_URL}${ENDPOINTS.PRICING_EXPLANATION(listingId)}`, {
-      headers, signal: controller.signal, timeout: 15_000,
+      headers, signal: controller.signal, timeout: PRICING_REQUEST_TIMEOUT_MS,
     }).then(response => {
       explanationLog.completed(response);
       setAiExplanation(response.data);
     }).catch(error => {
       if (!controller.signal.aborted) {
         explanationLog.failed(error);
-        setAiExplanation({ available: false, message: 'Could not reach the AI explanation service.' });
+        setAiExplanation({
+          available: false,
+          message: isPricingTimeout(error, explanationStartedAt)
+            ? 'The AI explanation is taking longer than expected. Please retry.'
+            : 'Could not reach the AI explanation service.',
+        });
       }
     }).finally(() => {
       if (!controller.signal.aborted) setAiExplanationLoading(false);
