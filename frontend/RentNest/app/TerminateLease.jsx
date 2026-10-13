@@ -74,6 +74,13 @@ const TerminateLease = () => {
     && String(rental.status).toLowerCase() === 'active';
   const canSubmit = eligible && !submitting && !showSuccess && (selectedOption === 'no_refund' || validAmount);
 
+  // Replace this form with the chat list, then open the chat on top of it, so Back from the
+  // chat returns to the list of chats instead of the already-submitted termination form.
+  const openTenantChat = () => {
+    router.replace('/ChatsScreen');
+    router.push(`/ChatsScreen2?partnerUserId=${rental.tenantUserID}&currentUser=${user.userID}`);
+  };
+
   const submitTerminationRequest = async () => {
     if (!canSubmit || submissionRef.current) return;
     submissionRef.current = true;
@@ -105,7 +112,7 @@ const TerminateLease = () => {
       notificationTimeoutRef.current = setTimeout(() => {
         if (version !== generation.current) return;
         setShowSuccess(false);
-        router.push(`/ChatsScreen2?partnerUserId=${rental.tenantUserID}&currentUser=${user.userID}`);
+        openTenantChat();
       }, 2000);
     } catch (error) {
       if (version !== generation.current) return;
@@ -240,7 +247,7 @@ const TerminateLease = () => {
         {/* Submit button */}
         {!!error && <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text>}
         {!!error && (
-          <TouchableOpacity accessibilityRole="button" style={styles.backButton} onPress={() => router.push(`/ChatsScreen2?partnerUserId=${rental.tenantUserID}&currentUser=${user.userID}`)}>
+          <TouchableOpacity accessibilityRole="button" style={styles.backButton} onPress={openTenantChat}>
             <Text>View tenant chat</Text>
           </TouchableOpacity>
         )}
