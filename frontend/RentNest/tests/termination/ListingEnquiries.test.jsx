@@ -203,3 +203,74 @@ test('failed enquiries retry with the same property reference', async () => {
   await press(ui, 'Retry');
   expect(axios.post.mock.calls.map(call => call[1].listingID)).toEqual([59, 59]);
 });
+
+
+const renderScrollableChat = async () => {
+  const scrollToEnd = jest.fn();
+  const ui = await render(<ChatsScreen2 />, {
+    createNodeMock: node => node.type === 'ScrollView' && node.props.onContentSizeChange
+      ? { scrollToEnd } : null,
+  });
+  const layoutMessages = async () => {
+    const list = ui.root.findAllByType('ScrollView').find(node => node.props.onContentSizeChange);
+    await act(async () => list.props.onContentSizeChange(390, 1800));
+  };
+  return { ui, scrollToEnd, layoutMessages };
+};
+
+test.each([undefined, '59'])('animates to the rendered outgoing message with attachment %s', async attachment => {
+  params.enquiryListingId = attachment;
+  const { ui, scrollToEnd, layoutMessages } = await renderScrollableChat();
+  await type(ui, 'Enter Message', 'Can we arrange a viewing?');
+  await press(ui, 'Send message');
+  expect(scrollToEnd).not.toHaveBeenCalled();
+  await layoutMessages();
+  expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+  expect(scrollToEnd).toHaveBeenCalledTimes(1);
+  await layoutMessages();
+  expect(scrollToEnd).toHaveBeenCalledTimes(1);
+});
+
+test('an empty send does not request a scroll', async () => {
+  const { ui, scrollToEnd, layoutMessages } = await renderScrollableChat();
+  await press(ui, 'Send message');
+  await layoutMessages();
+  expect(axios.post).not.toHaveBeenCalled();
+  expect(scrollToEnd).not.toHaveBeenCalled();
+});
+
+test('a sent offer scrolls after its card is loaded and laid out', async () => {
+  params = { currentUser: '11', partnerUserId: '22' };
+  messages = [{ messageID: 1, senderId: 22, listingId: 59, listingNameSnapshot: 'Bishan flat', message: 'Viewing?', date: '2026-10-12' }];
+  const { ui, scrollToEnd, layoutMessages } = await renderScrollableChat();
+  await press(ui, 'Offer this property');
+  for (const [label, value] of [['Monthly rent', '3000'], ['Rental deposit', '3000']]) {
+    const field = ui.root.findAllByType('TextInput').find(node => node.props.accessibilityLabel === label);
+    await act(async () => field.props.onChangeText(value));
+  }
+  const dateFields = ui.root.findAllByType('TextInput').filter(node => node.props.placeholder === 'DD-MM-YYYY');
+  await act(async () => dateFields[0].props.onChangeText('01-11-2026'));
+  await act(async () => dateFields[1].props.onChangeText('01-11-2027'));
+  axios.post.mockImplementation(async () => {
+    messages = [...messages, { messageID: 2, senderId: 11, rentalId: 81, message: 'Rental Offer', date: '2026-10-13' }];
+    return { status: 201, data: rentals[81] };
+  });
+  scrollToEnd.mockClear();
+  await press(ui, 'Send offer');
+  expect(text(ui.toJSON())).toContain('Bishan flat');
+  await layoutMessages();
+  expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+});
+
+test('returning after a sent termination request scrolls to its rendered card', async () => {
+  params = { currentUser: '11', partnerUserId: '22', scrollAfterSend: 'true' };
+  messages = [{ messageID: 3, senderId: 11, requestId: 71, date: '2026-10-13' }];
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation(url => url.includes('/requests/71')
+    ? Promise.resolve({ data: { requestID: 71, status: 'pending', tenantUserId: 22, refundAmount: 100 } })
+    : url.includes('/users/viewer') ? Promise.resolve({ data: { userID: 11 } }) : originalGet(url));
+  const { ui, scrollToEnd, layoutMessages } = await renderScrollableChat();
+  expect(text(ui.toJSON())).toContain('Pending');
+  await layoutMessages();
+  expect(scrollToEnd).toHaveBeenCalledWith({ animated: true });
+});

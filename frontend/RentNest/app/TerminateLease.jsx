@@ -105,7 +105,7 @@ const TerminateLease = () => {
       notificationTimeoutRef.current = setTimeout(() => {
         if (version !== generation.current) return;
         setShowSuccess(false);
-        router.push(`/ChatsScreen2?partnerUserId=${rental.tenantUserID}&currentUser=${user.userID}`);
+        router.push(`/ChatsScreen2?partnerUserId=${rental.tenantUserID}&currentUser=${user.userID}&scrollAfterSend=true`);
       }, 2000);
     } catch (error) {
       if (version !== generation.current) return;

@@ -58,7 +58,7 @@ const getSummaryErrorMessage = (error) => {
 const ChatsScreen2 = () => {
     const router = useRouter();
     const safeAreaInsets = useSafeAreaInsets();
-    const { partnerUserId, currentUser, enquiryListingId } = useLocalSearchParams();
+    const { partnerUserId, currentUser, enquiryListingId, scrollAfterSend } = useLocalSearchParams();
     const [chat, setChat] = useState([]);
     const [rentalsById, setRentalsById] = useState({});
     const [requestsById, setRequestsById] = useState({});
@@ -102,6 +102,7 @@ const ChatsScreen2 = () => {
     const [olderMessagesLoading, setOlderMessagesLoading] = useState(false);
     const chatScrollRef = useRef(null);
     const initialScrollComplete = useRef(false);
+    const sentMessageScrollPending = useRef(false);
     const conversationAbortRef = useRef(null);
     const notificationTimeoutRef = useRef(null);
     const summaryScrollRef = useRef(null);
@@ -128,13 +129,13 @@ const ChatsScreen2 = () => {
     const hydrateMessageCards = (messages, generation) => {
         const rentalIds = [...new Set(messages.map(message => message.rentalId).filter(id => id != null))];
         const requestIds = [...new Set(messages.map(message => message.requestId).filter(id => id != null))];
-        Promise.allSettled([
+        return Promise.allSettled([
             ...rentalIds.map(id => getRental(id, generation)),
             ...requestIds.map(id => getTerminationRequest(id, generation)),
         ]);
     };
 
-    const getConversation = async () => {
+    const getConversation = async ({ scrollToSentMessage = false } = {}) => {
         const generation = conversationGeneration.current;
         conversationAbortRef.current?.abort();
         const controller = new AbortController();
@@ -156,11 +157,18 @@ const ChatsScreen2 = () => {
                 signal: controller.signal,
             });
             if (controller.signal.aborted || generation !== conversationGeneration.current) return;
+            if (scrollToSentMessage) {
+                // Wait for offer/termination cards so scrolling includes their full height.
+                await hydrateMessageCards(data.messages.slice(-1), generation);
+                if (controller.signal.aborted || generation !== conversationGeneration.current) return;
+                sentMessageScrollPending.current = true;
+                initialScrollComplete.current = true;
+            }
             setChat(data.messages);
             setPartner(data.partner);
             setHasOlderMessages(data.hasMore);
             setLoading(false);
-            hydrateMessageCards(data.messages, generation);
+            hydrateMessageCards(scrollToSentMessage ? data.messages.slice(0, -1) : data.messages, generation);
         } catch (error) {
             if (controller.signal.aborted) return;
             if (error?.code === 'UNAUTHENTICATED') {
@@ -469,6 +477,8 @@ const ChatsScreen2 = () => {
         const tempMessageId = `temp-${Date.now()}`;
         const optimisticMessage = buildOptimisticMessage(messageText, tempMessageId, attachment);
         setNewMessage('');
+        sentMessageScrollPending.current = true;
+        initialScrollComplete.current = true;
         setChat((previousChat) => [...previousChat, optimisticMessage]);
 
         try{
@@ -489,6 +499,7 @@ const ChatsScreen2 = () => {
         messageBusy.current = true;
         const generation = conversationGeneration.current;
         const retryMessageId = `temp-${Date.now()}`;
+        chatScrollRef.current?.scrollToEnd({ animated: true });
         setChat((previousChat) => previousChat.map((message) => (
             message.messageID === messageToRetry.messageID
                 ? { ...message, messageID: retryMessageId, deliveryStatus: 'sending' }
@@ -796,7 +807,7 @@ const ChatsScreen2 = () => {
             // const editListingResponse = await axios.put(``) -> 
             if (acceptOfferResponse.status === 200) {
                 inboxStore.invalidate();
-                await getConversation();
+                await getConversation({ scrollToSentMessage: true });
             } else {
                 throw new Error('Offer could not be accepted');
             }
@@ -849,7 +860,7 @@ const handlePaymentAndAccept = async () => {
         await handlePaymentSubmit();
         await acceptRentalOffer();
         toggleSuccessfulPaymentModal();
-        await getConversation();
+        await getConversation({ scrollToSentMessage: true });
     } catch (error) {
         setPaymentError('Could not complete this offer. Check its status before retrying; a payment record may already exist.');
     } finally {
@@ -862,6 +873,7 @@ const handlePaymentAndAccept = async () => {
         offerSession.current += 1;
         const cached = chatData.peekConversation(partnerUserId);
         initialScrollComplete.current = false;
+        sentMessageScrollPending.current = false;
         setChat(cached?.messages || []);
         setPartner(cached?.partner || []);
         setHasOlderMessages(cached?.hasMore || false);
@@ -872,7 +884,7 @@ const handlePaymentAndAccept = async () => {
         setNewMessage('');
         setRentalModalVisible(false);
         setPaymentModalVisible(false);
-        getConversation();
+        getConversation({ scrollToSentMessage: scrollAfterSend === 'true' });
 
         return () => {
             conversationAbortRef.current?.abort();
@@ -880,12 +892,12 @@ const handlePaymentAndAccept = async () => {
                 clearTimeout(notificationTimeoutRef.current);
             }
         };
-    }, [refresh, partnerUserId, currentUser]);
+    }, [refresh, partnerUserId, currentUser, scrollAfterSend]);
 
     useEffect(() => {
         if (!Loading && chat.length > 0 && !initialScrollComplete.current) {
             initialScrollComplete.current = true;
-            const timer = setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: false }), 0);
+            const timer = setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: scrollAfterSend === 'true' }), 0);
             return () => clearTimeout(timer);
         }
     }, [Loading, chat.length]);
@@ -1059,7 +1071,7 @@ const handlePaymentAndAccept = async () => {
             await sendRentalOffer();
             if (session !== offerSession.current) return;
             setRentalModalVisible(false);
-            await getConversation();
+            await getConversation({ scrollToSentMessage: true });
         } catch (error) {
             if (session !== offerSession.current) return;
             setOfferError(error.response?.data?.message || (typeof error.response?.data === 'string' ? error.response.data : 'Offer could not be sent. Check availability and try again.'));
@@ -1204,7 +1216,7 @@ const handlePaymentAndAccept = async () => {
                                         viewerId={currentUser}
                                         onDecision={(decision) => {
                                             if (decision === 'accept') showChatNotification('Termination Accepted');
-                                            getConversation();
+                                            getConversation({ scrollToSentMessage: true });
                                         }}
                                     />
                                 )}
@@ -1352,6 +1364,11 @@ const handlePaymentAndAccept = async () => {
 
             <ScrollView
                 ref={chatScrollRef}
+                onContentSizeChange={() => {
+                    if (!sentMessageScrollPending.current) return;
+                    sentMessageScrollPending.current = false;
+                    chatScrollRef.current?.scrollToEnd({ animated: true });
+                }}
                 style={styles.chatList}
                 contentContainerStyle={styles.chatListContent}
                 maintainVisibleContentPosition={{ minIndexForVisible: 0 }}

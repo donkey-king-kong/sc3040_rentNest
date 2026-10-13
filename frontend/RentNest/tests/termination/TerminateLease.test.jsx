@@ -58,7 +58,7 @@ test.each(['1', '9300', '0010', String(Number.MAX_SAFE_INTEGER)])(
     expect(text(ui.toJSON())).toContain('Termination Submitted');
     expect(button(ui, 'Submit termination').props.disabled).toBe(true);
     await act(async () => { jest.advanceTimersByTime(2000); });
-    expect(router.push).toHaveBeenCalledWith('/ChatsScreen2?partnerUserId=22&currentUser=11');
+    expect(router.push).toHaveBeenCalledWith('/ChatsScreen2?partnerUserId=22&currentUser=11&scrollAfterSend=true');
   },
 );
 
