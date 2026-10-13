@@ -1,12 +1,14 @@
     package RentNest.controller;
 
     import RentNest.model.Listings;
+    import RentNest.model.User;
     import RentNest.dto.ListingsDTO;
+    import RentNest.service.ListingViewService;
     import RentNest.service.ListingsService;
-    import RentNest.repository.RentalsRepository;
     import org.springframework.beans.factory.annotation.Autowired;
     import org.springframework.http.HttpStatus;
     import org.springframework.http.ResponseEntity;
+    import org.springframework.security.core.annotation.AuthenticationPrincipal;
     import org.springframework.web.bind.annotation.*;
 
 
@@ -18,12 +20,12 @@
     public class ListingsController {
 
         private final ListingsService listingsService;
-        private final RentalsRepository rentalsRepository;
+        private final ListingViewService listingViewService;
 
         @Autowired
-        public ListingsController(ListingsService listingsService, RentalsRepository rentalsRepository) {
+        public ListingsController(ListingsService listingsService, ListingViewService listingViewService) {
             this.listingsService = listingsService;
-            this.rentalsRepository = rentalsRepository;
+            this.listingViewService = listingViewService;
         }
 
         // GET - Retrieve all listings
@@ -41,6 +43,22 @@
             } else {
                 return ResponseEntity.notFound().build();
             }
+        }
+
+        // POST - Record that the signed-in user opened this listing.
+        // The viewer comes from the token and the time from the server clock; neither is read
+        // from the request. Returns 204 either way, so the app never has to handle a failure
+        // for something the user did not ask for. A view of your own listing is not recorded.
+        @PostMapping("/{listingId}/views")
+        public ResponseEntity<Void> recordListingView(
+                @PathVariable Long listingId,
+                @AuthenticationPrincipal User user) {
+            try {
+                listingViewService.recordListingView(listingId, user);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.noContent().build();
         }
 
         // POST - Create a new listing
@@ -62,9 +80,21 @@
         }
 
 
-        // PUT - Update an existing listing (delegates to service)
+        // PUT - Update an existing listing (only its owner)
         @PutMapping("/{id}")
-        public ResponseEntity<Listings> updateListing(@PathVariable Long id, @RequestBody ListingsDTO listingDTO) {
+        public ResponseEntity<Listings> updateListing(@PathVariable Long id, @RequestBody ListingsDTO listingDTO, @AuthenticationPrincipal User user) {
+            Optional<Listings> existing = listingsService.getListingById(id);
+            if (existing.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            if (user == null || !existing.get().isOwnedBy(user)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+            // A listing's owner cannot be changed through editing.
+            Long requestedOwner = listingDTO.getOwnerUserID();
+            if (requestedOwner != null && !requestedOwner.equals(existing.get().getOwnerId())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
             Optional<Listings> updatedListing = listingsService.updateListing(id, listingDTO);
             if (updatedListing.isPresent()) {
                 return ResponseEntity.ok(updatedListing.get());
@@ -74,9 +104,16 @@
         }
 
 
-        // DELETE - Delete a listing by ID
+        // DELETE - Delete a listing by ID (only its owner or an admin)
         @DeleteMapping("/{id}")
-        public ResponseEntity<Void> deleteListing(@PathVariable Long id) {
+        public ResponseEntity<Void> deleteListing(@PathVariable Long id, @AuthenticationPrincipal User user) {
+            Optional<Listings> listing = listingsService.getListingById(id);
+            if (listing.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            if (user == null || !(user.isAdmin() || listing.get().isOwnedBy(user))) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
             listingsService.deleteListing(id);
             return ResponseEntity.noContent().build();
         }
@@ -136,23 +173,6 @@
             } catch (RuntimeException e) {
                 // Handle general runtime errors more gracefully
                 return new ResponseEntity<>("Error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-        }
-
-        @GetMapping("/user/{userID}/availableListingIDs")
-        public ResponseEntity<?> getAvailableListingIDsByUser(@PathVariable Long userID) {
-            try {
-                List<ListingsDTO> availableListings = listingsService.getListingsByUserID(userID)
-                    .stream()
-                    .filter(dto -> dto.getOwnerUserID() != null && dto.getOwnerUserID().equals(userID))
-                    .filter(dto -> rentalsRepository.findByListings_ListingID(dto.getListingID())
-                        .map(r -> "terminated".equals(r.getStatus()))
-                        .orElse(true))
-                    .collect(java.util.stream.Collectors.toList());
-                return ResponseEntity.ok(availableListings);
-            } catch (Exception e) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error: " + e.getMessage());
             }
         }
     }

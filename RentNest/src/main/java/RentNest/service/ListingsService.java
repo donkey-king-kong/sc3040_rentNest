@@ -6,6 +6,13 @@ import RentNest.repository.ListingsRepository;
 import RentNest.model.User;
 import RentNest.dto.UserDTO;
 import RentNest.repository.UserRepository;
+import RentNest.repository.RentalsRepository;
+import RentNest.repository.ListingDeletionRepository;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.Objects;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +27,8 @@ public class ListingsService {
     private final UserRepository userRepository;
     private final GeocodingService geocodingService;
     private final NearbyAmenitiesService nearbyAmenitiesService;
+    private final RentalsRepository rentalsRepository;
+    private final ListingDeletionRepository listingDeletionRepository;
 
     // Mapping Listings to ListingsDTO
     public ListingsDTO toListingsDTO(Listings listings) {
@@ -58,11 +67,15 @@ public class ListingsService {
     public ListingsService(ListingsRepository listingsRepository,
                            UserRepository userRepository,
                            GeocodingService geocodingService,
-                           NearbyAmenitiesService nearbyAmenitiesService) {
+                           NearbyAmenitiesService nearbyAmenitiesService,
+                           RentalsRepository rentalsRepository,
+                           ListingDeletionRepository listingDeletionRepository) {
         this.listingsRepository = listingsRepository;
         this.userRepository = userRepository;
         this.geocodingService = geocodingService;
         this.nearbyAmenitiesService = nearbyAmenitiesService;
+        this.rentalsRepository = rentalsRepository;
+        this.listingDeletionRepository = listingDeletionRepository;
     }
 
     // Retrieve all listings
@@ -148,12 +161,17 @@ public class ListingsService {
 //    }
 
     // Update the listing using ListingsDTO
+    @Transactional
     public Optional<Listings> updateListing(Long id, ListingsDTO listingDTO) {
         // Find the existing listing by ID
-        Optional<Listings> listingOptional = listingsRepository.findById(id);
+        Optional<Listings> listingOptional = listingsRepository.findByIdForUpdate(id);
 
         if (listingOptional.isPresent()) {
             Listings listing = listingOptional.get();
+            requireOwner(listing);
+            if (listingDTO.getOwnerUserID() != null && !Objects.equals(listing.getOwnerId(), listingDTO.getOwnerUserID())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Listing ownership cannot be reassigned");
+            }
 
             // Map fields from ListingsDTO to Listings entity
             listing.setName(listingDTO.getName());
@@ -169,13 +187,6 @@ public class ListingsService {
             listing.setDescription(listingDTO.getDescription());
             listing.setListingpicture(listingDTO.getListingpicture());
 
-            // Update owner if necessary (optional, based on your use case)
-            if (listingDTO.getOwnerUserID() != null) {
-                User owner = userRepository.findById(listingDTO.getOwnerUserID())
-                        .orElseThrow(() -> new RuntimeException("Owner not found"));
-                listing.setOwner(owner);
-            }
-
             // Save the updated listing back to the repository
             listingsRepository.save(listing);
             return Optional.of(listing);
@@ -186,8 +197,34 @@ public class ListingsService {
 
 
     // Delete a listing by its ID
+    @Transactional
     public void deleteListing(Long id) {
-        listingsRepository.deleteById(id);
+        Listings listing = listingsRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Listing not found"));
+        requireOwnerOrAdmin(listing, true);
+        if (listing.getTenantId() != null || rentalsRepository.existsByListings_ListingIDAndStatus(id, "active")) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Unable to delete this listing because a tenant is occupying the property.");
+        }
+        listingDeletionRepository.deleteDependents(listing);
+        listingsRepository.delete(listing);
+        listingsRepository.flush();
+    }
+
+    private void requireOwner(Listings listing) {
+        requireOwnerOrAdmin(listing, false);
+    }
+
+    private void requireOwnerOrAdmin(Listings listing, boolean allowAdmin) {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || !(auth.getPrincipal() instanceof User user)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        if (!Objects.equals(user.getUserID(), listing.getOwnerId()) && !(allowAdmin && user.isAdmin())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    allowAdmin ? "Only the listing owner or an admin can delete this property"
+                            : "Only the listing owner can modify this property");
+        }
     }
 
     //Get Flagged Listings

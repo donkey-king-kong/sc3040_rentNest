@@ -92,4 +92,9 @@ public class RentalContract {
     public void setProject(String project) {
         this.project = project;
     }
+
+    private String street;
+
+    public String getStreet() { return street; }
+    public void setStreet(String street) { this.street = street; }
 }

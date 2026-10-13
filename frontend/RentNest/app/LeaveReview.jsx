@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
   },
   star: {
     fontSize: 40,
-    color: '#E5E5EA',
+    color: '#8E8E93',
   },
   selectedStar: {
     fontSize: 40,

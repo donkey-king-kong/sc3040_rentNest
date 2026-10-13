@@ -1,12 +1,7 @@
-import { useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { Redirect } from 'expo-router';
 
+// Redirect waits until the root layout is mounted; calling router.replace in an
+// effect here throws "Attempted to navigate before mounting the Root Layout".
 export default function Index() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/LandingScreen');
-  }, [router]);
-
-  return null;
+  return <Redirect href="/LandingScreen" />;
 }

@@ -1,12 +1,18 @@
 package RentNest.controller;
 
 import RentNest.model.ChatHistory;
+import RentNest.dto.ChatConversationDTO;
 import RentNest.dto.ChatHistoryDTO;
+import RentNest.dto.ChatSummaryDTO;
+import RentNest.dto.ChatSummariesDTO;
 import RentNest.service.ChatHistoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 import RentNest.model.User;
@@ -28,12 +34,40 @@ public class ChatHistoryController {
         this.userRepository = userRepository;
     }
 
+    @GetMapping("/summaries")
+    public ResponseEntity<ChatSummariesDTO> getChatSummaries(
+            @AuthenticationPrincipal User authenticatedUser) {
+        if (authenticatedUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(new ChatSummariesDTO(
+                        authenticatedUser.getUserID(),
+                        chatHistoryService.getSummaries(authenticatedUser.getUserID())));
+    }
+
+    @GetMapping("/conversations/{partnerId}")
+    public ResponseEntity<ChatConversationDTO> getConversationPage(
+            @PathVariable Long partnerId,
+            @RequestParam(required = false) Long beforeMessageId,
+            @RequestParam(defaultValue = "50") int limit,
+            @AuthenticationPrincipal User authenticatedUser) {
+        if (authenticatedUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(chatHistoryService.getConversationPage(
+                        authenticatedUser.getUserID(), partnerId, beforeMessageId, limit));
+    }
+
     // Create a new chat history entry
     @PostMapping
     public ResponseEntity<?> createChatHistory(@RequestBody ChatHistoryDTO chatHistoryDTO) {
         try {
             // Attempt to create the chat history entry
-            ChatHistory createdChatHistory = chatHistoryService.createChatHistory(chatHistoryDTO);
+            ChatHistory createdChatHistory = chatHistoryService.sendMessage(chatHistoryDTO);
 
             if (createdChatHistory == null) {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -45,6 +79,8 @@ public class ChatHistoryController {
             // Handle bad input data
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("Invalid input data: " + e.getMessage());
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             // Handle cases where entities like User, Rental, or Request do not exist
             if (e.getMessage().contains("Sender not found")) {

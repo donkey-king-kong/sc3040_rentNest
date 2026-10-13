@@ -1,20 +1,24 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { inboxStore } from '../config/inbox';
 import axios from 'axios';
 import { FontAwesome } from '@expo/vector-icons';
 
 import { API_BASE_URL } from '../config/api';
+import { moderationDismissals } from '../config/moderationDismissals';
+import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 
 const EMPTY_COUNTS = {
-  reviews: 0,
-  users: 0,
-  listings: 0,
+  reviews: null,
+  users: null,
+  listings: null,
 };
 
 const AdminScreen = () => {
   const router = useRouter();
+  const requestVersion = useRef(0);
   const [counts, setCounts] = useState(EMPTY_COUNTS);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -31,7 +35,7 @@ const AdminScreen = () => {
     })}`;
   };
 
-  const fetchFlaggedCount = async (endpoint, token) => {
+  const fetchFlaggedCount = useCallback(async (endpoint, token) => {
     try {
       const response = await axios.get(`${API_BASE_URL}${endpoint}`, {
         headers: {
@@ -39,22 +43,21 @@ const AdminScreen = () => {
         },
       });
 
-      return Array.isArray(response.data) ? response.data.length : 0;
+      if (!Array.isArray(response.data)) throw new Error('Unexpected report response');
+      return response.data.length;
     } catch (error) {
       console.log(`Failed to fetch ${endpoint}:`, error.message);
-      return 0;
+      return null;
     }
-  };
+  }, []);
 
-  const fetchFlaggedCounts = async ({ initial = false } = {}) => {
-    if (initial) {
-      setIsLoading(true);
-    } else {
-      setIsRefreshing(true);
-    }
+  const fetchFlaggedCounts = useCallback(async () => {
+    const version = ++requestVersion.current;
+    setIsRefreshing(true);
 
     try {
       const token = await AsyncStorage.getItem('token');
+      if (version !== requestVersion.current) return;
 
       if (!token) {
         router.replace('/LoginScreen');
@@ -67,17 +70,25 @@ const AdminScreen = () => {
         fetchFlaggedCount('/api/listings/admin/flagged', token),
       ]);
 
+      if (version !== requestVersion.current) return;
       setCounts({ reviews, users, listings });
-      setLastUpdated(new Date());
+      setLastUpdated([reviews, users, listings].every(value => value !== null) ? new Date() : null);
+    } catch (error) {
+      if (version !== requestVersion.current) return;
+      setCounts(EMPTY_COUNTS);
+      setLastUpdated(null);
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (version === requestVersion.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  };
+  }, [router, fetchFlaggedCount]);
 
-  useEffect(() => {
-    fetchFlaggedCounts({ initial: true });
-  }, []);
+  useFocusEffect(useCallback(() => {
+    void fetchFlaggedCounts();
+    return () => { requestVersion.current += 1; };
+  }, [fetchFlaggedCounts]));
 
   const handleLogout = () => {
     Alert.alert(
@@ -90,6 +101,8 @@ const AdminScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              inboxStore.clear('logout');
+              moderationDismissals.reset();
               await AsyncStorage.multiRemove(['token', 'userId']);
               router.replace('/LandingScreen');
             } catch (error) {
@@ -102,6 +115,13 @@ const AdminScreen = () => {
   };
 
   const navigationCards = [
+    {
+      title: 'Platform Analytics',
+      description: 'Users, payments and moderation at a glance',
+      route: '/AdminAnalyticsScreen',
+      icon: 'bar-chart',
+      styles: { iconWrap: styles.listingIconWrap, icon: '#175CD3' },
+    },
     {
       title: 'Reviews',
       description: 'Flagged reviews pending action',
@@ -147,40 +167,42 @@ const AdminScreen = () => {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading flagged reports...</Text>
-      </View>
-    );
-  }
+  if (isLoading) return <AdminLoadingState message="Loading admin page..." backgroundColor="#FFFFFF" />;
+
+  const hasUnavailable = Object.values(counts).some(value => value === null);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.headerContainer}>
-        <View style={styles.titleRow}>
-          <Text style={styles.header}>Admin</Text>
-          <View style={styles.adminPill}>
-            <Text style={styles.adminPillText}>Admin</Text>
-          </View>
-        </View>
+        <AdminHeader title="Admin dashboard" inset />
 
         <View style={styles.metaRow}>
           <Text style={styles.lastUpdatedText}>
-            {formatLastUpdated(lastUpdated)}
-            <Text style={styles.metaDivider}>  ·  </Text>
+            {hasUnavailable ? 'Counts unavailable' : formatLastUpdated(lastUpdated)}
           </Text>
           <TouchableOpacity
             style={[styles.refreshLink, isRefreshing && styles.refreshButtonDisabled]}
             activeOpacity={0.8}
             onPress={() => fetchFlaggedCounts()}
             disabled={isRefreshing}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh report counts"
           >
-            <Text style={styles.refreshText}>{isRefreshing ? 'Refreshing ↺' : 'Refresh ↺'}</Text>
+            <FontAwesome name="refresh" size={14} color="#16794B" />
+            <Text style={styles.refreshText}>{isRefreshing ? 'Refreshing' : 'Refresh'}</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {hasUnavailable && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorMessage}>Some report counts couldn't be loaded.</Text>
+          <TouchableOpacity onPress={() => fetchFlaggedCounts()} disabled={isRefreshing}
+            accessibilityRole="button" accessibilityLabel="Retry report counts" style={styles.retryButton}>
+            <Text style={styles.retryText}>{isRefreshing ? 'Retrying...' : 'Retry'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.cardList}>
         {navigationCards.map((card) => {
@@ -207,11 +229,13 @@ const AdminScreen = () => {
                 <Text style={styles.cardDescription}>{card.description}</Text>
               </View>
 
-              <View style={[styles.countBadge, hasPending ? card.styles.badge : styles.mutedBadge]}>
-                <Text style={[styles.countBadgeText, hasPending ? card.styles.badgeText : styles.mutedBadgeText]}>
-                  {card.count}
-                </Text>
-              </View>
+              {card.count !== undefined && (
+                <View style={[styles.countBadge, hasPending ? card.styles.badge : styles.mutedBadge]}>
+                  <Text style={[styles.countBadgeText, hasPending ? card.styles.badgeText : styles.mutedBadgeText, card.count === null && { fontSize: 12 }]}>
+                    {card.count === null ? 'Unavailable' : card.count}
+                  </Text>
+                </View>
+              )}
 
               <FontAwesome name="chevron-right" size={18} color="#8E8E93" />
             </TouchableOpacity>
@@ -224,7 +248,7 @@ const AdminScreen = () => {
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <FontAwesome name="sign-out" size={20} color="black" style={styles.icon} />
         <Text style={styles.logoutText}>Log out</Text>
-        <Text style={styles.arrow}> &gt;</Text>
+        <FontAwesome name="chevron-right" size={18} color="#8E8E93" />
       </TouchableOpacity>
     </ScrollView>
   );
@@ -233,7 +257,7 @@ const AdminScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F7',
+    backgroundColor: '#FFFFFF',
   },
   contentContainer: {
     padding: 20,
@@ -242,65 +266,27 @@ const styles = StyleSheet.create({
   headerContainer: {
     marginBottom: 22,
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-  },
-  header: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#101820',
-    marginRight: 10,
-  },
-  adminPill: {
-    borderRadius: 999,
-    backgroundColor: '#FEF0C7',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: '#FEDF89',
-  },
-  adminPillText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#B54708',
-  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   lastUpdatedText: {
     fontSize: 12,
     color: '#666A70',
   },
-  metaDivider: {
-    color: '#9CA3AF',
-  },
   refreshLink: {
-    paddingVertical: 4,
+    minHeight: 44, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 6,
   },
   refreshButtonDisabled: {
     opacity: 0.6,
   },
-  refreshText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666A70',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F7F8FA',
-  },
-  loadingText: {
-    marginTop: 14,
-    color: '#101820',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  refreshText: { fontSize: 12, fontWeight: '600', color: '#16794B' },
+  errorBanner: { padding: 12, marginBottom: 16, backgroundColor: '#FEF3F2', borderRadius: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 8 },
+  errorMessage: { flex: 1, color: '#B42318', fontSize: 14 },
+  retryButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 10 },
+  retryText: { color: '#B42318', fontWeight: '700' },
   cardList: {
     gap: 14,
   },
@@ -434,10 +420,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'black',
     flex: 1,
-  },
-  arrow: {
-    fontSize: 16,
-    color: 'black',
   },
   icon: {
     marginRight: 10,

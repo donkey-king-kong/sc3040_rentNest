@@ -1,47 +1,71 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
-import { FontAwesome } from '@expo/vector-icons';
-import MorphingInfinity from '../components/MorphingInfinity';
+import { inboxStore } from '../config/inbox';
+import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 import ProfileImage from '../components/ProfileImage';
+import { startOptimisticDismissal } from '../config/moderationDismissals';
 
 const ReviewListingScreen2 = () => {
   const router = useRouter();
   const { listingid } = useLocalSearchParams();
 
   const [listingData, setListingData] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [isDismissing, setIsDismissing] = useState(false);
+  const deletePending = useRef(false);
+  const dismissPending = useRef(false);
 
   const handleIgnore = async () => {
+    if (dismissPending.current || deletePending.current) return;
+    dismissPending.current = true;
+    setIsDismissing(true);
+
     try {
       const token = await AsyncStorage.getItem('token');
       
       if (!token) {
+        dismissPending.current = false;
+        setIsDismissing(false);
         console.log('No token found!');
         router.replace('/LoginScreen');
         return;
       }
 
       console.log(`Executing PUT ${API_BASE_URL}/api/listings/setFlag/${listingid}/false`);
-      await axios.put(`${API_BASE_URL}/api/listings/setFlag/${listingid}/false`, {}, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
+      const started = startOptimisticDismissal({
+        type: 'listings',
+        id: listingid,
+        itemLabel: 'listing report',
+        request: () => axios.put(`${API_BASE_URL}/api/listings/setFlag/${listingid}/false`, {}, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+        }),
       });
 
-      // Go back and trigger refresh
-      router.setParams({ refresh: 'true' });
-      router.back();
+      if (started) {
+        router.back();
+      } else {
+        dismissPending.current = false;
+        setIsDismissing(false);
+      }
     } catch (error) {
+      dismissPending.current = false;
+      setIsDismissing(false);
       console.error("Failed to update listing flag:", error);
     }
   };
 
   const handleDelete = async () => {
+    if (deletePending.current) return;
+    deletePending.current = true;
+    setDeleting(true);
     try {
       const token = await AsyncStorage.getItem('token');
       
@@ -54,6 +78,7 @@ const ReviewListingScreen2 = () => {
       // First, delete the listing
       console.log(`Executing DELETE ${API_BASE_URL}/api/listings/${listingid}`);
       await axios.delete(`${API_BASE_URL}/api/listings/${listingid}`, {
+        timeout: 15000,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json',
@@ -61,10 +86,20 @@ const ReviewListingScreen2 = () => {
         },
       });
 
-      // Then navigate to ReviewListingScreen3
-      router.push('/ReviewListingScreen3');
+      // Replace the deleted property's review page with the standard success notification.
+      inboxStore.invalidate();
+      router.replace('/ReviewListingScreen3');
     } catch (error) {
-      console.error("Failed to delete listing:", error);
+      const serverMessage = error.response?.data?.message;
+      const message = typeof serverMessage === 'string' && serverMessage.trim()
+        ? serverMessage
+        : error.response
+          ? "Couldn't delete this listing. Refresh and try again."
+          : "Couldn't reach the server. Check your connection and try again.";
+      Alert.alert('Unable to delete listing', message);
+    } finally {
+      deletePending.current = false;
+      setDeleting(false);
     }
   };
 
@@ -96,7 +131,7 @@ const ReviewListingScreen2 = () => {
         owner: {
           userID: response.data.ownerId || 0,
           name: response.data.ownerName || 'Unknown Owner',
-          photoURL: response.data.ownerPhotoURL || "https://images.healthshots.com/healthshots/en/uploads/2020/12/08182549/positive-person.jpg"
+          photoURL: response.data.ownerPhotoURL || null
         },
       };
       console.log("Transformed listing:", flaggedListing);
@@ -115,22 +150,13 @@ const ReviewListingScreen2 = () => {
 
   if (!listingData) {
     return (
-      <View style={styles.loadingContainer}>
-        <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading listing review...</Text>
-      </View>
+      <AdminLoadingState message="Loading listing review..." />
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.topHeaderRow}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/ReviewListingScreen?refresh=true')}>
-          <FontAwesome name="chevron-left" size={18} color="#101820" />
-        </TouchableOpacity>
-        <Text style={styles.screenTitle}>Review Flagged Listing</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AdminHeader title="Review Flagged Listing" onBack={() => router.replace('/ReviewListingScreen')} backLabel="Back to listings" inset />
 
       <View style={styles.listingBox}>
         {/* Flag Image at the top right corner */}
@@ -171,14 +197,18 @@ const ReviewListingScreen2 = () => {
         <TouchableOpacity
           style={[styles.button, styles.ignoreButton]}
           onPress={handleIgnore} // Call handleIgnore function
+          disabled={deleting || isDismissing}
+          accessibilityState={{ disabled: deleting || isDismissing, busy: isDismissing }}
         >
-          <Text style={styles.buttonText}>Ignore</Text>
+          <Text style={styles.buttonText}>{isDismissing ? 'Dismissing…' : 'Dismiss Report'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.deleteButton]}
           onPress={handleDelete} // Call handleDelete function
+          disabled={deleting || isDismissing}
+          accessibilityState={{ disabled: deleting || isDismissing, busy: deleting }}
         >
-          <Text style={styles.buttonText}>Delete</Text>
+          <Text style={styles.buttonText}>{deleting ? 'Deleting…' : 'Delete Listing'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -188,44 +218,8 @@ const ReviewListingScreen2 = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
-    backgroundColor: '#f9f9f9',
-  },
-  topHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 2,
-  },
-  screenTitle: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#101820',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 42,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 20,
     backgroundColor: '#F7F8FA',
-  },
-  loadingText: {
-    marginTop: 24,
-    color: '#101820',
-    fontSize: 18,
-    fontWeight: '700',
   },
   listingBox: {
     backgroundColor: '#fff',
@@ -280,6 +274,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 5,
     width: '40%', // Adjust width as necessary
+    justifyContent: 'center', // keeps both buttons even if a label wraps
   },
   ignoreButton: {
     backgroundColor: 'green',

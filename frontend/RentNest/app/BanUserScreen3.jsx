@@ -1,24 +1,30 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router'; // Use useRouter for navigation
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Modal } from 'react-native';
+import { useRouter } from 'expo-router';
+
+import { FontAwesome } from 'react-native-vector-icons';
 
 const BanUserScreen3 = () => {
-  const router = useRouter(); // Get the router object
+  const router = useRouter();
+  const { replace } = router;
+  const returnToAdmin = () => router.replace('/AdminScreen');
+  useEffect(() => {
+    const timer = setTimeout(() => replace('/AdminScreen'), 2000);
+    return () => clearTimeout(timer);
+  }, [replace]);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.message}>User Banned!</Text>
-      <Image source={require('../assets/images/confirmation.png')} style={styles.confirmationImage} />
-
-      {/* Spacer to push button to the bottom */}
-      <View style={styles.spacer} />
-
-      <TouchableOpacity
-        style={styles.returnButton}
-        onPress={() => router.replace('/AdminScreen')} // Navigate back to AdminScreen
-      >
-        <Text style={styles.buttonText}>Return to Admin Screen</Text>
-      </TouchableOpacity>
+      <Modal transparent visible animationType="fade" statusBarTranslucent onRequestClose={returnToAdmin}>
+        <View style={styles.overlay} pointerEvents="none">
+          <View style={styles.card} accessibilityViewIsModal>
+            <View style={styles.iconBox} accessible={false}>
+              <FontAwesome name="check" size={34} color="#FFFFFF" accessible={false} />
+            </View>
+            <Text style={styles.title} accessibilityLiveRegion="polite">User Banned</Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -26,37 +32,16 @@ const BanUserScreen3 = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'flex-start', // Align items to the top
-    alignItems: 'center',
-    padding: 25,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#F7F8FA',
   },
-  message: {
-    fontSize: 28, // Increased font size
-    fontWeight: 'bold',
-    marginVertical: 20, // Space between message and image
-  },
-  confirmationImage: {
-    width: 100,
-    height: 100, // Adjust the size as needed
-    marginVertical: 10, // Space around the image
-  },
-  spacer: {
-    flex: 1, // This will push the button to the bottom of the screen
-  },
-  returnButton: {
-    backgroundColor: 'black',
-    paddingVertical: 15,
-    paddingHorizontal: 70,
-    borderRadius: 5,
-    marginBottom: 20, // Space from bottom
-  },
-  buttonText: {
-      fontSize: 15,
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
+  overlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)' },
+  card: { width: '100%', maxWidth: 360, alignItems: 'center', backgroundColor: 'rgba(45, 45, 45, 0.82)',
+    borderRadius: 28, paddingVertical: 28, paddingHorizontal: 24, shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.24, shadowRadius: 22, elevation: 8 },
+  iconBox: { width: 72, height: 72, borderRadius: 18, backgroundColor: 'rgba(58, 58, 58, 0.72)',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  title: { color: '#FFFFFF', fontSize: 22, fontWeight: '800', textAlign: 'center' },
 });
 
 export default BanUserScreen3;

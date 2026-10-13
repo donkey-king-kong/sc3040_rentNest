@@ -2,10 +2,17 @@
 
 RentNest helps property owners list rental homes and users search for available rentals.
 
+## Documentation
+
+See the [documentation index](Documentation/README.md) for feature guides,
+troubleshooting, database operations, and planning records.
+
 ## Setup Instructions
 
+If setup or debugging gets stuck, see [Price Insights troubleshooting](Documentation/Troubleshooting/price-insights.md).
+
 ### Required Installs
-- Java JDK
+- Java JDK 21
 - Maven
 - Node.js and npm
 - Expo Go mobile app, if testing on a physical phone
@@ -36,6 +43,8 @@ URA_ACCESSKEY=dummy
 ```
 
 ### Frontend Setup
+The merged frontend uses Expo SDK 57. Use a compatible Expo Go version or development build for mobile testing.
+
 1. Go to the frontend directory:
 ```bash
 cd frontend/RentNest
@@ -57,6 +66,27 @@ w = web
 i = iOS simulator
 a = Android emulator
 ```
+
+### Mobile Demo
+1. Connect your phone and computer to the same Wi-Fi.
+2. Start the backend and find your computer's Wi-Fi IPv4 address using `ipconfig`.
+3. In the frontend PowerShell terminal, set the backend address before starting Expo:
+```powershell
+$env:EXPO_PUBLIC_API_BASE_URL = "http://YOUR_COMPUTER_IP:8080"
+npm.cmd run start
+```
+4. Open the project on your phone using the Expo QR code. Keep both servers running.
+5. Check login, listings, admin moderation, analytics, and the rental flows used in your demo.
+### Offline Map (Optional)
+The listing map loads its libraries and tiles from the internet by default. To make it work on a poor or blocked connection, download the map assets once while online:
+```bash
+cd frontend/RentNest
+npm run map-assets
+```
+
+This saves about 14 MB to `public/map/`: the map libraries, fonts, icons and Singapore-only map tiles. The Expo dev server then serves them to web and to phones on the same network, so the map needs no internet access. The tile download needs the [go-pmtiles CLI](https://github.com/protomaps/go-pmtiles/releases) on your `PATH`, or its path in `PMTILES_BIN`.
+
+Without these files, the map falls back to the online sources as before.
 
 ### Backend Setup
 1. Go to the backend directory:
@@ -84,7 +114,11 @@ http://localhost:8080/swagger-ui/index.html
 ### Database Configuration
 The app uses a shared Supabase PostgreSQL database. The real connection details are not committed to Git. Get the database URL, username, and password from the team.
 
+The backend runs with `spring.jpa.hibernate.ddl-auto=validate`, so it never changes the shared schema. Read [docs/db/README.md](docs/db/README.md) before changing any entity class.
+
 ## Pre-Configured Users (Non-Exhaustive)
+
+These are the accounts documented on main. Confirm the current passwords with the team before the demo.
 | Role | Name | Email | Password |
 | --- | --- | --- | --- |
 | Owner | Superman | superman@gmail.com | superman123 |
@@ -102,6 +136,30 @@ The app uses a shared Supabase PostgreSQL database. The real connection details 
 - [Bus Stop API](https://datamall2.mytransport.sg/ltaodataservice/BusStops)
 - [URA Rental Prices API](https://www.ura.gov.sg/uraDataService/invokeUraDS?service=PMI_Resi_Rental&refPeriod=14q1)
 
+## Verification
+Backend tests use an isolated H2 database:
+```powershell
+cd RentNest
+mvn test
+```
+Use JDK 21. If your installed JDK is 26, the current Mockito/Byte Buddy dependency requires:
+```powershell
+mvn test "-DargLine=-Dnet.bytebuddy.experimental=true"
+```
+Frontend checks, from `frontend/RentNest`:
+```powershell
+npx.cmd expo install --check
+npm.cmd test -- --watchAll=false --runInBand
+```
+
 ## Developer Notes
+
+The owner analytics dashboard shows current listing occupancy; the monthly occupancy graph has been removed.
+Tenancy Length uses a pie chart with each length group's count and percentage of total tenancies in the legend.
+Analytics information tooltips use white cards with a border, shadow, and improved spacing.
+
+After a successful user ban, admins see a "User Banned" notification matching the Profile Updated popup, with a translucent charcoal card and white tick icon. It returns to the admin screen after two seconds or on native back dismissal.
+
+- [Listing enquiries and offers: required database migration, workflows and tests](Documentation/Features/listing-enquiry-offer-guide.md)
 - [Listing Image Rendering Troubleshoot](Documentation/Troubleshooting/listing-images.md)
 - [Profile Image Handling Troubleshoot](Documentation/Troubleshooting/profile-images.md)

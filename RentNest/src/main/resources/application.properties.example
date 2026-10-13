@@ -1,23 +1,86 @@
 # PostgreSQL
-spring.datasource.url=jdbc:YOUR_DB_CONNECTION_STRING
+# Use port 6543 (transaction mode) with prepareThreshold=0 to avoid prepared-statement
+# errors through PgBouncer. Port 5432 (session mode) exhausts the 30-connection limit.
+spring.datasource.url=jdbc:postgresql://YOUR_SUPABASE_HOST:6543/postgres?sslmode=require&prepareThreshold=0
 spring.datasource.username=YOUR_DB_USERNAME
 spring.datasource.password=YOUR_DB_PASSWORD
 
+# Connection pool — keep small to stay within Supabase's pooler limit
+spring.datasource.hikari.maximum-pool-size=5
+spring.datasource.hikari.minimum-idle=2
+
 # JPA / Hibernate
-spring.jpa.hibernate.ddl-auto=update
+# validate: fail startup if the code and the shared database disagree, instead of changing the shared schema.
+# Schema changes go through docs/db/ - see that README before changing any entity.
+spring.jpa.hibernate.ddl-auto=validate
 spring.jpa.show-sql=true
 
 # JWT
 security.jwt.secret-key=GENERATE_WITH_OPENSSL_RAND_BASE64_32
 security.jwt.expiration-time=3600000
 
+# Analytics (defaults shown; all optional)
+# Admin access comes from the users.role column, not from configuration
+analytics.currency=SGD
+analytics.time-zone=Asia/Singapore
+# Demo history is calculated from stored event dates, without a deployment-date cutoff.
+
 # External APIs
 LTADATAMALL_ACCOUNTKEY=YOUR_API_KEY
 URA_ACCESSKEY=YOUR_API_KEY
+# Optional: data.gov.sg API key (HDB rental data). Blank works but gets a lower rate limit.
+DATAGOVSG_API_KEY=
 
-# Gemini LLM API for AI chat summary and Ask AI guardrails
+# AI recommendations (OpenRouter). Leave the key blank to run the recommendation
+# pipeline entirely on its rule-based path; nothing else needs to change.
+# Get a key at https://openrouter.ai/keys. This key stays on the backend: the Expo app
+# never sees it, because EXPO_PUBLIC_* variables are shipped to the client.
+rentnest.ai.api-key=YOUR_OPENROUTER_KEY
+rentnest.ai.enabled=true
+
+# Pillar 1 - natural-language search text to structured filters.
+rentnest.ai.filter.enabled=true
+rentnest.ai.filter.model=google/gemini-2.5-flash-lite
+
+# Pillar 2 - re-rank of the top deterministically scored candidates.
+rentnest.ai.sorting.enabled=true
+rentnest.ai.sorting.model=google/gemini-2.5-flash-lite
+rentnest.ai.sorting.candidates=20
+
+# Listing summaries use factual templates, with no AI calls or database cache.
+
+# Timeouts. On expiry the request falls back to the rule-based path rather than failing.
+rentnest.ai.connect-timeout-ms=3000
+rentnest.ai.read-timeout-ms=9000
+
+# Gemini LLM API for AI chat summary, Ask AI guardrails and AI fair pricing
+# (room-type detection and price explanations)
 # Put the real key only in application.properties. Do not commit real API keys.
 llm.provider=gemini
 llm.api-key=YOUR_GEMINI_API_KEY
 llm.api-url=https://generativelanguage.googleapis.com/v1beta/models
 llm.model=gemini-3.6-flash
+llm.fallback-model=gemini-3.5-flash-lite
+# AI chat summary: primary attempt, one fallback attempt, cache and chunk limits.
+llm.connect-timeout-ms=5000
+llm.primary-timeout-ms=25000
+llm.fallback-timeout-ms=10000
+llm.retry-backoff-ms=300
+llm.summary-cache-ttl-ms=600000
+llm.summary-chunk-message-limit=100
+llm.summary-chunk-character-limit=12000
+
+# AI fair pricing: price listings without enough real comparables from simulated
+# transactions (labelled "DEMO" on the card). On by default; set false to use real data only.
+pricing.demo-data.enabled=true
+
+# AI fair pricing model (room detection and price explanation). A fast lite model keeps
+# the card responsive (~1 s per call); set a larger model here if needed.
+pricing.ai.model=gemini-3.5-flash-lite
+# Bound pricing-specific Gemini calls. On timeout, room classification falls back
+# to keywords and the explanation returns an unavailable response with Retry.
+pricing.ai.connect-timeout-ms=2000
+pricing.ai.read-timeout-ms=8000
+# Bound OneMap, data.gov.sg and URA calls used to build comparable rental data.
+pricing.data.connect-timeout-ms=2000
+pricing.data.read-timeout-ms=6000

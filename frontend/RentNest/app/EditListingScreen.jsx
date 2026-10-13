@@ -1,18 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Image, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, Image, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+
+const notificationBellIcon = require('../assets/images/notificationBell.png');
 import { FontAwesome } from '@expo/vector-icons';
 import MorphingInfinity from '../components/MorphingInfinity';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { inboxStore } from '../config/inbox';
 import { normalizeListingImageUrl } from '../components/ListingImage';
 
 const EditListingScreen = () => {
     const router = useRouter();
     const { listingId } = useLocalSearchParams();
     const [modalVisible, setModalVisible] = useState(false);
+    const [token, setToken] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const notificationTimeoutRef = useRef(null);
     const [listing, setListing] = useState({
         ownerUserID: 1,
         tenantUserID: 2,
@@ -38,6 +44,7 @@ const EditListingScreen = () => {
                     router.replace('/LandingScreen');
                     return;
                 }
+                setToken(token);
 
                 const response = await axios.get(`${API_BASE_URL}/api/listings/${listingId}`, {
                     headers: {
@@ -68,6 +75,17 @@ const EditListingScreen = () => {
         setListing({ ...listing, [field]: value });
     };
 
+    const formatWithCommas = (val) => {
+        const digits = String(val).replace(/\D/g, '');
+        if (!digits) return '';
+        return Number(digits).toLocaleString('en-US');
+    };
+
+    const handlePriceChange = (text) => {
+        const digits = text.replace(/\D/g, '');
+        setListing({ ...listing, price: digits });
+    };
+
     const handleUpdateListing = async () => {
         // Validation checks
         if (!listing.name) return Alert.alert('Validation Error', 'Name is required.');
@@ -82,6 +100,7 @@ const EditListingScreen = () => {
         if (!listing.description) return Alert.alert('Validation Error', 'Description is required.');
 
         try {
+            setIsSaving(true);
             const token = await AsyncStorage.getItem('token');
             if (!token) {
                 router.replace('/LandingScreen');
@@ -110,16 +129,18 @@ const EditListingScreen = () => {
                 }
             );
 
+            inboxStore.invalidate();
             setModalVisible(true);
+            notificationTimeoutRef.current = setTimeout(() => {
+                setModalVisible(false);
+                router.replace({ pathname: '/RentalInfoOwnerScreen', params: { listingId } });
+            }, 2000);
         } catch (error) {
             console.error('Error updating listing:', error);
             Alert.alert('Error', 'Failed to update listing');
+        } finally {
+            setIsSaving(false);
         }
-    };
-
-    const handleReturnHome = () => {
-        setModalVisible(false);
-        router.push({ pathname: '/RentalInfoOwnerScreen', params: { listingId } });
     };
 
     if (loading) {
@@ -172,6 +193,7 @@ const EditListingScreen = () => {
                         placeholderTextColor="#999"
                         value={listing.postal ? listing.postal.toString() : ''}
                         keyboardType="numeric"
+                        maxLength={6}
                         onChangeText={(value) => handleInputChange('postal', parseInt(value) || '')}
                     />
 
@@ -282,23 +304,33 @@ const EditListingScreen = () => {
                 />
 
                 {/* Update Listing Button */}
-                <TouchableOpacity style={styles.postButton} onPress={handleUpdateListing}>
-                    <Text style={styles.postButtonText}>Update Listing</Text>
+                <TouchableOpacity
+                    style={[styles.postButton, isSaving && styles.postButtonDisabled]}
+                    onPress={handleUpdateListing}
+                    disabled={isSaving}
+                >
+                    {isSaving ? (
+                        <View style={styles.savingContent}>
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                            <Text style={styles.postButtonText}>Saving...</Text>
+                        </View>
+                    ) : (
+                        <Text style={styles.postButtonText}>Update Listing</Text>
+                    )}
                 </TouchableOpacity>
 
-                {/* Confirmation Modal */}
                 <Modal
-                    transparent={true}
                     visible={modalVisible}
-                    animationType="slide"
+                    transparent
+                    animationType="fade"
+                    statusBarTranslucent
                 >
-                    <View style={styles.modalContainer}>
-                        <View style={styles.modalContent}>
-                            <Image source={require('../assets/images/confirmation.png')} style={styles.confirmationImage} />
-                            <Text style={styles.modalText}>Listing Updated Successfully!</Text>
-                            <TouchableOpacity style={styles.returnButton} onPress={handleReturnHome}>
-                                <Text style={styles.returnButtonText}>Return</Text>
-                            </TouchableOpacity>
+                    <View style={styles.notificationOverlay} pointerEvents="none">
+                        <View style={styles.notificationCard}>
+                            <View style={styles.notificationIconBox}>
+                                <Image source={notificationBellIcon} style={styles.notificationIcon} />
+                            </View>
+                            <Text style={styles.notificationText}>Listing Updated</Text>
                         </View>
                     </View>
                 </Modal>
@@ -358,6 +390,31 @@ const styles = StyleSheet.create({
         marginTop: 5,
         fontSize: 16,
     },
+    priceInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 5,
+        marginTop: 5,
+        paddingHorizontal: 10,
+        backgroundColor: '#fff',
+    },
+    priceDollar: {
+        fontSize: 16,
+        color: '#000',
+        paddingVertical: 10,
+        paddingRight: 4,
+    },
+    priceDollarPlaceholder: {
+        color: '#999',
+    },
+    priceInput: {
+        flex: 1,
+        fontSize: 16,
+        color: '#000',
+        paddingVertical: 10,
+    },
     typeContainer: {
         flexDirection: 'row',
         marginTop: 10,
@@ -396,38 +453,53 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 18,
     },
-    modalContainer: {
-        flex: 1,
-        justifyContent: 'flex-end',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    postButtonDisabled: {
+        opacity: 0.72,
     },
-    modalContent: {
-        backgroundColor: 'white',
-        padding: 20,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
+    savingContent: {
+        flexDirection: 'row',
         alignItems: 'center',
+        gap: 10,
     },
-    confirmationImage: {
-        width: 80,
-        height: 80,
-        borderRadius: 50,
-        marginBottom: 20,
+    notificationOverlay: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 22,
+        backgroundColor: 'rgba(0, 0, 0, 0.35)',
     },
-    modalText: {
-        fontSize: 18,
-        marginBottom: 20,
-        textAlign: 'center',
-        fontWeight: 'bold'
+    notificationCard: {
+        width: '100%',
+        maxWidth: 360,
+        alignItems: 'center',
+        backgroundColor: 'rgba(45, 45, 45, 0.82)',
+        borderRadius: 28,
+        paddingVertical: 28,
+        paddingHorizontal: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.24,
+        shadowRadius: 22,
+        elevation: 8,
     },
-    returnButton: {
-        backgroundColor: '#222222',
-        padding: 10,
-        borderRadius: 5,
+    notificationIconBox: {
+        width: 72,
+        height: 72,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(58, 58, 58, 0.72)',
+        marginBottom: 16,
     },
-    returnButtonText: {
-        color: '#fff',
-        fontSize: 16,
+    notificationIcon: {
+        width: 34,
+        height: 40,
+        resizeMode: 'contain',
+    },
+    notificationText: {
+        color: '#FFFFFF',
+        fontSize: 22,
+        fontWeight: '800',
     },
 });
 

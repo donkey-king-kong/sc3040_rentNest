@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Modal, Image, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Modal, Image } from 'react-native';
 import {useLocalSearchParams, useRouter} from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {jwtDecode} from "jwt-decode";
@@ -19,12 +19,26 @@ const TerminateLease = () => {
   const [selectedOption, setSelectedOption] = useState('refund');
   const [amount, setAmount] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [reload, setReload] = useState(0);
+  const submissionRef = useRef(false);
   const notificationTimeoutRef = useRef(null);
+  const generation = useRef(0);
 
   useEffect(() => {
+    const version = ++generation.current;
     const fetchData = async () => {
+      setLoading(true);
+      setError('');
+      setUser(null);
+      setRental(null);
+      setShowSuccess(false);
+      setSubmitting(false);
+      submissionRef.current = false;
       try {
         const token = await AsyncStorage.getItem('token');
+        if (version !== generation.current) return;
         if (!token) {
           router.replace('/LandingScreen');
           return;
@@ -39,26 +53,43 @@ const TerminateLease = () => {
           axios.get(`${API_BASE_URL}/api/users/${decoded.sub}`, { headers }),
           axios.get(`${API_BASE_URL}/api/rentals/${rentalId}`, { headers }),
         ]);
+        if (version !== generation.current) return;
         setUser(userResponse.data);
         setRental(rentalResponse.data);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        if (version === generation.current) setError('Unable to load this lease. Check your connection and retry.');
       } finally {
-        setLoading(false);
+        if (version === generation.current) setLoading(false);
       }
     };
     fetchData();
     return () => {
+      generation.current += 1;
       if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
     };
-  }, [rentalId]);
+  }, [rentalId, reload]);
 
-  const canSubmit = selectedOption === 'no_refund' || (selectedOption === 'refund' && amount.trim() !== '');
+  const validAmount = /^\d+$/.test(amount) && Number.isSafeInteger(Number(amount)) && Number(amount) > 0;
+  const eligible = !!user && !!rental && Number(user.userID) === Number(rental.ownerUserId)
+    && String(rental.status).toLowerCase() === 'active';
+  const canSubmit = eligible && !submitting && !showSuccess && (selectedOption === 'no_refund' || validAmount);
+
+  // Replace this form with the chat list, then open the chat on top of it, so Back from the
+  // chat returns to the list of chats instead of the already-submitted termination form.
+  const openTenantChat = (scrollAfterSend = false) => {
+    router.replace('/ChatsScreen');
+    router.push(`/ChatsScreen2?partnerUserId=${rental.tenantUserID}&currentUser=${user.userID}${scrollAfterSend ? '&scrollAfterSend=true' : ''}`);
+  };
 
   const submitTerminationRequest = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || submissionRef.current) return;
+    submissionRef.current = true;
+    const version = generation.current;
+    setSubmitting(true);
+    setError('');
     try {
       const token = await AsyncStorage.getItem('token');
+      if (version !== generation.current) return;
       if (!token) {
         router.replace('/LoginScreen');
         return;
@@ -75,15 +106,26 @@ const TerminateLease = () => {
           }
         }
       );
+      if (version !== generation.current) return;
       setShowSuccess(true);
       if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
       notificationTimeoutRef.current = setTimeout(() => {
+        if (version !== generation.current) return;
         setShowSuccess(false);
-        router.push(`/ChatsScreen2?partnerUserId=${rental.tenantUserID}&currentUser=${user.userID}`);
+        openTenantChat(true);
       }, 2000);
     } catch (error) {
-      console.error('Error sending termination request:', error);
-      Alert.alert('Error', 'Failed to submit termination request.');
+      if (version !== generation.current) return;
+      const status = error?.response?.status;
+      setError(status === 409 ? 'This lease already has a termination request or is no longer active. Open the chat to check its status.'
+        : status === 403 ? 'Only the owner of this lease can submit a termination request.'
+          : status === 401 ? 'Your session expired. Sign in again to continue.'
+            : 'Unable to submit the request. Check your connection and try again.');
+    } finally {
+      if (version === generation.current) {
+        submissionRef.current = false;
+        setSubmitting(false);
+      }
     }
   };
 
@@ -96,6 +138,18 @@ const TerminateLease = () => {
     );
   }
 
+  if (!eligible) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text accessibilityRole="alert" style={styles.errorText}>
+          {error || 'Only the owner of an active lease can request termination.'}
+        </Text>
+        {!!error && <TouchableOpacity accessibilityRole="button" style={styles.backButton} onPress={() => setReload(value => value + 1)}><Text>Retry</Text></TouchableOpacity>}
+        <TouchableOpacity accessibilityRole="button" style={styles.backButton} onPress={() => router.back()}><Text>Go back</Text></TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -104,7 +158,7 @@ const TerminateLease = () => {
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.backButton}>
             <FontAwesome name="chevron-left" size={18} color="#000" />
           </TouchableOpacity>
           <Text style={styles.title}>Terminate lease</Text>
@@ -122,19 +176,25 @@ const TerminateLease = () => {
         <Text style={styles.sectionLabel}>TERMINATION TYPE</Text>
         <View style={styles.optionsRow}>
           <TouchableOpacity
+            accessibilityRole="radio"
+            accessibilityState={{ selected: selectedOption === 'refund', disabled: submitting }}
+            disabled={submitting}
             style={[styles.optionButton, selectedOption === 'refund' && styles.optionSelected]}
             onPress={() => setSelectedOption('refund')}
           >
-            <Text style={styles.optionEmoji}>💰</Text>
+            <FontAwesome name="money" size={22} color="#505860" />
             <Text style={[styles.optionText, selectedOption === 'refund' && styles.optionTextSelected]}>
               Refund tenant
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
+            accessibilityRole="radio"
+            accessibilityState={{ selected: selectedOption === 'no_refund', disabled: submitting }}
+            disabled={submitting}
             style={[styles.optionButton, selectedOption === 'no_refund' && styles.optionSelected]}
             onPress={() => { setSelectedOption('no_refund'); setAmount(''); }}
           >
-            <Text style={styles.optionEmoji}>🚫</Text>
+            <FontAwesome name="ban" size={22} color="#505860" />
             <Text style={[styles.optionText, selectedOption === 'no_refund' && styles.optionTextSelected]}>
               No refund
             </Text>
@@ -149,16 +209,17 @@ const TerminateLease = () => {
             style={styles.amountInput}
             keyboardType="numeric"
             value={amount}
-            onChangeText={(text) => {
-              const match = text.match(/^\d*(\.\d{0,2})?/);
-              setAmount(match ? match[0] : '');
-            }}
-            editable={selectedOption === 'refund'}
+            onChangeText={setAmount}
+            accessibilityLabel="Refund amount in whole Singapore dollars"
+            editable={selectedOption === 'refund' && !submitting}
             placeholder="0"
-            placeholderTextColor="#aaa"
+            placeholderTextColor="#626970"
           />
         </View>
-        <Text style={styles.amountHint}>Enter the agreed refund amount (e.g. deposit or partial month)</Text>
+        <Text style={styles.amountHint}>Enter the agreed refund in whole Singapore dollars, without cents.</Text>
+        {selectedOption === 'refund' && amount !== '' && !validAmount && (
+          <Text accessibilityRole="alert" style={styles.errorText}>Enter a positive whole-dollar amount, or select No refund.</Text>
+        )}
 
         {/* Summary */}
         <Text style={styles.sectionLabel}>SUMMARY</Text>
@@ -177,20 +238,28 @@ const TerminateLease = () => {
             <View style={styles.summaryRow}>
               <Text style={styles.summaryKey}>Refund amount</Text>
               <Text style={[styles.summaryValue, styles.summaryRefundAmount]}>
-                ${Number(amount || 0).toLocaleString()}
+                {validAmount ? `SGD ${Number(amount).toLocaleString('en-SG')}` : 'Not entered'}
               </Text>
             </View>
           )}
         </View>
 
         {/* Submit button */}
+        {!!error && <Text accessibilityRole="alert" style={styles.errorText}>{error}</Text>}
+        {!!error && (
+          <TouchableOpacity accessibilityRole="button" style={styles.backButton} onPress={() => openTenantChat()}>
+            <Text>View tenant chat</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canSubmit, busy: submitting }}
           style={[styles.submitButton, !canSubmit && styles.submitButtonDisabled]}
           onPress={submitTerminationRequest}
           disabled={!canSubmit}
         >
           <FontAwesome name="ban" size={18} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={styles.submitButtonText}>Submit termination</Text>
+          <Text style={styles.submitButtonText}>{submitting ? 'Submitting...' : 'Submit termination'}</Text>
         </TouchableOpacity>
         <Text style={styles.submitDisclaimer}>This action cannot be undone once the tenant accepts.</Text>
       </ScrollView>
@@ -237,7 +306,9 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginRight: 12,
-    padding: 4,
+    padding: 12,
+    minHeight: 44,
+    minWidth: 44,
   },
   title: {
     fontSize: 24,
@@ -265,7 +336,7 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#999',
+    color: '#626970',
     letterSpacing: 0.8,
     marginBottom: 8,
     marginTop: 4,
@@ -287,10 +358,6 @@ const styles = StyleSheet.create({
   optionSelected: {
     borderColor: '#2FA84F',
     backgroundColor: '#f0faf3',
-  },
-  optionEmoji: {
-    fontSize: 22,
-    marginBottom: 4,
   },
   optionText: {
     fontSize: 14,
@@ -328,8 +395,15 @@ const styles = StyleSheet.create({
   },
   amountHint: {
     fontSize: 12,
-    color: '#aaa',
+    color: '#626970',
     marginBottom: 20,
+  },
+  errorText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#A12B2B',
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   summaryBox: {
     backgroundColor: '#f8f8f8',
@@ -359,7 +433,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#e53e3e',
+    backgroundColor: '#B52E2E',
     borderRadius: 8,
     marginBottom: 10,
   },
@@ -374,7 +448,7 @@ const styles = StyleSheet.create({
   submitDisclaimer: {
     textAlign: 'center',
     fontSize: 12,
-    color: '#aaa',
+    color: '#626970',
   },
   notificationOverlay: {
     flex: 1,

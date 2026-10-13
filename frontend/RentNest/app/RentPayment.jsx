@@ -17,6 +17,7 @@ import {useLocalSearchParams, useRouter} from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
+import { rentalDetailCache } from '../config/rentalDetails';
 import MorphingInfinity from '../components/MorphingInfinity';
 
 const notificationBellIcon = require('../assets/images/notificationBell.png');
@@ -81,8 +82,7 @@ const RentPaymentScreen = () => {
         },
       });
       const payments = response.data.payments || [];
-      const rentalID = payments.length > 0 ? payments[0].rentalID : null;
-      setRentalID(rentalID);
+      setRentalID(response.data.rentalId ?? (payments.length > 0 ? payments[0].rentalID : null));
       setAmount(response.data.rentalPrice || (payments.length > 0 ? payments[0].amount : 0));
       console.log("Payments response", response.status, response.data);
       setPaymentHistory(response.data);
@@ -277,6 +277,7 @@ const RentPaymentScreen = () => {
       });
 
       if (response.status === 200) {
+        rentalDetailCache.invalidate();
         await getPaymentHistory(); // Fetch the latest payment history
         setIsModalVisible(false);
         setCardNumber('');

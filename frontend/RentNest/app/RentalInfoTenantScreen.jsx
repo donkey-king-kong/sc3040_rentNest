@@ -262,6 +262,8 @@ const styles = StyleSheet.create({
   },
   left: {
     flexDirection: 'column',
+    flex: 1,
+    marginRight: 10,
   },
   listingName: {
     fontSize: 20,

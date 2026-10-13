@@ -216,11 +216,13 @@ public class PaymentService {
         Long rentalPrice = rental.getRentalPrice();
         Date leaseExpiry = rental.getLeaseExpiry();  // Retrieve the lease expiry date
 
-        // Fetch the payments associated with this rental
-        List<PaymentDTO> payments = getAllPaymentsByRentalID(rental.getRentalID());
+        // Fetch the payments associated with this rental (empty list is valid — tenant may not have paid yet)
+        List<PaymentDTO> payments = paymentRepository.findAllByRentalID(rental.getRentalID())
+                .stream().map(this::toPaymentDTO).collect(Collectors.toList());
 
         // Using a map to store the rental price, lease expiry, and the payments
         Map<String, Object> response = new HashMap<>();
+        response.put("rentalId", rental.getRentalID());      // Add rental ID so frontend can submit payments even with no history
         response.put("rentalPrice", rentalPrice);  // Add the rental price
         response.put("rentalDate", rental.getRentalDate());  // Add rental start date as fallback for older rentals
         response.put("leaseExpiry", leaseExpiry);  // Add the lease expiry date

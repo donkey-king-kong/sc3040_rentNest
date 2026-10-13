@@ -4,13 +4,56 @@ import java.util.List;
 import java.util.Optional;
 
 import RentNest.model.Listings;
+import RentNest.dto.InboxListingDTO;
+import RentNest.dto.OwnerRentalInfoDTO;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ListingsRepository extends JpaRepository<Listings, Long> {
+    // Load owner and tenant in the same query: the JSON includes their names and photos,
+    // and loading them lazily cost one database round trip per listing.
+    @Override
+    @EntityGraph(attributePaths = {"owner", "tenant"})
+    List<Listings> findAll();
+
+    @Query("SELECT new RentNest.dto.InboxListingDTO(l.listingID, l.name, l.location, " +
+            "l.listingpicture, l.owner.userID, t.userID, " +
+            "CASE WHEN l.owner.userID = :userId THEN 'Owner' ELSE 'Tenant' END) " +
+            "FROM Listings l LEFT JOIN l.tenant t " +
+            "WHERE l.owner.userID = :userId OR t.userID = :userId ORDER BY l.listingID")
+    List<InboxListingDTO> findInboxListings(@Param("userId") Long userId);
+
+    @Query("SELECT new RentNest.dto.OwnerRentalInfoDTO(l.listingID, l.name, l.location, " +
+            "l.listingpicture, l.price, o.userID, o.name, o.photoURL, t.userID, t.name, t.photoURL) " +
+            "FROM Listings l JOIN l.owner o LEFT JOIN l.tenant t " +
+            "WHERE l.listingID = :listingId AND o.userID = :ownerId")
+    Optional<OwnerRentalInfoDTO> findOwnerRentalInfo(
+            @Param("listingId") Long listingId, @Param("ownerId") Long ownerId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM Listings l WHERE l.listingID = :id")
+    Optional<Listings> findByIdForUpdate(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT l FROM Listings l JOIN FETCH l.owner WHERE l.listingID = :id")
+    Optional<Listings> findByIdForUpdateWithOwner(@Param("id") Long id);
+
+    @Query("SELECT l FROM Listings l JOIN FETCH l.owner o WHERE o.userID = :ownerId " +
+            "AND o.flagged = 0 AND l.flagged = false AND l.tenant IS NULL " +
+            "AND NOT EXISTS (SELECT r FROM Rentals r WHERE r.listings = l AND r.status IN ('pending', 'active')) " +
+            "ORDER BY l.name, l.listingID")
+    List<Listings> findOfferCandidates(@Param("ownerId") Long ownerId);
+
+    @Query("SELECT l FROM Listings l JOIN FETCH l.owner o WHERE l.tenant IS NULL " +
+            "AND l.flagged = false AND o.flagged = 0 AND o.userID <> :userId")
+    List<Listings> findRecommendationCandidates(@Param("userId") Long userId);
+
     List<Listings> findByFlaggedTrue();
     List<Listings> findByOwnerUserIDOrTenantUserID(Long ownerUserID, Long tenantUserID);
 

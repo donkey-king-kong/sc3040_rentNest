@@ -1,18 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { FontAwesome } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
-import MorphingInfinity from '../components/MorphingInfinity';
+import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 import ProfileImage from '../components/ProfileImage';
+import { startOptimisticDismissal } from '../config/moderationDismissals';
 
 const ProcessReviews2 = () => {
   const router = useRouter();
   const { reviewid } = useLocalSearchParams();
   const [review, setReview] = useState(null);
+  const [isDismissing, setIsDismissing] = useState(false);
+  const dismissPending = useRef(false);
 
   useEffect(() => {
     getFlaggedReview();
@@ -48,7 +50,7 @@ const ProcessReviews2 = () => {
           userID: response.data.reviewerID,
           name: response.data.reviewerName,
           email: response.data.reviewerEmail,
-          photoURL: response.data.reviewerPhotoURL || "https://images.healthshots.com/healthshots/en/uploads/2020/12/08182549/positive-person.jpg",
+          photoURL: response.data.reviewerPhotoURL || null,
         },
         flagged: response.data.flagged,
       };
@@ -61,28 +63,44 @@ const ProcessReviews2 = () => {
   };
 
   const handleIgnoreReview = async () => {
+    if (dismissPending.current) return;
+    dismissPending.current = true;
+    setIsDismissing(true);
+
     try {
       const token = await AsyncStorage.getItem('token');
       
       if (!token) {
+        dismissPending.current = false;
+        setIsDismissing(false);
         console.log('No token found!');
         router.replace('/LoginScreen');
         return;
       }
 
       console.log(`Executing PUT ${API_BASE_URL}/api/reviews/setFlag/${reviewid}/false`);
-      await axios.put(`${API_BASE_URL}/api/reviews/setFlag/${reviewid}/false`, {}, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
+      const started = startOptimisticDismissal({
+        type: 'reviews',
+        id: reviewid,
+        itemLabel: 'review report',
+        request: () => axios.put(`${API_BASE_URL}/api/reviews/setFlag/${reviewid}/false`, {}, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+        }),
       });
 
-      // Go back and trigger refresh
-      router.setParams({ refresh: 'true' });
-      router.back();
+      if (started) {
+        router.back();
+      } else {
+        dismissPending.current = false;
+        setIsDismissing(false);
+      }
     } catch (error) {
+      dismissPending.current = false;
+      setIsDismissing(false);
       console.error("Failed to ignore review:", error);
     }
   };
@@ -106,8 +124,8 @@ const ProcessReviews2 = () => {
         },
       });
 
-      // Navigate to process reviews screen 3
-      router.push('/ProcessReviewsScreen3');
+      // Return to the review list, which reloads when it regains focus.
+      router.back();
     } catch (error) {
       console.error("Failed to delete review:", error);
     }
@@ -115,22 +133,13 @@ const ProcessReviews2 = () => {
 
   if (!review) {
     return (
-      <View style={styles.loadingContainer}>
-        <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading review details...</Text>
-      </View>
+      <AdminLoadingState message="Loading review details..." />
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.topHeaderRow}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/ProcessReviewsScreen?refresh=true')}>
-          <FontAwesome name="chevron-left" size={18} color="#101820" />
-        </TouchableOpacity>
-        <Text style={styles.screenTitle}>Review Flagged Review</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <AdminHeader title="Review Flagged Review" onBack={() => router.replace('/ProcessReviewsScreen')} backLabel="Back to reviews" inset />
 
       <View style={styles.reviewBox}>
         <View style={styles.header}>
@@ -170,14 +179,18 @@ const ProcessReviews2 = () => {
         <TouchableOpacity
           style={[styles.button, styles.ignoreButton]}
           onPress={handleIgnoreReview}
+          disabled={isDismissing}
+          accessibilityState={{ disabled: isDismissing, busy: isDismissing }}
         >
-          <Text style={styles.buttonText}>Ignore</Text>
+          <Text style={styles.buttonText}>{isDismissing ? 'Dismissing…' : 'Dismiss Report'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.deleteButton]}
           onPress={handleDeleteReview}
+          disabled={isDismissing}
+          accessibilityState={{ disabled: isDismissing }}
         >
-          <Text style={styles.buttonText}>Delete</Text>
+          <Text style={styles.buttonText}>Delete Review</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -187,44 +200,8 @@ const ProcessReviews2 = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 15,
-    backgroundColor: '#f9f9f9',
-  },
-  topHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 2,
-  },
-  screenTitle: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#101820',
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 42,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 20,
     backgroundColor: '#F7F8FA',
-  },
-  loadingText: {
-    marginTop: 24,
-    color: '#101820',
-    fontSize: 18,
-    fontWeight: '700',
   },
   reviewBox: {
     backgroundColor: '#fff',
@@ -283,6 +260,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 5,
     width: '40%', // Adjust width as necessary
+    justifyContent: 'center', // keeps both buttons even if a label wraps
   },
   ignoreButton: {
     backgroundColor: 'green',

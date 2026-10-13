@@ -40,11 +40,13 @@ public class AuthenticationService {
             throw new IllegalArgumentException("Password cannot be left empty");
         }
 
+        String photoURL = PhotoUrlValidator.normalize(input.getPhotoURL());
         User user = new User()
                 .setName(input.getFullName())
                 .setEmail(input.getEmail())
                 .setPassword(passwordEncoder.encode(input.getPassword()))
-                .setContact(input.getContact());
+                .setContact(input.getContact())
+                .setPhotoURL(photoURL);
 
         return userRepository.save(user);
     }
