@@ -81,7 +81,8 @@ public class SecurityConfiguration {
 
         configuration.setAllowedOrigins(List.of("*"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization","Content-Type"));
+        configuration.setAllowedHeaders(List.of("Authorization","Content-Type", InboxRequestLoggingFilter.HEADER));
+        configuration.setExposedHeaders(List.of(InboxRequestLoggingFilter.HEADER));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 

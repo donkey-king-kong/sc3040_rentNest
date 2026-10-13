@@ -3,11 +3,11 @@
 ## What It Does
 
 LATEST REVISION: Condo/HDB prices, layouts and matching copy now follow
-`listing-variation-guide.md`; the landed property remains unchanged.
-For the existing populated database, run `update-listing-variations.sql`,
+[listing-variation-guide.md](listing-variation-guide.md); the landed property remains unchanged.
+For the existing populated database, run [update-listing-variations.sql](update-listing-variations.sql),
 not this fresh-import seed.
 
-`listing-reseed.sql` imports the 19 backed-up properties as new, vacant,
+[listing-reseed.sql](listing-reseed.sql) imports the 19 backed-up properties as new, vacant,
 unflagged listings. It assigns two to each existing user in ascending user ID
 order, stopping after 19 properties. With current users, IDs 1-9 get two each
 and ID 10 gets one. Users after that get none.
@@ -29,10 +29,10 @@ tables remain empty; historical amenities are not restored.
 
 1. Retain the verified `rentnest-before-reset.dump` backup. Stop backend/app
    writes and confirm the intended test project.
-2. Open SQL Editor and run the ENTIRE `listing-reseed.sql` file, not a fragment.
+2. Open SQL Editor and run the ENTIRE [listing-reseed.sql](listing-reseed.sql) file, not a fragment.
 3. Confirm successful completion through COMMIT. Retain the 19-row mapping grid.
    A result grid without a successful commit is not proof of completion.
-4. Run the checks below, then rerun `database-read-only-audit.sql`.
+4. Run the checks below, then rerun [database-read-only-audit.sql](../Audits/database-read-only-audit.sql).
 
 The script refuses to run if any reset table contains rows or fewer than ten
 users exist. It does not delete data to resolve a failed prerequisite. It also
@@ -88,7 +88,7 @@ flow; this SQL import cannot validate that flow.
 ## Original Import Validation
 
 The checks below describe the original backup-preserving import. See
-`listing-variation-guide.md` for validation of the revised synthetic profiles.
+[listing-variation-guide.md](listing-variation-guide.md) for validation of the revised synthetic profiles.
 
 Tested against a disposable local PostgreSQL copy with the actual restored schema:
 
@@ -109,7 +109,7 @@ require a listing. No target constraints were disabled.
 The user has confirmed the Supabase import and expected owner/count results.
 Rendered app/amenity validation remains pending. Do not rerun the seed on the
 populated target to remove the summary columns; use the separate column-removal
-migration described in `listing-summary-removal.md`.
+migration described in [listing-summary-removal.md](../../Features/listing-summary-removal.md).
 
 ## Data Handling
 

@@ -17,6 +17,7 @@ import amex from "../assets/images/amex.jpg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
+import { inboxStore } from '../config/inbox';
 import MorphingInfinity from '../components/MorphingInfinity';
 import AvatarOrb from '../components/AvatarOrb';
 import ProfileImage from '../components/ProfileImage';
@@ -728,6 +729,7 @@ const ChatsScreen2 = () => {
             });
             // const editListingResponse = await axios.put(``) -> 
             if (acceptOfferResponse.status === 200) {
+                inboxStore.invalidate();
                 await getConversation();
                 console.log("Rental Offer Accepted", acceptOfferResponse.data);
             } else {

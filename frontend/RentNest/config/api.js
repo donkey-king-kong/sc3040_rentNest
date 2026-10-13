@@ -50,6 +50,7 @@ export const ENDPOINTS = {
     SIGNUP: '/auth/signup',
     RESET_PASSWORD: '/auth/reset-password',
     LISTINGS: "/api/listings",
+    INBOX: '/api/listings/inbox',
     RECOMMENDATIONS: '/api/listings/recommendations',
     RENTALS: '/api/rentals',
     PAYMENTS: '/api/payment',

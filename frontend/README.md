@@ -1,5 +1,24 @@
 # Frontend
 
+## Inbox Loading and Logs
+
+Restart/deploy the backend before this frontend. Inbox uses the authenticated
+`GET /api/listings/inbox` endpoint rather than downloading every listing.
+It caches only the current session's properties in memory, keeps cards visible
+during background refresh, and supports pull-to-refresh plus Refresh/Retry.
+Login/logout clear the cache; property and rental changes invalidate it.
+Changes from another device appear on the next refresh or focus.
+
+Frontend and backend logs share the `[Inbox]` prefix and `X-Inbox-Request-Id`.
+They report request/query duration, status, row count, cache use, and failures
+without tokens or property payloads. Set `EXPO_PUBLIC_INBOX_DIAGNOSTICS=false`
+and restart/rebuild Expo to suppress frontend informational logs; warnings remain.
+
+Run `npm run test:inbox` from `frontend/RentNest`. See the
+[Inbox performance and diagnostics guide](../Documentation/Troubleshooting/inbox-performance.md)
+for backend logging controls, timing interpretation, measured improvements,
+safe regression commands, deployment requirements, and Android validation limits.
+
 ## Startup Routing
 
 The root stack explicitly starts at `index`, which redirects to `LandingScreen`
@@ -99,7 +118,7 @@ Web keyboard behavior and iOS interaction still require platform verification.
 ## Lease Termination
 
 Approved work is on `rental-termination`, branched from `main`. See the
-[workflow plan](../Documentation/termination-workflow-plan.md) for tickets and scope.
+[workflow plan](../Documentation/Plans/termination-workflow-plan.md) for tickets and scope.
 Automated termination checks passed; platform validation limits are recorded below.
 
 ### Owner and Tenant Guide

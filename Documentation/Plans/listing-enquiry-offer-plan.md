@@ -2,7 +2,7 @@
 
 Status: approved by the user and implemented on `rental-termination`.
 Local automated and isolated web validation are recorded in
-`listing-enquiry-offer-guide.md`; native-device and shared-database deployment
+[listing-enquiry-offer-guide.md](../Features/listing-enquiry-offer-guide.md); native-device and shared-database deployment
 checks remain release gates.
 
 ## Product Summary

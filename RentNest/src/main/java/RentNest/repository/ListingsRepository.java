@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import RentNest.model.Listings;
+import RentNest.dto.InboxListingDTO;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,6 +20,13 @@ public interface ListingsRepository extends JpaRepository<Listings, Long> {
     @Override
     @EntityGraph(attributePaths = {"owner", "tenant"})
     List<Listings> findAll();
+
+    @Query("SELECT new RentNest.dto.InboxListingDTO(l.listingID, l.name, l.location, " +
+            "l.listingpicture, l.owner.userID, t.userID, " +
+            "CASE WHEN l.owner.userID = :userId THEN 'Owner' ELSE 'Tenant' END) " +
+            "FROM Listings l LEFT JOIN l.tenant t " +
+            "WHERE l.owner.userID = :userId OR t.userID = :userId ORDER BY l.listingID")
+    List<InboxListingDTO> findInboxListings(@Param("userId") Long userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT l FROM Listings l WHERE l.listingID = :id")

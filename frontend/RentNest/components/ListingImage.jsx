@@ -93,6 +93,7 @@ const ListingImage = ({
   screen,
   listingId,
   listingName,
+  diagnostics = true,
   resizeMode = 'cover',
   width = DEFAULT_IMAGE_WIDTH,
   height = DEFAULT_IMAGE_HEIGHT,
@@ -106,7 +107,7 @@ const ListingImage = ({
   useEffect(() => {
     setImageUri(initialUri);
     setHasTerminalError(false);
-    console.log('[ListingImage] prepared', getImageDebugContext({
+    if (diagnostics) console.log('[ListingImage] prepared', getImageDebugContext({
       screen,
       listingId,
       listingName,
@@ -115,11 +116,11 @@ const ListingImage = ({
       optimizedUrl,
       usingFallback: initialUri === LISTING_IMAGE_FALLBACK,
     }));
-  }, [initialUri, listingId, listingName, optimizedUrl, screen, uri]);
+  }, [diagnostics, initialUri, listingId, listingName, optimizedUrl, screen, uri]);
 
   const handleError = (error) => {
     const nativeError = error?.nativeEvent?.error || error?.nativeEvent || error?.message || 'Unknown image load error';
-    console.log('[ListingImage] failed', {
+    if (diagnostics) console.log('[ListingImage] failed', {
       ...getImageDebugContext({
         screen,
         listingId,
@@ -136,7 +137,7 @@ const ListingImage = ({
   };
 
   const handleLoad = () => {
-    console.log('[ListingImage] loaded', getImageDebugContext({
+    if (diagnostics) console.log('[ListingImage] loaded', getImageDebugContext({
       screen,
       listingId,
       listingName,

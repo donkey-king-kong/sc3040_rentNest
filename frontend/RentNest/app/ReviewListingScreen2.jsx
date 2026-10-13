@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
+import { inboxStore } from '../config/inbox';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 import ProfileImage from '../components/ProfileImage';
 
@@ -66,6 +67,7 @@ const ReviewListingScreen2 = () => {
       });
 
       // Replace the deleted property's review page with the standard success notification.
+      inboxStore.invalidate();
       router.replace('/ReviewListingScreen3');
     } catch (error) {
       const serverMessage = error.response?.data?.message;
