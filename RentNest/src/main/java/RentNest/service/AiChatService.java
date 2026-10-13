@@ -70,7 +70,8 @@ public class AiChatService {
         }
 
         if (!isLlmConfigured()) {
-            return new AiChatSummaryResponseDTO(generatePlaceholderSummary(conversation), true);
+            String text = isDemoConversation(userA, userB) ? DEMO_SUMMARY_JSON : generatePlaceholderSummary(conversation);
+            return new AiChatSummaryResponseDTO(text, true);
         }
 
         SummaryCacheKey cacheKey = summaryCacheKey(userA, userB, conversation);
