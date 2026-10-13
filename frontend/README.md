@@ -1,5 +1,30 @@
 # Frontend
 
+## Startup Routing
+
+The root stack explicitly starts at `index`, which redirects to `LandingScreen`
+with **Log In** and **Sign Up**. Keep `index` registered before `AdminScreen` in
+`app/_layout.jsx` so native startup does not fall back to the admin screen.
+Explicit deep links still open their requested routes.
+
+Restarting Expo or closing Expo Go does not clear the token stored by
+AsyncStorage. Default startup shows Landing without checking or deleting that
+token; use Log out to end the saved session. Login still selects the appropriate
+dashboard after authentication.
+
+Run the focused configuration regression tests from `frontend/RentNest`:
+
+```bash
+node --test scripts/startup-routing.test.mjs
+```
+
+Verified on Android Expo Go: signed-out cold launch opens Landing, both landing
+buttons open their respective forms, Back from Login returns to Landing, and an
+explicit Login deep link remains supported. The three automated tests cover the
+initial screen, unconditional landing redirect, and retained admin styling.
+Authenticated cold launch, post-login dashboards, web, and iOS were not
+retested for this change.
+
 ## Profile Photo URLs
 
 Sign Up and Edit Profile include **Photo URL**. Sign Up shows the label inside
