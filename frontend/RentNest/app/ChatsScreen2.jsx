@@ -1482,7 +1482,7 @@ const handlePaymentAndAccept = async () => {
                                         <View style={styles.summaryCard}>
                                             <View style={styles.summaryCardHeaderRow}>
                                                 <FontAwesome name="commenting-o" size={14} color={isSummaryPlaceholder ? '#E94068' : '#A4A4AD'} style={styles.summaryCardIcon} />
-                                                <Text style={styles.summaryCardLabel}>Overview</Text>
+                                                <Text style={[styles.summaryCardLabel, isSummaryPlaceholder && { color: '#E94068' }]}>Overview</Text>
                                             </View>
                                             <Text style={styles.summaryCardContent}>{parsedSummary.overview}</Text>
                                         </View>
