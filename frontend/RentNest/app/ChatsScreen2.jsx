@@ -916,7 +916,7 @@ const handlePaymentAndAccept = async () => {
     useEffect(() => {
         if (!Loading && chat.length > 0 && !initialScrollComplete.current) {
             initialScrollComplete.current = true;
-            const timer = setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: scrollAfterSend === 'true' }), 0);
+            const timer = setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: false }), 100);
             return () => clearTimeout(timer);
         }
     }, [Loading, chat.length]);
@@ -1387,6 +1387,10 @@ const handlePaymentAndAccept = async () => {
                     if (!sentMessageScrollPending.current) return;
                     sentMessageScrollPending.current = false;
                     chatScrollRef.current?.scrollToEnd({ animated: true });
+                }}
+                onLayout={() => {
+                    if (!initialScrollComplete.current) return;
+                    chatScrollRef.current?.scrollToEnd({ animated: false });
                 }}
                 style={styles.chatList}
                 contentContainerStyle={styles.chatListContent}
