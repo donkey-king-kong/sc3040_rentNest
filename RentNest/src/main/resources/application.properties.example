@@ -60,6 +60,15 @@ llm.provider=gemini
 llm.api-key=YOUR_GEMINI_API_KEY
 llm.api-url=https://generativelanguage.googleapis.com/v1beta/models
 llm.model=gemini-3.6-flash
+llm.fallback-model=gemini-3.5-flash-lite
+# AI chat summary: primary attempt, one fallback attempt, cache and chunk limits.
+llm.connect-timeout-ms=5000
+llm.primary-timeout-ms=25000
+llm.fallback-timeout-ms=10000
+llm.retry-backoff-ms=300
+llm.summary-cache-ttl-ms=600000
+llm.summary-chunk-message-limit=100
+llm.summary-chunk-character-limit=12000
 
 # AI fair pricing: price listings without enough real comparables from simulated
 # transactions (labelled "DEMO" on the card). On by default; set false to use real data only.

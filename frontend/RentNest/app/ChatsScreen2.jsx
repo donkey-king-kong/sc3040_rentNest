@@ -29,6 +29,29 @@ import EnquiryPreview from '../components/EnquiryPreview';
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
 const notificationBellIcon = require('../assets/images/notificationBell.png');
+let aiChatRequestSequence = 0;
+
+const createAiChatRequestId = () => {
+    aiChatRequestSequence += 1;
+    return `ai-chat-${Date.now()}-${aiChatRequestSequence}`;
+};
+
+const getSummaryErrorMessage = (error) => {
+    const serverMessage = error?.response?.data?.message;
+    if (typeof serverMessage === 'string' && serverMessage.trim() !== '') {
+        return serverMessage;
+    }
+    switch (error?.response?.status) {
+        case 429:
+            return 'The AI service is busy. Please wait and try again.';
+        case 503:
+            return 'The AI service is temporarily unavailable. Please try again.';
+        case 504:
+            return 'The AI took too long to respond. Please try again.';
+        default:
+            return 'Unable to generate the chat summary right now. Please try again.';
+    }
+};
 
 const ChatsScreen2 = () => {
     const router = useRouter();
@@ -550,7 +573,8 @@ const ChatsScreen2 = () => {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-AI-Chat-Request-Id': createAiChatRequestId(),
                 },
             });
 
@@ -569,8 +593,7 @@ const ChatsScreen2 = () => {
             setSummaryModalVisible(true);
             Animated.spring(summarySheetY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
         } catch (error) {
-            console.error('Error generating chat summary:', error);
-            setSummaryError('Unable to generate chat summary right now.');
+            setSummaryError(getSummaryErrorMessage(error));
             setSummaryPlaceholder(false);
             setParsedSummary(null);
             summarySheetY.setValue(600);
@@ -1290,8 +1313,19 @@ const handlePaymentAndAccept = async () => {
                 <TouchableOpacity onPress={() => setAskAiModalVisible(true)} style={styles.aiSummaryButton}>
                     <Text style={styles.aiSummaryButtonText}>Ask AI</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={getChatSummary} style={styles.aiSummaryButton} disabled={isGeneratingSummary}>
-                    <Text style={styles.aiSummaryButtonText}>{isGeneratingSummary ? 'Summarising...' : 'Summarise Chat'}</Text>
+                <TouchableOpacity
+                    accessibilityLabel={isGeneratingSummary ? 'Summarising chat' : 'Summarise Chat'}
+                    accessibilityRole="button"
+                    accessibilityState={{ busy: isGeneratingSummary, disabled: isGeneratingSummary }}
+                    onPress={getChatSummary}
+                    style={[styles.aiSummaryButton, isGeneratingSummary && styles.aiSummaryButtonBusy]}
+                    disabled={isGeneratingSummary}
+                >
+                    {isGeneratingSummary ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                        <Text style={styles.aiSummaryButtonText}>Summarise Chat</Text>
+                    )}
                 </TouchableOpacity>
             </View>
 
@@ -1362,8 +1396,25 @@ const handlePaymentAndAccept = async () => {
                             showsVerticalScrollIndicator={false}
                             onLayout={() => summaryScrollRef.current?.scrollTo({ y: 0, animated: false })}
                         >
-                            {summaryError ? (
-                                <Text style={styles.summaryText}>{summaryError}</Text>
+                            {isGeneratingSummary ? (
+                                <View style={styles.summaryLoadingState}>
+                                    <ActivityIndicator
+                                        accessibilityLabel="Generating chat summary"
+                                        size="small"
+                                        color="#3D9BFF"
+                                    />
+                                </View>
+                            ) : summaryError ? (
+                                <View style={styles.summaryErrorState}>
+                                    <Text accessibilityRole="alert" style={styles.summaryText}>{summaryError}</Text>
+                                    <TouchableOpacity
+                                        accessibilityRole="button"
+                                        onPress={getChatSummary}
+                                        style={styles.summaryRetryButton}
+                                    >
+                                        <Text style={styles.summaryRetryButtonText}>Try Again</Text>
+                                    </TouchableOpacity>
+                                </View>
                             ) : parsedSummary ? (
                                 <View>
                                     {parsedSummary.overview && (
@@ -2142,7 +2193,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#101820',
         borderRadius: 10,
         paddingVertical: 10,
+        minHeight: 37,
         alignItems: 'center',
+        justifyContent: 'center',
+    },
+    aiSummaryButtonBusy: {
+        opacity: 0.82,
     },
     aiSummaryButtonText: {
         color: '#fff',
@@ -2488,6 +2544,29 @@ const styles = StyleSheet.create({
         width: '100%',
         marginBottom: 10,
         color: '#F1F1F4',
+    },
+    summaryLoadingState: {
+        minHeight: 120,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    summaryErrorState: {
+        paddingTop: 16,
+        alignItems: 'flex-start',
+    },
+    summaryRetryButton: {
+        minHeight: 44,
+        borderRadius: 12,
+        paddingHorizontal: 18,
+        paddingVertical: 11,
+        backgroundColor: '#3D7DD8',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    summaryRetryButtonText: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '800',
     },
     summaryOverlay: {
         position: 'absolute',

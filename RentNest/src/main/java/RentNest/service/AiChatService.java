@@ -1,5 +1,6 @@
 package RentNest.service;
 
+import RentNest.config.AiChatProperties;
 import RentNest.dto.AiChatSummaryResponseDTO;
 import RentNest.dto.AiChatQuestionResponseDTO;
 import RentNest.model.ChatHistory;
@@ -9,28 +10,25 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-import java.util.zip.GZIPInputStream;
 
 @Service
 public class AiChatService {
     private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
     private static final String PLACEHOLDER_PREFIX = "[HARDCODED PLACEHOLDER]";
-    private static final Duration LLM_CONNECT_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration LLM_REQUEST_TIMEOUT = Duration.ofSeconds(20);
+    private static final String SUMMARY_PROMPT_VERSION = "summary-v2";
     private static final List<String> PLACEHOLDER_API_KEYS = List.of(
             "YOUR_LLM_API_KEY",
             "YOUR_GEMINI_API_KEY",
@@ -38,26 +36,20 @@ public class AiChatService {
     );
 
     private final ChatHistoryService chatHistoryService;
-    private final HttpClient httpClient;
+    private final AiChatProperties properties;
+    private final AiChatProviderClient providerClient;
     private final ObjectMapper objectMapper;
+    private final Map<SummaryCacheKey, SummaryCacheEntry> summaryCache = new ConcurrentHashMap<>();
+    private final Map<SummaryCacheKey, CompletableFuture<AiChatSummaryResponseDTO>> summaryInFlight =
+            new ConcurrentHashMap<>();
 
-    @Value("${llm.api-key:}")
-    private String llmApiKey;
-
-    @Value("${llm.provider:gemini}")
-    private String llmProvider;
-
-    @Value("${llm.api-url:https://generativelanguage.googleapis.com/v1beta/models}")
-    private String llmApiUrl;
-
-    @Value("${llm.model:gemini-3.6-flash}")
-    private String llmModel;
-
-    public AiChatService(ChatHistoryService chatHistoryService) {
+    public AiChatService(
+            ChatHistoryService chatHistoryService,
+            AiChatProperties properties,
+            AiChatProviderClient providerClient) {
         this.chatHistoryService = chatHistoryService;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(LLM_CONNECT_TIMEOUT)
-                .build();
+        this.properties = properties;
+        this.providerClient = providerClient;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -75,7 +67,29 @@ public class AiChatService {
             return new AiChatSummaryResponseDTO(generatePlaceholderSummary(conversation), true);
         }
 
-        String systemInstruction = """
+        SummaryCacheKey cacheKey = summaryCacheKey(userA, userB, conversation);
+        long now = System.currentTimeMillis();
+        pruneSummaryCache(cacheKey, now);
+        SummaryCacheEntry cached = summaryCache.get(cacheKey);
+        if (cached != null && now - cached.createdAt() <= Math.max(1, properties.getSummaryCacheTtlMs())) {
+            log.info("[AIChat] event=summary_cache requestId={} cache=hit messageCount={}",
+                    requestId(), conversation.size());
+            return cached.response();
+        }
+        if (cached != null) summaryCache.remove(cacheKey, cached);
+        log.info("[AIChat] event=summary_cache requestId={} cache=miss messageCount={}",
+                requestId(), conversation.size());
+
+        CompletableFuture<AiChatSummaryResponseDTO> ownedFuture = new CompletableFuture<>();
+        CompletableFuture<AiChatSummaryResponseDTO> existing = summaryInFlight.putIfAbsent(cacheKey, ownedFuture);
+        if (existing != null) {
+            log.info("[AIChat] event=request_coalesced requestId={} messageCount={}",
+                    requestId(), conversation.size());
+            return awaitSummary(existing);
+        }
+
+        try {
+            String systemInstruction = """
                 You are the RentNest chat assistant for a rental housing app.
                 Summarise rental conversations for users who want quick status updates.
 
@@ -110,16 +124,23 @@ public class AiChatService {
                 {"overview":"Discussed unit condition and agreed on a weekend viewing.","next_steps":"Tenant will confirm availability by Friday.","sections":[{"label":"Viewing & move-in","icon":"calendar","rows":[{"label":"Viewing","value":"Sat 19 Sep 2:30 PM"},{"label":"Earliest move-in","value":"Oct 1"}]},{"label":"Location","icon":"map-marker","content":"Blk 18B, #12-04 near bus stop"}]}
                 """;
 
-        String prompt = """
-                Structured rental context:
-                %s
-
-                Chat transcript:
-                %s
-                """.formatted(formatConversationMetadata(conversation), formatConversation(conversation));
-
-        String summary = callLlm(systemInstruction, prompt);
-        return new AiChatSummaryResponseDTO(summary, false);
+            long summaryStarted = System.nanoTime();
+            AiChatProviderClient.Completion completion =
+                    summarizeConversation(conversation, systemInstruction);
+            validateSummaryJson(completion.text());
+            AiChatSummaryResponseDTO response = new AiChatSummaryResponseDTO(completion.text(), false);
+            summaryCache.put(cacheKey, new SummaryCacheEntry(System.currentTimeMillis(), response));
+            log.info("[AIChat] event=summary_generated requestId={} model={} status={} messageCount={} durationMs={} summary={}",
+                    requestId(), completion.model(), completion.status(), conversation.size(),
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - summaryStarted), completion.text());
+            ownedFuture.complete(response);
+            return response;
+        } catch (RuntimeException failure) {
+            ownedFuture.completeExceptionally(failure);
+            throw failure;
+        } finally {
+            summaryInFlight.remove(cacheKey, ownedFuture);
+        }
     }
 
     public AiChatQuestionResponseDTO askQuestion(Long userA, Long userB, String question) {
@@ -223,7 +244,12 @@ public class AiChatService {
                 %s
                 """.formatted(formatConversationMetadata(conversation), formatConversation(conversation), question.trim());
 
-        String answer = callLlm(systemInstruction, prompt);
+        String answer = providerClient.complete(
+                systemInstruction,
+                prompt,
+                "question",
+                conversation.size(),
+                false).text();
 
         return new AiChatQuestionResponseDTO(
                 true,
@@ -234,14 +260,14 @@ public class AiChatService {
     }
 
     private boolean isLlmConfigured() {
-        return llmApiKey != null
-                && !llmApiKey.isBlank()
-                && !PLACEHOLDER_API_KEYS.contains(llmApiKey)
-                && isSupportedProvider(llmProvider)
-                && llmApiUrl != null
-                && !llmApiUrl.isBlank()
-                && llmModel != null
-                && !llmModel.isBlank();
+        return properties.getApiKey() != null
+                && !properties.getApiKey().isBlank()
+                && !PLACEHOLDER_API_KEYS.contains(properties.getApiKey())
+                && isSupportedProvider(properties.getProvider())
+                && properties.getApiUrl() != null
+                && !properties.getApiUrl().isBlank()
+                && properties.getModel() != null
+                && !properties.getModel().isBlank();
     }
 
     private boolean isSupportedProvider(String provider) {
@@ -388,173 +414,178 @@ public class AiChatService {
         metadata.append("\n");
     }
 
-    private String callLlm(String systemInstruction, String prompt) {
-        if ("openrouter".equalsIgnoreCase(llmProvider)) {
-            return callOpenRouter(systemInstruction, prompt);
+    private AiChatProviderClient.Completion summarizeConversation(
+            List<ChatHistory> conversation,
+            String systemInstruction) {
+        List<TranscriptChunk> chunks = buildTranscriptChunks(conversation);
+        String metadata = formatConversationMetadata(conversation);
+        if (chunks.size() == 1) {
+            String prompt = """
+                    Structured rental context:
+                    %s
+
+                    Chat transcript:
+                    %s
+                    """.formatted(metadata, chunks.get(0).text());
+            return providerClient.complete(
+                    systemInstruction, prompt, "summary", conversation.size(), true);
         }
 
-        return callGemini(systemInstruction, prompt);
+        List<String> partialSummaries = new ArrayList<>();
+        for (int index = 0; index < chunks.size(); index++) {
+            TranscriptChunk chunk = chunks.get(index);
+            String prompt = """
+                    Structured rental context:
+                    %s
+
+                    This is part %d of %d of the chat transcript. Summarise only this part
+                    using the required JSON structure so it can be combined later.
+
+                    Chat transcript part:
+                    %s
+                    """.formatted(metadata, index + 1, chunks.size(), chunk.text());
+            AiChatProviderClient.Completion completion = providerClient.complete(
+                    systemInstruction, prompt, "summary_chunk", chunk.messageCount(), true);
+            validateSummaryJson(completion.text());
+            partialSummaries.add(completion.text());
+        }
+
+        String aggregatePrompt = """
+                Structured rental context:
+                %s
+
+                The complete conversation was processed in %d parts. Combine every
+                partial summary below into one final summary using the required JSON
+                structure. Preserve facts and next steps from all parts without repetition.
+
+                Partial summaries:
+                %s
+                """.formatted(metadata, chunks.size(), String.join("\n", partialSummaries));
+        return providerClient.complete(
+                systemInstruction, aggregatePrompt, "summary_aggregate",
+                conversation.size(), true);
     }
 
-    private String callOpenRouter(String systemInstruction, String prompt) {
+    private List<TranscriptChunk> buildTranscriptChunks(List<ChatHistory> conversation) {
+        int messageLimit = Math.max(1, properties.getSummaryChunkMessageLimit());
+        int characterLimit = Math.max(500, properties.getSummaryChunkCharacterLimit());
+        Rentals rental = findConversationRental(conversation);
+        Listings listing = rental != null ? rental.getListings() : null;
+        Long ownerId = listing != null ? listing.getOwnerId() : null;
+        Long tenantId = rental != null && rental.getTenantUserID() != null
+                ? rental.getTenantUserID()
+                : listing != null ? listing.getTenantId() : null;
+        List<TranscriptChunk> chunks = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int currentMessageCount = 0;
+
+        for (ChatHistory message : conversation) {
+            String line = formatSpeakerLabel(message, ownerId, tenantId) + ": "
+                    + (message.getMessage() == null ? "" : message.getMessage()) + "\n";
+            if (currentMessageCount >= messageLimit
+                    || (!current.isEmpty() && current.length() + line.length() > characterLimit)) {
+                chunks.add(new TranscriptChunk(current.toString(), currentMessageCount));
+                current.setLength(0);
+                currentMessageCount = 0;
+            }
+            if (line.length() > characterLimit) {
+                if (!current.isEmpty()) {
+                    chunks.add(new TranscriptChunk(current.toString(), currentMessageCount));
+                    current.setLength(0);
+                    currentMessageCount = 0;
+                }
+                for (int start = 0; start < line.length(); start += characterLimit) {
+                    int end = Math.min(start + characterLimit, line.length());
+                    chunks.add(new TranscriptChunk(line.substring(start, end), 1));
+                }
+                continue;
+            }
+            current.append(line);
+            currentMessageCount++;
+        }
+        if (!current.isEmpty()) {
+            chunks.add(new TranscriptChunk(current.toString(), currentMessageCount));
+        }
+        return chunks;
+    }
+
+    private void validateSummaryJson(String summary) {
         try {
-            Map<String, Object> requestBody = Map.of(
-                    "model", llmModel,
-                    "messages", List.of(
-                            Map.of(
-                                    "role", "system",
-                                    "content", systemInstruction
-                            ),
-                            Map.of(
-                                    "role", "user",
-                                    "content", prompt
-                            )
-                    ),
-                    "temperature", 0.2,
-                    "max_tokens", 2000
-            );
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(llmApiUrl))
-                    .timeout(LLM_REQUEST_TIMEOUT)
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
-                    .header("Accept-Encoding", "identity")
-                    .header("Authorization", "Bearer " + llmApiKey)
-                    .header("HTTP-Referer", "http://localhost:8080")
-                    .header("X-Title", "RentNest")
-                    .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(requestBody)))
-                    .build();
-
-            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new RuntimeException("OpenRouter API returned status " + response.statusCode());
+            JsonNode root = objectMapper.readTree(summary);
+            if (root == null
+                    || !root.path("overview").isTextual()
+                    || root.path("overview").asText().isBlank()
+                    || !root.path("next_steps").isTextual()
+                    || root.path("next_steps").asText().isBlank()
+                    || !root.path("sections").isArray()) {
+                throw new IllegalArgumentException("Missing required summary fields");
             }
-
-            JsonNode responseJson = objectMapper.readTree(decodeResponseBody(response));
-            JsonNode textNode = responseJson.path("choices").path(0).path("message").path("content");
-
-            if (textNode.isMissingNode() || textNode.asText().isBlank()) {
-                throw new RuntimeException("OpenRouter API returned an empty response");
-            }
-
-            String result = stripJsonCodeFence(textNode.asText());
-            log.info("[OpenRouter] LLM response:\n{}", result);
-            return result;
-        } catch (Exception e) {
-            throw new RuntimeException("Unable to call OpenRouter API: " + e.getMessage());
+        } catch (Exception failure) {
+            throw new AiChatProviderException(
+                    AiChatProviderException.Kind.INVALID_RESPONSE,
+                    "AI provider returned an invalid summary",
+                    false,
+                    failure);
         }
     }
 
-    private String decodeResponseBody(HttpResponse<byte[]> response) throws Exception {
-        String contentEncoding = response.headers()
-                .firstValue("content-encoding")
-                .orElse("");
-
-        if ("gzip".equalsIgnoreCase(contentEncoding)) {
-            try (GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(response.body()))) {
-                return new String(gzipInputStream.readAllBytes(), StandardCharsets.UTF_8);
-            }
-        }
-
-        return new String(response.body(), StandardCharsets.UTF_8);
+    private SummaryCacheKey summaryCacheKey(
+            Long userA,
+            Long userB,
+            List<ChatHistory> conversation) {
+        long firstUser = Math.min(userA, userB);
+        long secondUser = Math.max(userA, userB);
+        long latestMessageId = conversation.stream()
+                .map(ChatHistory::getMessageID)
+                .filter(java.util.Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse((long) conversation.size());
+        return new SummaryCacheKey(
+                firstUser,
+                secondUser,
+                latestMessageId,
+                properties.getModel(),
+                properties.getFallbackModel(),
+                SUMMARY_PROMPT_VERSION);
     }
 
-    private String callGemini(String systemInstruction, String prompt) {
+    private void pruneSummaryCache(SummaryCacheKey currentKey, long now) {
+        long ttlMs = Math.max(1, properties.getSummaryCacheTtlMs());
+        summaryCache.entrySet().removeIf(entry ->
+                now - entry.getValue().createdAt() > ttlMs
+                        || (entry.getKey().sameConversation(currentKey)
+                        && !entry.getKey().equals(currentKey)));
+    }
+
+    private AiChatSummaryResponseDTO awaitSummary(
+            CompletableFuture<AiChatSummaryResponseDTO> future) {
         try {
-            String url = String.format(
-                    "%s/%s:generateContent",
-                    llmApiUrl.replaceAll("/$", ""),
-                    llmModel
-            );
-
-            log.info("[Gemini] Calling model: {}", llmModel);
-            log.info("[Gemini] System instruction ({} chars):\n{}", systemInstruction.length(), systemInstruction);
-            log.info("[Gemini] User prompt ({} chars):\n{}", prompt.length(), prompt);
-
-            Map<String, Object> requestBody = Map.of(
-                    "systemInstruction", Map.of(
-                            "parts", List.of(Map.of("text", systemInstruction))
-                    ),
-                    "contents", List.of(
-                            Map.of(
-                                    "role", "user",
-                                    "parts", List.of(Map.of("text", prompt))
-                            )
-                    ),
-                    "generationConfig", Map.of(
-                            "temperature", 0.2,
-                            "maxOutputTokens", 4096,
-                            "thinkingConfig", Map.of(
-                                    "thinkingBudget", 256
-                            )
-                    )
-            );
-
-            String requestBodyJson = objectMapper.writeValueAsString(requestBody);
-            log.info("[Gemini] Sending request to: {}", url);
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(LLM_REQUEST_TIMEOUT)
-                    .header("Content-Type", "application/json")
-                    .header("x-goog-api-key", llmApiKey)
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBodyJson))
-                    .build();
-
-            long startMs = System.currentTimeMillis();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            long elapsedMs = System.currentTimeMillis() - startMs;
-
-            log.info("[Gemini] HTTP {} received in {}ms", response.statusCode(), elapsedMs);
-
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                log.error("[Gemini] HTTP {} error body: {}", response.statusCode(), response.body());
-                throw new RuntimeException("Gemini API returned status " + response.statusCode() + ": " + response.body());
+            return future.join();
+        } catch (CompletionException failure) {
+            if (failure.getCause() instanceof RuntimeException runtimeFailure) {
+                throw runtimeFailure;
             }
-
-            JsonNode responseJson = objectMapper.readTree(response.body());
-
-            // Log token usage
-            JsonNode usageNode = responseJson.path("usageMetadata");
-            if (!usageNode.isMissingNode()) {
-                log.info("[Gemini] Token usage — prompt: {}, candidates: {}, total: {}",
-                        usageNode.path("promptTokenCount").asInt(),
-                        usageNode.path("candidatesTokenCount").asInt(),
-                        usageNode.path("totalTokenCount").asInt());
-            }
-
-            // Log finish reason
-            JsonNode finishReason = responseJson.path("candidates").path(0).path("finishReason");
-            if (!finishReason.isMissingNode()) {
-                log.info("[Gemini] Finish reason: {}", finishReason.asText());
-            }
-
-            JsonNode textNode = responseJson.path("candidates").path(0).path("content").path("parts").path(0).path("text");
-
-            if (textNode.isMissingNode() || textNode.asText().isBlank()) {
-                log.error("[Gemini] Unexpected response structure: {}", response.body());
-                throw new RuntimeException("Gemini API returned an empty response");
-            }
-
-            String result = stripJsonCodeFence(textNode.asText());
-            log.info("[Gemini] Response ({} chars):\n{}", result.length(), result);
-            return result;
-        } catch (Exception e) {
-            throw new RuntimeException("Unable to call Gemini API: " + e.getMessage());
+            throw failure;
         }
     }
 
-    private String stripJsonCodeFence(String text) {
-        if (text == null) {
-            return "";
-        }
+    private String requestId() {
+        String value = MDC.get("aiChatRequestId");
+        return value == null ? "unavailable" : value;
+    }
 
-        return text.trim()
-                .replaceFirst("(?is)^```(?:json)?\\s*", "")
-                .replaceFirst("(?is)\\s*```$", "")
-                .trim();
+    private record TranscriptChunk(String text, int messageCount) {}
+    private record SummaryCacheEntry(long createdAt, AiChatSummaryResponseDTO response) {}
+    private record SummaryCacheKey(
+            long firstUser,
+            long secondUser,
+            long latestMessageId,
+            String primaryModel,
+            String fallbackModel,
+            String promptVersion) {
+        private boolean sameConversation(SummaryCacheKey other) {
+            return firstUser == other.firstUser && secondUser == other.secondUser;
+        }
     }
 
     private boolean isOutOfScopeQuestion(String question) {

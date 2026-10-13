@@ -11,7 +11,10 @@ jest.mock('react-native', () => ({
   AppState: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
   Dimensions: { get: () => ({ width: 390, height: 844 }) },
   Animated: {
-    Value: class { interpolate() { return 0; } },
+    Value: class {
+      setValue() {}
+      interpolate() { return 0; }
+    },
     View: 'Animated.View',
     timing: () => ({ start: jest.fn() }),
     spring: () => ({ start: jest.fn() }),

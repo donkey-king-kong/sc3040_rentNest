@@ -83,11 +83,12 @@ public class SecurityConfiguration {
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization","Content-Type",
                 InboxRequestLoggingFilter.HEADER, RentalDetailLoggingFilter.HEADER,
-                ChatRequestLoggingFilter.HEADER));
+                ChatRequestLoggingFilter.HEADER, AiChatRequestLoggingFilter.HEADER));
         configuration.setExposedHeaders(List.of(
                 InboxRequestLoggingFilter.HEADER,
                 RentalDetailLoggingFilter.HEADER,
-                ChatRequestLoggingFilter.HEADER));
+                ChatRequestLoggingFilter.HEADER,
+                AiChatRequestLoggingFilter.HEADER));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 

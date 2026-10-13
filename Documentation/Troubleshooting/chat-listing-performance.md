@@ -37,6 +37,49 @@ The Chats navigation remains visible during first load. Saved rows remain visibl
 during refresh failures. Conversations keep Back available and show partner and
 messages before auxiliary cards settle.
 
+## AI Chat Summary Reliability
+
+AI chat summaries use a primary Gemini attempt followed by one fallback attempt
+only for timeouts, transport failures, HTTP 429, and provider 5xx responses.
+Client/authentication errors are not retried. The current sequence is:
+
+```properties
+llm.model=gemini-3.6-flash
+llm.fallback-model=gemini-3.5-flash-lite
+llm.connect-timeout-ms=5000
+llm.primary-timeout-ms=25000
+llm.fallback-timeout-ms=10000
+llm.retry-backoff-ms=300
+```
+
+The fallback is the single retry, so a normal conversation has approximately
+35 seconds of maximum provider wait plus the 300 ms backoff. It returns as soon
+as either model succeeds.
+
+Successful summaries are cached in backend memory for ten minutes by participant
+pair, latest message ID, prompt version, and model configuration. A new message
+changes the key. Matching concurrent requests share one provider call. This is
+disposable derived data: it requires no database table and clears on restart.
+
+Short conversations use one provider call. Conversations over either 100
+messages or 12,000 formatted characters are split into complete bounded chunks,
+each chunk is summarized, and those summaries are merged. No older messages are
+silently discarded. Oversized conversations can take longer because they require
+multiple bounded provider calls.
+
+The backend validates the required summary JSON before caching it. API failures
+use recoverable statuses:
+
+| Status | Meaning |
+| --- | --- |
+| `429` | Provider rate limit remained after fallback |
+| `503` | Provider unavailable or returned an invalid summary |
+| `504` | Both bounded attempts timed out |
+
+The frontend displays a native loading indicator in the disabled **Summarise
+Chat** button. A handled failure opens the summary sheet with a specific message
+and **Try Again** action instead of producing a React Native LogBox error.
+
 ## Listing and Pricing Loading
 
 `HomeListingScreen` requests viewer and listing data concurrently. Once those
@@ -111,6 +154,13 @@ warnings. Publishing the first summary rows does not trigger another refresh.
 Set `EXPO_PUBLIC_CHAT_DIAGNOSTICS=false` before restarting Expo to suppress
 informational frontend events. Warnings remain.
 
+AI summary events use `[AIChat]` and `X-AI-Chat-Request-Id`. Provider events log
+request ID, operation, model, status, duration, and message count. The final
+generated summary is intentionally logged. API keys, original chat transcripts,
+system instructions, user prompts, and arbitrary provider error bodies are not
+logged. Generated summaries can contain conversation details, so production log
+access and retention must be treated as sensitive.
+
 Pricing continues to use `[PricingAI]` and `X-Pricing-Request-Id`. Provider logs
 exclude API keys, prompts, descriptions, generated text, and arbitrary provider
 messages. See [price insights](price-insights.md) for event interpretation.
@@ -121,7 +171,7 @@ Backend, with Java 21:
 
 ```bash
 mvn -q \
-  -Dtest=ChatPerformanceIntegrationTest,FairPricingControllerTest,FairPricingServiceTest,FairPricingDemoDataTest,FairPriceExplanationServiceTest,PricingDiagnosticsTest,RoomPricingTest \
+  -Dtest=ChatPerformanceIntegrationTest,AiChatProviderClientTest,AiChatServiceTest,AiChatControllerTest,AiChatRequestLoggingFilterTest,FairPricingControllerTest,FairPricingServiceTest,FairPricingDemoDataTest,FairPriceExplanationServiceTest,PricingDiagnosticsTest,RoomPricingTest \
   test
 ```
 
@@ -133,10 +183,11 @@ npx expo export --platform android --output-dir /tmp/rentnest-chat-listing-andro
 ```
 
 The backend chat integration checks authentication, compact contracts,
-pagination, constant query counts, safe correlation logs, and CORS. Frontend
-tests cover request deduplication, session changes, page merging, the complete
-listing display gate, pricing retry, offer-card authorization, and ended-tenancy
-labels.
+pagination, constant query counts, safe correlation logs, fallback, cache
+invalidation, request coalescing, chunking, error mapping, and CORS. Frontend
+tests cover request deduplication, session changes, page merging, summary
+loading/retry states, the complete listing display gate, pricing retry,
+offer-card authorization, and ended-tenancy labels.
 
 ## Deployment
 
