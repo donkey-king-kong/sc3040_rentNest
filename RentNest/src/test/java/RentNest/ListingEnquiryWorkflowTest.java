@@ -128,6 +128,11 @@ class ListingEnquiryWorkflowTest {
         as(owner);
         requestService.makeTerminationRequest(b.getRentalID(), 0);
         Long request = requests.findAll().getFirst().getRequestID();
+        // Card messages carry text like regular messages, for chat previews and the database.
+        assertEquals("Rental Offer", chats.findAll().stream()
+                .filter(c -> b.getRentalID().equals(c.getRentalId())).findFirst().orElseThrow().getMessage());
+        assertEquals("Lease Termination", chats.findAll().stream()
+                .filter(c -> request.equals(c.getRequestId())).findFirst().orElseThrow().getMessage());
         as(tenant);
         requestService.decideTermination(request, "accept");
         as(owner);

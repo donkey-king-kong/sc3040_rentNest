@@ -121,7 +121,7 @@ public class RequestsService {
         chatHistoryDto.setSender(actor);
         chatHistoryDto.setReceiver(rental.getTenantUserID());
         chatHistoryDto.setRental(null);
-        chatHistoryDto.setMessage(null);
+        chatHistoryDto.setMessage("Lease Termination"); 
 
         chatHistoryDto.setDate(new Date());
         
