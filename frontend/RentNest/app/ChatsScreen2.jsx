@@ -142,11 +142,22 @@ const ChatsScreen2 = () => {
         conversationAbortRef.current = controller;
         const cached = chatData.peekConversation(partnerUserId);
         if (cached) {
-            setChat(cached.messages);
-            setPartner(cached.partner);
-            setHasOlderMessages(cached.hasMore);
-            setLoading(false);
-            hydrateMessageCards(cached.messages, generation);
+            const needsHydration = cached.messages.some(m => m.rentalId != null || m.requestId != null);
+            if (!needsHydration) {
+                setChat(cached.messages);
+                setPartner(cached.partner);
+                setHasOlderMessages(cached.hasMore);
+                setLoading(false);
+            }
+            hydrateMessageCards(cached.messages, generation).then(() => {
+                if (generation !== conversationGeneration.current) return;
+                if (needsHydration) {
+                    setChat(cached.messages);
+                    setPartner(cached.partner);
+                    setHasOlderMessages(cached.hasMore);
+                    setLoading(false);
+                }
+            });
         } else {
             setLoading(true);
         }
@@ -164,11 +175,19 @@ const ChatsScreen2 = () => {
                 sentMessageScrollPending.current = true;
                 initialScrollComplete.current = true;
             }
+            const remainingMessages = scrollToSentMessage ? data.messages.slice(0, -1) : data.messages;
+            const freshNeedsHydration = remainingMessages.some(m => m.rentalId != null || m.requestId != null);
+            if (freshNeedsHydration) {
+                await hydrateMessageCards(remainingMessages, generation);
+                if (controller.signal.aborted || generation !== conversationGeneration.current) return;
+            }
             setChat(data.messages);
             setPartner(data.partner);
             setHasOlderMessages(data.hasMore);
             setLoading(false);
-            hydrateMessageCards(scrollToSentMessage ? data.messages.slice(0, -1) : data.messages, generation);
+            if (!freshNeedsHydration) {
+                hydrateMessageCards(remainingMessages, generation);
+            }
         } catch (error) {
             if (controller.signal.aborted) return;
             if (error?.code === 'UNAUTHENTICATED') {
@@ -3008,7 +3027,7 @@ const styles = StyleSheet.create({
     terminationShell: {
         flexShrink: 1,
         width: '88%',
-        maxWidth: 360,
+        maxWidth: 420,
     },
     rentalOfferMessage: {
         width: '100%',
