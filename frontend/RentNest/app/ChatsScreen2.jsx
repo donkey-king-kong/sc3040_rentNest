@@ -1310,12 +1310,6 @@ const handlePaymentAndAccept = async () => {
     if (Loading) {
         return (
             <View style={styles.loadingShell}>
-                <View style={styles.loadingHeader}>
-                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.backButton}>
-                        <FontAwesome name="chevron-left" size={18} color="#101820" />
-                    </TouchableOpacity>
-                    <Text style={styles.loadingHeaderText}>Chat</Text>
-                </View>
                 <View style={styles.loadingScreen}>
                     <MorphingInfinity size={86} color="#2FA84F" />
                     <Text style={styles.loadingText}>Loading chat history...</Text>
