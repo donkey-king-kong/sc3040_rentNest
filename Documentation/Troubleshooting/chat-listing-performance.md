@@ -103,6 +103,11 @@ Chat frontend and backend events use `[Chat]`; optimized reads share
 and cache age. They exclude tokens, emails, user/property IDs, message text,
 photos, rental/payment values, and response bodies.
 
+Leaving the Chats screen aborts an in-progress summary refresh. The frontend logs
+that expected lifecycle event as informational `request_cancelled`; only genuine
+network, authentication, validation, and server failures use `request_failed`
+warnings. Publishing the first summary rows does not trigger another refresh.
+
 Set `EXPO_PUBLIC_CHAT_DIAGNOSTICS=false` before restarting Expo to suppress
 informational frontend events. Warnings remain.
 

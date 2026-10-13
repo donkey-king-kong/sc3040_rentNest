@@ -5,6 +5,7 @@ const events = new Set([
   'request_started',
   'request_completed',
   'request_failed',
+  'request_cancelled',
   'request_deduplicated',
   'cache_hit',
   'cache_miss',

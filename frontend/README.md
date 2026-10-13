@@ -17,9 +17,10 @@ failed. Later retries keep the listing visible. Fair-price estimate and
 explanation start together; backend request coalescing prevents duplicate
 classification/estimate work.
 
-Chat logs use `[Chat]` and `X-Chat-Request-Id`. Set
-`EXPO_PUBLIC_CHAT_DIAGNOSTICS=false` and restart Expo to suppress informational
-frontend events; warnings remain. Pricing Gemini calls use
+Chat logs use `[Chat]` and `X-Chat-Request-Id`. Navigation cancellations are
+informational `request_cancelled` events; genuine request failures remain
+warnings. Set `EXPO_PUBLIC_CHAT_DIAGNOSTICS=false` and restart Expo to suppress
+informational frontend events. Pricing Gemini calls use
 `pricing.ai.connect-timeout-ms` and `pricing.ai.read-timeout-ms`.
 
 Run `npm run test:chat-listing-performance` from `frontend/RentNest`. See the

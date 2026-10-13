@@ -92,3 +92,37 @@ it('rejects malformed responses without caching them', async () => {
   );
   expect(chatData.peekSummaries()).toBeNull();
 });
+
+it('logs intentional cancellation without warning and keeps real failures as warnings', async () => {
+  const info = jest.spyOn(console, 'info').mockImplementation(() => {});
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const controller = new AbortController();
+  axios.get.mockImplementationOnce(async () => {
+    controller.abort();
+    throw Object.assign(new Error('canceled'), {
+      code: 'ERR_CANCELED',
+      name: 'CanceledError',
+    });
+  });
+
+  await expect(chatData.loadSummaries({
+    force: true,
+    signal: controller.signal,
+  })).rejects.toMatchObject({ code: 'ERR_CANCELED' });
+  expect(info).toHaveBeenCalledWith(
+    '[Chat] request_cancelled',
+    expect.objectContaining({ operation: 'summaries' }),
+  );
+  expect(warn).not.toHaveBeenCalled();
+
+  axios.get.mockRejectedValueOnce(Object.assign(new Error('offline'), {
+    code: 'ERR_NETWORK',
+  }));
+  await expect(chatData.loadSummaries({ force: true })).rejects.toMatchObject({
+    code: 'ERR_NETWORK',
+  });
+  expect(warn).toHaveBeenCalledWith(
+    '[Chat] request_failed',
+    expect.objectContaining({ operation: 'summaries' }),
+  );
+});

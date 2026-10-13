@@ -11,6 +11,11 @@ const conversations = new Map();
 const inFlight = new Map();
 
 const now = () => Date.now();
+const isCancelled = (error, signal) => signal?.aborted
+  || error?.code === 'ERR_CANCELED'
+  || error?.name === 'CanceledError'
+  || error?.name === 'AbortError'
+  || (typeof axios.isCancel === 'function' && axios.isCancel(error));
 
 const validToken = async () => {
   const token = await AsyncStorage.getItem('token');
@@ -95,12 +100,13 @@ const request = async (path, token, operation, signal) => {
     });
     return response.data;
   } catch (error) {
-    logChat('request_failed', {
+    const cancelled = isCancelled(error, signal);
+    logChat(cancelled ? 'request_cancelled' : 'request_failed', {
       operation,
       durationMs: now() - started,
       httpStatus: error?.response?.status,
     });
-    if (error?.response?.status === 401 || error?.response?.status === 403) {
+    if (!cancelled && (error?.response?.status === 401 || error?.response?.status === 403)) {
       session = null;
       resetData('logout');
       error.code = 'UNAUTHENTICATED';

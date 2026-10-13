@@ -26,13 +26,14 @@ const ChatsScreen = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
   const activeRequest = useRef(null);
+  const hasVisibleChats = useRef(chats.length > 0);
 
   const refreshChats = useCallback(async (manual = false) => {
     activeRequest.current?.abort();
     const controller = new AbortController();
     activeRequest.current = controller;
     if (manual) setIsRefreshing(true);
-    else if (chats.length === 0) setIsLoading(true);
+    else if (!hasVisibleChats.current) setIsLoading(true);
     setError('');
     try {
       const data = await chatData.loadSummaries({
@@ -40,6 +41,7 @@ const ChatsScreen = () => {
         signal: controller.signal,
       });
       if (!controller.signal.aborted) {
+        hasVisibleChats.current = data.chats.length > 0;
         setChats(data.chats);
         setCurrentUserId(data.currentUserId);
       }
@@ -51,16 +53,18 @@ const ChatsScreen = () => {
         setError('Chats could not be refreshed. Check your connection and try again.');
       }
     } finally {
+      if (activeRequest.current === controller) activeRequest.current = null;
       if (!controller.signal.aborted) {
         setIsLoading(false);
         setIsRefreshing(false);
       }
     }
-  }, [chats.length, router]);
+  }, [router]);
 
   useFocusEffect(useCallback(() => {
     const cachedData = chatData.peekSummaries();
     if (cachedData) {
+      hasVisibleChats.current = cachedData.chats.length > 0;
       setChats(cachedData.chats);
       setCurrentUserId(cachedData.currentUserId);
       setIsLoading(false);
