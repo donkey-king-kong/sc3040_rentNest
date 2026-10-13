@@ -82,8 +82,7 @@ const RentPaymentScreen = () => {
         },
       });
       const payments = response.data.payments || [];
-      const rentalID = payments.length > 0 ? payments[0].rentalID : null;
-      setRentalID(rentalID);
+      setRentalID(response.data.rentalId ?? (payments.length > 0 ? payments[0].rentalID : null));
       setAmount(response.data.rentalPrice || (payments.length > 0 ? payments[0].amount : 0));
       console.log("Payments response", response.status, response.data);
       setPaymentHistory(response.data);

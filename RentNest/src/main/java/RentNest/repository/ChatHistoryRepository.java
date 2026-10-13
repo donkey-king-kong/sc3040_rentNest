@@ -17,7 +17,7 @@ public interface ChatHistoryRepository extends JpaRepository<ChatHistory, Long> 
             "CASE WHEN ch.sender.userID = :userId THEN ch.receiver.userID ELSE ch.sender.userID END, " +
             "CASE WHEN ch.sender.userID = :userId THEN ch.receiver.name ELSE ch.sender.name END, " +
             "CASE WHEN ch.sender.userID = :userId THEN ch.receiver.photoURL ELSE ch.sender.photoURL END, " +
-            "ch.messageID, ch.message, ch.date) " +
+            "ch.messageID, COALESCE(ch.message, ''), ch.date) " +
             "FROM ChatHistory ch " +
             "WHERE ch.sender.userID = :userId OR ch.receiver.userID = :userId " +
             "ORDER BY ch.date DESC, ch.messageID DESC")
