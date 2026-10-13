@@ -1444,7 +1444,7 @@ const handlePaymentAndAccept = async () => {
                                 <Text style={styles.summarySheetTitle}>AI chat summary</Text>
                             </View>
                         </View>
-                        {isSummaryPlaceholder && (
+                        {isSummaryPlaceholder && !parsedSummary && (
                             <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
                         )}
                         <ScrollView
@@ -1481,7 +1481,7 @@ const handlePaymentAndAccept = async () => {
                                     {parsedSummary.overview && (
                                         <View style={styles.summaryCard}>
                                             <View style={styles.summaryCardHeaderRow}>
-                                                <FontAwesome name="commenting-o" size={14} color="#A4A4AD" style={styles.summaryCardIcon} />
+                                                <FontAwesome name="commenting-o" size={14} color={isSummaryPlaceholder ? '#E94068' : '#A4A4AD'} style={styles.summaryCardIcon} />
                                                 <Text style={styles.summaryCardLabel}>Overview</Text>
                                             </View>
                                             <Text style={styles.summaryCardContent}>{parsedSummary.overview}</Text>
