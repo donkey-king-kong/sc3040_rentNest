@@ -39,6 +39,13 @@ afterEach(() => {
   expect(global.fetch).not.toHaveBeenCalled();
 });
 
+// The form is replaced by the chat list first, so Back from the chat lands on the list.
+function expectChatOverChatList() {
+  expect(router.replace).toHaveBeenCalledWith('/ChatsScreen');
+  expect(router.push).toHaveBeenCalledWith('/ChatsScreen2?partnerUserId=22&currentUser=11');
+  expect(router.replace.mock.invocationCallOrder[0]).toBeLessThan(router.push.mock.invocationCallOrder[0]);
+}
+
 async function amount(ui, value) {
   await act(async () => { ui.root.findByType('TextInput').props.onChangeText(value); });
 }
@@ -58,7 +65,7 @@ test.each(['1', '9300', '0010', String(Number.MAX_SAFE_INTEGER)])(
     expect(text(ui.toJSON())).toContain('Termination Submitted');
     expect(button(ui, 'Submit termination').props.disabled).toBe(true);
     await act(async () => { jest.advanceTimersByTime(2000); });
-    expect(router.push).toHaveBeenCalledWith('/ChatsScreen2?partnerUserId=22&currentUser=11');
+    expectChatOverChatList();
   },
 );
 
@@ -137,8 +144,9 @@ test.each([
   expect(button(ui, 'Submit termination').props.disabled).toBe(false);
   await act(async () => { jest.advanceTimersByTime(2000); });
   expect(router.push).not.toHaveBeenCalled();
+  expect(router.replace).not.toHaveBeenCalled();
   await press(ui, 'View tenant chat');
-  expect(router.push).toHaveBeenCalledWith('/ChatsScreen2?partnerUserId=22&currentUser=11');
+  expectChatOverChatList();
 });
 
 test('initial lease load failure blocks submission and Retry restores the form', async () => {
