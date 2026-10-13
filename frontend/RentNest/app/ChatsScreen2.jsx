@@ -496,13 +496,13 @@ const ChatsScreen2 = () => {
         const tempMessageId = `temp-${Date.now()}`;
         const optimisticMessage = buildOptimisticMessage(messageText, tempMessageId, attachment);
         setNewMessage('');
+        setEnquiry(null);
         sentMessageScrollPending.current = true;
         initialScrollComplete.current = true;
         setChat((previousChat) => [...previousChat, optimisticMessage]);
 
         try{
             await sendMessageToBackend(messageText, tempMessageId, attachment?.listingId);
-            if (generation === conversationGeneration.current) setEnquiry(null);
         } catch (error) {
             console.error('Error sending message:', error);
             setChat((previousChat) => previousChat.map((message) => (
