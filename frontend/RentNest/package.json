@@ -13,6 +13,7 @@
     "test:photo-url": "node --test scripts/photo-url.test.mjs",
     "test:pricing-diagnostics": "node --test scripts/pricing-diagnostics.test.mjs",
     "test:inbox": "node --test scripts/inbox-store.test.mjs && jest --runInBand --watchAll=false --runTestsByPath components/__tests__/InboxScreen.test.jsx",
+    "test:rental-details": "node --test scripts/rental-detail-store.test.mjs && jest --config jest.termination.config.cjs --runInBand --runTestsByPath tests/termination/RentalInfoOwner.test.jsx tests/termination/TenantOverview.test.jsx",
     "lint": "expo lint"
   },
   "jest": {

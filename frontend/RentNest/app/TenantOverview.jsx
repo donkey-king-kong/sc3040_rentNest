@@ -1,105 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import MorphingInfinity from '../components/MorphingInfinity';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { API_BASE_URL, ENDPOINTS } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import { jwtDecode } from 'jwt-decode';
+import { detailKey } from '../config/rentalDetails';
+import { useRentalDetail } from '../config/useRentalDetail';
 import ProfileImage from '../components/ProfileImage';
 
 
 const TenantOverview = () => {
   const router = useRouter();
   const { tenantId, listingId } = useLocalSearchParams();
-  const [loading, setLoading] = useState(true);
-  const [tenant, setTenant] = useState(null);
-  const [rental, setRental] = useState(null);
-  const [payments, setPayments] = useState([]);
-  const [outstandingPayments, setOutstandingPayments] = useState([]);
-  const [currentUserId, setCurrentUserId] = useState(null);
-  const [tenancyError, setTenancyError] = useState('');
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setRental(null);
-      setTenancyError('');
-      try {
-        const token = await AsyncStorage.getItem('token');
-        if (!token) {
-          router.replace('/LandingScreen');
-          return;
-        }
-
-        const headers = {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        };
-        const decoded = jwtDecode(token);
-        const meResponse = await axios.get(`${API_BASE_URL}/api/users/${decoded.sub}`, { headers });
-        setCurrentUserId(meResponse.data.userID);
-
-        const tenantResponse = await axios.get(`${API_BASE_URL}/api/users/id/${tenantId}`, { headers });
-        setTenant(tenantResponse.data);
-
-        const rentalResponse = await axios.get(
-          `${API_BASE_URL}${ENDPOINTS.RENTALS}/listing/${listingId}`,
-          { headers }
-        );
-        const currentRental = rentalResponse.data;
-        if (currentRental.status !== 'active'
-            || Number(currentRental.tenantUserID) !== Number(tenantId)
-            || Number(currentRental.ownerUserId) !== Number(meResponse.data.userID)) {
-          setTenancyError('This is no longer the active tenancy for this property. Return to the property to view its current tenant.');
-          setLoading(false);
-          return;
-        }
-        setRental(currentRental);
-
-        try {
-          const paymentsResponse = await axios.get(
-            `${API_BASE_URL}${ENDPOINTS.TENANT_PAYMENTS(listingId, tenantId)}`,
-            { headers }
-          );
-          if (paymentsResponse.data && paymentsResponse.data.payments) {
-            const sortedPayments = paymentsResponse.data.payments.sort((a, b) =>
-              new Date(b.date) - new Date(a.date)
-            );
-            setPayments(sortedPayments);
-          }
-        } catch (err) {
-          if (!err.response || err.response.status !== 404) throw err;
-        }
-
-        try {
-          const outstandingResponse = await axios.get(
-            `${API_BASE_URL}${ENDPOINTS.OUTSTANDING_PAYMENTS(rentalResponse.data.rentalID)}`,
-            { headers }
-          );
-          if (outstandingResponse.data) {
-            const outstandingData = typeof outstandingResponse.data === 'string'
-              ? JSON.parse(outstandingResponse.data)
-              : outstandingResponse.data;
-            if (outstandingData['Outstanding Months']) {
-              setOutstandingPayments(outstandingData['Outstanding Months']);
-            }
-          }
-        } catch (err) {
-          if (!err.response || err.response.status !== 404) throw err;
-        }
-
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [listingId, tenantId]);
+  const summary = useRentalDetail(detailKey('summary', listingId, tenantId));
+  const rental = summary.data;
+  const financial = useRentalDetail(rental ? detailKey('payments', rental.rentalID) : null,
+    summary.verified, summary.updatedAt);
+  const payments = financial.data?.payments || [];
+  const outstandingPayments = financial.data?.outstandingMonths || [];
+  const currentUserId = rental?.ownerUserId;
+  const tenant = rental ? { userID: rental.tenantUserID, name: rental.tenantName, photoURL: rental.tenantPhotoURL } : null;
+  const tenancyUnavailable = financial.status === 404 || financial.status === 409;
+  const canAct = summary.verified && !tenancyUnavailable;
 
   const handleTerminateLease = () => {
     router.push({ pathname: '/TerminateLease', params: { rentalId: rental.rentalID } });
@@ -126,34 +47,32 @@ const TenantOverview = () => {
     });
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading tenant information...</Text>
-      </View>
-    );
-  }
-
-  if (!tenant || !rental) {
-    return (
-      <View style={styles.loadingContainer}>
-        <TouchableOpacity onPress={() => router.back()} style={{ position: 'absolute', top: 20, left: 20 }}>
-          <FontAwesome name="chevron-left" size={18} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.loadingText}>{tenancyError || 'Failed to load tenant information.'}</Text>
-      </View>
-    );
-  }
-
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}
+      refreshControl={<RefreshControl refreshing={summary.loading && !!rental} onRefresh={() => summary.refresh()} />}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.backButton}>
           <FontAwesome name="chevron-left" size={18} color="#000" />
         </TouchableOpacity>
         <Text style={styles.title}>Tenant Overview</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Refresh tenant information" disabled={summary.loading}
+          style={styles.refreshButton} onPress={() => summary.refresh()}>
+          <Text style={styles.refreshText}>Refresh</Text>
+        </TouchableOpacity>
       </View>
+      {summary.error ? <View>
+        <Text accessibilityRole="alert" style={styles.errorText}>{summary.error}</Text>
+        <TouchableOpacity accessibilityRole="button" disabled={summary.loading} style={styles.refreshButton}
+          onPress={() => summary.refresh()}><Text style={styles.refreshText}>Retry tenant information</Text></TouchableOpacity>
+      </View> : null}
+      {!rental && !summary.error ? <View style={styles.loadingContainer}>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text accessibilityLiveRegion="polite" style={styles.loadingText}>Loading tenant information...</Text>
+      </View> : null}
+      {rental ? <>
+      {summary.stale ? <Text style={styles.statusText} accessibilityLiveRegion="polite">
+        Showing saved tenant details. {summary.loading ? 'Checking for updates...' : 'Refresh to confirm the current tenancy.'}
+      </Text> : null}
 
       {/* White outlined box for tenant overview */}
       <View style={styles.overviewBox}>
@@ -163,6 +82,7 @@ const TenantOverview = () => {
           style={styles.tenantPhoto}
           textStyle={styles.tenantPhotoInitials}
           screen="TenantOverview"
+          diagnostics={false}
           userId={tenant.userID}
           role="tenant"
         />
@@ -172,6 +92,10 @@ const TenantOverview = () => {
           <Text style={styles.rentalPrice}>${rental.rentalPrice} monthly rent</Text>
         </View>
         <TouchableOpacity 
+          accessibilityRole="button"
+          accessibilityLabel="Chat with tenant"
+          disabled={!canAct}
+          accessibilityState={{ disabled: !canAct }}
           onPress={() => router.push(`/ChatsScreen2?partnerUserId=${tenantId}&currentUser=${currentUserId}`)}
           style={styles.chatButton}
         >
@@ -181,6 +105,20 @@ const TenantOverview = () => {
 
       {/* Payment History */}
       <Text style={styles.sectionTitle}>Payment History</Text>
+      {financial.error ? <View>
+        <Text accessibilityRole="alert" style={styles.errorText}>{financial.error}</Text>
+        <TouchableOpacity accessibilityRole="button" style={styles.refreshButton} disabled={financial.loading}
+          onPress={() => tenancyUnavailable ? summary.refresh() : financial.refresh()}>
+          <Text style={styles.refreshText}>Retry payments</Text>
+        </TouchableOpacity>
+      </View> : null}
+      {!financial.data && !financial.error ? <Text accessibilityLiveRegion="polite" style={styles.statusText}>
+        {summary.verified || summary.loading ? 'Loading payments...' : 'Refresh tenant information to load payments.'}
+      </Text> : null}
+      {financial.data ? <>
+      {financial.stale ? <Text accessibilityLiveRegion="polite" style={styles.statusText}>
+        Showing saved payments. {financial.loading ? 'Checking for updates...' : 'Refresh before relying on these amounts.'}
+      </Text> : null}
 
       {/* Outstanding Payments */}
       {outstandingPayments.length > 0 ? (
@@ -190,7 +128,7 @@ const TenantOverview = () => {
               {new Date(dateStr).toLocaleString('default', { month: 'long', year: 'numeric' })}
             </Text>
             <View style={styles.paymentInfo}>
-              <Text style={styles.paymentAmount}>${rental.rentalPrice}</Text>
+              <Text style={styles.paymentAmount}>${financial.data.rentalPrice}</Text>
               <Text style={styles.smallText1}>Payment Pending</Text>
             </View>
           </View>
@@ -202,8 +140,8 @@ const TenantOverview = () => {
       )}
 
       {/* Paid Payments */}
-      {payments.map((payment, index) => (
-        <View key={`paid-${index}`} style={styles.paymentRow}>
+      {payments.map((payment) => (
+        <View key={`paid-${payment.paymentID}`} style={styles.paymentRow}>
           <Text style={styles.paymentDate}>
             {new Date(payment.date).toLocaleString('default', { month: 'long', year: 'numeric' })}
           </Text>
@@ -215,26 +153,31 @@ const TenantOverview = () => {
           </View>
         </View>
       ))}
+      </> : null}
 
       {/* Terminate Lease Button */}
-      <TouchableOpacity style={styles.actionButton} onPress={handleTerminateLease}>
+      <TouchableOpacity accessibilityRole="button" disabled={!canAct} accessibilityState={{ disabled: !canAct }}
+        style={[styles.actionButton, !canAct && styles.disabled]} onPress={handleTerminateLease}>
         <FontAwesome name="ban" size={20} color="black" />
         <Text style={styles.buttonText}>Terminate Lease</Text>
         <FontAwesome name="chevron-right" size={20} color="gray" />
       </TouchableOpacity>
 
       {/* Leave Review Button */}
-      <TouchableOpacity style={styles.actionButton} onPress={handleLeaveReview}>
+      <TouchableOpacity accessibilityRole="button" disabled={!canAct} accessibilityState={{ disabled: !canAct }}
+        style={[styles.actionButton, !canAct && styles.disabled]} onPress={handleLeaveReview}>
         <FontAwesome name="star" size={20} color="black" />
         <Text style={styles.buttonText}>Leave Review</Text>
         <FontAwesome name="chevron-right" size={20} color="gray" />
       </TouchableOpacity>
+      </> : null}
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flexGrow: 1,
     padding: 20,
     backgroundColor: '#fff',
   },
@@ -256,12 +199,20 @@ const styles = StyleSheet.create({
   },
   backButton: {
     marginRight: 12,
-    padding: 4,
+    minHeight: 48,
+    minWidth: 40,
+    justifyContent: 'center',
   },
   title: {
+    flex: 1,
     fontSize: 24,
     fontWeight: 'bold',
   },
+  refreshButton: { minHeight: 48, paddingHorizontal: 8, justifyContent: 'center' },
+  refreshText: { color: '#205C43', fontSize: 14, fontWeight: '600' },
+  errorText: { color: '#9B263D', fontSize: 16, lineHeight: 24 },
+  statusText: { color: '#555', fontSize: 14, lineHeight: 21, marginBottom: 12 },
+  disabled: { opacity: 0.5 },
   overviewBox: {
     flexDirection: 'row',
     borderWidth: 1,

@@ -1,5 +1,24 @@
 # Frontend
 
+## Owner Rental Details
+
+Restart/deploy the backend before using the updated Rental Info and Tenant Overview
+screens. They now use `/api/owner/...` detail endpoints: one property request, then
+one tenant-summary request and one combined payment request when opening a tenant.
+The tenant profile and lease appear without waiting for payments.
+
+Both screens retain Back during loading, support refresh/retry, and label saved
+data during revalidation. Payment errors have a separate retry and never imply
+zero outstanding. Management actions require freshly verified ownership/tenancy.
+Login/logout and relevant listing/rental/payment mutations reset the memory cache.
+
+Logs use `[RentalDetail]` and `X-Rental-Request-Id`; set
+`EXPO_PUBLIC_RENTAL_DIAGNOSTICS=false` to suppress frontend info logs after an Expo
+restart/rebuild. Run `npm run test:rental-details` from `frontend/RentNest`.
+See the [rental detail performance guide](../Documentation/Troubleshooting/rental-detail-performance.md)
+for contracts, preserved billing rules, paired measurements, backend controls,
+and native validation limits.
+
 ## Inbox Loading and Logs
 
 Restart/deploy the backend before this frontend. Inbox uses the authenticated

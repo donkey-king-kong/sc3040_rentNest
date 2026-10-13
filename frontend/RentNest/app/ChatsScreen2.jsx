@@ -18,6 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
 import { inboxStore } from '../config/inbox';
+import { rentalDetailCache } from '../config/rentalDetails';
 import MorphingInfinity from '../components/MorphingInfinity';
 import AvatarOrb from '../components/AvatarOrb';
 import ProfileImage from '../components/ProfileImage';
@@ -766,6 +767,7 @@ const ChatsScreen2 = () => {
             });
 
             if (response.status === 200) {
+                rentalDetailCache.invalidate();
                 console.log('Payment Successful', response.status, response.data)
             } else {
                 throw new Error('Payment could not be recorded');

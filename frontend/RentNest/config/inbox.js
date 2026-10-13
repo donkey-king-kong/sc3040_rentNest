@@ -3,6 +3,7 @@ import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { API_BASE_URL, ENDPOINTS } from './api';
 import { createInboxStore } from './inboxStore';
+import { rentalDetailCache } from './rentalDetails';
 
 export const inboxStore = createInboxStore({
   async readToken() {
@@ -23,3 +24,15 @@ export const inboxStore = createInboxStore({
     });
   },
 });
+
+// Existing login/logout and listing/tenancy mutation hooks reset both caches.
+const clearInbox = inboxStore.clear;
+const invalidateInbox = inboxStore.invalidate;
+inboxStore.clear = reason => {
+  rentalDetailCache.clear(reason);
+  clearInbox(reason);
+};
+inboxStore.invalidate = () => {
+  rentalDetailCache.invalidate();
+  invalidateInbox();
+};

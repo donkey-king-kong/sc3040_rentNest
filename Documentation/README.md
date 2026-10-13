@@ -26,6 +26,7 @@ unless the guide specifies another working directory.
 ## Troubleshooting
 
 - [Inbox performance, cache behavior, and frontend/backend logs](Troubleshooting/inbox-performance.md)
+- [Owner rental detail performance, payments, and diagnostics](Troubleshooting/rental-detail-performance.md)
 - [Price insights and AI diagnostics](Troubleshooting/price-insights.md)
 - [Listing images](Troubleshooting/listing-images.md)
 - [Profile images](Troubleshooting/profile-images.md)

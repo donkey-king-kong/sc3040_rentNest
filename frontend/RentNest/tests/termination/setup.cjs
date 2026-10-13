@@ -3,11 +3,12 @@ global.IS_REACT_ACT_ENVIRONMENT = true;
 jest.mock('react-native', () => ({
   ...Object.fromEntries([
     'ActivityIndicator', 'Text', 'TouchableOpacity', 'View', 'TextInput',
-    'KeyboardAvoidingView', 'ScrollView', 'Image', 'StatusBar',
+    'KeyboardAvoidingView', 'ScrollView', 'Image', 'StatusBar', 'RefreshControl',
   ].map(name => [name, name])),
   Modal: ({ visible, children }) => visible ? children : null,
   StyleSheet: { create: styles => styles },
   Platform: { OS: 'ios' },
+  AppState: { addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
   Dimensions: { get: () => ({ width: 390, height: 844 }) },
   Animated: {
     Value: class { interpolate() { return 0; } },
@@ -38,6 +39,7 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('../../config/api', () => ({ API_BASE_URL: 'https://rentnest.test' }));
 jest.mock('../../components/MorphingInfinity', () => 'MorphingInfinity');
 jest.mock('../../components/ProfileImage', () => 'ProfileImage');
+jest.mock('../../components/ListingImage', () => 'ListingImage');
 jest.mock('../../components/AvatarOrb', () => 'AvatarOrb');
 
 beforeEach(() => {

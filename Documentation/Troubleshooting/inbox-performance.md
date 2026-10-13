@@ -1,5 +1,10 @@
 # Inbox Performance and Diagnostics
 
+For the owner screens opened from Inbox, see the
+[rental detail performance guide](rental-detail-performance.md). It documents
+the separate owner-scoped reads, progressive payment loading, and shared
+session/mutation invalidation hooks.
+
 ## Behavior and Deployment
 
 Deploy/restart the backend before using the updated frontend. Inbox now calls
