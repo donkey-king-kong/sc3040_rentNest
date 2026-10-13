@@ -457,14 +457,6 @@ const HomeListingScreen = () => {
   if (initialListingLoading) {
     return (
       <View style={styles.loadingScreen}>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={() => router.back()}
-          style={styles.loadingBackButton}
-        >
-          <FontAwesome name="chevron-left" size={18} color="#101820" />
-        </TouchableOpacity>
         <MorphingInfinity size={86} color="#2FA84F" />
         <Text style={styles.loadingText}>Loading listing...</Text>
       </View>
@@ -801,17 +793,6 @@ const styles = StyleSheet.create({
     color: '#101820',
     fontSize: 18,
     fontWeight: '700',
-  },
-  loadingBackButton: {
-    position: 'absolute',
-    top: 48,
-    left: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
   },
   sectionStatus: {
     minHeight: 72,
