@@ -8,14 +8,14 @@ const ReviewListingScreen3 = () => {
   const router = useRouter();
 
   useEffect(() => {
-    const timeout = setTimeout(() => router.replace('/AdminScreen'), 2000);
+    const timeout = setTimeout(() => router.replace('/ReviewListingScreen'), 2000);
     return () => clearTimeout(timeout);
   }, [router]);
 
   return (
     <View style={styles.container}>
       <Modal visible transparent animationType="fade" statusBarTranslucent
-        onRequestClose={() => router.replace('/AdminScreen')}>
+        onRequestClose={() => router.replace('/ReviewListingScreen')}>
         <View style={styles.notificationOverlay} pointerEvents="none">
           <View style={styles.notificationCard}>
             <View style={styles.notificationIconBox}>

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -14,12 +14,15 @@ const ProcessReviewsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const router = useRouter();
-  const { refresh } = useLocalSearchParams();
+  const requestVersion = useRef(0);
 
-  const getFlaggedReviews = async () => {
+  const getFlaggedReviews = useCallback(async () => {
+    const version = ++requestVersion.current;
+    setRefreshing(true);
     setLoadError(null);
     try {
       const token = await AsyncStorage.getItem('token');
+      if (version !== requestVersion.current) return;
       
       if (!token) {
         console.log('No token found!');
@@ -50,23 +53,23 @@ const ProcessReviewsScreen = () => {
           flagged: review.flagged,
       }))
       console.log(flaggedReviews);
+      if (version !== requestVersion.current) return;
       setReviewsData(flaggedReviews);
     } catch (error) {
+      if (version !== requestVersion.current) return;
       console.error("An error occurred:", error);
       setReviewsData([]);
       setLoadError(moderationLoadError(error, 'reviews'));
+    } finally {
+      if (version === requestVersion.current) setRefreshing(false);
     }
-  };
+  }, [router]);
 
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    await getFlaggedReviews();
-    setRefreshing(false);
-  }, []);
-
-  useEffect(() => {
-    getFlaggedReviews();
-  }, [refresh]);
+  useFocusEffect(useCallback(() => {
+    void getFlaggedReviews();
+    // Ignore requests from before leaving when returning to the moderation list.
+    return () => { requestVersion.current += 1; };
+  }, [getFlaggedReviews]));
 
   // Search function to filter reviews by title or text
   const filterReviews = (reviews, query) => {
@@ -113,7 +116,7 @@ const ProcessReviewsScreen = () => {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
+            onRefresh={getFlaggedReviews}
           />
         }
         renderItem={({ item }) => (

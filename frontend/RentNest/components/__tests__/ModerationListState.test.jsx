@@ -7,18 +7,33 @@ import ModerationListState, { moderationLoadError } from '../ModerationListState
 import BanUserScreen from '../../app/BanUserScreen';
 import BanUserScreen3 from '../../app/BanUserScreen3';
 import ProcessReviewsScreen from '../../app/ProcessReviewsScreen';
+import ProcessReviewsScreen2 from '../../app/ProcessReviewsScreen2';
 import AdminScreen from '../../app/AdminScreen';
+import ReviewListingScreen from '../../app/ReviewListingScreen';
+import ReviewListingScreen3 from '../../app/ReviewListingScreen3';
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockSetParams = jest.fn();
+const mockRouter = { push: mockPush, replace: mockReplace, back: mockBack, setParams: mockSetParams };
+const mockFocus = { enter: null, leave: null };
 
 jest.mock('axios');
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'));
 jest.mock('../../config/api', () => ({ API_BASE_URL: 'http://test.local', ENDPOINTS: {} }));
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn(), setParams: jest.fn() }),
-  useLocalSearchParams: () => ({}),
+  useRouter: () => mockRouter,
+  useLocalSearchParams: () => ({ reviewid: '7' }),
+  useFocusEffect: (effect) => require('react').useEffect(() => {
+    let cleanup;
+    const leave = () => { cleanup?.(); cleanup = null; };
+    mockFocus.leave = leave;
+    mockFocus.enter = () => { cleanup = effect(); };
+    mockFocus.enter();
+    return leave;
+  }, [effect]),
 }));
 
 // React 19 commits test renders asynchronously unless they are wrapped in act.
@@ -184,5 +199,106 @@ describe('admin count recovery', () => {
     expect(renderedText(tree)).not.toContain("Some report counts couldn't be loaded.");
     expect(renderedText(tree)).not.toContain('Unavailable');
     expect(tree.root.findAllByType(Text).filter(node => node.props.children === 0)).toHaveLength(3);
+  });
+});
+
+
+describe('review moderation refresh on return', () => {
+  const review = { reviewID: 7, title: 'Reported review', text: 'Review text', rating: 3,
+    reviewerID: 2, reviewerName: 'Reviewer', flagged: true };
+
+  it.each([
+    ['reviews', ProcessReviewsScreen, 'Dismiss Report'],
+    ['reviews', ProcessReviewsScreen, 'Delete Review'],
+    ['admin counts', AdminScreen, 'Dismiss Report'],
+    ['admin counts', AdminScreen, 'Delete Review'],
+  ])('refreshes mounted %s after %s action', async (name, Screen, label) => {
+    let reported = true;
+    axios.get.mockImplementation(async url => ({ data: url.endsWith('/admin/flagged')
+      ? (url.includes('/reviews/') && reported ? [review] : []) : review }));
+    axios.put.mockImplementation(async () => { reported = false; return { data: {} }; });
+    axios.delete.mockImplementation(async () => { reported = false; return { status: 204 }; });
+    let tree, detail;
+    await act(async () => { tree = create(<Screen />); });
+    if (name === 'reviews') expect(renderedText(tree)).toContain('Reported review');
+    else expect(tree.root.findAllByType(Text).map(node => node.props.children)).toContain(1);
+    await act(async () => { mockFocus.leave(); detail = create(<ProcessReviewsScreen2 />); });
+    const button = detail.root.findAll(node => typeof node.props.onPress === 'function'
+      && node.findAllByType(Text).some(text => text.props.children === label))[0];
+    await act(async () => { await button.props.onPress(); });
+    if (label === 'Dismiss Report') {
+      expect(axios.put).toHaveBeenCalledWith('http://test.local/api/reviews/setFlag/7/false', {}, expect.any(Object));
+      expect(mockBack).toHaveBeenCalled();
+      expect(mockSetParams).not.toHaveBeenCalled();
+    } else {
+      expect(axios.delete).toHaveBeenCalledWith('http://test.local/api/reviews/7', expect.any(Object));
+      expect(mockBack).toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    }
+    await act(async () => { mockFocus.enter(); });
+    if (name === 'reviews') {
+      expect(renderedText(tree)).not.toContain('Reported review');
+      expect(renderedText(tree)).toContain('No reported reviews right now.');
+    } else {
+      const values = tree.root.findAllByType(Text).map(node => node.props.children);
+      expect(values).not.toContain(1);
+      expect(values.filter(value => value === 0)).toHaveLength(3);
+    }
+    expect(axios.get.mock.calls.filter(([url]) => url.endsWith('/admin/flagged'))).toHaveLength(name === 'reviews' ? 2 : 6);
+    await act(async () => { detail.unmount(); tree.unmount(); });
+  });
+
+  it.each([['reviews', ProcessReviewsScreen], ['admin counts', AdminScreen]])(
+    'ignores a stale response after refreshing %s', async (name, Screen) => {
+      let resolveOld;
+      let old = true;
+      axios.get.mockImplementation(url => {
+        if (old && url.includes('/reviews/')) return new Promise(resolve => { resolveOld = resolve; });
+        return Promise.resolve({ data: [] });
+      });
+      let tree;
+      await act(async () => { tree = create(<Screen />); });
+      await act(async () => { mockFocus.leave(); old = false; mockFocus.enter(); });
+      await act(async () => { resolveOld({ data: [review] }); });
+      if (name === 'reviews') {
+        expect(renderedText(tree)).toContain('No reported reviews right now.');
+        expect(renderedText(tree)).not.toContain('Reported review');
+      } else {
+        expect(tree.root.findAllByType(Text).filter(node => node.props.children === 0)).toHaveLength(3);
+        expect(tree.root.findAllByType(Text).map(node => node.props.children)).not.toContain(1);
+      }
+      await act(async () => tree.unmount());
+    });
+});
+
+
+describe('listing deletion returns to refreshed listings', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it.each(['automatic dismissal', 'native dismissal'])('returns to Review Listings using %s', async action => {
+    axios.get.mockResolvedValue({ data: [{ listingID: 72, name: 'Courtyard Flat', ownerName: 'Owner' }] });
+    let list, notification;
+    await act(async () => { list = create(<ReviewListingScreen />); });
+    expect(renderedText(list)).toContain('Courtyard Flat');
+    await act(async () => { mockFocus.leave(); notification = create(<ReviewListingScreen3 />); });
+    expect(renderedText(notification)).toContain('Listing Deleted');
+    if (action === 'native dismissal') {
+      await act(async () => notification.root.findByType(Modal).props.onRequestClose());
+    } else {
+      await act(async () => jest.advanceTimersByTime(1999));
+      expect(mockReplace).not.toHaveBeenCalled();
+      await act(async () => jest.advanceTimersByTime(1));
+    }
+    expect(mockReplace).toHaveBeenCalledWith('/ReviewListingScreen');
+    expect(mockReplace).not.toHaveBeenCalledWith('/AdminScreen');
+    await act(async () => notification.unmount());
+    axios.get.mockResolvedValue({ data: [] });
+    await act(async () => { mockFocus.enter(); });
+    expect(renderedText(list)).not.toContain('Courtyard Flat');
+    expect(renderedText(list)).toContain('No reported listings right now.');
+    expect(axios.get).toHaveBeenCalledTimes(2);
+    await act(async () => { list.unmount(); jest.runOnlyPendingTimers(); });
+    expect(mockReplace).toHaveBeenCalledTimes(1);
   });
 });

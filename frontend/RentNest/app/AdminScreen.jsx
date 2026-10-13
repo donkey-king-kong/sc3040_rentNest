@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { FontAwesome } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ const EMPTY_COUNTS = {
 
 const AdminScreen = () => {
   const router = useRouter();
+  const requestVersion = useRef(0);
   const [counts, setCounts] = useState(EMPTY_COUNTS);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -32,7 +33,7 @@ const AdminScreen = () => {
     })}`;
   };
 
-  const fetchFlaggedCount = async (endpoint, token) => {
+  const fetchFlaggedCount = useCallback(async (endpoint, token) => {
     try {
       const response = await axios.get(`${API_BASE_URL}${endpoint}`, {
         headers: {
@@ -46,17 +47,15 @@ const AdminScreen = () => {
       console.log(`Failed to fetch ${endpoint}:`, error.message);
       return null;
     }
-  };
+  }, []);
 
-  const fetchFlaggedCounts = async ({ initial = false } = {}) => {
-    if (initial) {
-      setIsLoading(true);
-    } else {
-      setIsRefreshing(true);
-    }
+  const fetchFlaggedCounts = useCallback(async () => {
+    const version = ++requestVersion.current;
+    setIsRefreshing(true);
 
     try {
       const token = await AsyncStorage.getItem('token');
+      if (version !== requestVersion.current) return;
 
       if (!token) {
         router.replace('/LoginScreen');
@@ -69,20 +68,25 @@ const AdminScreen = () => {
         fetchFlaggedCount('/api/listings/admin/flagged', token),
       ]);
 
+      if (version !== requestVersion.current) return;
       setCounts({ reviews, users, listings });
       setLastUpdated([reviews, users, listings].every(value => value !== null) ? new Date() : null);
     } catch (error) {
+      if (version !== requestVersion.current) return;
       setCounts(EMPTY_COUNTS);
       setLastUpdated(null);
     } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+      if (version === requestVersion.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-  };
+  }, [router, fetchFlaggedCount]);
 
-  useEffect(() => {
-    fetchFlaggedCounts({ initial: true });
-  }, []);
+  useFocusEffect(useCallback(() => {
+    void fetchFlaggedCounts();
+    return () => { requestVersion.current += 1; };
+  }, [fetchFlaggedCounts]));
 
   const handleLogout = () => {
     Alert.alert(

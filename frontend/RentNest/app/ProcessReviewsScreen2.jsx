@@ -78,8 +78,7 @@ const ProcessReviews2 = () => {
         },
       });
 
-      // Go back and trigger refresh
-      router.setParams({ refresh: 'true' });
+      // The review list reloads when it regains focus.
       router.back();
     } catch (error) {
       console.error("Failed to ignore review:", error);
@@ -105,8 +104,8 @@ const ProcessReviews2 = () => {
         },
       });
 
-      // Navigate to process reviews screen 3
-      router.push('/ProcessReviewsScreen3');
+      // Return to the review list, which reloads when it regains focus.
+      router.back();
     } catch (error) {
       console.error("Failed to delete review:", error);
     }
@@ -120,7 +119,7 @@ const ProcessReviews2 = () => {
 
   return (
     <View style={styles.container}>
-      <AdminHeader title="Review Flagged Review" onBack={() => router.replace('/ProcessReviewsScreen?refresh=true')} backLabel="Back to reviews" inset />
+      <AdminHeader title="Review Flagged Review" onBack={() => router.replace('/ProcessReviewsScreen')} backLabel="Back to reviews" inset />
 
       <View style={styles.reviewBox}>
         <View style={styles.header}>
