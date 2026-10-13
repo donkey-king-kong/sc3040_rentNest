@@ -95,13 +95,11 @@ const render = async () => {
 const hasText = value => tree.root.findAllByType(Text)
   .some(node => node.props.children === value);
 
-it('keeps Back available while core listing data is loading', async () => {
+it('does not show Back while core listing data is loading', async () => {
   corePending = deferred();
   await render();
   expect(hasText('Loading listing...')).toBe(true);
-  const back = tree.root.find(node => node.props.accessibilityLabel === 'Go back');
-  await act(async () => back.props.onPress());
-  expect(mockRouter.back).toHaveBeenCalled();
+  expect(tree.root.findAll(node => node.props.accessibilityLabel === 'Go back')).toHaveLength(0);
 });
 
 it('waits for pricing and secondary requests before displaying the listing', async () => {
@@ -118,6 +116,24 @@ it('waits for pricing and secondary requests before displaying the listing', asy
   expect(hasText('Fast property')).toBe(true);
   expect(hasText('Loading listing...')).toBe(false);
   expect(tree.root.findByType('FairPriceCard').props.loading).toBe(false);
+});
+
+it('keeps the loaded-screen Back control outside scrolling content', async () => {
+  await render();
+  await act(async () => {
+    pricingPending.resolve({ status: 200, data: { available: true } });
+    secondaryPending.resolve({ status: 200, data: [] });
+  });
+
+  const back = tree.root.find(node => node.props.accessibilityLabel === 'Go back');
+  let ancestor = back.parent;
+  while (ancestor) {
+    expect(ancestor.type).not.toBe('ScrollView');
+    ancestor = ancestor.parent;
+  }
+
+  await act(async () => back.props.onPress());
+  expect(mockRouter.back).toHaveBeenCalled();
 });
 
 it('exposes a retry after pricing fails', async () => {

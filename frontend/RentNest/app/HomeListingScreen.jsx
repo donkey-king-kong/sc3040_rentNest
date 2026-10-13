@@ -457,14 +457,6 @@ const HomeListingScreen = () => {
   if (initialListingLoading) {
     return (
       <View style={styles.loadingScreen}>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={() => router.back()}
-          style={styles.loadingBackButton}
-        >
-          <FontAwesome name="chevron-left" size={18} color="#101820" />
-        </TouchableOpacity>
         <MorphingInfinity size={86} color="#2FA84F" />
         <Text style={styles.loadingText}>Loading listing...</Text>
       </View>
@@ -472,23 +464,21 @@ const HomeListingScreen = () => {
   }
 
   return (
-    <ScrollView style={styles.box}>
-      <View style={styles.imageWrapper}>
-        <ListingImage
-          uri={listing.imageURL}
-          style={styles.image}
-          screen="HomeListingScreen"
-          listingId={listingId}
-          listingName={listing.name}
-          width={600}
-          height={400}
-          diagnostics={false}
-        />
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <FontAwesome name="chevron-left" size={18} color="#101820" />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.container}>
+    <View style={styles.screen}>
+      <ScrollView style={styles.box}>
+        <View style={styles.imageWrapper}>
+          <ListingImage
+            uri={listing.imageURL}
+            style={styles.image}
+            screen="HomeListingScreen"
+            listingId={listingId}
+            listingName={listing.name}
+            width={600}
+            height={400}
+            diagnostics={false}
+          />
+        </View>
+        <View style={styles.container}>
         {/* Display the name and address */}
         <Text style={styles.name}>{listing.name}</Text>
         <Text style={styles.location}>{listing.location}</Text>
@@ -761,12 +751,25 @@ const HomeListingScreen = () => {
                         </View>
                       </Modal>
         
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+        onPress={() => router.back()}
+        style={styles.backButton}
+      >
+        <FontAwesome name="chevron-left" size={18} color="#101820" />
+      </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    position: 'relative',
+  },
   priceInsightsContainer: {
     marginHorizontal: 0,
   },
@@ -790,17 +793,6 @@ const styles = StyleSheet.create({
     color: '#101820',
     fontSize: 18,
     fontWeight: '700',
-  },
-  loadingBackButton: {
-    position: 'absolute',
-    top: 48,
-    left: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
   },
   sectionStatus: {
     minHeight: 72,
@@ -836,12 +828,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     left: 16,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.85)',
+    zIndex: 1,
+    elevation: 4,
   },
   name: {
     fontSize: 24,
