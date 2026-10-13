@@ -164,6 +164,13 @@ public class RentalsService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This property is no longer available for an offer");
         }
 
+        boolean listingAlreadyRented = rentalsRepository.findByListings_ListingID(rentalDTO.getListingID())
+                .filter(r -> "active".equals(r.getStatus()) || "pending".equals(r.getStatus()))
+                .isPresent();
+        if (listingAlreadyRented) {
+            throw new IllegalArgumentException("Listing already has an active or pending rental.");
+        }
+
         // Fetch the tenant (receiver) by receiverID from UserRepository
         User receiver = userRepository.findById(receiverID)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Receiver not found"));

@@ -74,6 +74,10 @@ public class RentalsDTO {
         this.listingID = listingID;
     }
 
+    public void setListingID(Long listingID) {
+        this.listingID = listingID;
+    }
+
     public void setTenantUserID(Long tenantUserID) {
         this.tenantUserID = tenantUserID;
     }

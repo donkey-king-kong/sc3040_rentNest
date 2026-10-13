@@ -1,0 +1,4 @@
+requestid,refund_amount,status,rentalid
+5,0,terminated,55
+8,2925,Pending,47
+9,7500,Pending,60

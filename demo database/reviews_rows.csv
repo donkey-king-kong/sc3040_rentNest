@@ -1,0 +1,157 @@
+reviewid,flagged,rating,text,title,reviewerid,userid
+219,false,3,"The flat itself is fine and the rent is fair, but I had to follow up a few times before the leaking tap was fixed.","Decent, but slow on repairs",1,2
+220,false,4,"Reliable with rent and kept the place tidy. A couple of late replies on chat, but nothing that caused any problems.",Good tenant,1,22
+221,false,5,"Punctual, answered every question about the unit honestly and followed up with the details I asked for the same day.",Great viewing experience,1,28
+222,false,3,"Rent was paid, though sometimes a few days late. The flat needed some extra cleaning at handover.",Okay tenant,2,1
+223,false,4,Took good care of the furniture and was flexible with viewing arrangements near the end of the lease.,Pleasant to deal with,2,23
+224,false,5,"Repairs were handled within a day or two, rent receipts always came on time and the deposit terms were explained clearly upfront. Would happily rent from them again.",Best landlord I have rented from,2,31
+225,false,5,"Always paid rent on time, kept the unit spotless and reported small issues early. A pleasure to rent to.",Excellent tenant,3,24
+226,false,3,"Was polite, but changed the viewing time a couple of times and took a while to give an answer.",Okay enquiry,3,43
+227,false,2,Arrived 40 minutes late to the viewing and stopped replying after asking for a discount.,Late and unresponsive,3,50
+228,false,5,"Respectful of the property and the neighbours, and very easy to communicate with. Would rent to them again without hesitation.",Highly recommended tenant,4,25
+229,false,1,"Booked a viewing, did not turn up and never replied to follow-up messages.",Did not show up,4,51
+231,false,5,Rent was never late and the flat was returned in better condition than expected. Thank you!,Model tenant,5,26
+232,false,5,"Arrived on time for the viewing, asked sensible questions and kept me updated on their decision. Very easy to deal with.",Courteous and punctual,5,43
+233,false,5,"Clear about their requirements and budget from the start, which made arranging the viewing simple.",Great enquirer,5,51
+234,false,5,"Always paid rent on time, kept the unit spotless and reported small issues early. A pleasure to rent to.",Excellent tenant,6,27
+235,false,5,"Arrived on time for the viewing, asked sensible questions and kept me updated on their decision. Very easy to deal with.",Courteous and punctual,6,44
+236,false,5,"Clear about their requirements and budget from the start, which made arranging the viewing simple.",Great enquirer,6,55
+237,false,3,"No serious issues, but I had to send reminders about rent and the house rules more than once.","Fine, with some reminders",7,28
+238,false,5,Quick to reply to my enquiry and happy to arrange a viewing at short notice. The unit was exactly as listed.,Very helpful owner,7,30
+239,false,5,"Arrived on time for the viewing, asked sensible questions and kept me updated on their decision. Very easy to deal with.",Courteous and punctual,7,38
+240,false,3,"Rent was paid, though sometimes a few days late. The flat needed some extra cleaning at handover.",Okay tenant,8,29
+241,false,5,"Clear about their requirements and budget from the start, which made arranging the viewing simple.",Great enquirer,8,38
+243,false,5,"Respectful of the property and the neighbours, and very easy to communicate with. Would rent to them again without hesitation.",Highly recommended tenant,9,30
+244,false,5,"Arrived on time for the viewing, asked sensible questions and kept me updated on their decision. Very easy to deal with.",Courteous and punctual,9,47
+245,false,3,"Was polite, but changed the viewing time a couple of times and took a while to give an answer.",Okay enquiry,9,53
+246,false,4,"Reliable with rent and kept the place tidy. A couple of late replies on chat, but nothing that caused any problems.",Good tenant,10,31
+247,false,4,"Good communication throughout the enquiry. Needed a reminder about the viewing time, but otherwise very pleasant.",Polite and organised,10,44
+248,false,3,Showed interest but went quiet for a while after the viewing.,Average,10,55
+249,false,2,Rent was late on multiple occasions and some minor damage was not reported until the end of the lease.,Several late payments,11,32
+250,false,4,Friendly during the viewing and replied promptly afterwards.,Pleasant to deal with,11,53
+251,false,2,Arrived 40 minutes late to the viewing and stopped replying after asking for a discount.,Late and unresponsive,11,54
+252,false,2,The unit was left quite messy and a few fittings were damaged. Communication was also inconsistent.,Needs to improve upkeep,12,33
+253,false,4,"Good communication throughout the enquiry. Needed a reminder about the viewing time, but otherwise very pleasant.",Polite and organised,12,39
+254,false,5,"Clear about their requirements and budget from the start, which made arranging the viewing simple.",Great enquirer,12,52
+255,false,4,Took good care of the furniture and was flexible with viewing arrangements near the end of the lease.,Pleasant to deal with,13,34
+256,false,1,"Booked a viewing, did not turn up and never replied to follow-up messages.",Did not show up,13,40
+257,false,4,Friendly during the viewing and replied promptly afterwards.,Pleasant to deal with,13,50
+258,false,5,"Punctual, answered every question about the unit honestly and followed up with the details I asked for the same day.",Great viewing experience,15,7
+259,false,4,"Reliable with rent and kept the place tidy. A couple of late replies on chat, but nothing that caused any problems.",Good tenant,15,35
+260,false,5,"Arrived on time for the viewing, asked sensible questions and kept me updated on their decision. Very easy to deal with.",Courteous and punctual,15,54
+261,false,1,Repeated late payments and complaints from neighbours about noise. Would not rent to this tenant again.,Difficult tenancy,16,36
+262,false,4,Took good care of the furniture and was flexible with viewing arrangements near the end of the lease.,Pleasant to deal with,16,37
+263,false,5,"Clear about their requirements and budget from the start, which made arranging the viewing simple.",Great enquirer,16,45
+264,false,4,"Replied quickly and the viewing went well. Took a little while to confirm the final price, but overall a good experience.",Helpful and friendly,17,15
+265,false,2,Rent was late on multiple occasions and some minor damage was not reported until the end of the lease.,Several late payments,17,38
+266,false,5,"Arrived on time for the viewing, asked sensible questions and kept me updated on their decision. Very easy to deal with.",Courteous and punctual,17,48
+267,true,1,Confirmed a viewing time and then did not turn up or reply to messages. Wasted a trip.,No-show at viewing,18,9
+268,false,4,"Reliable with rent and kept the place tidy. A couple of late replies on chat, but nothing that caused any problems.",Good tenant,18,39
+269,false,2,"Kept changing what they were looking for, which made the enquiry drag on.",Unclear requirements,18,45
+270,false,4,Took good care of the furniture and was flexible with viewing arrangements near the end of the lease.,Pleasant to deal with,21,40
+271,false,2,Arrived 40 minutes late to the viewing and stopped replying after asking for a discount.,Late and unresponsive,21,42
+272,false,4,"Good communication throughout the enquiry. Needed a reminder about the viewing time, but otherwise very pleasant.",Polite and organised,21,52
+273,false,5,"Any issue with the flat was sorted quickly, and they always gave notice before coming over. The flat matched the listing exactly. Highly recommended.",Responsive and fair,22,1
+274,false,5,Rent was never late and the flat was returned in better condition than expected. Thank you!,Model tenant,22,41
+275,false,4,Friendly during the viewing and replied promptly afterwards.,Pleasant to deal with,22,56
+276,false,3,"No major problems, but replies could take a while. Expect to chase them for anything that is not urgent.",Average experience,23,2
+277,false,5,"Always paid rent on time, kept the unit spotless and reported small issues early. A pleasure to rent to.",Excellent tenant,23,42
+278,false,2,"Kept changing what they were looking for, which made the enquiry drag on.",Unclear requirements,23,48
+279,false,3,"The flat itself is fine and the rent is fair, but I had to follow up a few times before the leaking tap was fixed.","Decent, but slow on repairs",24,3
+280,false,4,"Good communication throughout the enquiry. Needed a reminder about the viewing time, but otherwise very pleasant.",Polite and organised,24,40
+281,false,5,"Respectful of the property and the neighbours, and very easy to communicate with. Would rent to them again without hesitation.",Highly recommended tenant,24,43
+282,false,4,"Friendly and easy to reach. Minor repairs sometimes took a few days, but everything got fixed properly in the end.",Good landlord overall,25,4
+283,false,5,"Clear about their requirements and budget from the start, which made arranging the viewing simple.",Great enquirer,25,41
+284,false,5,Rent was never late and the flat was returned in better condition than expected. Thank you!,Model tenant,25,44
+285,false,5,"Clear contract, quick replies on chat and no surprises with charges. They even left a guide for the appliances on move-in day.",Smooth tenancy from start to finish,26,5
+286,false,5,"Always paid rent on time, kept the unit spotless and reported small issues early. A pleasure to rent to.",Excellent tenant,26,45
+287,false,4,Friendly during the viewing and replied promptly afterwards.,Pleasant to deal with,26,46
+288,false,4,"Communication was good and the rent process was simple. The aircon servicing was a little late, otherwise a pleasant stay.",Reliable and polite,27,6
+289,false,1,Repeated late payments and complaints from neighbours about noise. Would not rent to this tenant again.,Difficult tenancy,27,46
+290,false,5,"Arrived on time for the viewing, asked sensible questions and kept me updated on their decision. Very easy to deal with.",Courteous and punctual,27,49
+291,false,5,"Repairs were handled within a day or two, rent receipts always came on time and the deposit terms were explained clearly upfront. Would happily rent from them again.",Best landlord I have rented from,28,7
+292,false,4,"Good communication throughout the enquiry. Needed a reminder about the viewing time, but otherwise very pleasant.",Polite and organised,28,41
+293,false,5,"Respectful of the property and the neighbours, and very easy to communicate with. Would rent to them again without hesitation.",Highly recommended tenant,28,47
+294,false,2,Messages often went unanswered for days and a broken water heater took over two weeks to replace. The flat was also not as clean as shown at handover.,Communication needs work,29,8
+295,false,4,"Clear answers about utilities and the lease terms. The viewing time had to be moved once, but they let me know early.",Good communication,29,32
+296,false,4,"Reliable with rent and kept the place tidy. A couple of late replies on chat, but nothing that caused any problems.",Good tenant,29,48
+297,false,3,"No major problems, but replies could take a while. Expect to chase them for anything that is not urgent.",Average experience,30,9
+298,true,1,"Booked a viewing, did not turn up and never replied to follow-up messages.",Did not show up,30,47
+299,false,5,Rent was never late and the flat was returned in better condition than expected. Thank you!,Model tenant,30,49
+300,false,5,"Always paid rent on time, kept the unit spotless and reported small issues early. A pleasure to rent to.",Excellent tenant,31,2
+301,false,5,"Any issue with the flat was sorted quickly, and they always gave notice before coming over. The flat matched the listing exactly. Highly recommended.",Responsive and fair,31,10
+302,false,3,"Was polite, but changed the viewing time a couple of times and took a while to give an answer.",Okay enquiry,31,46
+303,false,5,"Clear contract, quick replies on chat and no surprises with charges. They even left a guide for the appliances on move-in day.",Smooth tenancy from start to finish,32,11
+304,false,2,Took several days to reply to my enquiry and the viewing was rescheduled twice without much notice.,Slow to respond,32,12
+305,false,2,The unit was left quite messy and a few fittings were damaged. Communication was also inconsistent.,Needs to improve upkeep,32,51
+306,false,2,"Several items in the listing were missing on move-in, and getting them sorted took a lot of back and forth.",Not as described,33,12
+307,false,5,Quick to reply to my enquiry and happy to arrange a viewing at short notice. The unit was exactly as listed.,Very helpful owner,33,13
+308,false,5,"Respectful of the property and the neighbours, and very easy to communicate with. Would rent to them again without hesitation.",Highly recommended tenant,33,52
+309,false,2,Messages often went unanswered for days and a broken water heater took over two weeks to replace. The flat was also not as clean as shown at handover.,Communication needs work,34,13
+310,false,5,Rent was never late and the flat was returned in better condition than expected. Thank you!,Model tenant,34,53
+311,false,4,Friendly during the viewing and replied promptly afterwards.,Pleasant to deal with,34,56
+312,false,5,"Punctual, answered every question about the unit honestly and followed up with the details I asked for the same day.",Great viewing experience,35,5
+313,false,3,"The flat itself is fine and the rent is fair, but I had to follow up a few times before the leaking tap was fixed.","Decent, but slow on repairs",35,15
+314,false,5,"Always paid rent on time, kept the unit spotless and reported small issues early. A pleasure to rent to.",Excellent tenant,35,54
+315,false,2,"Several items in the listing were missing on move-in, and getting them sorted took a lot of back and forth.",Not as described,36,16
+316,false,2,Arrived 40 minutes late to the viewing and stopped replying after asking for a discount.,Late and unresponsive,36,49
+317,false,3,"No serious issues, but I had to send reminders about rent and the house rules more than once.","Fine, with some reminders",36,55
+318,false,2,Messages often went unanswered for days and a broken water heater took over two weeks to replace. The flat was also not as clean as shown at handover.,Communication needs work,37,16
+319,false,3,Showed interest but went quiet for a while after the viewing.,Average,37,50
+320,false,1,Repeated late payments and complaints from neighbours about noise. Would not rent to this tenant again.,Difficult tenancy,37,56
+321,false,3,"No major problems, but replies could take a while. Expect to chase them for anything that is not urgent.",Average experience,38,17
+322,false,4,"Replied quickly and the viewing went well. Took a little while to confirm the final price, but overall a good experience.",Helpful and friendly,38,23
+323,false,2,"The photos looked much better than the actual unit, and the owner was vague when asked about the rent breakdown.",Listing was misleading,38,25
+324,false,4,"Clear answers about utilities and the lease terms. The viewing time had to be moved once, but they let me know early.",Good communication,39,3
+325,false,5,Quick to reply to my enquiry and happy to arrange a viewing at short notice. The unit was exactly as listed.,Very helpful owner,39,17
+326,false,5,"Repairs were handled within a day or two, rent receipts always came on time and the deposit terms were explained clearly upfront. Would happily rent from them again.",Best landlord I have rented from,39,18
+327,true,2,Took several days to reply to my enquiry and the viewing was rescheduled twice without much notice.,Slow to respond,40,1
+328,false,5,"Punctual, answered every question about the unit honestly and followed up with the details I asked for the same day.",Great viewing experience,40,13
+329,false,1,Repairs were ignored and there were unannounced visits to the unit. Getting the deposit discussed was very stressful.,Would not rent again,40,21
+330,false,5,Quick to reply to my enquiry and happy to arrange a viewing at short notice. The unit was exactly as listed.,Very helpful owner,41,6
+331,false,4,"Friendly and easy to reach. Minor repairs sometimes took a few days, but everything got fixed properly in the end.",Good landlord overall,41,22
+332,false,4,"Replied quickly and the viewing went well. Took a little while to confirm the final price, but overall a good experience.",Helpful and friendly,41,37
+333,false,2,"Several items in the listing were missing on move-in, and getting them sorted took a lot of back and forth.",Not as described,42,23
+334,false,5,"Punctual, answered every question about the unit honestly and followed up with the details I asked for the same day.",Great viewing experience,42,24
+335,false,5,Quick to reply to my enquiry and happy to arrange a viewing at short notice. The unit was exactly as listed.,Very helpful owner,42,33
+336,false,4,"Clear answers about utilities and the lease terms. The viewing time had to be moved once, but they let me know early.",Good communication,43,12
+337,false,3,"The flat itself is fine and the rent is fair, but I had to follow up a few times before the leaking tap was fixed.","Decent, but slow on repairs",43,24
+339,false,1,Confirmed a viewing time and then did not turn up or reply to messages. Wasted a trip.,No-show at viewing,44,3
+340,false,3,"Got the information I needed eventually, though replies were slow and the viewing started late.",Okay enquiry experience,44,6
+341,true,1,Repairs were ignored and there were unannounced visits to the unit. Getting the deposit discussed was very stressful.,Would not rent again,44,25
+342,false,5,"Punctual, answered every question about the unit honestly and followed up with the details I asked for the same day.",Great viewing experience,45,8
+343,false,2,"The photos looked much better than the actual unit, and the owner was vague when asked about the rent breakdown.",Listing was misleading,45,10
+344,false,5,"Any issue with the flat was sorted quickly, and they always gave notice before coming over. The flat matched the listing exactly. Highly recommended.",Responsive and fair,45,26
+345,false,5,Quick to reply to my enquiry and happy to arrange a viewing at short notice. The unit was exactly as listed.,Very helpful owner,46,8
+346,false,5,"Clear contract, quick replies on chat and no surprises with charges. They even left a guide for the appliances on move-in day.",Smooth tenancy from start to finish,46,27
+347,false,5,"Punctual, answered every question about the unit honestly and followed up with the details I asked for the same day.",Great viewing experience,46,35
+348,false,5,Quick to reply to my enquiry and happy to arrange a viewing at short notice. The unit was exactly as listed.,Very helpful owner,47,16
+349,false,5,"Repairs were handled within a day or two, rent receipts always came on time and the deposit terms were explained clearly upfront. Would happily rent from them again.",Best landlord I have rented from,47,28
+350,false,4,"Clear answers about utilities and the lease terms. The viewing time had to be moved once, but they let me know early.",Good communication,47,31
+351,false,5,"Punctual, answered every question about the unit honestly and followed up with the details I asked for the same day.",Great viewing experience,48,21
+352,false,3,"No major problems, but replies could take a while. Expect to chase them for anything that is not urgent.",Average experience,48,29
+353,false,3,"The owner was polite, but some details about the unit were different from the listing.",Mixed experience,48,36
+354,false,2,Took several days to reply to my enquiry and the viewing was rescheduled twice without much notice.,Slow to respond,49,7
+355,false,2,"The photos looked much better than the actual unit, and the owner was vague when asked about the rent breakdown.",Listing was misleading,49,11
+356,false,5,"Any issue with the flat was sorted quickly, and they always gave notice before coming over. The flat matched the listing exactly. Highly recommended.",Responsive and fair,49,30
+357,false,4,"Replied quickly and the viewing went well. Took a little while to confirm the final price, but overall a good experience.",Helpful and friendly,50,4
+358,false,2,Took several days to reply to my enquiry and the viewing was rescheduled twice without much notice.,Slow to respond,50,17
+360,false,2,"The photos looked much better than the actual unit, and the owner was vague when asked about the rent breakdown.",Listing was misleading,51,5
+361,false,4,"Clear answers about utilities and the lease terms. The viewing time had to be moved once, but they let me know early.",Good communication,51,22
+362,false,1,Repairs were ignored and there were unannounced visits to the unit. Getting the deposit discussed was very stressful.,Would not rent again,51,32
+363,false,4,"Replied quickly and the viewing went well. Took a little while to confirm the final price, but overall a good experience.",Helpful and friendly,52,4
+364,false,5,"Punctual, answered every question about the unit honestly and followed up with the details I asked for the same day.",Great viewing experience,52,11
+365,false,4,"Communication was good and the rent process was simple. The aircon servicing was a little late, otherwise a pleasant stay.",Reliable and polite,52,33
+366,false,4,"Clear answers about utilities and the lease terms. The viewing time had to be moved once, but they let me know early.",Good communication,53,18
+367,false,4,"Replied quickly and the viewing went well. Took a little while to confirm the final price, but overall a good experience.",Helpful and friendly,53,29
+368,false,4,"Friendly and easy to reach. Minor repairs sometimes took a few days, but everything got fixed properly in the end.",Good landlord overall,53,34
+369,false,4,"Clear answers about utilities and the lease terms. The viewing time had to be moved once, but they let me know early.",Good communication,54,18
+370,false,5,Quick to reply to my enquiry and happy to arrange a viewing at short notice. The unit was exactly as listed.,Very helpful owner,54,27
+371,false,2,Messages often went unanswered for days and a broken water heater took over two weeks to replace. The flat was also not as clean as shown at handover.,Communication needs work,54,35
+372,false,2,Took several days to reply to my enquiry and the viewing was rescheduled twice without much notice.,Slow to respond,55,21
+373,false,5,"Punctual, answered every question about the unit honestly and followed up with the details I asked for the same day.",Great viewing experience,55,34
+374,false,4,"Communication was good and the rent process was simple. The aircon servicing was a little late, otherwise a pleasant stay.",Reliable and polite,55,36
+375,false,4,"Replied quickly and the viewing went well. Took a little while to confirm the final price, but overall a good experience.",Helpful and friendly,56,9
+376,false,2,"The photos looked much better than the actual unit, and the owner was vague when asked about the rent breakdown.",Listing was misleading,56,26
+377,false,2,"Several items in the listing were missing on move-in, and getting them sorted took a lot of back and forth.",Not as described,56,37
+384,false,1,Absolute dogshit of a landlord. Never rent from him. Wasted my damn time and money. Would not recommend this guy to anyone.,Terrible experience,4,3

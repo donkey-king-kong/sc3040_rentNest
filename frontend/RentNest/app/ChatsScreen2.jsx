@@ -142,11 +142,22 @@ const ChatsScreen2 = () => {
         conversationAbortRef.current = controller;
         const cached = chatData.peekConversation(partnerUserId);
         if (cached) {
-            setChat(cached.messages);
-            setPartner(cached.partner);
-            setHasOlderMessages(cached.hasMore);
-            setLoading(false);
-            hydrateMessageCards(cached.messages, generation);
+            const needsHydration = cached.messages.some(m => m.rentalId != null || m.requestId != null);
+            if (!needsHydration) {
+                setChat(cached.messages);
+                setPartner(cached.partner);
+                setHasOlderMessages(cached.hasMore);
+                setLoading(false);
+            }
+            hydrateMessageCards(cached.messages, generation).then(() => {
+                if (generation !== conversationGeneration.current) return;
+                if (needsHydration) {
+                    setChat(cached.messages);
+                    setPartner(cached.partner);
+                    setHasOlderMessages(cached.hasMore);
+                    setLoading(false);
+                }
+            });
         } else {
             setLoading(true);
         }
@@ -164,11 +175,19 @@ const ChatsScreen2 = () => {
                 sentMessageScrollPending.current = true;
                 initialScrollComplete.current = true;
             }
+            const remainingMessages = scrollToSentMessage ? data.messages.slice(0, -1) : data.messages;
+            const freshNeedsHydration = remainingMessages.some(m => m.rentalId != null || m.requestId != null);
+            if (freshNeedsHydration) {
+                await hydrateMessageCards(remainingMessages, generation);
+                if (controller.signal.aborted || generation !== conversationGeneration.current) return;
+            }
             setChat(data.messages);
             setPartner(data.partner);
             setHasOlderMessages(data.hasMore);
             setLoading(false);
-            hydrateMessageCards(scrollToSentMessage ? data.messages.slice(0, -1) : data.messages, generation);
+            if (!freshNeedsHydration) {
+                hydrateMessageCards(remainingMessages, generation);
+            }
         } catch (error) {
             if (controller.signal.aborted) return;
             if (error?.code === 'UNAUTHENTICATED') {
@@ -477,13 +496,13 @@ const ChatsScreen2 = () => {
         const tempMessageId = `temp-${Date.now()}`;
         const optimisticMessage = buildOptimisticMessage(messageText, tempMessageId, attachment);
         setNewMessage('');
+        setEnquiry(null);
         sentMessageScrollPending.current = true;
         initialScrollComplete.current = true;
         setChat((previousChat) => [...previousChat, optimisticMessage]);
 
         try{
             await sendMessageToBackend(messageText, tempMessageId, attachment?.listingId);
-            if (generation === conversationGeneration.current) setEnquiry(null);
         } catch (error) {
             console.error('Error sending message:', error);
             setChat((previousChat) => previousChat.map((message) => (
@@ -897,7 +916,7 @@ const handlePaymentAndAccept = async () => {
     useEffect(() => {
         if (!Loading && chat.length > 0 && !initialScrollComplete.current) {
             initialScrollComplete.current = true;
-            const timer = setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: scrollAfterSend === 'true' }), 0);
+            const timer = setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: false }), 100);
             return () => clearTimeout(timer);
         }
     }, [Loading, chat.length]);
@@ -1291,12 +1310,6 @@ const handlePaymentAndAccept = async () => {
     if (Loading) {
         return (
             <View style={styles.loadingShell}>
-                <View style={styles.loadingHeader}>
-                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.backButton}>
-                        <FontAwesome name="chevron-left" size={18} color="#101820" />
-                    </TouchableOpacity>
-                    <Text style={styles.loadingHeaderText}>Chat</Text>
-                </View>
                 <View style={styles.loadingScreen}>
                     <MorphingInfinity size={86} color="#2FA84F" />
                     <Text style={styles.loadingText}>Loading chat history...</Text>
@@ -1340,7 +1353,16 @@ const handlePaymentAndAccept = async () => {
 
             {/* Header row 2: Ask AI + Summarise Chat */}
             <View style={styles.headerActionsRow}>
-                <TouchableOpacity onPress={() => setAskAiModalVisible(true)} style={styles.aiSummaryButton}>
+                <TouchableOpacity
+                    onPress={() => {
+                        if (!Array.isArray(chat) || chat.length === 0) {
+                            showChatNotification('Nothing to ask about yet — start the conversation first.');
+                            return;
+                        }
+                        setAskAiModalVisible(true);
+                    }}
+                    style={styles.aiSummaryButton}
+                >
                     <Text style={styles.aiSummaryButtonText}>Ask AI</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1368,6 +1390,10 @@ const handlePaymentAndAccept = async () => {
                     if (!sentMessageScrollPending.current) return;
                     sentMessageScrollPending.current = false;
                     chatScrollRef.current?.scrollToEnd({ animated: true });
+                }}
+                onLayout={() => {
+                    if (!initialScrollComplete.current) return;
+                    chatScrollRef.current?.scrollToEnd({ animated: false });
                 }}
                 style={styles.chatList}
                 contentContainerStyle={styles.chatListContent}
@@ -1418,7 +1444,7 @@ const handlePaymentAndAccept = async () => {
                                 <Text style={styles.summarySheetTitle}>AI chat summary</Text>
                             </View>
                         </View>
-                        {isSummaryPlaceholder && (
+                        {isSummaryPlaceholder && !parsedSummary && (
                             <Text style={styles.placeholderNotice}>Currently using hardcoded placeholder summary.</Text>
                         )}
                         <ScrollView
@@ -1455,8 +1481,8 @@ const handlePaymentAndAccept = async () => {
                                     {parsedSummary.overview && (
                                         <View style={styles.summaryCard}>
                                             <View style={styles.summaryCardHeaderRow}>
-                                                <FontAwesome name="commenting-o" size={14} color="#A4A4AD" style={styles.summaryCardIcon} />
-                                                <Text style={styles.summaryCardLabel}>Overview</Text>
+                                                <FontAwesome name="commenting-o" size={14} color={isSummaryPlaceholder ? '#E94068' : '#A4A4AD'} style={styles.summaryCardIcon} />
+                                                <Text style={[styles.summaryCardLabel, isSummaryPlaceholder && { color: '#E94068' }]}>Overview</Text>
                                             </View>
                                             <Text style={styles.summaryCardContent}>{parsedSummary.overview}</Text>
                                         </View>
@@ -3008,7 +3034,7 @@ const styles = StyleSheet.create({
     terminationShell: {
         flexShrink: 1,
         width: '88%',
-        maxWidth: 360,
+        maxWidth: 420,
     },
     rentalOfferMessage: {
         width: '100%',

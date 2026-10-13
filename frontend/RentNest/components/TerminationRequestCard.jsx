@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
@@ -132,40 +132,49 @@ export default function TerminationRequestCard({ requestId, onDecision, initialR
       ) : request ? (
         <>
           {!!request.listingName && <Text style={styles.property}>{request.listingName}</Text>}
-          <View style={styles.refund}>
-            <Text style={styles.description}>Refund to tenant</Text>
-            <Text style={styles.amount}>
+          <View style={styles.detailRow}>
+            <View style={styles.detailLabelGroup}>
+              <Feather name="rotate-ccw" size={15} color="#8F8F96" style={styles.detailIcon} />
+              <Text style={styles.detailLabel}>Deposit refund</Text>
+            </View>
+            <Text style={styles.detailValue}>
               {new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD', maximumFractionDigits: 0 }).format(request.refundAmount)}
             </Text>
           </View>
-          <Text style={styles.description}>
-            {accepted ? 'The tenant accepted. This lease has ended.'
-              : rejected ? 'The tenant rejected this request. The lease remains active.'
-                : pending ? (isTenant ? 'Accepting ends your lease immediately.' : 'Awaiting the tenant\u2019s response. The lease remains active.')
-                  : 'This request cannot be acted on. Refresh to check its status.'}
-          </Text>
-          {canDecide && (
+          {canDecide ? (
             <View style={styles.actions}>
               {confirming ? (
                 <>
                   <Text style={styles.confirmation}>End this lease on the terms above? This cannot be undone.</Text>
-                  <TouchableOpacity accessibilityRole="button" disabled={busy} style={[styles.primary, busy && styles.disabled]} onPress={() => decide('accept')}>
-                    <Text style={styles.primaryText}>{busy ? 'Saving...' : 'Confirm termination'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.secondary} onPress={() => setConfirming(false)}>
-                    <Text style={styles.secondaryText}>Go back</Text>
-                  </TouchableOpacity>
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity accessibilityRole="button" disabled={busy} style={[styles.secondary, styles.actionBtn]} onPress={() => setConfirming(false)}>
+                      <Text style={styles.secondaryText}>Go back</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity accessibilityRole="button" disabled={busy} style={[styles.primary, styles.actionBtn, busy && styles.disabled]} onPress={() => decide('accept')}>
+                      <Text style={styles.primaryText}>{busy ? 'Saving...' : 'Confirm'}</Text>
+                    </TouchableOpacity>
+                  </View>
                 </>
               ) : (
-                <>
-                  <TouchableOpacity accessibilityRole="button" disabled={busy} style={[styles.primary, busy && styles.disabled]} onPress={() => setConfirming(true)}>
-                    <Text style={styles.primaryText}>Accept termination</Text>
+                <View style={styles.actionRow}>
+                  <TouchableOpacity accessibilityRole="button" disabled={busy} style={[styles.secondary, styles.actionBtn]} onPress={() => decide('reject')}>
+                    <Text style={styles.secondaryText}>{busy ? 'Saving...' : 'Decline'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity accessibilityRole="button" disabled={busy} style={styles.secondary} onPress={() => decide('reject')}>
-                    <Text style={styles.secondaryText}>{busy ? 'Saving...' : 'Reject request'}</Text>
+                  <TouchableOpacity accessibilityRole="button" disabled={busy} style={[styles.primary, styles.actionBtn, busy && styles.disabled]} onPress={() => setConfirming(true)}>
+                    <Text style={styles.primaryText}>Accept</Text>
                   </TouchableOpacity>
-                </>
+                </View>
               )}
+            </View>
+          ) : (
+            <View style={styles.statusFooter}>
+              <View style={[styles.statusDot, (accepted || rejected) && styles.statusDotSettled]} />
+              <Text style={styles.statusFooterText}>
+                {accepted ? 'Lease ended'
+                  : rejected ? 'Request rejected'
+                    : pending ? (isTenant ? 'Awaiting your response' : 'Awaiting tenant response')
+                      : 'Status unavailable'}
+              </Text>
             </View>
           )}
         </>
@@ -198,26 +207,39 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
   title: { fontSize: 18, lineHeight: 24, fontWeight: '800', color: '#FFFFFF', flexShrink: 1 },
-  body: { padding: 16, gap: 14 },
+  body: { paddingHorizontal: 16, paddingTop: 16 },
   statusPill: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(255, 159, 10, 0.18)' },
   acceptedPill: { backgroundColor: '#DDF8E5' },
   rejectedPill: { backgroundColor: 'rgba(255, 69, 58, 0.18)' },
   status: { fontSize: 13, fontWeight: '800', color: '#FF9F0A' },
   accepted: { color: '#1C8E3A' },
   rejected: { color: '#FF453A' },
-  property: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: '#101820' },
-  refund: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: '#E8EAED', paddingVertical: 14, gap: 6 },
-  amount: { fontSize: 26, lineHeight: 34, fontWeight: '700', color: '#101820', fontVariant: ['tabular-nums'] },
+  property: { fontSize: 14, lineHeight: 20, fontWeight: '600', color: '#101820', marginBottom: 4 },
+  detailRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#ECECEF', gap: 12,
+  },
+  detailRowLast: { borderBottomWidth: 0 },
+  detailLabelGroup: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  detailIcon: { width: 18, textAlign: 'center', marginRight: 10 },
+  detailLabel: { color: '#85858C', fontSize: 16, fontWeight: '700' },
+  detailValue: { color: '#1C1C20', fontSize: 16, fontWeight: '800', textAlign: 'right', flexShrink: 1, fontVariant: ['tabular-nums'] },
   description: { fontSize: 14, lineHeight: 21, color: '#505860' },
-  loading: { gap: 10, alignItems: 'flex-start' },
-  actions: { gap: 8 },
-  primary: { minHeight: 48, padding: 12, borderRadius: 10, backgroundColor: '#101820', alignItems: 'center', justifyContent: 'center' },
+  loading: { gap: 10, alignItems: 'flex-start', paddingBottom: 16 },
+  actions: { paddingTop: 4, paddingBottom: 12 },
+  actionRow: { flexDirection: 'row', gap: 8 },
+  actionBtn: { flex: 1 },
+  primary: { height: 40, paddingHorizontal: 16, borderRadius: 10, backgroundColor: '#101820', alignItems: 'center', justifyContent: 'center' },
   primaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  secondary: { minHeight: 48, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#CED3D8', alignItems: 'center', justifyContent: 'center' },
+  secondary: { height: 40, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: '#CED3D8', alignItems: 'center', justifyContent: 'center' },
   secondaryText: { fontSize: 14, fontWeight: '600', color: '#101820', textAlign: 'center' },
-  confirmation: { color: '#8F3030', fontSize: 14, lineHeight: 21 },
+  confirmation: { color: '#8F3030', fontSize: 14, lineHeight: 21, marginBottom: 8 },
+  statusFooter: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F1F5', borderRadius: 14, padding: 14, marginTop: 4, marginBottom: 16 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#8F8F96', marginRight: 8 },
+  statusDotSettled: { backgroundColor: '#1C8E3A' },
+  statusFooterText: { fontSize: 14, fontWeight: '600', color: '#505860' },
   disabled: { opacity: 0.6 },
-  error: { color: '#A12B2B', fontSize: 14, lineHeight: 21 },
-  refresh: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' },
+  error: { color: '#A12B2B', fontSize: 14, lineHeight: 21, paddingBottom: 8 },
+  refresh: { paddingVertical: 12, justifyContent: 'center', alignSelf: 'flex-start' },
   refreshText: { color: '#505860', fontSize: 13, textDecorationLine: 'underline' },
 });

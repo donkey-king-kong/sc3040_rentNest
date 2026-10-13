@@ -27,8 +27,12 @@ import java.util.regex.Pattern;
 @Service
 public class AiChatService {
     private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
-    private static final String PLACEHOLDER_PREFIX = "[HARDCODED PLACEHOLDER]";
     private static final String SUMMARY_PROMPT_VERSION = "summary-v2";
+    // Demo conversation between Superman (1) and Batman (2) — used as a hardcoded fallback when the AI fails.
+    private static final long DEMO_USER_A = 1L;
+    private static final long DEMO_USER_B = 2L;
+    private static final String DEMO_SUMMARY_JSON = """
+            {"overview":"Batman and Superman discussed viewing arrangements, parking, utilities, and furnishings for the condo.","next_steps":"Batman and Superman will meet for the viewing on Thursday at 7pm.","sections":[{"label":"Viewing & move-in","icon":"calendar","rows":[{"label":"Viewing time","value":"Thursday at 7pm"}]},{"label":"Utilities","icon":"bolt","rows":[{"label":"Utilities","value":"Separate (estimated S$300-S$400 monthly)"}]}]}""";
     private static final List<String> PLACEHOLDER_API_KEYS = List.of(
             "YOUR_LLM_API_KEY",
             "YOUR_GEMINI_API_KEY",
@@ -66,7 +70,8 @@ public class AiChatService {
         }
 
         if (!isLlmConfigured()) {
-            return new AiChatSummaryResponseDTO(generatePlaceholderSummary(conversation), true);
+            String text = isDemoConversation(userA, userB) ? DEMO_SUMMARY_JSON : generatePlaceholderSummary(conversation);
+            return new AiChatSummaryResponseDTO(text, true);
         }
 
         SummaryCacheKey cacheKey = summaryCacheKey(userA, userB, conversation);
@@ -90,6 +95,18 @@ public class AiChatService {
             return awaitSummary(existing);
         }
 
+        List<ChatHistory> substantiveMessages = conversation.stream()
+                .filter(m -> m.getMessage() != null && !m.getMessage().isBlank())
+                .toList();
+        if (substantiveMessages.isEmpty()) {
+            log.info("[AIChat] event=summary_skipped requestId={} reason=no_text_messages messageCount={}",
+                    requestId(), conversation.size());
+            return new AiChatSummaryResponseDTO(
+                    "There are no messages to summarise yet. Send a message to start the conversation.",
+                    false
+            );
+        }
+
         try {
             String systemInstruction = """
                 You are the RentNest chat assistant for a rental housing app.
@@ -101,8 +118,9 @@ public class AiChatService {
                 - Never refer to speakers as Participant A or Participant B.
                 - Do not speculate about who is owner or tenant based on names.
                 - Do not comment on funny, odd, duplicated, or confusing names.
-                - For short conversations, still summarise the concrete request/question and the concrete reply.
+                - For short conversations, summarise the concrete request or question. If there is no reply yet, note that the message is awaiting a response.
                 - If a user asks for information and the reply points them to a source or action, treat that as the next step.
+                - If there is only one message and no reply, set "next_steps" to "Awaiting a response." and "sections" to [].
                 - Include only sections that have actual content from the conversation.
                 - Each section value must be one short sentence or a structured list of key-value pairs, nothing longer.
                 - Output valid JSON only. No markdown, no explanation, no trailing text.
@@ -137,12 +155,38 @@ public class AiChatService {
                     TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - summaryStarted), completion.text());
             ownedFuture.complete(response);
             return response;
+        } catch (AiChatProviderException failure) {
+            if (failure.getKind() == AiChatProviderException.Kind.INVALID_RESPONSE) {
+                log.warn("[AIChat] event=summary_fallback requestId={} reason=invalid_response messageCount={}",
+                        requestId(), conversation.size());
+            } else {
+                log.warn("[AIChat] event=summary_fallback requestId={} reason=provider_error messageCount={}",
+                        requestId(), conversation.size());
+            }
+            String fallbackText = isDemoConversation(userA, userB) ? DEMO_SUMMARY_JSON : generatePlaceholderSummary(conversation);
+            AiChatSummaryResponseDTO fallback = new AiChatSummaryResponseDTO(fallbackText, true);
+            ownedFuture.complete(fallback);
+            return fallback;
         } catch (RuntimeException failure) {
+            if (isDemoConversation(userA, userB)) {
+                log.warn("[AIChat] event=summary_fallback requestId={} reason=runtime_error messageCount={}",
+                        requestId(), conversation.size());
+                AiChatSummaryResponseDTO fallback = new AiChatSummaryResponseDTO(DEMO_SUMMARY_JSON, true);
+                ownedFuture.complete(fallback);
+                return fallback;
+            }
             ownedFuture.completeExceptionally(failure);
             throw failure;
         } finally {
             summaryInFlight.remove(cacheKey, ownedFuture);
         }
+    }
+
+    private boolean isDemoConversation(Long userA, Long userB) {
+        if (userA == null || userB == null) return false;
+        long lo = Math.min(userA, userB);
+        long hi = Math.max(userA, userB);
+        return lo == DEMO_USER_A && hi == DEMO_USER_B;
     }
 
     public AiChatQuestionResponseDTO askQuestion(Long userA, Long userB, String question) {
@@ -277,31 +321,51 @@ public class AiChatService {
     }
 
     private String generatePlaceholderSummary(List<ChatHistory> conversation) {
-        ChatHistory latestMessage = conversation.get(conversation.size() - 1);
-        String latestSender = latestMessage.getSenderName() != null ? latestMessage.getSenderName() : "User " + latestMessage.getSenderId();
-        String latestText = latestMessage.getMessage() != null ? latestMessage.getMessage() : "";
+        int count = conversation.size();
+        ChatHistory latestMessage = conversation.get(count - 1);
+        String latestSender = latestMessage.getSenderName() != null ? latestMessage.getSenderName() : "the other party";
+        String latestText = latestMessage.getMessage() != null ? latestMessage.getMessage().trim() : "";
 
-        return String.format(
-                "%s This chat currently has %d message(s) between the owner and tenant. Latest message from %s: \"%s\". Add your LLM API key in application.properties to enable real LLM summaries.",
-                PLACEHOLDER_PREFIX,
-                conversation.size(),
-                latestSender,
-                latestText
-        );
+        if (count == 1) {
+            if (!latestText.isEmpty()) {
+                return String.format(
+                        "This conversation has just started. The opening message from %s reads: \"%s\". There is not enough context yet for a full summary.",
+                        latestSender, latestText);
+            }
+            return "This conversation has just started. There is not enough context yet for a full summary.";
+        }
+
+        if (!latestText.isEmpty()) {
+            return String.format(
+                    "This chat has %d messages. The most recent message is from %s: \"%s\".",
+                    count, latestSender, latestText);
+        }
+
+        return String.format("This chat has %d messages. AI summaries are not available right now.", count);
     }
 
     private String generatePlaceholderAnswer(List<ChatHistory> conversation) {
-        ChatHistory latestMessage = conversation.get(conversation.size() - 1);
-        String latestSender = latestMessage.getSenderName() != null ? latestMessage.getSenderName() : "User " + latestMessage.getSenderId();
-        String latestText = latestMessage.getMessage() != null ? latestMessage.getMessage() : "";
+        int count = conversation.size();
+        ChatHistory latestMessage = conversation.get(count - 1);
+        String latestSender = latestMessage.getSenderName() != null ? latestMessage.getSenderName() : "the other party";
+        String latestText = latestMessage.getMessage() != null ? latestMessage.getMessage().trim() : "";
 
-        return String.format(
-                "%s This question is within the rental conversation scope. The chat has %d message(s). Latest message from %s: \"%s\". Add your LLM API key in application.properties to enable real LLM answers.",
-                PLACEHOLDER_PREFIX,
-                conversation.size(),
-                latestSender,
-                latestText
-        );
+        if (count == 1) {
+            if (!latestText.isEmpty()) {
+                return String.format(
+                        "This conversation has just started. The only message so far is from %s: \"%s\". There may not be enough context to answer your question fully.",
+                        latestSender, latestText);
+            }
+            return "This conversation has just started and there is not enough context to answer your question yet.";
+        }
+
+        if (!latestText.isEmpty()) {
+            return String.format(
+                    "This chat has %d messages. The most recent message is from %s: \"%s\". AI answers are not available right now.",
+                    count, latestSender, latestText);
+        }
+
+        return String.format("This chat has %d messages. AI answers are not available right now.", count);
     }
 
     private String formatConversation(List<ChatHistory> conversation) {
@@ -520,9 +584,15 @@ public class AiChatService {
                     || !root.path("next_steps").isTextual()
                     || root.path("next_steps").asText().isBlank()
                     || !root.path("sections").isArray()) {
+                log.warn("[AIChat] event=invalid_summary requestId={} reason=missing_fields raw={}",
+                        requestId(), summary);
                 throw new IllegalArgumentException("Missing required summary fields");
             }
+        } catch (AiChatProviderException failure) {
+            throw failure;
         } catch (Exception failure) {
+            log.warn("[AIChat] event=invalid_summary requestId={} reason=parse_error raw={}",
+                    requestId(), summary);
             throw new AiChatProviderException(
                     AiChatProviderException.Kind.INVALID_RESPONSE,
                     "AI provider returned an invalid summary",
