@@ -2,9 +2,9 @@ import { act, create } from 'react-test-renderer';
 
 const mounted = [];
 
-export async function render(element) {
+export async function render(element, options) {
   let renderer;
-  await act(async () => { renderer = create(element); });
+  await act(async () => { renderer = create(element, options); });
   mounted.push(renderer);
   return renderer;
 }

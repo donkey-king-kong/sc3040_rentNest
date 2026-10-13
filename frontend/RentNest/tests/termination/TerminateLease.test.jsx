@@ -40,9 +40,9 @@ afterEach(() => {
 });
 
 // The form is replaced by the chat list first, so Back from the chat lands on the list.
-function expectChatOverChatList() {
+function expectChatOverChatList(scrollAfterSend = false) {
   expect(router.replace).toHaveBeenCalledWith('/ChatsScreen');
-  expect(router.push).toHaveBeenCalledWith('/ChatsScreen2?partnerUserId=22&currentUser=11');
+  expect(router.push).toHaveBeenCalledWith(`/ChatsScreen2?partnerUserId=22&currentUser=11${scrollAfterSend ? '&scrollAfterSend=true' : ''}`);
   expect(router.replace.mock.invocationCallOrder[0]).toBeLessThan(router.push.mock.invocationCallOrder[0]);
 }
 
@@ -65,7 +65,7 @@ test.each(['1', '9300', '0010', String(Number.MAX_SAFE_INTEGER)])(
     expect(text(ui.toJSON())).toContain('Termination Submitted');
     expect(button(ui, 'Submit termination').props.disabled).toBe(true);
     await act(async () => { jest.advanceTimersByTime(2000); });
-    expectChatOverChatList();
+    expectChatOverChatList(true);
   },
 );
 
