@@ -25,6 +25,7 @@ import AvatarOrb from '../components/AvatarOrb';
 import ProfileImage from '../components/ProfileImage';
 import TerminationRequestCard from '../components/TerminationRequestCard';
 import EnquiryPreview from '../components/EnquiryPreview';
+import { formatLeaseDateInput } from '../utils/formatLeaseDateInput';
 
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
@@ -1764,7 +1765,7 @@ const handlePaymentAndAccept = async () => {
                                                 onSubmitEditing={() => leaseEndInputRef.current?.focus()}
                                                 blurOnSubmit={false}
                                                 value={rentalDate}
-                                                onChangeText={setRentalDate}
+                                                onChangeText={text => setRentalDate(previous => formatLeaseDateInput(text, previous))}
                                             />
                                             {startMsg && (
                                                 <View style={styles.rentalOfferWarnIcon}>
@@ -1789,7 +1790,7 @@ const handlePaymentAndAccept = async () => {
                                                 returnKeyType="send"
                                                 onSubmitEditing={handleSendOffer}
                                                 value={leaseExpiry}
-                                                onChangeText={setLeaseExpiry}
+                                                onChangeText={text => setLeaseExpiry(previous => formatLeaseDateInput(text, previous))}
                                             />
                                             {endMsg && (
                                                 <View style={styles.rentalOfferWarnIcon}>
