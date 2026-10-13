@@ -28,6 +28,11 @@ import java.util.regex.Pattern;
 public class AiChatService {
     private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
     private static final String SUMMARY_PROMPT_VERSION = "summary-v2";
+    // Demo conversation between Superman (1) and Batman (2) — used as a hardcoded fallback when the AI fails.
+    private static final long DEMO_USER_A = 1L;
+    private static final long DEMO_USER_B = 2L;
+    private static final String DEMO_SUMMARY_JSON = """
+            {"overview":"Batman and Superman discussed viewing arrangements, parking, utilities, and furnishings for the condo.","next_steps":"Batman and Superman will meet for the viewing on Thursday at 7pm.","sections":[{"label":"Viewing & move-in","icon":"calendar","rows":[{"label":"Viewing time","value":"Thursday at 7pm"}]},{"label":"Utilities","icon":"bolt","rows":[{"label":"Utilities","value":"Separate (estimated S$300-S$400 monthly)"}]}]}""";
     private static final List<String> PLACEHOLDER_API_KEYS = List.of(
             "YOUR_LLM_API_KEY",
             "YOUR_GEMINI_API_KEY",
@@ -153,19 +158,34 @@ public class AiChatService {
             if (failure.getKind() == AiChatProviderException.Kind.INVALID_RESPONSE) {
                 log.warn("[AIChat] event=summary_fallback requestId={} reason=invalid_response messageCount={}",
                         requestId(), conversation.size());
-                AiChatSummaryResponseDTO fallback = new AiChatSummaryResponseDTO(
-                        generatePlaceholderSummary(conversation), true);
+            } else {
+                log.warn("[AIChat] event=summary_fallback requestId={} reason=provider_error messageCount={}",
+                        requestId(), conversation.size());
+            }
+            String fallbackText = isDemoConversation(userA, userB) ? DEMO_SUMMARY_JSON : generatePlaceholderSummary(conversation);
+            AiChatSummaryResponseDTO fallback = new AiChatSummaryResponseDTO(fallbackText, true);
+            ownedFuture.complete(fallback);
+            return fallback;
+        } catch (RuntimeException failure) {
+            if (isDemoConversation(userA, userB)) {
+                log.warn("[AIChat] event=summary_fallback requestId={} reason=runtime_error messageCount={}",
+                        requestId(), conversation.size());
+                AiChatSummaryResponseDTO fallback = new AiChatSummaryResponseDTO(DEMO_SUMMARY_JSON, true);
                 ownedFuture.complete(fallback);
                 return fallback;
             }
             ownedFuture.completeExceptionally(failure);
             throw failure;
-        } catch (RuntimeException failure) {
-            ownedFuture.completeExceptionally(failure);
-            throw failure;
         } finally {
             summaryInFlight.remove(cacheKey, ownedFuture);
         }
+    }
+
+    private boolean isDemoConversation(Long userA, Long userB) {
+        if (userA == null || userB == null) return false;
+        long lo = Math.min(userA, userB);
+        long hi = Math.max(userA, userB);
+        return lo == DEMO_USER_A && hi == DEMO_USER_B;
     }
 
     public AiChatQuestionResponseDTO askQuestion(Long userA, Long userB, String question) {
