@@ -80,6 +80,11 @@ The frontend displays a native loading indicator in the disabled **Summarise
 Chat** button. A handled failure opens the summary sheet with a specific message
 and **Try Again** action instead of producing a React Native LogBox error.
 
+An empty loaded conversation is handled entirely on the frontend. The summary
+sheet explains that messages are needed and no summary endpoint or provider call
+is made. The backend independently keeps the same empty-conversation guard for
+direct API clients and logs `event=summary_skipped` without calling Gemini.
+
 ## Listing and Pricing Loading
 
 `HomeListingScreen` requests viewer and listing data concurrently. Once those

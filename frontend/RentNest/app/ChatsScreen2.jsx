@@ -29,6 +29,7 @@ import EnquiryPreview from '../components/EnquiryPreview';
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
 const notificationBellIcon = require('../assets/images/notificationBell.png');
+const EMPTY_CHAT_SUMMARY = 'There are no messages to summarise yet. Send a message to start the conversation.';
 let aiChatRequestSequence = 0;
 
 const createAiChatRequestId = () => {
@@ -540,6 +541,22 @@ const ChatsScreen2 = () => {
     }
 
     const getChatSummary = async () => {
+        if (!Array.isArray(chat) || chat.length === 0) {
+            setGeneratingSummary(false);
+            setSummaryError('');
+            setChatSummary(EMPTY_CHAT_SUMMARY);
+            setSummaryPlaceholder(false);
+            setParsedSummary(null);
+            summarySheetY.setValue(600);
+            setSummaryModalVisible(true);
+            Animated.spring(summarySheetY, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 4,
+            }).start();
+            return;
+        }
+
         const cacheKey = getChatSummaryCacheKey();
 
         if (summaryCache?.key === cacheKey) {

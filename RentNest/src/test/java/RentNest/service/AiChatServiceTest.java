@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,6 +56,27 @@ class AiChatServiceTest {
         when(providerClient.complete(anyString(), anyString(), anyString(), anyInt(), anyBoolean()))
                 .thenReturn(completion());
         service = new AiChatService(chatHistoryService, properties, providerClient);
+    }
+
+    @Test
+    void emptyConversationReturnsUserFacingStateWithoutCallingProvider(CapturedOutput output) {
+        MDC.put("aiChatRequestId", "empty-summary-request");
+        messages.clear();
+        try {
+            AiChatSummaryResponseDTO response = service.generateChatSummary(1L, 2L);
+
+            assertEquals(
+                    "There are no messages to summarise yet. Send a message to start the conversation.",
+                    response.getSummary());
+            assertFalse(response.isPlaceholder());
+            verify(providerClient, never())
+                    .complete(anyString(), anyString(), anyString(), anyInt(), anyBoolean());
+        } finally {
+            MDC.remove("aiChatRequestId");
+        }
+
+        assertTrue(output.getOut().contains(
+                "event=summary_skipped requestId=empty-summary-request reason=empty_conversation"));
     }
 
     @Test

@@ -57,9 +57,11 @@ public class AiChatService {
         List<ChatHistory> conversation = chatHistoryService.getConversationBetweenUsers(userA, userB);
 
         if (conversation.isEmpty()) {
+            log.info("[AIChat] event=summary_skipped requestId={} reason=empty_conversation messageCount=0",
+                    requestId());
             return new AiChatSummaryResponseDTO(
-                    PLACEHOLDER_PREFIX + " No messages found between these users yet.",
-                    true
+                    "There are no messages to summarise yet. Send a message to start the conversation.",
+                    false
             );
         }
 

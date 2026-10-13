@@ -157,6 +157,20 @@ test('failed offer loading is safe and can retry before rental details arrive', 
   expect(buttons(ui).map(text)).toContain('Accept offer');
 });
 
+test('empty chat shows a local summary state without an AI request', async () => {
+  messages = [];
+  const ui = await render(<ChatsScreen2 />);
+
+  await press(ui, 'Summarise Chat');
+
+  expect(text(ui.toJSON())).toContain(
+    'There are no messages to summarise yet. Send a message to start the conversation.',
+  );
+  expect(text(ui.toJSON())).not.toContain('Currently using hardcoded placeholder summary.');
+  expect(text(ui.toJSON())).not.toContain('[HARDCODED PLACEHOLDER]');
+  expect(axios.get.mock.calls.some(([url]) => url.includes('/ai-chat/summary'))).toBe(false);
+});
+
 test('summary button shows an accessible loading icon while the request is pending', async () => {
   const response = deferred();
   const originalGet = axios.get.getMockImplementation();
