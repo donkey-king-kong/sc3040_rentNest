@@ -10,6 +10,9 @@ the old user/rental/payment request chain. No schema or index migration is neede
   display fields. Vacant owned properties remain available.
 - Tenant Overview makes one summary request, renders the tenant and lease, then
   requests payment history and outstanding months together.
+- Entering either owner detail screen uses the standard full-screen green
+  infinity transition until the property or tenant summary is freshly verified.
+  Cached primary content does not flash beneath a native refresh spinner.
 - Back remains available during loading and errors. Both screens support
   pull-to-refresh and explicit Refresh/Retry.
 - Payments have their own loading and retry state. Loading or failed financial
@@ -77,12 +80,14 @@ revalidate data. Concurrent loads of the same resource share a request. Requests
 time out after 15 seconds; there is no automatic retry loop. Blur cancels pending
 work, and late responses cannot replace a newer request or account.
 
-Saved property/tenant details can render during refresh but are explicitly
-labelled as saved. Sensitive actions stay disabled until revalidation succeeds.
-Payments wait for a verified summary; refreshing the summary also refreshes the
-financial section. Cached payments are labelled when their own retry is pending
-or fails. `404`/`409` removes unavailable resource data. `401`/`403`, missing or
-expired tokens, and account changes clear session data.
+Saved property/tenant details remain cached but stay behind the full-screen
+transition until revalidation succeeds. If revalidation fails without proving
+the resource unavailable, the saved details can render with an explicit stale
+label and disabled sensitive actions. Payments wait for a verified summary and
+continue loading progressively afterward; refreshing the summary also refreshes
+the financial section. Cached payments are labelled when their own retry is
+pending or fails. `404`/`409` removes unavailable resource data. `401`/`403`,
+missing or expired tokens, and account changes clear session data.
 
 Login/logout and successful listing create/edit/delete, offer acceptance, and
 termination decisions clear/invalidate both Inbox and rental detail caches through

@@ -47,6 +47,25 @@ const TenantOverview = () => {
     });
   };
 
+  if (!summary.verified && !summary.error) {
+    return (
+      <View style={styles.loadingContainer}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={() => router.back()}
+          style={styles.loadingBackButton}
+        >
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </TouchableOpacity>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text accessibilityLiveRegion="polite" style={styles.loadingText}>
+          Loading tenant information...
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}
       refreshControl={<RefreshControl refreshing={summary.loading && !!rental} onRefresh={() => summary.refresh()} />}>
@@ -64,10 +83,6 @@ const TenantOverview = () => {
         <Text accessibilityRole="alert" style={styles.errorText}>{summary.error}</Text>
         <TouchableOpacity accessibilityRole="button" disabled={summary.loading} style={styles.refreshButton}
           onPress={() => summary.refresh()}><Text style={styles.refreshText}>Retry tenant information</Text></TouchableOpacity>
-      </View> : null}
-      {!rental && !summary.error ? <View style={styles.loadingContainer}>
-        <MorphingInfinity size={86} color="#2FA84F" />
-        <Text accessibilityLiveRegion="polite" style={styles.loadingText}>Loading tenant information...</Text>
       </View> : null}
       {rental ? <>
       {summary.stale ? <Text style={styles.statusText} accessibilityLiveRegion="polite">
@@ -185,12 +200,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F8FA',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#555',
+    marginTop: 24,
+    color: '#101820',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  loadingBackButton: {
+    position: 'absolute',
+    top: 48,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',

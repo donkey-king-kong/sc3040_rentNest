@@ -24,6 +24,25 @@ const RentalInfoOwner = () => {
     }
   };
 
+  if (!detail.verified && !detail.error) {
+    return (
+      <View style={styles.loadingContainer}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          onPress={() => router.back()}
+          style={styles.loadingBackButton}
+        >
+          <FontAwesome name="chevron-left" size={18} color="#101820" />
+        </TouchableOpacity>
+        <MorphingInfinity size={86} color="#2FA84F" />
+        <Text accessibilityLiveRegion="polite" style={styles.loadingText}>
+          Loading rental info...
+        </Text>
+      </View>
+    );
+  }
+
   return (
       <ScrollView style={styles.container} contentContainerStyle={{ flexGrow: 1 }}
         refreshControl={<RefreshControl refreshing={detail.loading && !!listing} onRefresh={() => detail.refresh()} />}>
@@ -41,10 +60,6 @@ const RentalInfoOwner = () => {
           <Text accessibilityRole="alert" style={styles.errorText}>{detail.error}</Text>
           <TouchableOpacity accessibilityRole="button" disabled={detail.loading} style={styles.refreshButton}
             onPress={() => detail.refresh()}><Text style={styles.refreshText}>Retry</Text></TouchableOpacity>
-        </View> : null}
-        {!listing && !detail.error ? <View style={styles.loadingContainer}>
-          <MorphingInfinity size={86} color="#2FA84F" />
-          <Text accessibilityLiveRegion="polite" style={styles.loadingText}>Loading rental info...</Text>
         </View> : null}
         {listing && detail.stale ? <Text accessibilityLiveRegion="polite" style={styles.statusText}>
           Showing saved details. {detail.loading ? 'Checking for updates...' : 'Refresh to confirm the current tenancy.'}
@@ -190,13 +205,24 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#F7F8FA',
   },
   loadingText: {
     marginTop: 24,
     color: '#101820',
     fontSize: 18,
     fontWeight: '700',
+  },
+  loadingBackButton: {
+    position: 'absolute',
+    top: 48,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
   },
   titleRow: {
     flexDirection: 'row',

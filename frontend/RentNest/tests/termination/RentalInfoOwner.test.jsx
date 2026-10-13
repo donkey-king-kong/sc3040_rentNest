@@ -45,6 +45,17 @@ test('Back remains available during a pending request', async () => {
   expect(router.back).toHaveBeenCalled();
 });
 
+test('warm cache still uses the standard transition while revalidating', async () => {
+  await rentalDetailCache.resource('property:59').refresh();
+  const pending = deferred();
+  axios.get.mockReturnValue(pending.promise);
+  const ui = await render(<RentalInfoOwner />);
+  expect(text(ui.toJSON())).toContain('Loading rental info...');
+  expect(text(ui.toJSON())).not.toContain('Showing saved details');
+  await act(async () => pending.resolve({ status: 200, data: listing }));
+  expect(text(ui.toJSON())).toContain('Manage Tenant');
+});
+
 test('vacant properties display an explicit no-tenant state', async () => {
   axios.get.mockResolvedValue({ status: 200, data: { ...listing, tenantId: null } });
   const ui = await render(<RentalInfoOwner />);

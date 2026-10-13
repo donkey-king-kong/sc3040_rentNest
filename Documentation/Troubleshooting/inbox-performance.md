@@ -48,11 +48,13 @@ before returning rows. The response is ordered by `listingID` and contains:
 `config/inboxStore.js` keeps only the current session's data in memory.
 It does not persist properties in AsyncStorage.
 
-On the first visit, Inbox shows its loading indicator while leaving navigation
-available. Subsequent visits show cached cards immediately and refresh in the
-background. Both successful empty results and populated results are cached.
-Focus, returning the app to the foreground while Inbox is focused, pull-to-refresh,
-and the Refresh button trigger revalidation. Concurrent refreshes share one request.
+On first visit, tab entry, tab return, and foreground return while focused,
+Inbox shows the standard full-screen green infinity transition while leaving
+bottom navigation available. Cached cards remain in memory but stay hidden until
+focus revalidation settles, preventing a native refresh spinner from appearing
+over stale content. Pull-to-refresh and the Refresh button keep cards visible
+during manual revalidation. Both successful empty and populated results are
+cached, and concurrent refreshes share one request.
 
 Successful listing creation, editing, deletion, offer acceptance, and termination
 decisions invalidate cached data. Login and both logout paths clear it.
@@ -60,12 +62,13 @@ Invalidation/session clearing aborts pending requests; old successes and failure
 cannot overwrite a newer session or a newer request. Token expiry is checked
 locally, and the token is checked again before accepting a response.
 
-Network/server failures retain already-cached cards and show a retry message.
-A failed first load is not displayed as an empty inbox. Requests time out after
-15 seconds. There is no automatic retry loop.
+Network/server failures retain already-cached cards. After the focus transition
+settles, those cards reappear with a retry message. A failed first load is not
+displayed as an empty inbox. Requests time out after 15 seconds. There is no
+automatic retry loop.
 
 Changes made on another device become visible on the next refresh/focus, not
-through real-time push. Existing cards can be briefly stale during background
+through real-time push. Existing cards can be briefly stale during manual
 refresh. The backend still authorizes every property/rental action.
 
 ## Logs

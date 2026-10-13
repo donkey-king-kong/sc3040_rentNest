@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, AppState } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import NavigationBar from '../components/NavigationBar';
@@ -9,15 +9,26 @@ import ListingImage from '../components/ListingImage';
 const InboxScreen = () => {
   const router = useRouter();
   const state = useSyncExternalStore(inboxStore.subscribe, inboxStore.getSnapshot, inboxStore.getSnapshot);
+  const [focusLoading, setFocusLoading] = useState(true);
   const userListings = state.data || [];
-  const isLoading = state.data === null && !state.error;
+  const isLoading = focusLoading || (state.data === null && !state.error);
 
   useFocusEffect(useCallback(() => {
-    inboxStore.refresh('focus');
+    let active = true;
+    const refreshForFocus = () => {
+      setFocusLoading(true);
+      Promise.resolve(inboxStore.refresh('focus')).finally(() => {
+        if (active) setFocusLoading(false);
+      });
+    };
+    refreshForFocus();
     const subscription = AppState.addEventListener('change', next => {
-      if (next === 'active') inboxStore.refresh('focus');
+      if (next === 'active') refreshForFocus();
     });
-    return () => subscription.remove();
+    return () => {
+      active = false;
+      subscription.remove();
+    };
   }, []));
   useEffect(() => {
     if (state.unauthenticated) router.replace('/LoginScreen');
@@ -68,6 +79,18 @@ const InboxScreen = () => {
     );
   };
 
+  if (isLoading) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.loadingContainer}>
+          <MorphingInfinity size={86} color="#2FA84F" />
+          <Text accessibilityLiveRegion="polite" style={styles.loadingText}>Loading inbox...</Text>
+        </View>
+        <NavigationBar style={styles.navigationBar} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.container}>
@@ -95,12 +118,7 @@ const InboxScreen = () => {
             </TouchableOpacity>
           </View>
         ) : null}
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <MorphingInfinity size={86} color="#2FA84F" />
-            <Text accessibilityLiveRegion="polite" style={styles.loadingText}>Loading inbox...</Text>
-          </View>
-        ) : <FlatList
+        <FlatList
           data={userListings}
           renderItem={renderItem}
           keyExtractor={(item) => item.listingID.toString()}
@@ -117,7 +135,7 @@ const InboxScreen = () => {
               <Text style={styles.emptySubtitle}>Your inbox will show rentals you own or are tenanting.</Text>
             </View>
           }
-        />}
+        />
       </View>
       <NavigationBar style={styles.navigationBar} />
     </View>

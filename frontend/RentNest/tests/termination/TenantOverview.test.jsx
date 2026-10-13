@@ -55,6 +55,17 @@ test('matching active tenancy opens termination with the current rental ID', asy
   expect(axios.get).toHaveBeenCalledTimes(2);
 });
 
+test('standard loader keeps Back available while tenant information is pending', async () => {
+  const pending = deferred();
+  axios.get.mockReturnValue(pending.promise);
+  const ui = await render(<TenantOverview />);
+  expect(text(ui.toJSON())).toContain('Loading tenant information...');
+  expect(text(ui.toJSON())).not.toContain('Tenant Overview');
+  await press(ui, 'Go back');
+  expect(router.back).toHaveBeenCalled();
+  await act(async () => pending.reject(httpError(404)));
+});
+
 test('profile and Back work before the financial request finishes', async () => {
   const pending = deferred();
   axios.get.mockImplementation(url => url.endsWith('/tenants/22')
@@ -89,13 +100,14 @@ test('payment failure has its own retry and does not imply zero outstanding', as
   expect(axios.get).toHaveBeenCalledTimes(3);
 });
 
-test('cached summary cannot authorize actions before revalidation', async () => {
+test('cached summary stays behind the standard loader until revalidation', async () => {
   await rentalDetailCache.resource('summary:59:22').refresh();
   const pending = deferred();
   axios.get.mockReturnValue(pending.promise);
   const ui = await render(<TenantOverview />);
-  expect(text(ui.toJSON())).toContain('Showing saved tenant details');
-  expect(button(ui, 'Terminate Lease').props.disabled).toBe(true);
+  expect(text(ui.toJSON())).toContain('Loading tenant information...');
+  expect(text(ui.toJSON())).not.toContain('Showing saved tenant details');
+  expect(buttons(ui).map(text)).not.toContain('Terminate Lease');
   await act(async () => pending.reject(httpError(404)));
   expect(buttons(ui).map(text)).not.toContain('Terminate Lease');
 });

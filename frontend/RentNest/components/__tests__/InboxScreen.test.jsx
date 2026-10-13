@@ -53,13 +53,14 @@ it('keeps navigation accessible on initial loading', async () => {
   expect(tree.root.findAllByType('NavigationBar')).toHaveLength(1);
 });
 
-it('retains cached cards during background refresh and after a failed refresh', async () => {
+it('uses the standard transition for warm-cache focus refresh then restores cards on failure', async () => {
   await inboxStore.refresh();
   let reject;
   mockRequest.mockImplementation(() => new Promise((_, no) => { reject = no; }));
   await render();
-  expect(text('Loading inbox...')).toBe(false);
-  expect(tree.root.findByType(FlatList).props.data).toHaveLength(2);
+  expect(text('Loading inbox...')).toBe(true);
+  expect(tree.root.findAllByType(FlatList)).toHaveLength(0);
+  expect(tree.root.findAllByType('NavigationBar')).toHaveLength(1);
   await act(async () => { reject({ code: 'ERR_NETWORK' }); });
   expect(tree.root.findByType(FlatList).props.data).toHaveLength(2);
   expect(text('Retry')).toBe(true);
