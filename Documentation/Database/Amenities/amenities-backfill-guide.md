@@ -20,10 +20,10 @@ calls the force-refresh POST endpoint.
    running throughout the backfill.
 3. Stop other app/detail-page activity and refresh jobs. Let existing background
    jobs finish before taking the snapshot. Do not run concurrent backfill tools.
-4. In Supabase SQL Editor run `amenities-backfill-inventory.sql` with a role that
+4. In Supabase SQL Editor run [amenities-backfill-inventory.sql](amenities-backfill-inventory.sql) with a role that
    can see all listings and amenities.
 5. Export its complete results as JSON to
-   `Documentation/amenities-before.json` in this project.
+   `Documentation/Database/Amenities/amenities-before.json` in this project.
 
 The query includes only listing IDs, coordinates, per-category counts and
 fingerprints of amenity rows. It does not export user credentials or chat data.
@@ -35,7 +35,7 @@ From the project root:
 
 ```bash
 python3 RentNest/scripts/backfill-missing-amenities.py \
-  --inventory Documentation/amenities-before.json \
+  --inventory Documentation/Database/Amenities/amenities-before.json \
   --dry-run
 ```
 
@@ -45,7 +45,7 @@ Then run:
 ```bash
 python3 RentNest/scripts/backfill-missing-amenities.py \
   --base-url http://localhost:8080 \
-  --inventory Documentation/amenities-before.json
+  --inventory Documentation/Database/Amenities/amenities-before.json
 ```
 
 Use the actual backend origin if it differs. HTTPS is required for non-loopback
@@ -99,12 +99,12 @@ retry empty results while APIs are failing.
 ## Verify Preservation and Coverage
 
 Run the same inventory SQL again after generation settles. Export as
-`Documentation/amenities-after.json`, then run:
+`Documentation/Database/Amenities/amenities-after.json`, then run:
 
 ```bash
 python3 RentNest/scripts/backfill-missing-amenities.py \
-  --inventory Documentation/amenities-before.json \
-  --after-inventory Documentation/amenities-after.json
+  --inventory Documentation/Database/Amenities/amenities-before.json \
+  --after-inventory Documentation/Database/Amenities/amenities-after.json
 ```
 
 This comparison makes no API calls. It verifies the count and complete-row

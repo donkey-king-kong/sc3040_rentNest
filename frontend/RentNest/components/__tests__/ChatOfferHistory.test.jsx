@@ -4,6 +4,7 @@ import { act, create } from 'react-test-renderer';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ChatsScreen2 from '../../app/ChatsScreen2';
+import { chatData } from '../../config/chatData';
 
 let mockRouteParams;
 jest.mock('axios');
@@ -15,7 +16,12 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockRouteParams,
   useFocusEffect: callback => require('react').useEffect(callback, [callback]),
 }));
-jest.mock('jwt-decode', () => ({ jwtDecode: () => ({ sub: 'viewer@test.local' }) }));
+jest.mock('jwt-decode', () => ({
+  jwtDecode: () => ({
+    sub: 'viewer@test.local',
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  }),
+}));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -35,7 +41,17 @@ const renderConversation = async ({ status = 'pending', currentUser = 3, tenantU
     ...(withTermination ? [{ messageID: 203, senderId: 1, receiverId: 3, rentalId: null, requestId: 8, message: null, date: '2026-06-30T10:00:00Z' }] : []),
   ];
   axios.get.mockImplementation(async url => {
-    if (url.includes('/chathistory/conversation')) return { data: chats };
+    if (url.includes('/chathistory/conversations/')) {
+      const partnerId = Number(mockRouteParams.partnerUserId);
+      return {
+        status: 200,
+        data: {
+          partner: { userID: partnerId, name: 'Chat partner', photoURL: null, flagged: 0 },
+          messages: chats,
+          hasMore: false,
+        },
+      };
+    }
     if (url.includes('/rentals/15')) {
       if (rentalFails) throw new Error('Rental unavailable');
       return { data: { rentalID, tenantUserID, ownerUserId: 1, status, rentalPrice: 4650, depositPrice: 9300, leaseExpiry: '2027-08-01T00:00:00Z' } };
@@ -52,6 +68,7 @@ const renderConversation = async ({ status = 'pending', currentUser = 3, tenantU
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  chatData.clear('test');
   await AsyncStorage.clear();
   await AsyncStorage.setItem('token', 'test-token');
 });

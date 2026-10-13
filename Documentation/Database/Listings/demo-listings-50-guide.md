@@ -3,14 +3,14 @@
 ## Scope
 
 LATEST REVISION: all 68 Condo/HDB profiles now have varied prices, rooms and
-sizes. For the already-imported database, use `update-listing-variations.sql`
-and `listing-variation-guide.md`. The seed and source JSON are synchronized.
+sizes. For the already-imported database, use [update-listing-variations.sql](update-listing-variations.sql)
+and [listing-variation-guide.md](listing-variation-guide.md). The seed and source JSON are synchronized.
 The description-only instructions and validation below describe the earlier
 revision; do not rerun that script after the numeric revision.
 
 The user has already imported the batch: the supplied export contains original
 IDs 59-77 and new IDs 78-127. To replace the visible demo text, run
-`update-demo-listing-descriptions.sql`, NOT the append seed again.
+[update-demo-listing-descriptions.sql](update-demo-listing-descriptions.sql), NOT the append seed again.
 The update changes only the 50 new descriptions. It checks each exported ID,
 name, address, postal code, type, bedroom/bathroom count, size, floor, and old
 description before writing. A missing or edited row aborts the entire update.
@@ -19,7 +19,7 @@ Back up the current database, stop writers, then run the entire update file.
 Expect a 50-row result grid with natural property descriptions and a successful
 commit. Reload the app afterward.
 
-Run `demo-listings-50.sql` to append exactly 50 vacant, unflagged listings to
+Run [demo-listings-50.sql](demo-listings-50.sql) to append exactly 50 vacant, unflagged listings to
 an untouched 19-listing baseline only. It does not change existing listings or other app data, create
 users, restore rental history, or recreate the three retired summary columns.
 It creates no permanent tables or columns.
@@ -52,10 +52,10 @@ by sample-listing mode. No frontend or backend code was changed for this revisio
 
 ## Address Evidence
 
-`demo-listings-50-sources.csv` records the screenshot address, postal code,
+[demo-listings-50-sources.csv](demo-listings-50-sources.csv) records the screenshot address, postal code,
 OneMap address/building label, coordinates, lookup URL, evidence type, and
 distance from the backed-up `postal_code_coordinates` reference.
-`demo-listings-50-data.json` is the readable data embedded in the SQL.
+[demo-listings-50-data.json](demo-listings-50-data.json) is the readable data embedded in the SQL.
 
 The chosen 50 locations are:
 
@@ -101,14 +101,14 @@ Already imported? Use the description update above, not these seed steps.
 1. Retain the original verified backup and make a fresh backup of the current
    19-listing baseline if you need to restore this exact state.
 2. Stop backend/app writes and confirm the intended test project.
-3. Open SQL Editor and run the ENTIRE `demo-listings-50.sql` file.
+3. Open SQL Editor and run the ENTIRE [demo-listings-50.sql](demo-listings-50.sql) file.
 4. If the editor warns about creating tables without RLS, the two objects in
    this script are temporary session-local tables, dropped on commit.
    "Run without RLS" does not change RLS on existing tables.
 5. Require successful completion through `COMMIT`, not just a result grid.
    Retain the 50-row mapping of batch index, new ID, owner, photo-source ID,
    postal code, and name.
-6. Run the checks below and then `database-read-only-audit.sql`.
+6. Run the checks below and then [database-read-only-audit.sql](../Audits/database-read-only-audit.sql).
 
 The script refuses any baseline other than 19 listings, any source listing
 without a valid owner or HTTPS photo reference, insufficient owner slots, or an

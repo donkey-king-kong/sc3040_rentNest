@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { inboxStore } from '../config/inbox';
 import axios from 'axios';
 import { FontAwesome } from '@expo/vector-icons';
 
@@ -95,6 +96,7 @@ const AdminScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              inboxStore.clear('logout');
               await AsyncStorage.multiRemove(['token', 'userId']);
               router.replace('/LandingScreen');
             } catch (error) {

@@ -5,7 +5,7 @@ const safeErrorCodes = new Set([
 ]);
 
 // Keep Axios configs, response bodies and free-text messages out of diagnostics.
-export function startPricingRequestLog(operation, listingId) {
+export function startPricingRequestLog(operation, listingId, timeoutMs = null) {
   const started = Date.now();
   const safeId = /^\d{1,20}$/.test(String(listingId)) ? String(listingId) : 'unknown';
   const kind = operation === 'explanation' ? 'explanation' : 'estimate';
@@ -28,13 +28,25 @@ export function startPricingRequestLog(operation, listingId) {
   return {
     completed(response) {
       const available = response?.data?.available === true;
-      write(available ? 'info' : 'warn', 'request_completed', {
+      // Both outcomes are handled by the pricing card. The backend retains
+      // provider warnings; using info here avoids an Expo LogBox for unavailable.
+      write('info', 'request_completed', {
         httpStatus: typeof response?.status === 'number' ? response.status : null,
         available,
       });
     },
     failed(error) {
-      write('error', 'request_failed', {
+      const durationMs = Math.max(0, Date.now() - started);
+      const timedOut = error?.code === 'ECONNABORTED'
+        || error?.code === 'ETIMEDOUT'
+        || (
+          error?.code === 'ERR_NETWORK'
+          && Number.isFinite(timeoutMs)
+          && durationMs >= timeoutMs * 0.95
+        );
+      // The pricing card handles failures with an inline Retry action. Keep
+      // diagnostics visible without turning expected network failures into LogBox.
+      write('info', timedOut ? 'request_timed_out' : 'request_failed', {
         httpStatus: typeof error?.response?.status === 'number' ? error.response.status : null,
         errorCode: safeErrorCodes.has(error?.code) ? error.code : 'unknown',
       });

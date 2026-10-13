@@ -19,6 +19,7 @@ import { FontAwesome } from '@expo/vector-icons';
  *  - compact:        optional; tighter layout for embedding inside forms
  *  - aiExplanation:  optional; FairPriceExplanation from /api/pricing/listing/{id}/explanation
  *  - aiExplanationLoading: optional; show a spinner while the AI writes the explanation
+ *  - onRetry: optional; retries estimate and explanation after an unavailable response
  */
 
 // The bands are ordered (closer to market = darker), so they use one blue ramp,
@@ -88,7 +89,16 @@ const adviceFor = (pct, isOwner) => {
     : 'Above similar rentals nearby. Ask what justifies the premium, for example renovation, furnishing or view.';
 };
 
-const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact, aiExplanation, aiExplanationLoading }) => {
+const FairPriceCard = ({
+  estimate,
+  loading,
+  askingPrice,
+  onUseSuggested,
+  compact,
+  aiExplanation,
+  aiExplanationLoading,
+  onRetry,
+}) => {
   const [showDetails, setShowDetails] = useState(false);
   const [aiExpanded, setAiExpanded] = useState(false);
   const [open, setOpen] = useState(true);
@@ -112,6 +122,11 @@ const FairPriceCard = ({ estimate, loading, askingPrice, onUseSuggested, compact
       <View style={[styles.card, compact && styles.cardCompact]}>
         <Header />
         <Text style={styles.secondary}>{estimate.message || 'No estimate available for this property.'}</Text>
+        {onRetry ? (
+          <TouchableOpacity style={styles.retryButton} onPress={onRetry} accessibilityRole="button">
+            <Text style={styles.retryButtonText}>Retry pricing</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     );
   }
@@ -548,6 +563,17 @@ const styles = StyleSheet.create({
   useButtonText: {
     fontWeight: '600',
     color: INK,
+  },
+  retryButton: {
+    alignSelf: 'flex-start',
+    minHeight: 44,
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  retryButtonText: {
+    color: '#184F95',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 

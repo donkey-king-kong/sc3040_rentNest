@@ -3,7 +3,7 @@
 ## Run
 
 1. Open the intended Supabase project, then SQL Editor -> New query.
-2. Paste the complete contents of `database-read-only-audit.sql`.
+2. Paste the complete contents of [database-read-only-audit.sql](database-read-only-audit.sql).
 3. Run with an authorized database role that can read all listed public tables.
    Row-level security can hide rows and make counts misleading. Do not disable RLS
    or change grants to run this audit; use an appropriately authorized session.

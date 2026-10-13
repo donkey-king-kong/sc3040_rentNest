@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { inboxStore } from '../config/inbox';
 
 export function terminationError(error) {
   const status = error?.response?.status;
@@ -87,6 +88,7 @@ export default function TerminationRequestCard({ requestId, onDecision, initialR
         { decision },
         { headers: { Authorization: `Bearer ${token}` } },
       );
+      inboxStore.invalidate();
       if (version !== generation.current) return;
       setRequest(response.data);
       setConfirming(false);

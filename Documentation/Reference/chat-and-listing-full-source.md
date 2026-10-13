@@ -1,6 +1,9 @@
-# Current Chat and Listing Screen Source
+# Historical Chat and Listing Screen Source
 
-These files are under frontend/RentNest in this workspace; frontend/HomeGoWhere does not exist. Full current working-tree contents, without truncation.
+This is a historical source snapshot retained for reference, not the current
+working-tree source. Consult [ChatsScreen2.jsx](../../frontend/RentNest/app/ChatsScreen2.jsx)
+and [HomeListingScreen.jsx](../../frontend/RentNest/app/HomeListingScreen.jsx)
+for the maintained implementations. The captured code below is preserved unchanged.
 
 ## frontend/RentNest/app/ChatsScreen2.jsx
 

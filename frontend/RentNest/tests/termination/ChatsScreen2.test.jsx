@@ -5,6 +5,7 @@ import { jwtDecode } from 'jwt-decode';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import ChatsScreen2 from '../../app/ChatsScreen2';
 import TerminationRequestCard from '../../components/TerminationRequestCard';
+import { chatData } from '../../config/chatData';
 import { act } from 'react-test-renderer';
 import { render, text, buttons, press, deferred } from './helpers';
 
@@ -17,6 +18,7 @@ let rental;
 beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(console, 'log').mockImplementation(() => {});
+  chatData.clear('test');
   viewerId = 22;
   rental = {
     rentalID: 81, ownerUserId: 11, tenantUserID: 22, status: 'terminated',
@@ -35,9 +37,28 @@ beforeEach(() => {
     currentUser: String(viewerId), partnerUserId: viewerId === 22 ? '11' : '22',
   }));
   AsyncStorage.getItem.mockResolvedValue('test-token');
-  jwtDecode.mockReturnValue({ sub: 'viewer@example.test' });
+  jwtDecode.mockReturnValue({ sub: 'viewer@example.test', exp: Math.floor(Date.now() / 1000) + 3600 });
   axios.get.mockImplementation(async url => {
-    if (url.endsWith('/chathistory/conversation')) return { data: messages };
+    if (url.includes('/chathistory/conversations/')) {
+      const partnerId = Number(url.split('/').pop().split('?')[0]);
+      return {
+        status: 200,
+        data: {
+          partner: { userID: partnerId, name: 'Chat partner', flagged: 0 },
+          messages,
+          hasMore: false,
+        },
+      };
+    }
+    if (url.includes('/ai-chat/summary')) {
+      return {
+        status: 200,
+        data: {
+          summary: '{"overview":"Chat overview","next_steps":"Follow up","sections":[]}',
+          placeholder: false,
+        },
+      };
+    }
     if (url.includes('/users/id/')) return { data: { userID: 11, name: 'Chat partner', flagged: 0 } };
     if (url.includes('/users/')) return { data: { userID: viewerId } };
     if (url.includes('/rentals/')) return { data: rental };
@@ -70,7 +91,7 @@ test('request-only messages mount independent real cards and refresh after a dec
     `${base}/api/requests/71/decision`, { decision: 'accept' },
     { headers: { Authorization: 'Bearer test-token' } },
   ]]);
-  expect(axios.get.mock.calls.filter(([url]) => url.endsWith('/chathistory/conversation'))).toHaveLength(2);
+  expect(axios.get.mock.calls.filter(([url]) => url.includes('/chathistory/conversations/'))).toHaveLength(2);
   expect(text(ui.root.findAllByType(TerminationRequestCard)[0])).toContain('Accepted');
   expect(text(ui.root.findAllByType(TerminationRequestCard)[1])).toContain('Rejected');
 });
@@ -126,7 +147,7 @@ test('failed offer loading is safe and can retry before rental details arrive', 
   rental = { ...rental, status: 'pending' };
   messages = [{ messageID: 1, senderId: 11, rentalId: 81, date: '2026-10-12T10:00:00Z' }];
   const ui = await render(<ChatsScreen2 />);
-  expect(text(ui.toJSON())).toContain('Loading chat history...');
+  expect(text(ui.toJSON())).toContain('Loading offer details. Tap to retry.');
   await act(async () => { response.reject(new Error('Rental unavailable')); });
   expect(text(ui.toJSON())).toContain('Loading offer details. Tap to retry.');
   expect(buttons(ui).map(text)).not.toContain('Accept offer');
@@ -134,4 +155,89 @@ test('failed offer loading is safe and can retry before rental details arrive', 
   await press(ui, 'Loading offer details. Tap to retry.');
   expect(text(ui.toJSON())).not.toContain('Loading offer details. Tap to retry.');
   expect(buttons(ui).map(text)).toContain('Accept offer');
+});
+
+test('empty chat shows a local summary state without an AI request', async () => {
+  messages = [];
+  const ui = await render(<ChatsScreen2 />);
+
+  await press(ui, 'Summarise Chat');
+
+  expect(text(ui.toJSON())).toContain(
+    'There are no messages to summarise yet. Send a message to start the conversation.',
+  );
+  expect(text(ui.toJSON())).not.toContain('Currently using hardcoded placeholder summary.');
+  expect(text(ui.toJSON())).not.toContain('[HARDCODED PLACEHOLDER]');
+  expect(axios.get.mock.calls.some(([url]) => url.includes('/ai-chat/summary'))).toBe(false);
+});
+
+test('summary button shows an accessible loading icon while the request is pending', async () => {
+  const response = deferred();
+  const originalGet = axios.get.getMockImplementation();
+  axios.get.mockImplementation((url, config) =>
+    url.includes('/ai-chat/summary') ? response.promise : originalGet(url, config));
+  const ui = await render(<ChatsScreen2 />);
+  const summaryButton = buttons(ui).find(node => text(node) === 'Summarise Chat');
+
+  await act(async () => {
+    summaryButton.props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  const busyButton = buttons(ui).find(node => node.props.accessibilityLabel === 'Summarising chat');
+  expect(busyButton.props.disabled).toBe(true);
+  expect(busyButton.props.accessibilityState).toEqual({ busy: true, disabled: true });
+  expect(busyButton.findAllByType('ActivityIndicator')).toHaveLength(1);
+  expect(text(busyButton)).not.toContain('Summarising...');
+
+  await act(async () => {
+    response.resolve({
+      status: 200,
+      data: {
+        summary: '{"overview":"Chat overview","next_steps":"Follow up","sections":[]}',
+        placeholder: false,
+      },
+    });
+  });
+  expect(text(ui.toJSON())).toContain('Chat overview');
+});
+
+test('summary timeout shows an inline recovery action and retry succeeds', async () => {
+  const originalGet = axios.get.getMockImplementation();
+  let summaryAttempts = 0;
+  axios.get.mockImplementation((url, config) => {
+    if (!url.includes('/ai-chat/summary')) return originalGet(url, config);
+    summaryAttempts += 1;
+    if (summaryAttempts === 1) {
+      return Promise.reject({
+        response: {
+          status: 504,
+          data: { message: 'The AI took too long to respond. Please try again.' },
+        },
+      });
+    }
+    return Promise.resolve({
+      status: 200,
+      data: {
+        summary: '{"overview":"Recovered summary","next_steps":"Continue","sections":[]}',
+        placeholder: false,
+      },
+    });
+  });
+  const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const ui = await render(<ChatsScreen2 />);
+  errorSpy.mockClear();
+
+  await press(ui, 'Summarise Chat');
+  expect(text(ui.toJSON())).toContain('The AI took too long to respond. Please try again.');
+  expect(buttons(ui).map(text)).toContain('Try Again');
+  expect(errorSpy).not.toHaveBeenCalled();
+
+  await press(ui, 'Try Again');
+  expect(text(ui.toJSON())).toContain('Recovered summary');
+  expect(summaryAttempts).toBe(2);
+  const summaryCall = axios.get.mock.calls.find(([url]) => url.includes('/ai-chat/summary'));
+  expect(summaryCall[1].headers['X-AI-Chat-Request-Id']).toMatch(/^ai-chat-\d+-\d+$/);
+  errorSpy.mockRestore();
 });

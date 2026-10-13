@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * LLM layer of the AI Fair-Pricing Model.
@@ -30,7 +31,7 @@ public class FairPriceExplanationService {
     private static final Logger log = LoggerFactory.getLogger(FairPriceExplanationService.class);
 
     static final String NOT_CONFIGURED = "AI explanations are not configured on the server (llm.api-key is not set).";
-    static final int MAX_OUTPUT_TOKENS = 2048;
+    static final int MAX_OUTPUT_TOKENS = 512;
     /** Explanations are cached per listing state so repeated page views cost nothing. */
     static final long CACHE_TTL_MILLIS = 6 * 60 * 60 * 1000L;
     static final int MAX_DESCRIPTION_CHARS = 2000;
@@ -56,6 +57,7 @@ public class FairPriceExplanationService {
 
     private record CacheEntry(long createdAt, FairPriceExplanation explanation) {}
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<FairPriceExplanation>> inFlight = new ConcurrentHashMap<>();
 
     private final FairPricingService fairPricingService;
     private final ListingsService listingsService;
@@ -99,11 +101,22 @@ public class FairPriceExplanationService {
 
         log.info("[PricingAI] event=explanation_cache requestId={} listingId={} cache={}",
                 MDC.get("pricingRequestId"), listingId, hit == null ? "miss" : "expired");
-        FairPriceExplanation result = explain(l, estimate);
-        if (result.isAvailable()) {
-            cache.put(key, new CacheEntry(System.currentTimeMillis(), result));
+        var pending = new CompletableFuture<FairPriceExplanation>();
+        var existing = inFlight.putIfAbsent(key, pending);
+        if (existing != null) return Optional.of(existing.join());
+        try {
+            FairPriceExplanation result = explain(l, estimate);
+            if (result.isAvailable()) {
+                cache.put(key, new CacheEntry(System.currentTimeMillis(), result));
+            }
+            pending.complete(result);
+            return Optional.of(result);
+        } catch (RuntimeException exception) {
+            pending.completeExceptionally(exception);
+            throw exception;
+        } finally {
+            inFlight.remove(key, pending);
         }
-        return Optional.of(result);
     }
 
     /** Ask Gemini to explain an estimate for a listing (no caching, no database access). */

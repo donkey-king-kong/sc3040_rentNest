@@ -1,91 +1,49 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, AppState } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import NavigationBar from '../components/NavigationBar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from "axios";
-import { API_BASE_URL } from '../config/api';
-import { jwtDecode } from "jwt-decode";
+import { inboxStore } from '../config/inbox';
 import MorphingInfinity from '../components/MorphingInfinity';
 import ListingImage from '../components/ListingImage';
 
 const InboxScreen = () => {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [listings, setListings] = useState([]);
-  
-  const fetchListings = async () => {
-    try {
-      setIsLoading(true);
+  const state = useSyncExternalStore(inboxStore.subscribe, inboxStore.getSnapshot, inboxStore.getSnapshot);
+  const [focusLoading, setFocusLoading] = useState(true);
+  const userListings = state.data || [];
+  const isLoading = focusLoading || (state.data === null && !state.error);
 
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        console.log("No token found!");
-        router.replace("/LoginScreen");
-        return;
-      }
-
-      // Get email from token
-      const decoded = jwtDecode(token);
-      const email = decoded.sub;
-      console.log('[InboxScreen] Token decoded successfully, email:', email);
-
-      // Get the current user and the listings in parallel; neither request needs the other.
-      const headers = { "Authorization": `Bearer ${token}` };
-      const [userResponse, listingsResponse] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/users/${email}`, { headers }),
-        axios.get(`${API_BASE_URL}/api/listings`, { headers }),
-      ]);
-      console.log("Current User obtained:", userResponse.data);
-      setCurrentUser(userResponse.data);
-
-      console.log('[InboxScreen] listing image payloads:', listingsResponse.data.map(listing => ({
-        listingID: listing.listingID,
-        name: listing.name,
-        listingpicture: listing.listingpicture,
-      })));
-      setListings(listingsResponse.data);
-
-      setIsLoading(false);
-    } catch (error) {
-      console.error("Error in fetchListings:", error);
-      setIsLoading(false);
-      if (error.response?.status === 401) {
-        router.replace("/LoginScreen");
-      }
-    }
-  };
-
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    const refreshForFocus = () => {
+      setFocusLoading(true);
+      Promise.resolve(inboxStore.refresh('focus')).finally(() => {
+        if (active) setFocusLoading(false);
+      });
+    };
+    refreshForFocus();
+    const subscription = AppState.addEventListener('change', next => {
+      if (next === 'active') refreshForFocus();
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []));
   useEffect(() => {
-    fetchListings();
-  }, []);
-
-  // Filter listings for the current user
-  const userListings = listings.filter(listing =>
-    listing.ownerId === currentUser?.userID ||
-    (listing.tenantId === currentUser?.userID)
-    // || (listing.tenantId === null && listing.ownerId !== currentUser?.userID) // Include viewer listings
-  );
+    if (state.unauthenticated) router.replace('/LoginScreen');
+  }, [state.unauthenticated, router]);
 
   // Render each listing item
   const renderItem = ({ item }) => {
-    const isOwner = item.ownerId === currentUser?.userID;
-    const isTenant = item.tenantId === currentUser?.userID;
-
-    let roleText;
-    if (isOwner) {
-      roleText = 'Owner';
-    } else if (isTenant) {
-      roleText = 'Tenant';
-    } 
-    // else if (item.tenantId === null) {
-    //   roleText = 'Viewer'; // For listings without a tenant and where the owner is not the current user
-    // }
+    const isOwner = item.role === 'Owner';
+    const isTenant = item.role === 'Tenant';
 
     return (
       <TouchableOpacity
         style={styles.listingContainer}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name || 'Unnamed property'}, ${item.role}`}
         onPress={() => {
           if (isOwner) {
             router.push({
@@ -98,18 +56,13 @@ const InboxScreen = () => {
               params: { listingId: item.listingID, tenantId: item.tenantId },
             });
           } 
-          // else if (item.tenantId === null) {
-          //   router.push({
-          //     pathname: '/RentalInfoViewerScreen',
-          //     params: { listingId: item.listingID },
-          //   });
-          // }
         }}
       >
         <ListingImage
           uri={item.listingpicture}
           style={styles.image}
           screen="InboxScreen"
+          diagnostics={false}
           listingId={item.listingID}
           listingName={item.name}
           width={160}
@@ -117,10 +70,10 @@ const InboxScreen = () => {
         />
         <View style={styles.detailsContainer}>
           <View style={styles.roleBox}>
-            <Text style={styles.roleText}>{roleText}</Text>
+            <Text style={styles.roleText}>{item.role}</Text>
           </View>
-          <Text style={styles.title}>{item.name}</Text>
-          <Text style={styles.address}>{item.location}</Text>
+          <Text style={styles.title}>{item.name || 'Unnamed property'}</Text>
+          <Text style={styles.address}>{item.location || 'Location not specified'}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -128,9 +81,12 @@ const InboxScreen = () => {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading inbox...</Text>
+      <View style={styles.screen}>
+        <View style={styles.loadingContainer}>
+          <MorphingInfinity size={86} color="#2FA84F" />
+          <Text accessibilityLiveRegion="polite" style={styles.loadingText}>Loading inbox...</Text>
+        </View>
+        <NavigationBar style={styles.navigationBar} />
       </View>
     );
   }
@@ -138,7 +94,30 @@ const InboxScreen = () => {
   return (
     <View style={styles.screen}>
       <View style={styles.container}>
-        <Text style={styles.header}>Inbox</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.header}>Inbox</Text>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Refresh inbox"
+            accessibilityState={{ disabled: state.loading }}
+            disabled={state.loading}
+            onPress={() => inboxStore.refresh('manual')}
+            style={styles.refreshButton}
+          >
+            <Text style={styles.refreshText}>{state.loading ? 'Refreshing...' : 'Refresh'}</Text>
+          </TouchableOpacity>
+        </View>
+        {state.error && !state.unauthenticated ? (
+          <View style={styles.errorContainer}>
+            <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.errorText}>
+              {state.data === null ? 'Could not load your inbox. Check your connection and try again.' : state.error}
+            </Text>
+            <TouchableOpacity accessibilityRole="button" onPress={() => inboxStore.refresh('manual')}
+              style={styles.refreshButton} disabled={state.loading}>
+              <Text style={styles.refreshText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         <FlatList
           data={userListings}
           renderItem={renderItem}
@@ -147,8 +126,10 @@ const InboxScreen = () => {
           maxToRenderPerBatch={4}
           windowSize={5}
           removeClippedSubviews
+          refreshing={state.loading}
+          onRefresh={() => inboxStore.refresh('manual')}
           contentContainerStyle={userListings.length === 0 ? { flexGrow: 1 } : null}
-          ListEmptyComponent={
+          ListEmptyComponent={state.error ? null :
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyTitle}>No active rentals</Text>
               <Text style={styles.emptySubtitle}>Your inbox will show rentals you own or are tenanting.</Text>
@@ -186,8 +167,21 @@ const styles = StyleSheet.create({
   header: {
     fontSize: 28,
     fontWeight: 'bold',
+    flex: 1,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 20,
   },
+  refreshButton: {
+    paddingHorizontal: 12,
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  refreshText: { color: '#205C43', fontSize: 16, fontWeight: '600' },
+  errorContainer: { marginBottom: 16 },
+  errorText: { color: '#9B263D', fontSize: 16, lineHeight: 24 },
   emptyContainer: {
     flexGrow: 1,
     alignItems: 'center',
@@ -204,7 +198,7 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     fontSize: 16,
-    color: '#888',
+    color: '#666',
     textAlign: 'center',
     lineHeight: 24,
   },

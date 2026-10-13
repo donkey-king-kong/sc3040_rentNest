@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NavigationBar from '../components/NavigationBar';
 import { API_BASE_URL } from '../config/api';
+import { inboxStore } from '../config/inbox';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { normalizeListingImageUrl } from '../components/ListingImage';
@@ -139,6 +140,7 @@ const CreateListingScreen = () => {
                 }
             });
             
+            inboxStore.invalidate();
             setModalVisible(true);
             notificationTimeoutRef.current = setTimeout(() => {
                 setModalVisible(false);
