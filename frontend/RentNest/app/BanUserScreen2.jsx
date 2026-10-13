@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
@@ -6,12 +6,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 import ProfileImage from '../components/ProfileImage';
+import { startOptimisticDismissal } from '../config/moderationDismissals';
 
 const BanUsersScreen2 = () => {
   const router = useRouter();
   const { userid } = useLocalSearchParams();
 
   const [flaggedUser, setFlaggedUser] = useState(null);
+  const [isDismissing, setIsDismissing] = useState(false);
+  const dismissPending = useRef(false);
 
   const getFlaggedUser = async () => {
     try {
@@ -77,26 +80,44 @@ const BanUsersScreen2 = () => {
   };
 
   const handleIgnoreUser = async () => {
+    if (dismissPending.current) return;
+    dismissPending.current = true;
+    setIsDismissing(true);
+
     try {
       const token = await AsyncStorage.getItem('token');
       
       if (!token) {
+        dismissPending.current = false;
+        setIsDismissing(false);
         console.log('No token found!');
         router.replace('/LoginScreen');
         return;
       }
 
       console.log(`Executing PUT ${API_BASE_URL}/api/users/setFlag/${userid}/0`);
-      await axios.put(`${API_BASE_URL}/api/users/setFlag/${userid}/0`, {}, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
+      const started = startOptimisticDismissal({
+        type: 'users',
+        id: userid,
+        itemLabel: 'user report',
+        request: () => axios.put(`${API_BASE_URL}/api/users/setFlag/${userid}/0`, {}, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+        }),
       });
 
-      router.replace('/BanUserScreen?refresh=true');
+      if (started) {
+        router.back();
+      } else {
+        dismissPending.current = false;
+        setIsDismissing(false);
+      }
     } catch (error) {
+      dismissPending.current = false;
+      setIsDismissing(false);
       console.error("Failed to ignore user:", error);
     }
   };
@@ -138,12 +159,16 @@ const BanUsersScreen2 = () => {
         <TouchableOpacity
           style={[styles.button, styles.ignoreButton]}
           onPress={handleIgnoreUser}
+          disabled={isDismissing}
+          accessibilityState={{ disabled: isDismissing, busy: isDismissing }}
         >
-          <Text style={styles.buttonText}>Dismiss Report</Text>
+          <Text style={styles.buttonText}>{isDismissing ? 'Dismissing…' : 'Dismiss Report'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.deleteButton]}
           onPress={handleBanUser}
+          disabled={isDismissing}
+          accessibilityState={{ disabled: isDismissing }}
         >
           <Text style={styles.buttonText}>Ban User</Text>
         </TouchableOpacity>

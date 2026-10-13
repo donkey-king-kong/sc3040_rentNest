@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import ModerationListState, { moderationLoadError } from '../components/ModerationListState';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
+import { moderationDismissals, useModerationDismissals } from '../config/moderationDismissals';
 
 const ProcessReviewsScreen = () => {
   const [reviewsData, setReviewsData] = useState(null);
@@ -15,6 +16,8 @@ const ProcessReviewsScreen = () => {
   const [loadError, setLoadError] = useState(null);
   const router = useRouter();
   const requestVersion = useRef(0);
+  const dismissals = useModerationDismissals('reviews');
+  const seenCompletionVersion = useRef(dismissals.completionVersion);
 
   const getFlaggedReviews = useCallback(async () => {
     const version = ++requestVersion.current;
@@ -54,6 +57,10 @@ const ProcessReviewsScreen = () => {
       }))
       console.log(flaggedReviews);
       if (version !== requestVersion.current) return;
+      moderationDismissals.reconcile(
+        'reviews',
+        flaggedReviews.map(review => review.reviewid),
+      );
       setReviewsData(flaggedReviews);
     } catch (error) {
       if (version !== requestVersion.current) return;
@@ -71,6 +78,12 @@ const ProcessReviewsScreen = () => {
     return () => { requestVersion.current += 1; };
   }, [getFlaggedReviews]));
 
+  useEffect(() => {
+    if (seenCompletionVersion.current === dismissals.completionVersion) return;
+    seenCompletionVersion.current = dismissals.completionVersion;
+    void getFlaggedReviews();
+  }, [dismissals.completionVersion, getFlaggedReviews]);
+
   // Search function to filter reviews by title or text
   const filterReviews = (reviews, query) => {
     if (!query || !reviews) return reviews;
@@ -87,6 +100,10 @@ const ProcessReviewsScreen = () => {
     );
   }
 
+  const visibleReviews = reviewsData.filter(
+    review => !moderationDismissals.isPending('reviews', review.reviewid),
+  );
+
   return (
     <View style={styles.container}>
       <AdminHeader title="Process Flagged Reviews" onBack={() => router.replace('/AdminScreen')} backLabel="Back to admin" inset />
@@ -102,7 +119,7 @@ const ProcessReviewsScreen = () => {
 
       {/* FlatList for reviews */}
       <FlatList
-        data={filterReviews(reviewsData, searchQuery) || []}
+        data={filterReviews(visibleReviews, searchQuery) || []}
         ListEmptyComponent={
           <ModerationListState
             loading={reviewsData === null && !loadError}

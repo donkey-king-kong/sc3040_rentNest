@@ -6,6 +6,7 @@ import axios from 'axios';
 import { FontAwesome } from '@expo/vector-icons';
 
 import { API_BASE_URL } from '../config/api';
+import { moderationDismissals } from '../config/moderationDismissals';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 
 const EMPTY_COUNTS = {
@@ -99,6 +100,7 @@ const AdminScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
+              moderationDismissals.reset();
               await AsyncStorage.multiRemove(['token', 'userId']);
               router.replace('/LandingScreen');
             } catch (error) {
