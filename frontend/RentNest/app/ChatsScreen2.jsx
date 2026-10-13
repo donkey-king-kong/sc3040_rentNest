@@ -1353,7 +1353,16 @@ const handlePaymentAndAccept = async () => {
 
             {/* Header row 2: Ask AI + Summarise Chat */}
             <View style={styles.headerActionsRow}>
-                <TouchableOpacity onPress={() => setAskAiModalVisible(true)} style={styles.aiSummaryButton}>
+                <TouchableOpacity
+                    onPress={() => {
+                        if (!Array.isArray(chat) || chat.length === 0) {
+                            showChatNotification('Nothing to ask about yet — start the conversation first.');
+                            return;
+                        }
+                        setAskAiModalVisible(true);
+                    }}
+                    style={styles.aiSummaryButton}
+                >
                     <Text style={styles.aiSummaryButtonText}>Ask AI</Text>
                 </TouchableOpacity>
                 <TouchableOpacity

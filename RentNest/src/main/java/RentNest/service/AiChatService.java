@@ -27,7 +27,6 @@ import java.util.regex.Pattern;
 @Service
 public class AiChatService {
     private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
-    private static final String PLACEHOLDER_PREFIX = "[HARDCODED PLACEHOLDER]";
     private static final String SUMMARY_PROMPT_VERSION = "summary-v2";
     private static final List<String> PLACEHOLDER_API_KEYS = List.of(
             "YOUR_LLM_API_KEY",
@@ -113,8 +112,9 @@ public class AiChatService {
                 - Never refer to speakers as Participant A or Participant B.
                 - Do not speculate about who is owner or tenant based on names.
                 - Do not comment on funny, odd, duplicated, or confusing names.
-                - For short conversations, still summarise the concrete request/question and the concrete reply.
+                - For short conversations, summarise the concrete request or question. If there is no reply yet, note that the message is awaiting a response.
                 - If a user asks for information and the reply points them to a source or action, treat that as the next step.
+                - If there is only one message and no reply, set "next_steps" to "Awaiting a response." and "sections" to [].
                 - Include only sections that have actual content from the conversation.
                 - Each section value must be one short sentence or a structured list of key-value pairs, nothing longer.
                 - Output valid JSON only. No markdown, no explanation, no trailing text.
@@ -300,31 +300,51 @@ public class AiChatService {
     }
 
     private String generatePlaceholderSummary(List<ChatHistory> conversation) {
-        ChatHistory latestMessage = conversation.get(conversation.size() - 1);
-        String latestSender = latestMessage.getSenderName() != null ? latestMessage.getSenderName() : "User " + latestMessage.getSenderId();
-        String latestText = latestMessage.getMessage() != null ? latestMessage.getMessage() : "";
+        int count = conversation.size();
+        ChatHistory latestMessage = conversation.get(count - 1);
+        String latestSender = latestMessage.getSenderName() != null ? latestMessage.getSenderName() : "the other party";
+        String latestText = latestMessage.getMessage() != null ? latestMessage.getMessage().trim() : "";
 
-        return String.format(
-                "%s This chat currently has %d message(s) between the owner and tenant. Latest message from %s: \"%s\". Add your LLM API key in application.properties to enable real LLM summaries.",
-                PLACEHOLDER_PREFIX,
-                conversation.size(),
-                latestSender,
-                latestText
-        );
+        if (count == 1) {
+            if (!latestText.isEmpty()) {
+                return String.format(
+                        "This conversation has just started. The opening message from %s reads: \"%s\". There is not enough context yet for a full summary.",
+                        latestSender, latestText);
+            }
+            return "This conversation has just started. There is not enough context yet for a full summary.";
+        }
+
+        if (!latestText.isEmpty()) {
+            return String.format(
+                    "This chat has %d messages. The most recent message is from %s: \"%s\".",
+                    count, latestSender, latestText);
+        }
+
+        return String.format("This chat has %d messages. AI summaries are not available right now.", count);
     }
 
     private String generatePlaceholderAnswer(List<ChatHistory> conversation) {
-        ChatHistory latestMessage = conversation.get(conversation.size() - 1);
-        String latestSender = latestMessage.getSenderName() != null ? latestMessage.getSenderName() : "User " + latestMessage.getSenderId();
-        String latestText = latestMessage.getMessage() != null ? latestMessage.getMessage() : "";
+        int count = conversation.size();
+        ChatHistory latestMessage = conversation.get(count - 1);
+        String latestSender = latestMessage.getSenderName() != null ? latestMessage.getSenderName() : "the other party";
+        String latestText = latestMessage.getMessage() != null ? latestMessage.getMessage().trim() : "";
 
-        return String.format(
-                "%s This question is within the rental conversation scope. The chat has %d message(s). Latest message from %s: \"%s\". Add your LLM API key in application.properties to enable real LLM answers.",
-                PLACEHOLDER_PREFIX,
-                conversation.size(),
-                latestSender,
-                latestText
-        );
+        if (count == 1) {
+            if (!latestText.isEmpty()) {
+                return String.format(
+                        "This conversation has just started. The only message so far is from %s: \"%s\". There may not be enough context to answer your question fully.",
+                        latestSender, latestText);
+            }
+            return "This conversation has just started and there is not enough context to answer your question yet.";
+        }
+
+        if (!latestText.isEmpty()) {
+            return String.format(
+                    "This chat has %d messages. The most recent message is from %s: \"%s\". AI answers are not available right now.",
+                    count, latestSender, latestText);
+        }
+
+        return String.format("This chat has %d messages. AI answers are not available right now.", count);
     }
 
     private String formatConversation(List<ChatHistory> conversation) {
