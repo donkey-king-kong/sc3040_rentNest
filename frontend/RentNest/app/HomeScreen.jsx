@@ -183,237 +183,243 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View
-          accessibilityLabel="Loading recommendations"
-          style={styles.loadingScreen}
-        >
-          <MorphingInfinity size={86} color="#2FA84F" />
-          <Text style={styles.loadingText}>Loading listings...</Text>
+      <View style={styles.screen}>
+        <View style={styles.container}>
+          <View
+            accessibilityLabel="Loading recommendations"
+            style={styles.loadingScreen}
+          >
+            <MorphingInfinity size={86} color="#2FA84F" />
+            <Text style={styles.loadingText}>Loading listings...</Text>
+          </View>
         </View>
-        <NavigationBar />
+        <NavigationBar style={styles.navigationBar} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Find your next home</Text>
-      <Text style={styles.muted}>
-        Search in your own words, or use the filters to narrow the results.
-      </Text>
-      <View style={styles.row}>
-        <View
-          style={[
-            styles.searchField,
-            focusedField === "query" && styles.focused,
-          ]}
-        >
-          <Feather
-            name="search"
-            size={16}
-            color="#666"
-            style={styles.searchIcon}
-          />
-          <TextInput
-            ref={searchInput}
-            accessibilityLabel="Search homes"
-            style={[styles.searchInput, styles.noOutline]}
-            placeholder="Area or postal code"
-            placeholderTextColor="#888"
-            numberOfLines={1}
-            value={form.query}
-            maxLength={300}
-            onFocus={() => setFocusedField("query")}
-            onBlur={() => setFocusedField(null)}
-            onChangeText={(value) => update("query", value)}
-            onSubmitEditing={() => fetchListings(form)}
-          />
-          {form.query ? (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              style={styles.clearButton}
-              onPress={() => {
-                update("query", "");
-                searchInput.current?.focus();
-              }}
-            >
-              <Feather name="x" size={18} color="#333" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => fetchListings(form)}
-        >
-          <Text style={styles.buttonText}>Search</Text>
-        </TouchableOpacity>
-      </View>
-      <TouchableOpacity
-        accessibilityRole="button"
-        accessibilityState={{ expanded: showFilters }}
-        style={[styles.control, styles.filterToggle]}
-        onPress={() => setShowFilters(!showFilters)}
-      >
-        <Text style={styles.filterToggleText}>
-          {showFilters
-            ? "Hide filters"
-            : "Filter by budget, bedrooms, or property type"}
+    <View style={styles.screen}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Find your next home</Text>
+        <Text style={styles.muted}>
+          Search in your own words, or use the filters to narrow the results.
         </Text>
-        <Feather
-          name={showFilters ? "chevron-up" : "chevron-down"}
-          size={16}
-          color="#205c43"
-          style={styles.filterChevron}
-        />
-      </TouchableOpacity>
-      {showFilters && (
-        <View>
-          <View style={styles.row}>
-            {[
-              ["minPrice", "Min S$/mo", "Minimum rent, S$ per month"],
-              ["maxPrice", "Max S$/mo", "Maximum rent, S$ per month"],
-              ["minBeds", "Min beds", "Minimum bedrooms"],
-            ].map(([key, placeholder, label]) => (
-              <TextInput
-                key={key}
-                accessibilityLabel={label}
-                style={[
-                  styles.control,
-                  styles.filterInput,
-                  styles.noOutline,
-                  focusedField === key && styles.focused,
-                ]}
-                placeholder={placeholder}
-                placeholderTextColor="#888"
-                keyboardType="numeric"
-                onFocus={() => setFocusedField(key)}
-                onBlur={() => setFocusedField(null)}
-                value={form[key]}
-                onChangeText={(value) => update(key, value)}
-              />
-            ))}
-          </View>
-          <Text style={styles.filterLabel}>Property type</Text>
-          <View style={styles.pickerRow}>
-            <Dropdown
-              label="Property type"
-              options={propertyTypeOptions}
-              value={form.types[0] || ""}
-              onChange={(value) => update("types", value ? [value] : [])}
+        <View style={styles.row}>
+          <View
+            style={[
+              styles.searchField,
+              focusedField === "query" && styles.focused,
+            ]}
+          >
+            <Feather
+              name="search"
+              size={16}
+              color="#666"
+              style={styles.searchIcon}
             />
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Clear advanced filters"
-              style={styles.clearFiltersButton}
-              onPress={() => {
-                const clearedFilters = { ...emptyForm, query: form.query };
-                setForm(clearedFilters);
-                fetchListings(clearedFilters);
-              }}
-            >
-              <Text style={styles.clearFiltersText}>Clear</Text>
-            </TouchableOpacity>
+            <TextInput
+              ref={searchInput}
+              accessibilityLabel="Search homes"
+              style={[styles.searchInput, styles.noOutline]}
+              placeholder="Area or postal code"
+              placeholderTextColor="#888"
+              numberOfLines={1}
+              value={form.query}
+              maxLength={300}
+              onFocus={() => setFocusedField("query")}
+              onBlur={() => setFocusedField(null)}
+              onChangeText={(value) => update("query", value)}
+              onSubmitEditing={() => fetchListings(form)}
+            />
+            {form.query ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+                style={styles.clearButton}
+                onPress={() => {
+                  update("query", "");
+                  searchInput.current?.focus();
+                }}
+              >
+                <Feather name="x" size={18} color="#333" />
+              </TouchableOpacity>
+            ) : null}
           </View>
-        </View>
-      )}
-      <View style={styles.row}>
-        <TouchableOpacity
-          style={styles.control}
-          onPress={() =>
-            setSort(sort === "recommended" ? "price" : "recommended")
-          }
-        >
-          <Text style={styles.controlText}>
-            Sort: {sort === "recommended" ? "Recommended" : "Lowest rent"}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.control} onPress={clearHistory}>
-          <Text style={styles.controlText}>Reset Recommendations</Text>
-        </TouchableOpacity>
-      </View>
-      {error ? (
-        <View>
-          <Text accessibilityRole="alert" style={styles.error}>
-            {error}
-          </Text>
-          <TouchableOpacity onPress={() => fetchListings(form)}>
-            <Text style={styles.link}>Retry</Text>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={() => fetchListings(form)}
+          >
+            <Text style={styles.buttonText}>Search</Text>
           </TouchableOpacity>
         </View>
-      ) : null}
-      {result ? (
-        <FlatList
-          style={styles.list}
-          data={items}
-          keyExtractor={(item) => String(item.listingID)}
-          contentContainerStyle={{ paddingBottom: 20 }}
-          ListHeaderComponent={
-            <View style={{ marginVertical: 12 }}>
-              <Text style={styles.heading}>
-                {result.mode === "personalized"
-                  ? "Recommended for you"
-                  : "Homes to explore"}{" "}
-                · {result.total} matches
-              </Text>
-              <Text style={styles.muted}>
-                Applied:{" "}
-                {result.filters.locations?.join(" / ") || "All locations"},{" "}
-                {result.filters.types.join(", ") || "All types"}, rent S$
-                {result.filters.minPrice ?? 0} to{" "}
-                {result.filters.maxPrice ?? "Any"},{" "}
-                {result.filters.minBeds ?? 0}+ bedrooms
-              </Text>
-              {result.total > items.length && (
-                <Text style={styles.muted}>
-                  Showing the top {items.length}. Narrow your search for more
-                  specific results.
-                </Text>
-              )}
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{ expanded: showFilters }}
+          style={[styles.control, styles.filterToggle]}
+          onPress={() => setShowFilters(!showFilters)}
+        >
+          <Text style={styles.filterToggleText}>
+            {showFilters
+              ? "Hide filters"
+              : "Filter by budget, bedrooms, or property type"}
+          </Text>
+          <Feather
+            name={showFilters ? "chevron-up" : "chevron-down"}
+            size={16}
+            color="#205c43"
+            style={styles.filterChevron}
+          />
+        </TouchableOpacity>
+        {showFilters && (
+          <View>
+            <View style={styles.row}>
+              {[
+                ["minPrice", "Min S$/mo", "Minimum rent, S$ per month"],
+                ["maxPrice", "Max S$/mo", "Maximum rent, S$ per month"],
+                ["minBeds", "Min beds", "Minimum bedrooms"],
+              ].map(([key, placeholder, label]) => (
+                <TextInput
+                  key={key}
+                  accessibilityLabel={label}
+                  style={[
+                    styles.control,
+                    styles.filterInput,
+                    styles.noOutline,
+                    focusedField === key && styles.focused,
+                  ]}
+                  placeholder={placeholder}
+                  placeholderTextColor="#888"
+                  keyboardType="numeric"
+                  onFocus={() => setFocusedField(key)}
+                  onBlur={() => setFocusedField(null)}
+                  value={form[key]}
+                  onChangeText={(value) => update(key, value)}
+                />
+              ))}
             </View>
-          }
-          ListEmptyComponent={
-            <Text style={styles.heading}>
-              No available homes match. Try a wider budget or fewer filters.
-            </Text>
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => openListing(item)}
-            >
-              <ListingImage
-                uri={item.listingpicture}
-                style={styles.image}
-                screen="HomeScreen"
-                listingId={item.listingID}
-                listingName={item.name}
-                width={240}
-                height={160}
+            <Text style={styles.filterLabel}>Property type</Text>
+            <View style={styles.pickerRow}>
+              <Dropdown
+                label="Property type"
+                options={propertyTypeOptions}
+                value={form.types[0] || ""}
+                onChange={(value) => update("types", value ? [value] : [])}
               />
-              <View style={{ padding: 14 }}>
-                <Text style={styles.heading}>
-                  {item.name || "Rental property"}
-                </Text>
-                {item.demo ? (
-                  <Text style={styles.muted}>
-                    Sample listing · illustrative stock photo
-                  </Text>
-                ) : null}
-                <Text>{item.description || "Description unavailable."}</Text>
-              </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Clear advanced filters"
+                style={styles.clearFiltersButton}
+                onPress={() => {
+                  const clearedFilters = { ...emptyForm, query: form.query };
+                  setForm(clearedFilters);
+                  fetchListings(clearedFilters);
+                }}
+              >
+                <Text style={styles.clearFiltersText}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        <View style={styles.row}>
+          <TouchableOpacity
+            style={styles.control}
+            onPress={() =>
+              setSort(sort === "recommended" ? "price" : "recommended")
+            }
+          >
+            <Text style={styles.controlText}>
+              Sort: {sort === "recommended" ? "Recommended" : "Lowest rent"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.control} onPress={clearHistory}>
+            <Text style={styles.controlText}>Reset Recommendations</Text>
+          </TouchableOpacity>
+        </View>
+        {error ? (
+          <View>
+            <Text accessibilityRole="alert" style={styles.error}>
+              {error}
+            </Text>
+            <TouchableOpacity onPress={() => fetchListings(form)}>
+              <Text style={styles.link}>Retry</Text>
             </TouchableOpacity>
-          )}
-        />
-      ) : null}
-      <NavigationBar />
+          </View>
+        ) : null}
+        {result ? (
+          <FlatList
+            style={styles.list}
+            data={items}
+            keyExtractor={(item) => String(item.listingID)}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            ListHeaderComponent={
+              <View style={{ marginVertical: 12 }}>
+                <Text style={styles.heading}>
+                  {result.mode === "personalized"
+                    ? "Recommended for you"
+                    : "Homes to explore"}{" "}
+                  · {result.total} matches
+                </Text>
+                <Text style={styles.muted}>
+                  Applied:{" "}
+                  {result.filters.locations?.join(" / ") || "All locations"},{" "}
+                  {result.filters.types.join(", ") || "All types"}, rent S$
+                  {result.filters.minPrice ?? 0} to{" "}
+                  {result.filters.maxPrice ?? "Any"},{" "}
+                  {result.filters.minBeds ?? 0}+ bedrooms
+                </Text>
+                {result.total > items.length && (
+                  <Text style={styles.muted}>
+                    Showing the top {items.length}. Narrow your search for more
+                    specific results.
+                  </Text>
+                )}
+              </View>
+            }
+            ListEmptyComponent={
+              <Text style={styles.heading}>
+                No available homes match. Try a wider budget or fewer filters.
+              </Text>
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.card}
+                onPress={() => openListing(item)}
+              >
+                <ListingImage
+                  uri={item.listingpicture}
+                  style={styles.image}
+                  screen="HomeScreen"
+                  listingId={item.listingID}
+                  listingName={item.name}
+                  width={240}
+                  height={160}
+                />
+                <View style={{ padding: 14 }}>
+                  <Text style={styles.heading}>
+                    {item.name || "Rental property"}
+                  </Text>
+                  {item.demo ? (
+                    <Text style={styles.muted}>
+                      Sample listing · illustrative stock photo
+                    </Text>
+                  ) : null}
+                  <Text>{item.description || "Description unavailable."}</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          />
+        ) : null}
+      </View>
+      <NavigationBar style={styles.navigationBar} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#fff" },
   container: { flex: 1, backgroundColor: "#fff", padding: 20 },
+  navigationBar: { height: 60, backgroundColor: "#fff" },
   title: { fontSize: 25, fontWeight: "bold", marginBottom: 6 },
   heading: { fontSize: 17, fontWeight: "600", marginBottom: 6 },
   muted: { color: "#555", fontSize: 13, marginBottom: 6, lineHeight: 19 },
