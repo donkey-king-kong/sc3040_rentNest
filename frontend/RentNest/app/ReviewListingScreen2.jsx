@@ -7,6 +7,7 @@ import { API_BASE_URL } from '../config/api';
 import { inboxStore } from '../config/inbox';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 import ProfileImage from '../components/ProfileImage';
+import { startOptimisticDismissal } from '../config/moderationDismissals';
 
 const ReviewListingScreen2 = () => {
   const router = useRouter();
@@ -14,30 +15,49 @@ const ReviewListingScreen2 = () => {
 
   const [listingData, setListingData] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [isDismissing, setIsDismissing] = useState(false);
   const deletePending = useRef(false);
+  const dismissPending = useRef(false);
 
   const handleIgnore = async () => {
+    if (dismissPending.current || deletePending.current) return;
+    dismissPending.current = true;
+    setIsDismissing(true);
+
     try {
       const token = await AsyncStorage.getItem('token');
       
       if (!token) {
+        dismissPending.current = false;
+        setIsDismissing(false);
         console.log('No token found!');
         router.replace('/LoginScreen');
         return;
       }
 
       console.log(`Executing PUT ${API_BASE_URL}/api/listings/setFlag/${listingid}/false`);
-      await axios.put(`${API_BASE_URL}/api/listings/setFlag/${listingid}/false`, {}, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
+      const started = startOptimisticDismissal({
+        type: 'listings',
+        id: listingid,
+        itemLabel: 'listing report',
+        request: () => axios.put(`${API_BASE_URL}/api/listings/setFlag/${listingid}/false`, {}, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+        }),
       });
 
-      // The flagged-list screen refreshes when it regains focus.
-      router.back();
+      if (started) {
+        router.back();
+      } else {
+        dismissPending.current = false;
+        setIsDismissing(false);
+      }
     } catch (error) {
+      dismissPending.current = false;
+      setIsDismissing(false);
       console.error("Failed to update listing flag:", error);
     }
   };
@@ -177,16 +197,16 @@ const ReviewListingScreen2 = () => {
         <TouchableOpacity
           style={[styles.button, styles.ignoreButton]}
           onPress={handleIgnore} // Call handleIgnore function
-          disabled={deleting}
-          accessibilityState={{ disabled: deleting }}
+          disabled={deleting || isDismissing}
+          accessibilityState={{ disabled: deleting || isDismissing, busy: isDismissing }}
         >
-          <Text style={styles.buttonText}>Dismiss Report</Text>
+          <Text style={styles.buttonText}>{isDismissing ? 'Dismissing…' : 'Dismiss Report'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.button, styles.deleteButton]}
           onPress={handleDelete} // Call handleDelete function
-          disabled={deleting}
-          accessibilityState={{ disabled: deleting, busy: deleting }}
+          disabled={deleting || isDismissing}
+          accessibilityState={{ disabled: deleting || isDismissing, busy: deleting }}
         >
           <Text style={styles.buttonText}>{deleting ? 'Deleting…' : 'Delete Listing'}</Text>
         </TouchableOpacity>

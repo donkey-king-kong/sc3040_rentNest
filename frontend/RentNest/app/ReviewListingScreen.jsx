@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import axios from 'axios';
@@ -7,6 +7,7 @@ import { API_BASE_URL } from '../config/api';
 import ModerationListState, { moderationLoadError } from '../components/ModerationListState';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 import ProfileImage from '../components/ProfileImage';
+import { moderationDismissals, useModerationDismissals } from '../config/moderationDismissals';
 
 const ReviewListingsScreen = () => {
   const [listingsData, setListingsData] = useState(null);
@@ -15,10 +16,12 @@ const ReviewListingsScreen = () => {
   const [loadError, setLoadError] = useState(null);
   const router = useRouter();
   const requestVersion = useRef(0);
+  const dismissals = useModerationDismissals('listings');
+  const seenCompletionVersion = useRef(dismissals.completionVersion);
 
-  const getFlaggedListings = useCallback(async () => {
+  const getFlaggedListings = useCallback(async ({ showRefreshIndicator = false } = {}) => {
     const version = ++requestVersion.current;
-    setRefreshing(true);
+    if (showRefreshIndicator) setRefreshing(true);
     setLoadError(null);
     try {
       const token = await AsyncStorage.getItem('token');
@@ -59,6 +62,10 @@ const ReviewListingsScreen = () => {
         };
       }));
       if (version !== requestVersion.current) return;
+      moderationDismissals.reconcile(
+        'listings',
+        listingsWithOwners.map(listing => listing.listingID),
+      );
       setListingsData(listingsWithOwners);
     } catch (error) {
       if (version !== requestVersion.current) return;
@@ -76,6 +83,12 @@ const ReviewListingsScreen = () => {
     return () => { requestVersion.current += 1; };
   }, [getFlaggedListings]));
 
+  useEffect(() => {
+    if (seenCompletionVersion.current === dismissals.completionVersion) return;
+    seenCompletionVersion.current = dismissals.completionVersion;
+    void getFlaggedListings();
+  }, [dismissals.completionVersion, getFlaggedListings]);
+
   // Search function to filter listings by owner name or listing name
   const filterListings = (listings, query) => {
     if (!query || !listings) return listings;
@@ -92,6 +105,10 @@ const ReviewListingsScreen = () => {
     );
   }
 
+  const visibleListings = listingsData.filter(
+    listing => !moderationDismissals.isPending('listings', listing.listingID),
+  );
+
   return (
     <View style={styles.container}>
       <AdminHeader title="Review Listings" onBack={() => router.replace('/AdminScreen')} backLabel="Back to admin" inset />
@@ -107,21 +124,21 @@ const ReviewListingsScreen = () => {
 
       {/* FlatList for listings */}
       <FlatList
-        data={filterListings(listingsData, searchQuery) || []}
+        data={filterListings(visibleListings, searchQuery) || []}
         ListEmptyComponent={
           <ModerationListState
             loading={listingsData === null && !loadError}
             error={loadError}
             searching={!!searchQuery}
             emptyText="No reported listings right now."
-            onRetry={getFlaggedListings}
+            onRetry={() => getFlaggedListings({ showRefreshIndicator: true })}
           />
         }
         keyExtractor={item => item.listingID.toString()}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={getFlaggedListings}
+            onRefresh={() => getFlaggedListings({ showRefreshIndicator: true })}
           />
         }
         renderItem={({ item }) => (

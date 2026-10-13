@@ -1,27 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import ModerationListState, { moderationLoadError } from '../components/ModerationListState';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
 import ProfileImage from '../components/ProfileImage';
+import { moderationDismissals, useModerationDismissals } from '../config/moderationDismissals';
 
 const BanUsersScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [flaggedUsersData, setFlaggedUsersData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const router = useRouter();
-  const { refresh } = useLocalSearchParams();
+  const requestVersion = useRef(0);
+  const dismissals = useModerationDismissals('users');
+  const seenCompletionVersion = useRef(dismissals.completionVersion);
 
-  const getFlaggedUsers = async () => {
+  const getFlaggedUsers = useCallback(async ({ showRefreshIndicator = false } = {}) => {
+    const version = ++requestVersion.current;
+    if (showRefreshIndicator) setRefreshing(true);
     setLoadError(null);
     try {
-      setIsLoading(true);
       const token = await AsyncStorage.getItem('token');
+      if (version !== requestVersion.current) return;
       
       if (!token) {
         console.log('No token found!');
@@ -46,21 +50,26 @@ const BanUsersScreen = () => {
       }));
       console.log(transformedData)
 
+      if (version !== requestVersion.current) return;
+      moderationDismissals.reconcile(
+        'users',
+        transformedData.map(user => user.userid),
+      );
       setFlaggedUsersData(transformedData);
     } catch (error) {
+      if (version !== requestVersion.current) return;
       console.error("An error occurred:", error);
       setFlaggedUsersData([]);
       setLoadError(moderationLoadError(error, 'users'));
     } finally {
-      setIsLoading(false);
+      if (version === requestVersion.current) setRefreshing(false);
     }
-  };
+  }, [router]);
 
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    await getFlaggedUsers();
-    setRefreshing(false);
-  }, []);
+  const onRefresh = useCallback(
+    () => getFlaggedUsers({ showRefreshIndicator: true }),
+    [getFlaggedUsers],
+  );
 
   // Search function to filter flagged users by name
   const filterUsers = (users, query) => {
@@ -70,22 +79,26 @@ const BanUsersScreen = () => {
     );
   };
 
-  useEffect(() => {
-    getFlaggedUsers();
-  }, []);
+  useFocusEffect(useCallback(() => {
+    void getFlaggedUsers();
+    return () => { requestVersion.current += 1; };
+  }, [getFlaggedUsers]));
 
-  // Effect to handle refresh parameter
   useEffect(() => {
-    if (refresh === 'true') {
-      getFlaggedUsers();
-    }
-  }, [refresh]);
+    if (seenCompletionVersion.current === dismissals.completionVersion) return;
+    seenCompletionVersion.current = dismissals.completionVersion;
+    void getFlaggedUsers();
+  }, [dismissals.completionVersion, getFlaggedUsers]);
 
-  if (isLoading) {
+  if (!flaggedUsersData) {
     return (
       <AdminLoadingState message="Loading flagged users..." />
     );
   }
+
+  const visibleUsers = flaggedUsersData.filter(
+    user => !moderationDismissals.isPending('users', user.userid),
+  );
 
   return (
     <View style={styles.container}>
@@ -102,15 +115,15 @@ const BanUsersScreen = () => {
 
       {/* FlatList for flagged users */}
       <FlatList
-        data={filterUsers(flaggedUsersData || [], searchQuery)}
+        data={filterUsers(visibleUsers, searchQuery)}
         keyExtractor={item => String(item.userid)}
         ListEmptyComponent={
           <ModerationListState
-            loading={isLoading}
+            loading={flaggedUsersData === null && !loadError}
             error={loadError}
             searching={!!searchQuery}
             emptyText="No reported users right now."
-            onRetry={getFlaggedUsers}
+            onRetry={onRefresh}
           />
         }
         refreshControl={

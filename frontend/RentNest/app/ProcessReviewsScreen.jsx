@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Image, FlatList, TouchableOpacity, TextInput, RefreshControl } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { FontAwesome } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config/api';
 import ModerationListState, { moderationLoadError } from '../components/ModerationListState';
 import { AdminHeader, AdminLoadingState } from '../components/AdminUI';
+import { moderationDismissals, useModerationDismissals } from '../config/moderationDismissals';
 
 const ProcessReviewsScreen = () => {
   const [reviewsData, setReviewsData] = useState(null);
@@ -14,12 +15,17 @@ const ProcessReviewsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const router = useRouter();
-  const { refresh } = useLocalSearchParams();
+  const requestVersion = useRef(0);
+  const dismissals = useModerationDismissals('reviews');
+  const seenCompletionVersion = useRef(dismissals.completionVersion);
 
-  const getFlaggedReviews = async () => {
+  const getFlaggedReviews = useCallback(async ({ showRefreshIndicator = false } = {}) => {
+    const version = ++requestVersion.current;
+    if (showRefreshIndicator) setRefreshing(true);
     setLoadError(null);
     try {
       const token = await AsyncStorage.getItem('token');
+      if (version !== requestVersion.current) return;
       
       if (!token) {
         console.log('No token found!');
@@ -50,23 +56,33 @@ const ProcessReviewsScreen = () => {
           flagged: review.flagged,
       }))
       console.log(flaggedReviews);
+      if (version !== requestVersion.current) return;
+      moderationDismissals.reconcile(
+        'reviews',
+        flaggedReviews.map(review => review.reviewid),
+      );
       setReviewsData(flaggedReviews);
     } catch (error) {
+      if (version !== requestVersion.current) return;
       console.error("An error occurred:", error);
       setReviewsData([]);
       setLoadError(moderationLoadError(error, 'reviews'));
+    } finally {
+      if (version === requestVersion.current) setRefreshing(false);
     }
-  };
+  }, [router]);
 
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    await getFlaggedReviews();
-    setRefreshing(false);
-  }, []);
+  useFocusEffect(useCallback(() => {
+    void getFlaggedReviews();
+    // Ignore requests from before leaving when returning to the moderation list.
+    return () => { requestVersion.current += 1; };
+  }, [getFlaggedReviews]));
 
   useEffect(() => {
-    getFlaggedReviews();
-  }, [refresh]);
+    if (seenCompletionVersion.current === dismissals.completionVersion) return;
+    seenCompletionVersion.current = dismissals.completionVersion;
+    void getFlaggedReviews();
+  }, [dismissals.completionVersion, getFlaggedReviews]);
 
   // Search function to filter reviews by title or text
   const filterReviews = (reviews, query) => {
@@ -84,6 +100,10 @@ const ProcessReviewsScreen = () => {
     );
   }
 
+  const visibleReviews = reviewsData.filter(
+    review => !moderationDismissals.isPending('reviews', review.reviewid),
+  );
+
   return (
     <View style={styles.container}>
       <AdminHeader title="Process Flagged Reviews" onBack={() => router.replace('/AdminScreen')} backLabel="Back to admin" inset />
@@ -99,21 +119,21 @@ const ProcessReviewsScreen = () => {
 
       {/* FlatList for reviews */}
       <FlatList
-        data={filterReviews(reviewsData, searchQuery) || []}
+        data={filterReviews(visibleReviews, searchQuery) || []}
         ListEmptyComponent={
           <ModerationListState
             loading={reviewsData === null && !loadError}
             error={loadError}
             searching={!!searchQuery}
             emptyText="No reported reviews right now."
-            onRetry={getFlaggedReviews}
+            onRetry={() => getFlaggedReviews({ showRefreshIndicator: true })}
           />
         }
         keyExtractor={item => item.reviewid.toString()}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
+            onRefresh={() => getFlaggedReviews({ showRefreshIndicator: true })}
           />
         }
         renderItem={({ item }) => (
