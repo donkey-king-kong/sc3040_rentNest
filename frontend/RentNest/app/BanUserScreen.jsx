@@ -19,9 +19,9 @@ const BanUsersScreen = () => {
   const dismissals = useModerationDismissals('users');
   const seenCompletionVersion = useRef(dismissals.completionVersion);
 
-  const getFlaggedUsers = useCallback(async () => {
+  const getFlaggedUsers = useCallback(async ({ showRefreshIndicator = false } = {}) => {
     const version = ++requestVersion.current;
-    setRefreshing(true);
+    if (showRefreshIndicator) setRefreshing(true);
     setLoadError(null);
     try {
       const token = await AsyncStorage.getItem('token');
@@ -66,7 +66,10 @@ const BanUsersScreen = () => {
     }
   }, [router]);
 
-  const onRefresh = useCallback(() => getFlaggedUsers(), [getFlaggedUsers]);
+  const onRefresh = useCallback(
+    () => getFlaggedUsers({ showRefreshIndicator: true }),
+    [getFlaggedUsers],
+  );
 
   // Search function to filter flagged users by name
   const filterUsers = (users, query) => {
@@ -120,7 +123,7 @@ const BanUsersScreen = () => {
             error={loadError}
             searching={!!searchQuery}
             emptyText="No reported users right now."
-            onRetry={getFlaggedUsers}
+            onRetry={onRefresh}
           />
         }
         refreshControl={

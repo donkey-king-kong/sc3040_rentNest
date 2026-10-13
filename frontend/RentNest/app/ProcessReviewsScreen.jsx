@@ -19,9 +19,9 @@ const ProcessReviewsScreen = () => {
   const dismissals = useModerationDismissals('reviews');
   const seenCompletionVersion = useRef(dismissals.completionVersion);
 
-  const getFlaggedReviews = useCallback(async () => {
+  const getFlaggedReviews = useCallback(async ({ showRefreshIndicator = false } = {}) => {
     const version = ++requestVersion.current;
-    setRefreshing(true);
+    if (showRefreshIndicator) setRefreshing(true);
     setLoadError(null);
     try {
       const token = await AsyncStorage.getItem('token');
@@ -126,14 +126,14 @@ const ProcessReviewsScreen = () => {
             error={loadError}
             searching={!!searchQuery}
             emptyText="No reported reviews right now."
-            onRetry={getFlaggedReviews}
+            onRetry={() => getFlaggedReviews({ showRefreshIndicator: true })}
           />
         }
         keyExtractor={item => item.reviewid.toString()}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={getFlaggedReviews}
+            onRefresh={() => getFlaggedReviews({ showRefreshIndicator: true })}
           />
         }
         renderItem={({ item }) => (

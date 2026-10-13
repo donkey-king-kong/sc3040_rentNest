@@ -19,9 +19,9 @@ const ReviewListingsScreen = () => {
   const dismissals = useModerationDismissals('listings');
   const seenCompletionVersion = useRef(dismissals.completionVersion);
 
-  const getFlaggedListings = useCallback(async () => {
+  const getFlaggedListings = useCallback(async ({ showRefreshIndicator = false } = {}) => {
     const version = ++requestVersion.current;
-    setRefreshing(true);
+    if (showRefreshIndicator) setRefreshing(true);
     setLoadError(null);
     try {
       const token = await AsyncStorage.getItem('token');
@@ -131,14 +131,14 @@ const ReviewListingsScreen = () => {
             error={loadError}
             searching={!!searchQuery}
             emptyText="No reported listings right now."
-            onRetry={getFlaggedListings}
+            onRetry={() => getFlaggedListings({ showRefreshIndicator: true })}
           />
         }
         keyExtractor={item => item.listingID.toString()}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={getFlaggedListings}
+            onRefresh={() => getFlaggedListings({ showRefreshIndicator: true })}
           />
         }
         renderItem={({ item }) => (

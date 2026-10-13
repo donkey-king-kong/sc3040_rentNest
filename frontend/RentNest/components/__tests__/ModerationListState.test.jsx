@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Text } from 'react-native';
+import { Modal, RefreshControl, Text } from 'react-native';
 import { act, create } from 'react-test-renderer';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -157,6 +157,49 @@ describe('moderation screens', () => {
     expect(text).toContain("Can't reach the server. Check your connection and try again.");
     expect(text).not.toContain('Loading...');
     expect(text).not.toContain('Loading…');
+  });
+});
+
+describe('moderation refresh indicators', () => {
+  it.each([
+    ['users', BanUserScreen],
+    ['reviews', ProcessReviewsScreen],
+    ['listings', ReviewListingScreen],
+  ])('keeps automatic %s refreshes silent and shows manual refresh feedback', async (_name, Screen) => {
+    axios.get.mockResolvedValueOnce({ data: [] });
+    let tree;
+    await act(async () => { tree = create(<Screen />); });
+
+    const refreshControl = () => tree.root.findByType(RefreshControl);
+    expect(refreshControl().props.refreshing).toBe(false);
+
+    let finishAutomaticRefresh;
+    axios.get.mockImplementationOnce(() => new Promise(resolve => {
+      finishAutomaticRefresh = resolve;
+    }));
+    await act(async () => {
+      mockFocus.leave();
+      mockFocus.enter();
+      await Promise.resolve();
+    });
+    expect(refreshControl().props.refreshing).toBe(false);
+    await act(async () => {
+      finishAutomaticRefresh({ data: [] });
+    });
+
+    let finishManualRefresh;
+    axios.get.mockImplementationOnce(() => new Promise(resolve => {
+      finishManualRefresh = resolve;
+    }));
+    await act(async () => {
+      refreshControl().props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(refreshControl().props.refreshing).toBe(true);
+    await act(async () => {
+      finishManualRefresh({ data: [] });
+    });
+    expect(refreshControl().props.refreshing).toBe(false);
   });
 });
 
