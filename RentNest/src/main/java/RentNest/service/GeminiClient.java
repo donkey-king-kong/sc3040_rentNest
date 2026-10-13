@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -18,6 +20,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -45,7 +48,7 @@ public class GeminiClient {
     static final String GENERATE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent";
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
     private final String apiKey;
     private final String model;
@@ -60,11 +63,22 @@ public class GeminiClient {
     /** Placeholder from application.properties.example, treated as "no key". */
     static final String KEY_PLACEHOLDER = "YOUR_GEMINI_API_KEY";
 
+    public GeminiClient(String apiKey, String model) {
+        this(apiKey, model, 2_000, 8_000);
+    }
+
+    @Autowired
     public GeminiClient(@Value("${llm.api-key:${GEMINI_API_KEY:}}") String apiKey,
-                        @Value("${pricing.ai.model:" + DEFAULT_MODEL + "}") String model) {
+                        @Value("${pricing.ai.model:" + DEFAULT_MODEL + "}") String model,
+                        @Value("${pricing.ai.connect-timeout-ms:2000}") int connectTimeoutMs,
+                        @Value("${pricing.ai.read-timeout-ms:8000}") int readTimeoutMs) {
         String key = apiKey == null ? "" : apiKey.trim();
         this.apiKey = KEY_PLACEHOLDER.equals(key) ? "" : key;
         this.model = model == null || model.isBlank() ? DEFAULT_MODEL : model.trim();
+        var requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofMillis(Math.max(100, connectTimeoutMs)));
+        requestFactory.setReadTimeout(Duration.ofMillis(Math.max(100, readTimeoutMs)));
+        this.restTemplate = new RestTemplate(requestFactory);
     }
 
     public boolean isConfigured() {

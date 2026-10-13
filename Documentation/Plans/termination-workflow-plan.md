@@ -89,7 +89,7 @@ Implementation and automated acceptance checks are complete; platform gaps are l
 ### TERM-04: Approved Documentation
 
 - Owner: Technical Writer. Priority: P2. Status: documentation updated and checked against implementation.
-- Scope: only `Documentation/termination-workflow-plan.md` and `frontend/README.md`.
+- Scope: only `Documentation/Plans/termination-workflow-plan.md` and `frontend/README.md`.
 - Dependencies: approved scope and current TERM-01/TERM-02 contracts.
 - Implementation notes: replace superseded proposals; preserve unrelated frontend guide content; no commits or other file changes.
 - Acceptance: concise scope/tickets, accurate route/API/statuses/refund rules, explicit rejection limitation and exclusions.

@@ -4,6 +4,7 @@ import RentNest.dto.AiChatQuestionRequestDTO;
 import RentNest.dto.AiChatQuestionResponseDTO;
 import RentNest.dto.AiChatSummaryResponseDTO;
 import RentNest.model.User;
+import RentNest.service.AiChatProviderException;
 import RentNest.service.AiChatService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ai-chat")
@@ -42,10 +45,13 @@ public class AiChatController {
 
             AiChatSummaryResponseDTO summary = aiChatService.generateChatSummary(userA, userB);
             return ResponseEntity.ok(summary);
+        } catch (AiChatProviderException failure) {
+            return providerFailure("summary", failure);
         } catch (Exception e) {
-            logger.error("AI chat summary request failed for userA={}, userB={}", userA, userB, e);
+            logger.error("AI chat summary request failed unexpectedly for userA={}, userB={}",
+                    userA, userB, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("An unexpected error occurred while generating the chat summary: " + e.getMessage());
+                    .body(errorBody("ai_internal_error", "Unable to generate the summary right now."));
         }
     }
 
@@ -67,6 +73,8 @@ public class AiChatController {
                     request.getQuestion()
             );
             return ResponseEntity.ok(result);
+        } catch (AiChatProviderException failure) {
+            return providerFailure("question", failure);
         } catch (Exception e) {
             logger.error("Ask AI request failed for userA={}, userB={}, questionLength={}",
                     request.getUserA(),
@@ -74,8 +82,36 @@ public class AiChatController {
                     request.getQuestion() == null ? 0 : request.getQuestion().length(),
                     e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("An unexpected error occurred while answering the AI chat question: " + e.getMessage());
+                    .body(errorBody("ai_internal_error", "Unable to answer right now."));
         }
+    }
+
+    private ResponseEntity<?> providerFailure(
+            String operation,
+            AiChatProviderException failure) {
+        HttpStatus status = switch (failure.getKind()) {
+            case TIMEOUT -> HttpStatus.GATEWAY_TIMEOUT;
+            case RATE_LIMIT -> HttpStatus.TOO_MANY_REQUESTS;
+            case UNAVAILABLE, INVALID_RESPONSE -> HttpStatus.SERVICE_UNAVAILABLE;
+        };
+        String code = switch (failure.getKind()) {
+            case TIMEOUT -> "ai_timeout";
+            case RATE_LIMIT -> "ai_rate_limited";
+            case UNAVAILABLE -> "ai_unavailable";
+            case INVALID_RESPONSE -> "ai_invalid_response";
+        };
+        String message = switch (failure.getKind()) {
+            case TIMEOUT -> "The AI took too long to respond. Please try again.";
+            case RATE_LIMIT -> "The AI service is busy. Please wait and try again.";
+            case UNAVAILABLE, INVALID_RESPONSE -> "The AI service is temporarily unavailable. Please try again.";
+        };
+        logger.warn("AI chat provider request failed operation={} kind={} status={}",
+                operation, failure.getKind(), status.value());
+        return ResponseEntity.status(status).body(errorBody(code, message));
+    }
+
+    private Map<String, String> errorBody(String code, String message) {
+        return Map.of("code", code, "message", message);
     }
 
     private boolean isAuthenticatedConversationParticipant(Long userA, Long userB, Authentication authentication) {

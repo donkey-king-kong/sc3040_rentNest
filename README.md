@@ -2,9 +2,10 @@
 
 RentNest helps property owners list rental homes and users search for available rentals.
 
-## Recommendations
+## Documentation
 
-See [the recommendation guide](RentNest/RECOMMENDATIONS.md) for the personalised ranking flow, Singapore sample listings, walkthrough, setup and tests.
+See the [documentation index](Documentation/README.md) for feature guides,
+troubleshooting, database operations, and planning records.
 
 ## Setup Instructions
 
@@ -159,6 +160,6 @@ Analytics information tooltips use white cards with a border, shadow, and improv
 
 After a successful user ban, admins see a "User Banned" notification matching the Profile Updated popup, with a translucent charcoal card and white tick icon. It returns to the admin screen after two seconds or on native back dismissal.
 
-- [Listing enquiries and offers: required database migration, workflows and tests](Documentation/listing-enquiry-offer-guide.md)
+- [Listing enquiries and offers: required database migration, workflows and tests](Documentation/Features/listing-enquiry-offer-guide.md)
 - [Listing Image Rendering Troubleshoot](Documentation/Troubleshooting/listing-images.md)
 - [Profile Image Handling Troubleshoot](Documentation/Troubleshooting/profile-images.md)

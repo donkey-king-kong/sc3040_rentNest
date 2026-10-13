@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { jwtDecode } from 'jwt-decode';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { inboxStore } from '../config/inbox';
 import MorphingInfinity from '../components/MorphingInfinity';
 import ProfileImage from '../components/ProfileImage';
 
@@ -86,6 +87,7 @@ const ProfileScreen = () => {
   // Function to navigate to LandingScreen
   const handleLogout = async () => {
     try {
+      inboxStore.clear('logout');
       await AsyncStorage.multiRemove(['token', 'userId']);
       delete axios.defaults.headers.common['Authorization'];
       router.replace('/LandingScreen');

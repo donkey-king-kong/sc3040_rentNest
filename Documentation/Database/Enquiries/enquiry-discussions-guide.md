@@ -3,9 +3,9 @@
 ## Historical Rental Follow-On
 
 The enquiry-only batch has been populated. The approved follow-on in
-`historical-rentals-guide.md` backdates 34 discussions and adds accepted offers
+[historical-rentals-guide.md](../Rentals/historical-rentals-guide.md) backdates 34 discussions and adds accepted offers
 and payment history. **After applying that follow-on, do not rerun
-`seed-enquiry-discussions.sql`.** Its original exact-match timestamps are
+[seed-enquiry-discussions.sql](seed-enquiry-discussions.sql).** Its original exact-match timestamps are
 superseded; it is not a repair tool for the updated history.
 
 ## What This Adds
@@ -21,11 +21,11 @@ superseded; it is not a repair tool for the updated history.
 
 Files:
 
-- `enquiry-discussions-preview.md`: every discussion, participant, and timestamp.
-- `enquiry-discussions.json`: exact dataset and assignment manifest.
-- `seed-enquiry-discussions.sql`: self-contained Supabase script, including the
+- [enquiry-discussions-preview.md](enquiry-discussions-preview.md): every discussion, participant, and timestamp.
+- [enquiry-discussions.json](enquiry-discussions.json): exact dataset and assignment manifest.
+- [seed-enquiry-discussions.sql](seed-enquiry-discussions.sql): self-contained Supabase script, including the
   manifest. No import or separate JSON upload is needed.
-- `enquiry-discussion-seed-plan.md`: approved scope and assignments.
+- [enquiry-discussion-seed-plan.md](../../Plans/enquiry-discussion-seed-plan.md): approved scope and assignments.
 
 This is a demo-data batch, not messages actually sent by the named account
 holders. The chats use natural language without demo labels in message bodies.
@@ -37,7 +37,7 @@ holders. The chats use natural language without demo labels in message bodies.
 2. Pause application/backend writers while running the batch. Short table locks
    keep validation and insertion consistent; they time out after five seconds
    instead of waiting indefinitely. No running service is stopped by this file.
-3. Open `seed-enquiry-discussions.sql` in the Supabase SQL Editor and run the
+3. Open [seed-enquiry-discussions.sql](seed-enquiry-discussions.sql) in the Supabase SQL Editor and run the
    **whole file unchanged first**. Its default setting is:
 
    ```sql

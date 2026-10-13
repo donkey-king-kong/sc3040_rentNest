@@ -1,6 +1,7 @@
 package RentNest.repository;
 
 import RentNest.model.Rentals;
+import RentNest.dto.OwnerTenantSummaryDTO;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -13,6 +14,20 @@ import java.util.Optional;
 
 @Repository
 public interface RentalsRepository extends JpaRepository<Rentals, Long> {
+    String OWNER_SUMMARY = "SELECT new RentNest.dto.OwnerTenantSummaryDTO(" +
+            "r.rentalID, l.listingID, o.userID, t.userID, t.name, t.photoURL, " +
+            "r.status, r.rentalPrice, r.rentalDate, r.leaseExpiry) " +
+            "FROM Rentals r JOIN r.listings l JOIN l.owner o JOIN l.tenant t " +
+            "WHERE o.userID = :ownerId AND r.status = 'active' AND r.tenantUserID = t.userID ";
+
+    @Query(OWNER_SUMMARY + "AND l.listingID = :listingId AND t.userID = :tenantId")
+    Optional<OwnerTenantSummaryDTO> findOwnerTenantSummary(
+            @Param("ownerId") Long ownerId, @Param("listingId") Long listingId, @Param("tenantId") Long tenantId);
+
+    @Query(OWNER_SUMMARY + "AND r.rentalID = :rentalId")
+    Optional<OwnerTenantSummaryDTO> findOwnerPaymentContext(
+            @Param("ownerId") Long ownerId, @Param("rentalId") Long rentalId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM Rentals r WHERE r.rentalID = :rentalID")
     Optional<Rentals> findByIdForUpdate(@Param("rentalID") Long rentalID);

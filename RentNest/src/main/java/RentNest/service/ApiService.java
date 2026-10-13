@@ -11,6 +11,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -21,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.stream.Collectors;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.text.SimpleDateFormat;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -36,7 +38,7 @@ public class ApiService {
 
     private static final Logger logger = LoggerFactory.getLogger(ApiService.class);
 
-    private RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, double[]> postalCodeCoordinateCache = new ConcurrentHashMap<>();
 
@@ -45,6 +47,15 @@ public class ApiService {
 
     @Autowired
     private GeocodingService geocodingService;
+
+    public ApiService(
+            @Value("${pricing.data.connect-timeout-ms:2000}") int connectTimeoutMs,
+            @Value("${pricing.data.read-timeout-ms:6000}") int readTimeoutMs) {
+        var requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofMillis(Math.max(100, connectTimeoutMs)));
+        requestFactory.setReadTimeout(Duration.ofMillis(Math.max(100, readTimeoutMs)));
+        this.restTemplate = new RestTemplate(requestFactory);
+    }
 
     private int getPostalByListingId(Long id) {
         return listingsRepository.findById(id)

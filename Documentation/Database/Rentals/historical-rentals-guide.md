@@ -7,11 +7,11 @@ changed by the assistant.** Local PostgreSQL validation passed 39 checks.
 
 Files:
 
-- `seed-historical-rentals.sql`: self-contained SQL, including the exact manifest.
-- `historical-rentals-preview.md`: every assignment, date, before/after dialogue
+- [seed-historical-rentals.sql](seed-historical-rentals.sql): self-contained SQL, including the exact manifest.
+- [historical-rentals-preview.md](historical-rentals-preview.md): every assignment, date, before/after dialogue
   edit, offer, and payment.
-- `historical-rentals.json`: machine-readable source/target records.
-- `historical-rental-payment-seed-plan.md`: approved schedule and scope.
+- [historical-rentals.json](historical-rentals.json): machine-readable source/target records.
+- [historical-rental-payment-seed-plan.md](../../Plans/historical-rental-payment-seed-plan.md): approved schedule and scope.
 
 This batch represents fictional demo activity, not actions actually taken by
 these account holders. It creates final accepted records, not a live replay of
@@ -49,7 +49,7 @@ reviews, account timestamps, or schema definitions are changed.
    Use an authorized database-owner connection in the SQL Editor, not a
    restricted application-user connection. RLS-filtered reads must not conceal
    records from the checks.
-3. Open `seed-historical-rentals.sql` in the SQL Editor. Run the **entire file**
+3. Open [seed-historical-rentals.sql](seed-historical-rentals.sql) in the SQL Editor. Run the **entire file**
    unchanged first. Near the top it contains:
 
    ```sql
@@ -99,7 +99,7 @@ reviews, account timestamps, or schema definitions are changed.
    script does not overwrite subsequent real lifecycle changes.
 6. Run the checks below, resume writers, and refresh the app.
 
-**Do not rerun `seed-enquiry-discussions.sql` after this batch.** Its original
+**Do not rerun [seed-enquiry-discussions.sql](../Enquiries/seed-enquiry-discussions.sql) after this batch.** Its original
 October-only timestamps and exact-match checks have been superseded. Keep that
 file as a historical artifact, not a repair tool.
 

@@ -8,6 +8,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import { inboxStore } from '../config/inbox';
 import { normalizeListingImageUrl } from '../components/ListingImage';
 
 const EditListingScreen = () => {
@@ -128,6 +129,7 @@ const EditListingScreen = () => {
                 }
             );
 
+            inboxStore.invalidate();
             setModalVisible(true);
             notificationTimeoutRef.current = setTimeout(() => {
                 setModalVisible(false);

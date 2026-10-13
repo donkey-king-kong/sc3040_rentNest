@@ -18,7 +18,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -100,6 +102,10 @@ public class FairPricingService {
     /** @param broad true when comparables come from a town or wide radius rather than the street/project */
     private record CacheEntry(long createdAt, List<ComparableTransaction> comps, String basis, boolean broad) {}
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private record ListingEstimateEntry(long createdAt, FairPriceEstimate estimate) {}
+    private final Map<String, ListingEstimateEntry> listingEstimateCache = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<FairPriceEstimate>> listingEstimateInFlight =
+            new ConcurrentHashMap<>();
     static final Tier[] TIER_NAMES = {Tier.EXCELLENT, Tier.GREAT, Tier.GOOD};
 
     private static final Pattern NUMBER = Pattern.compile("\\d+(?:\\.\\d+)?");
@@ -143,6 +149,28 @@ public class FairPricingService {
 
     /** Estimate for a listing, pricing room rentals as a share of whole-unit rents. */
     public FairPriceEstimate estimateForListing(Listings l) {
+        String key = listingEstimateKey(l);
+        ListingEstimateEntry hit = listingEstimateCache.get(key);
+        if (hit != null && System.currentTimeMillis() - hit.createdAt() < CACHE_TTL_MILLIS) {
+            return hit.estimate();
+        }
+        var pending = new CompletableFuture<FairPriceEstimate>();
+        var existing = listingEstimateInFlight.putIfAbsent(key, pending);
+        if (existing != null) return existing.join();
+        try {
+            FairPriceEstimate estimate = calculateForListing(l);
+            listingEstimateCache.put(key, new ListingEstimateEntry(System.currentTimeMillis(), estimate));
+            pending.complete(estimate);
+            return estimate;
+        } catch (RuntimeException exception) {
+            pending.completeExceptionally(exception);
+            throw exception;
+        } finally {
+            listingEstimateInFlight.remove(key, pending);
+        }
+    }
+
+    private FairPriceEstimate calculateForListing(Listings l) {
         RoomTypeClassifier.Classification c = roomTypeClassifier == null ? null
                 : roomTypeClassifier.classify(l.getName(), l.getDescription());
         if (c == null || !c.isRoom()) {
@@ -169,6 +197,19 @@ public class FairPricingService {
                     + "% of " + e.getBasis());
         }
         return e;
+    }
+
+    private String listingEstimateKey(Listings listing) {
+        return listing.getListingID() + "|" + Objects.hash(
+                listing.getName(),
+                listing.getDescription(),
+                listing.getType(),
+                listing.getPostal(),
+                listing.getBeds(),
+                listing.getSize(),
+                listing.getFloor(),
+                listing.getPrice(),
+                listing.getLocation());
     }
 
     /** Share of whole-unit rent for a master or common room, by property type and unit bedrooms. */

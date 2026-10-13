@@ -17,6 +17,9 @@ import amex from "../assets/images/amex.jpg";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import {API_BASE_URL} from "../config/api";
+import { inboxStore } from '../config/inbox';
+import { rentalDetailCache } from '../config/rentalDetails';
+import { chatData } from '../config/chatData';
 import MorphingInfinity from '../components/MorphingInfinity';
 import AvatarOrb from '../components/AvatarOrb';
 import ProfileImage from '../components/ProfileImage';
@@ -26,6 +29,30 @@ import EnquiryPreview from '../components/EnquiryPreview';
 const errorIcon = require('../assets/images/errorIcon.png');
 const retryButtonIcon = require('../assets/images/retryButton.png');
 const notificationBellIcon = require('../assets/images/notificationBell.png');
+const EMPTY_CHAT_SUMMARY = 'There are no messages to summarise yet. Send a message to start the conversation.';
+let aiChatRequestSequence = 0;
+
+const createAiChatRequestId = () => {
+    aiChatRequestSequence += 1;
+    return `ai-chat-${Date.now()}-${aiChatRequestSequence}`;
+};
+
+const getSummaryErrorMessage = (error) => {
+    const serverMessage = error?.response?.data?.message;
+    if (typeof serverMessage === 'string' && serverMessage.trim() !== '') {
+        return serverMessage;
+    }
+    switch (error?.response?.status) {
+        case 429:
+            return 'The AI service is busy. Please wait and try again.';
+        case 503:
+            return 'The AI service is temporarily unavailable. Please try again.';
+        case 504:
+            return 'The AI took too long to respond. Please try again.';
+        default:
+            return 'Unable to generate the chat summary right now. Please try again.';
+    }
+};
 
 const ChatsScreen2 = () => {
     const router = useRouter();
@@ -70,7 +97,11 @@ const ChatsScreen2 = () => {
     const [cardExpiryError, setCardExpiryError] = useState('');
     const [cardCvvError, setCardCvvError] = useState('');
     const [Loading, setLoading] = useState(true);
+    const [hasOlderMessages, setHasOlderMessages] = useState(false);
+    const [olderMessagesLoading, setOlderMessagesLoading] = useState(false);
     const chatScrollRef = useRef(null);
+    const initialScrollComplete = useRef(false);
+    const conversationAbortRef = useRef(null);
     const notificationTimeoutRef = useRef(null);
     const summaryScrollRef = useRef(null);
     const depositInputRef = useRef(null);
@@ -93,50 +124,70 @@ const ChatsScreen2 = () => {
     const [isAskingAi, setAskingAi] = useState(false);
     const { refresh } = useLocalSearchParams();
 
+    const hydrateMessageCards = (messages, generation) => {
+        const rentalIds = [...new Set(messages.map(message => message.rentalId).filter(id => id != null))];
+        const requestIds = [...new Set(messages.map(message => message.requestId).filter(id => id != null))];
+        Promise.allSettled([
+            ...rentalIds.map(id => getRental(id, generation)),
+            ...requestIds.map(id => getTerminationRequest(id, generation)),
+        ]);
+    };
+
     const getConversation = async () => {
         const generation = conversationGeneration.current;
+        conversationAbortRef.current?.abort();
+        const controller = new AbortController();
+        conversationAbortRef.current = controller;
+        const cached = chatData.peekConversation(partnerUserId);
+        if (cached) {
+            setChat(cached.messages);
+            setPartner(cached.partner);
+            setHasOlderMessages(cached.hasMore);
+            setLoading(false);
+            hydrateMessageCards(cached.messages, generation);
+        } else {
+            setLoading(true);
+        }
+        setChatError('');
         try {
-            console.log('[getConversation] Partner User ID:', partnerUserId);
-            console.log('[getConversation] Current User ID:', currentUser);
-
-            const token = await AsyncStorage.getItem('token');
-            if (!token) {
-                console.log('No token found!');
+            const data = await chatData.loadConversation(partnerUserId, {
+                force: true,
+                signal: controller.signal,
+            });
+            if (controller.signal.aborted || generation !== conversationGeneration.current) return;
+            setChat(data.messages);
+            setPartner(data.partner);
+            setHasOlderMessages(data.hasMore);
+            setLoading(false);
+            hydrateMessageCards(data.messages, generation);
+        } catch (error) {
+            if (controller.signal.aborted) return;
+            if (error?.code === 'UNAUTHENTICATED') {
                 router.replace('/LoginScreen');
                 return;
             }
-            const chatResponse = await axios.get(`${API_BASE_URL}/api/chathistory/conversation`, {
-                params:{
-                    userA: partnerUserId,
-                    userB: currentUser
-                },
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                }
+            if (!cached) setChat([]);
+            setChatError('Chat history could not be refreshed. You can retry without leaving this conversation.');
+            setLoading(false);
+        }
+    };
+
+    const loadOlderMessages = async () => {
+        if (olderMessagesLoading || !hasOlderMessages || chat.length === 0) return;
+        setOlderMessagesLoading(true);
+        try {
+            const data = await chatData.loadConversation(partnerUserId, {
+                beforeMessageId: chat[0].messageID,
+                force: true,
             });
-            console.log("Conversations response", chatResponse.data);
-            const chatData = Array.isArray(chatResponse.data) ? chatResponse.data : [];
-            if (generation !== conversationGeneration.current) return;
-            setChat(chatData); // Store the fetched data in state
-            if (chatData.length > 0) {
-                await Promise.all(chatData.map((msg) => {
-                    if (msg.rentalId != null) {
-                        return getRental(msg.rentalId, generation);
-                    }
-                    if (msg.requestId != null) {
-                        return getTerminationRequest(msg.requestId, generation);
-                    }
-                    return Promise.resolve();
-                }));
-            }
-            await getPartner();
-            setLoading(false);
+            setChat(data.messages);
+            setHasOlderMessages(data.hasMore);
+            hydrateMessageCards(data.messages, conversationGeneration.current);
         } catch (error) {
-            console.error('Error fetching conversation:', error);
-            setChat([]);
-            setLoading(false);
+            if (error?.code === 'UNAUTHENTICATED') router.replace('/LoginScreen');
+            else setChatError('Older messages could not be loaded. Tap to try again.');
+        } finally {
+            setOlderMessagesLoading(false);
         }
     };
 
@@ -160,12 +211,14 @@ const ChatsScreen2 = () => {
                     'Content-Type': 'application/json'
                 }
             });
-            console.log("Rental response", rentalResponse.data);
             if (generation === conversationGeneration.current) {
                 setRentalsById(previous => ({ ...previous, [rentalId]: rentalResponse.data }));
             }
         } catch (error) {
-            console.error('Error fetching rentals:', error);
+            console.warn('[Chat] operation_failed', {
+                operation: 'rental_card',
+                httpStatus: error?.response?.status,
+            });
         }
     }
 
@@ -182,7 +235,10 @@ const ChatsScreen2 = () => {
             }
         } catch (error) {
             // The card loads the request itself when it was not preloaded.
-            console.error('Error fetching termination request:', error);
+            console.warn('[Chat] operation_failed', {
+                operation: 'termination_card',
+                httpStatus: error?.response?.status,
+            });
         }
     }
 
@@ -204,7 +260,6 @@ const ChatsScreen2 = () => {
                     'Content-Type': 'application/json'
                 }
             });
-            console.log("Listing response " + listingResponse.data);
             const options = Array.isArray(listingResponse.data) ? listingResponse.data : [];
             if (isCurrent()) setListing(options);
             return options;
@@ -232,7 +287,6 @@ const ChatsScreen2 = () => {
                     'Content-Type': 'application/json'
                 }
             });
-            console.log("Partner response", partnerResponse.data);
             setPartner(partnerResponse.data); // Store the fetched data in state
         }
         catch (error) {
@@ -373,8 +427,6 @@ const ChatsScreen2 = () => {
             throw new Error('Missing authentication token');
         }
 
-        console.log('rentalID:', chat.rentalId || null);
-        console.log('requestID:', chat.requestId || null);
         const body = {
             receiverID: partnerUserId,
             senderID: currentUser,
@@ -394,6 +446,7 @@ const ChatsScreen2 = () => {
 
         if (generation !== conversationGeneration.current) return;
         if (sendChatResponse.status === 201){
+            chatData.invalidate();
             setChat((previousChat) => previousChat.map((message) => (
                 message.messageID === tempMessageId
                     ? { ...sendChatResponse.data, deliveryStatus: 'sent' }
@@ -488,6 +541,22 @@ const ChatsScreen2 = () => {
     }
 
     const getChatSummary = async () => {
+        if (!Array.isArray(chat) || chat.length === 0) {
+            setGeneratingSummary(false);
+            setSummaryError('');
+            setChatSummary(EMPTY_CHAT_SUMMARY);
+            setSummaryPlaceholder(false);
+            setParsedSummary(null);
+            summarySheetY.setValue(600);
+            setSummaryModalVisible(true);
+            Animated.spring(summarySheetY, {
+                toValue: 0,
+                useNativeDriver: true,
+                bounciness: 4,
+            }).start();
+            return;
+        }
+
         const cacheKey = getChatSummaryCacheKey();
 
         if (summaryCache?.key === cacheKey) {
@@ -521,7 +590,8 @@ const ChatsScreen2 = () => {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-AI-Chat-Request-Id': createAiChatRequestId(),
                 },
             });
 
@@ -540,8 +610,7 @@ const ChatsScreen2 = () => {
             setSummaryModalVisible(true);
             Animated.spring(summarySheetY, { toValue: 0, useNativeDriver: true, bounciness: 4 }).start();
         } catch (error) {
-            console.error('Error generating chat summary:', error);
-            setSummaryError('Unable to generate chat summary right now.');
+            setSummaryError(getSummaryErrorMessage(error));
             setSummaryPlaceholder(false);
             setParsedSummary(null);
             summarySheetY.setValue(600);
@@ -658,7 +727,6 @@ const ChatsScreen2 = () => {
     const sendRentalOffer = async() => {
         try{
             const token = await AsyncStorage.getItem('token');
-            console.log("listingid", listing)
             if (!token) {
                 console.log('No token found!');
                 router.replace('/LoginScreen');
@@ -683,7 +751,6 @@ const ChatsScreen2 = () => {
                         date: new Date().toISOString(),
                     },
                 };
-                console.log("rental body:", rentalBody)
                 const sendRentalResponse = await axios.post(`${API_BASE_URL}/api/rentals/createRentalOffer?senderID=${currentUser}&receiverID=${partnerUserId}`, rentalBody,{
                     headers: {
                         'Authorization': `Bearer ${token}`,
@@ -701,7 +768,6 @@ const ChatsScreen2 = () => {
     }
 
     const acceptRentalOffer = async () => {
-        console.log("Rental ID" , rental.rentalID);
         try {
             const token = await AsyncStorage.getItem('token');
             if (!token) {
@@ -728,8 +794,8 @@ const ChatsScreen2 = () => {
             });
             // const editListingResponse = await axios.put(``) -> 
             if (acceptOfferResponse.status === 200) {
+                inboxStore.invalidate();
                 await getConversation();
-                console.log("Rental Offer Accepted", acceptOfferResponse.data);
             } else {
                 throw new Error('Offer could not be accepted');
             }
@@ -764,7 +830,7 @@ const ChatsScreen2 = () => {
             });
 
             if (response.status === 200) {
-                console.log('Payment Successful', response.status, response.data)
+                rentalDetailCache.invalidate();
             } else {
                 throw new Error('Payment could not be recorded');
             }
@@ -793,7 +859,11 @@ const handlePaymentAndAccept = async () => {
     useEffect(() => {
         conversationGeneration.current += 1;
         offerSession.current += 1;
-        setChat([]);
+        const cached = chatData.peekConversation(partnerUserId);
+        initialScrollComplete.current = false;
+        setChat(cached?.messages || []);
+        setPartner(cached?.partner || []);
+        setHasOlderMessages(cached?.hasMore || false);
         setRentalsById({});
         setRequestsById({});
         setActiveRentalId(null);
@@ -804,11 +874,20 @@ const handlePaymentAndAccept = async () => {
         getConversation();
 
         return () => {
+            conversationAbortRef.current?.abort();
             if (notificationTimeoutRef.current) {
                 clearTimeout(notificationTimeoutRef.current);
             }
         };
     }, [refresh, partnerUserId, currentUser]);
+
+    useEffect(() => {
+        if (!Loading && chat.length > 0 && !initialScrollComplete.current) {
+            initialScrollComplete.current = true;
+            const timer = setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: false }), 0);
+            return () => clearTimeout(timer);
+        }
+    }, [Loading, chat.length]);
 
     useEffect(() => {
         let cancelled = false;
@@ -917,6 +996,7 @@ const handlePaymentAndAccept = async () => {
                 screen="ChatsScreen2"
                 userId={partnerUserId}
                 role="chat-partner"
+                diagnostics={false}
             />
         );
     };
@@ -1197,9 +1277,17 @@ const handlePaymentAndAccept = async () => {
 
     if (Loading) {
         return (
-            <View style={styles.loadingScreen}>
-                <MorphingInfinity size={86} color="#2FA84F" />
-                <Text style={styles.loadingText}>Loading chat history...</Text>
+            <View style={styles.loadingShell}>
+                <View style={styles.loadingHeader}>
+                    <TouchableOpacity accessibilityRole="button" accessibilityLabel="Go back" onPress={() => router.back()} style={styles.backButton}>
+                        <FontAwesome name="chevron-left" size={18} color="#101820" />
+                    </TouchableOpacity>
+                    <Text style={styles.loadingHeaderText}>Chat</Text>
+                </View>
+                <View style={styles.loadingScreen}>
+                    <MorphingInfinity size={86} color="#2FA84F" />
+                    <Text style={styles.loadingText}>Loading chat history...</Text>
+                </View>
             </View>
         );
     }
@@ -1242,8 +1330,19 @@ const handlePaymentAndAccept = async () => {
                 <TouchableOpacity onPress={() => setAskAiModalVisible(true)} style={styles.aiSummaryButton}>
                     <Text style={styles.aiSummaryButtonText}>Ask AI</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={getChatSummary} style={styles.aiSummaryButton} disabled={isGeneratingSummary}>
-                    <Text style={styles.aiSummaryButtonText}>{isGeneratingSummary ? 'Summarising...' : 'Summarise Chat'}</Text>
+                <TouchableOpacity
+                    accessibilityLabel={isGeneratingSummary ? 'Summarising chat' : 'Summarise Chat'}
+                    accessibilityRole="button"
+                    accessibilityState={{ busy: isGeneratingSummary, disabled: isGeneratingSummary }}
+                    onPress={getChatSummary}
+                    style={[styles.aiSummaryButton, isGeneratingSummary && styles.aiSummaryButtonBusy]}
+                    disabled={isGeneratingSummary}
+                >
+                    {isGeneratingSummary ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                        <Text style={styles.aiSummaryButtonText}>Summarise Chat</Text>
+                    )}
                 </TouchableOpacity>
             </View>
 
@@ -1254,8 +1353,25 @@ const handlePaymentAndAccept = async () => {
                 ref={chatScrollRef}
                 style={styles.chatList}
                 contentContainerStyle={styles.chatListContent}
-                onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: false })}
+                maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             >
+                {hasOlderMessages ? (
+                    <TouchableOpacity
+                        accessibilityRole="button"
+                        disabled={olderMessagesLoading}
+                        onPress={loadOlderMessages}
+                        style={styles.loadOlderButton}
+                    >
+                        <Text style={styles.loadOlderText}>
+                            {olderMessagesLoading ? 'Loading older messages...' : 'Load older messages'}
+                        </Text>
+                    </TouchableOpacity>
+                ) : null}
+                {!!chatError && (
+                    <TouchableOpacity accessibilityRole="button" onPress={getConversation} style={styles.chatRetryBanner}>
+                        <Text accessibilityRole="alert" style={styles.chatRetryText}>{chatError} Tap to retry.</Text>
+                    </TouchableOpacity>
+                )}
                 {renderMessage()}
             </ScrollView>
 
@@ -1297,8 +1413,25 @@ const handlePaymentAndAccept = async () => {
                             showsVerticalScrollIndicator={false}
                             onLayout={() => summaryScrollRef.current?.scrollTo({ y: 0, animated: false })}
                         >
-                            {summaryError ? (
-                                <Text style={styles.summaryText}>{summaryError}</Text>
+                            {isGeneratingSummary ? (
+                                <View style={styles.summaryLoadingState}>
+                                    <ActivityIndicator
+                                        accessibilityLabel="Generating chat summary"
+                                        size="small"
+                                        color="#3D9BFF"
+                                    />
+                                </View>
+                            ) : summaryError ? (
+                                <View style={styles.summaryErrorState}>
+                                    <Text accessibilityRole="alert" style={styles.summaryText}>{summaryError}</Text>
+                                    <TouchableOpacity
+                                        accessibilityRole="button"
+                                        onPress={getChatSummary}
+                                        style={styles.summaryRetryButton}
+                                    >
+                                        <Text style={styles.summaryRetryButtonText}>Try Again</Text>
+                                    </TouchableOpacity>
+                                </View>
                             ) : parsedSummary ? (
                                 <View>
                                     {parsedSummary.overview && (
@@ -2077,7 +2210,12 @@ const styles = StyleSheet.create({
         backgroundColor: '#101820',
         borderRadius: 10,
         paddingVertical: 10,
+        minHeight: 37,
         alignItems: 'center',
+        justifyContent: 'center',
+    },
+    aiSummaryButtonBusy: {
+        opacity: 0.82,
     },
     aiSummaryButtonText: {
         color: '#fff',
@@ -2096,6 +2234,30 @@ const styles = StyleSheet.create({
     },
     chatListContent: {
         paddingVertical: 8,
+    },
+    loadOlderButton: {
+        alignSelf: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        marginBottom: 12,
+    },
+    loadOlderText: {
+        color: '#176B31',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    chatRetryBanner: {
+        marginHorizontal: 12,
+        marginBottom: 12,
+        padding: 12,
+        borderRadius: 10,
+        backgroundColor: '#FFF4F2',
+    },
+    chatRetryText: {
+        color: '#7D251D',
+        fontSize: 14,
+        lineHeight: 20,
+        textAlign: 'center',
     },
     // Message groups
     groupContainer: {
@@ -2163,6 +2325,23 @@ const styles = StyleSheet.create({
         textAlign: 'right',
     },
     // Loading
+    loadingShell: {
+        flex: 1,
+        backgroundColor: '#F7F8FA',
+    },
+    loadingHeader: {
+        minHeight: 64,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        backgroundColor: '#FFFFFF',
+    },
+    loadingHeaderText: {
+        marginLeft: 12,
+        color: '#101820',
+        fontSize: 20,
+        fontWeight: '700',
+    },
     loadingScreen: {
         flex: 1,
         alignItems: 'center',
@@ -2382,6 +2561,29 @@ const styles = StyleSheet.create({
         width: '100%',
         marginBottom: 10,
         color: '#F1F1F4',
+    },
+    summaryLoadingState: {
+        minHeight: 120,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    summaryErrorState: {
+        paddingTop: 16,
+        alignItems: 'flex-start',
+    },
+    summaryRetryButton: {
+        minHeight: 44,
+        borderRadius: 12,
+        paddingHorizontal: 18,
+        paddingVertical: 11,
+        backgroundColor: '#3D7DD8',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    summaryRetryButtonText: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '800',
     },
     summaryOverlay: {
         position: 'absolute',

@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 import RentNest.model.Listings;
+import RentNest.dto.InboxListingDTO;
+import RentNest.dto.OwnerRentalInfoDTO;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,6 +21,20 @@ public interface ListingsRepository extends JpaRepository<Listings, Long> {
     @Override
     @EntityGraph(attributePaths = {"owner", "tenant"})
     List<Listings> findAll();
+
+    @Query("SELECT new RentNest.dto.InboxListingDTO(l.listingID, l.name, l.location, " +
+            "l.listingpicture, l.owner.userID, t.userID, " +
+            "CASE WHEN l.owner.userID = :userId THEN 'Owner' ELSE 'Tenant' END) " +
+            "FROM Listings l LEFT JOIN l.tenant t " +
+            "WHERE l.owner.userID = :userId OR t.userID = :userId ORDER BY l.listingID")
+    List<InboxListingDTO> findInboxListings(@Param("userId") Long userId);
+
+    @Query("SELECT new RentNest.dto.OwnerRentalInfoDTO(l.listingID, l.name, l.location, " +
+            "l.listingpicture, l.price, o.userID, o.name, o.photoURL, t.userID, t.name, t.photoURL) " +
+            "FROM Listings l JOIN l.owner o LEFT JOIN l.tenant t " +
+            "WHERE l.listingID = :listingId AND o.userID = :ownerId")
+    Optional<OwnerRentalInfoDTO> findOwnerRentalInfo(
+            @Param("listingId") Long listingId, @Param("ownerId") Long ownerId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT l FROM Listings l WHERE l.listingID = :id")

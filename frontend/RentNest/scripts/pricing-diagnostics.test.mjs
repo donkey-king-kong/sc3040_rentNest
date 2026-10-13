@@ -26,21 +26,21 @@ test('successful estimate logs lifecycle, timing, status, and a consistent attem
   assert.ok(!JSON.stringify(calls).includes('private description'));
 });
 
-test('HTTP 200 with available false warns without dumping the response message', t => {
+test('HTTP 200 with available false stays informational without dumping the response message', t => {
   const calls = capture(t);
   const log = startPricingRequestLog('explanation', '41');
   log.completed({
     status: 200,
     data: { available: false, message: 'provider error containing private-token', model: 'private model data' },
   });
-  assert.equal(calls[1].level, 'warn');
+  assert.equal(calls[1].level, 'info');
   assert.equal(calls[1].fields.httpStatus, 200);
   assert.equal(calls[1].fields.available, false);
   assert.equal(calls[1].fields.endpoint, '/api/pricing/listing/41/explanation');
   assert.ok(!JSON.stringify(calls).includes('private'));
 });
 
-test('transport errors include status and safe code but exclude Axios secrets', t => {
+test('handled transport errors stay informational and exclude Axios secrets', t => {
   const calls = capture(t);
   startPricingRequestLog('explanation', 41).failed({
     code: 'ERR_BAD_RESPONSE',
@@ -48,7 +48,8 @@ test('transport errors include status and safe code but exclude Axios secrets', 
     config: { headers: { Authorization: 'Bearer private-token' } },
     response: { status: 503, data: { message: 'private provider text' } },
   });
-  assert.equal(calls[1].level, 'error');
+  assert.equal(calls[1].level, 'info');
+  assert.equal(calls[1].fields.event, 'request_failed');
   assert.equal(calls[1].fields.httpStatus, 503);
   assert.equal(calls[1].fields.errorCode, 'ERR_BAD_RESPONSE');
   assert.ok(!JSON.stringify(calls).includes('private'));
@@ -57,8 +58,18 @@ test('transport errors include status and safe code but exclude Axios secrets', 
 test('timeout without an HTTP response is distinct from an HTTP error', t => {
   const calls = capture(t);
   startPricingRequestLog('explanation', 41).failed({ code: 'ECONNABORTED' });
+  assert.equal(calls[1].level, 'info');
+  assert.equal(calls[1].fields.event, 'request_timed_out');
   assert.equal(calls[1].fields.httpStatus, null);
   assert.equal(calls[1].fields.errorCode, 'ECONNABORTED');
+});
+
+test('React Native network error at the deadline is classified as a timeout', t => {
+  const calls = capture(t);
+  startPricingRequestLog('estimate', 41, 0).failed({ code: 'ERR_NETWORK' });
+  assert.equal(calls[1].level, 'info');
+  assert.equal(calls[1].fields.event, 'request_timed_out');
+  assert.equal(calls[1].fields.errorCode, 'ERR_NETWORK');
 });
 
 test('unexpected free-text error codes and route values are not logged', t => {
@@ -69,10 +80,10 @@ test('unexpected free-text error codes and route values are not logged', t => {
   assert.ok(!JSON.stringify(calls).includes('private'));
 });
 
-test('malformed success payload is logged as unavailable', t => {
+test('malformed success payload is logged as an informational unavailable state', t => {
   const calls = capture(t);
   startPricingRequestLog('explanation', 41).completed({ status: 200 });
-  assert.equal(calls[1].level, 'warn');
+  assert.equal(calls[1].level, 'info');
   assert.equal(calls[1].fields.available, false);
 });
 

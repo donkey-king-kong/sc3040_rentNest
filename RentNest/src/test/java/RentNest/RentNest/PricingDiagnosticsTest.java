@@ -4,6 +4,7 @@ import RentNest.controller.FairPricingController;
 import RentNest.model.Listings;
 import RentNest.model.api.FairPriceEstimate;
 import RentNest.model.api.FairPriceExplanation;
+import RentNest.service.ApiService;
 import RentNest.service.FairPriceExplanationService;
 import RentNest.service.FairPricingService;
 import RentNest.service.GeminiClient;
@@ -16,6 +17,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
@@ -42,6 +44,17 @@ class PricingDiagnosticsTest {
         client = new GeminiClient(KEY, "test-model");
         server = MockRestServiceServer.bindTo(
                 (RestTemplate) ReflectionTestUtils.getField(client, "restTemplate")).build();
+    }
+
+    @Test
+    void boundsComparableDataConnectionsAndReads() {
+        ApiService apiService = new ApiService(2_100, 6_200);
+        RestTemplate template = (RestTemplate) ReflectionTestUtils.getField(apiService, "restTemplate");
+        assertNotNull(template);
+        assertInstanceOf(SimpleClientHttpRequestFactory.class, template.getRequestFactory());
+        Object factory = template.getRequestFactory();
+        assertEquals(2_100, ReflectionTestUtils.getField(factory, "connectTimeout"));
+        assertEquals(6_200, ReflectionTestUtils.getField(factory, "readTimeout"));
     }
 
     private GeminiClient.Reply generate() {
