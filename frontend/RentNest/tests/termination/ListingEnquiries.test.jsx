@@ -2,15 +2,18 @@ import React from 'react';
 import { act } from 'react-test-renderer';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { jwtDecode } from 'jwt-decode';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import ChatsScreen2 from '../../app/ChatsScreen2';
 import EnquiryPreview from '../../components/EnquiryPreview';
+import { chatData } from '../../config/chatData';
 import { render, text, buttons, press, button, deferred } from './helpers';
 
 let params, messages, options, rentals, router;
 beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(console, 'log').mockImplementation(() => {});
+  chatData.clear('test');
   params = { currentUser: '22', partnerUserId: '11', enquiryListingId: '59' };
   messages = [];
   options = [
@@ -25,8 +28,22 @@ beforeEach(() => {
   useRouter.mockReturnValue(router);
   useLocalSearchParams.mockImplementation(() => params);
   AsyncStorage.getItem.mockResolvedValue('test-token');
+  jwtDecode.mockReturnValue({
+    sub: 'viewer@example.test',
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  });
   axios.get.mockImplementation(async url => {
-    if (url.includes('/chathistory/conversation')) return { data: messages };
+    if (url.includes('/chathistory/conversations/')) {
+      const partnerId = Number(params.partnerUserId);
+      return {
+        status: 200,
+        data: {
+          partner: { userID: partnerId, name: 'Chat partner', photoURL: null, flagged: 0 },
+          messages,
+          hasMore: false,
+        },
+      };
+    }
     if (url.includes('/offer-options')) return { data: options };
     if (url.includes('/rentals/')) return { data: rentals[url.split('/').pop()] };
     if (url.includes('/users/id/')) return { data: { name: 'Chat partner', userID: Number(params.partnerUserId) } };

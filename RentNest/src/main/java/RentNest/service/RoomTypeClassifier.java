@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -66,6 +67,7 @@ public class RoomTypeClassifier {
 
     private final GeminiClient gemini;
     private final Map<String, Classification> cache = new ConcurrentHashMap<>();
+    private final Map<String, CompletableFuture<Classification>> inFlight = new ConcurrentHashMap<>();
 
     public RoomTypeClassifier(GeminiClient gemini) {
         this.gemini = gemini;
@@ -76,19 +78,30 @@ public class RoomTypeClassifier {
         Classification hit = cache.get(key);
         if (hit != null) return hit;
 
-        Classification result = null;
-        if (gemini != null && gemini.isConfigured()) {
-            GeminiClient.Reply reply = gemini.generate(GeminiClient.Operation.ROOM_CLASSIFICATION,
-                    SYSTEM_PROMPT, buildPrompt(title, description), 1024, RESPONSE_SCHEMA);
-            if (reply.ok()) result = parse(reply.text());
+        var pending = new CompletableFuture<Classification>();
+        var existing = inFlight.putIfAbsent(key, pending);
+        if (existing != null) return existing.join();
+        try {
+            Classification result = null;
+            if (gemini != null && gemini.isConfigured()) {
+                GeminiClient.Reply reply = gemini.generate(GeminiClient.Operation.ROOM_CLASSIFICATION,
+                        SYSTEM_PROMPT, buildPrompt(title, description), 512, RESPONSE_SCHEMA);
+                if (reply.ok()) result = parse(reply.text());
+            }
+            if (result == null) {
+                result = classifyByKeywords(title, description);
+            } else {
+                // Only cache AI answers; keyword results are cheap and a later AI call may succeed.
+                cache.put(key, result);
+            }
+            pending.complete(result);
+            return result;
+        } catch (RuntimeException exception) {
+            pending.completeExceptionally(exception);
+            throw exception;
+        } finally {
+            inFlight.remove(key, pending);
         }
-        if (result == null) {
-            result = classifyByKeywords(title, description);
-        } else {
-            // Only cache AI answers; keyword results are cheap and a later AI call may succeed.
-            cache.put(key, result);
-        }
-        return result;
     }
 
     static String buildPrompt(String title, String description) {

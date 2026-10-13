@@ -5,6 +5,7 @@ import { jwtDecode } from 'jwt-decode';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import ChatsScreen2 from '../../app/ChatsScreen2';
 import TerminationRequestCard from '../../components/TerminationRequestCard';
+import { chatData } from '../../config/chatData';
 import { act } from 'react-test-renderer';
 import { render, text, buttons, press, deferred } from './helpers';
 
@@ -17,6 +18,7 @@ let rental;
 beforeEach(() => {
   jest.clearAllMocks();
   jest.spyOn(console, 'log').mockImplementation(() => {});
+  chatData.clear('test');
   viewerId = 22;
   rental = {
     rentalID: 81, ownerUserId: 11, tenantUserID: 22, status: 'terminated',
@@ -35,9 +37,19 @@ beforeEach(() => {
     currentUser: String(viewerId), partnerUserId: viewerId === 22 ? '11' : '22',
   }));
   AsyncStorage.getItem.mockResolvedValue('test-token');
-  jwtDecode.mockReturnValue({ sub: 'viewer@example.test' });
+  jwtDecode.mockReturnValue({ sub: 'viewer@example.test', exp: Math.floor(Date.now() / 1000) + 3600 });
   axios.get.mockImplementation(async url => {
-    if (url.endsWith('/chathistory/conversation')) return { data: messages };
+    if (url.includes('/chathistory/conversations/')) {
+      const partnerId = Number(url.split('/').pop().split('?')[0]);
+      return {
+        status: 200,
+        data: {
+          partner: { userID: partnerId, name: 'Chat partner', flagged: 0 },
+          messages,
+          hasMore: false,
+        },
+      };
+    }
     if (url.includes('/users/id/')) return { data: { userID: 11, name: 'Chat partner', flagged: 0 } };
     if (url.includes('/users/')) return { data: { userID: viewerId } };
     if (url.includes('/rentals/')) return { data: rental };
@@ -70,7 +82,7 @@ test('request-only messages mount independent real cards and refresh after a dec
     `${base}/api/requests/71/decision`, { decision: 'accept' },
     { headers: { Authorization: 'Bearer test-token' } },
   ]]);
-  expect(axios.get.mock.calls.filter(([url]) => url.endsWith('/chathistory/conversation'))).toHaveLength(2);
+  expect(axios.get.mock.calls.filter(([url]) => url.includes('/chathistory/conversations/'))).toHaveLength(2);
   expect(text(ui.root.findAllByType(TerminationRequestCard)[0])).toContain('Accepted');
   expect(text(ui.root.findAllByType(TerminationRequestCard)[1])).toContain('Rejected');
 });
@@ -126,7 +138,7 @@ test('failed offer loading is safe and can retry before rental details arrive', 
   rental = { ...rental, status: 'pending' };
   messages = [{ messageID: 1, senderId: 11, rentalId: 81, date: '2026-10-12T10:00:00Z' }];
   const ui = await render(<ChatsScreen2 />);
-  expect(text(ui.toJSON())).toContain('Loading chat history...');
+  expect(text(ui.toJSON())).toContain('Loading offer details. Tap to retry.');
   await act(async () => { response.reject(new Error('Rental unavailable')); });
   expect(text(ui.toJSON())).toContain('Loading offer details. Tap to retry.');
   expect(buttons(ui).map(text)).not.toContain('Accept offer');

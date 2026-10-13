@@ -4,6 +4,7 @@ import { jwtDecode } from 'jwt-decode';
 import { API_BASE_URL, ENDPOINTS } from './api';
 import { createInboxStore } from './inboxStore';
 import { rentalDetailCache } from './rentalDetails';
+import { chatData } from './chatData';
 
 export const inboxStore = createInboxStore({
   async readToken() {
@@ -25,14 +26,16 @@ export const inboxStore = createInboxStore({
   },
 });
 
-// Existing login/logout and listing/tenancy mutation hooks reset both caches.
+// Existing login/logout and listing/tenancy mutation hooks reset session-scoped caches.
 const clearInbox = inboxStore.clear;
 const invalidateInbox = inboxStore.invalidate;
 inboxStore.clear = reason => {
   rentalDetailCache.clear(reason);
+  chatData.clear(reason);
   clearInbox(reason);
 };
 inboxStore.invalidate = () => {
   rentalDetailCache.invalidate();
+  chatData.invalidate();
   invalidateInbox();
 };

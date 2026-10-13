@@ -68,3 +68,7 @@ pricing.demo-data.enabled=true
 # AI fair pricing model (room detection and price explanation). A fast lite model keeps
 # the card responsive (~1 s per call); set a larger model here if needed.
 pricing.ai.model=gemini-3.5-flash-lite
+# Bound pricing-specific Gemini calls. On timeout, room classification falls back
+# to keywords and the explanation returns an unavailable response with Retry.
+pricing.ai.connect-timeout-ms=2000
+pricing.ai.read-timeout-ms=8000

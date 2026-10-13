@@ -1,5 +1,31 @@
 # Frontend
 
+## Chat and Listing Detail Performance
+
+Restart/deploy the backend before using the optimized chat endpoints. The Chats
+tab now calls authenticated `GET /api/chathistory/summaries` instead of downloading
+every message. Conversations use
+`GET /api/chathistory/conversations/{partnerId}` and initially load the latest 50
+messages; **Load older messages** retrieves earlier pages. Session-only caches keep
+saved rows visible during focus refresh, and chat mutations invalidate them.
+
+Conversation headers and messages render before rental/termination card details.
+Listing details fetch the viewer and property concurrently, then load
+amenities, reviews, history, and pricing concurrently behind the initial loading
+screen. The complete listing appears after every initial section has loaded or
+failed. Later retries keep the listing visible. Fair-price estimate and
+explanation start together; backend request coalescing prevents duplicate
+classification/estimate work.
+
+Chat logs use `[Chat]` and `X-Chat-Request-Id`. Set
+`EXPO_PUBLIC_CHAT_DIAGNOSTICS=false` and restart Expo to suppress informational
+frontend events; warnings remain. Pricing Gemini calls use
+`pricing.ai.connect-timeout-ms` and `pricing.ai.read-timeout-ms`.
+
+Run `npm run test:chat-listing-performance` from `frontend/RentNest`. See the
+[chat and listing performance guide](../Documentation/Troubleshooting/chat-listing-performance.md)
+for API contracts, cache behavior, measurements, and diagnostic fields.
+
 ## Owner Rental Details
 
 Restart/deploy the backend before using the updated Rental Info and Tenant Overview
@@ -94,7 +120,9 @@ authorization headers, and free-text error messages are not included.
 See [AI Fair Price Diagnostics](../Documentation/Troubleshooting/price-insights.md#ai-fair-price-diagnostics)
 for backend correlation and examples. Run the dependency-free logger tests from
 `frontend/RentNest` with `npm run test:pricing-diagnostics` on Node 22.7+ or Node 24.
-Retry, timeout, and rendering behavior are unchanged.
+The listing screen now has a pricing retry, starts estimate and explanation
+concurrently, and renders core property content without waiting for pricing.
+Provider timeouts are configured on the backend.
 
 ## Property Type Filter
 

@@ -1,209 +1,103 @@
-import { useEffect, useState } from 'react';
-import {View, Text, StyleSheet, Image, FlatList, TouchableOpacity} from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import {
+  AppState,
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+} from 'react-native';
 import NavigationBar from '../components/NavigationBar';
-import {useRouter} from "expo-router";
-import axios from "axios";
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE_URL } from '../config/api';
-import { jwtDecode } from 'jwt-decode';
+import {useFocusEffect, useRouter} from "expo-router";
 import MorphingInfinity from '../components/MorphingInfinity';
 import ProfileImage from '../components/ProfileImage';
+import { chatData } from '../config/chatData';
 
 import noActiveChatsImage from '../assets/images/noActiveChats.png';
 
 const ChatsScreen = () => {
-  console.log('[ChatsScreen] Component initialized');
   const router = useRouter();
-  const [messages, setMessages] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [chats, setChats] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [initialDataFetched, setInitialDataFetched] = useState(false);
+  const cached = chatData.peekSummaries();
+  const [chats, setChats] = useState(cached?.chats || []);
+  const [currentUserId, setCurrentUserId] = useState(cached?.currentUserId || null);
+  const [isLoading, setIsLoading] = useState(!cached);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState('');
+  const activeRequest = useRef(null);
 
-  // First useEffect: Fetch initial data
-  useEffect(() => {
-    console.log('[ChatsScreen] Starting initial data fetch');
-    let isMounted = true;
-
-    const fetchData = async () => {
-      try {
-        console.log('[ChatsScreen] Attempting to retrieve token');
-        const token = await AsyncStorage.getItem('token');
-        
-        if (!token) {
-          console.log('[ChatsScreen] No token found - redirecting to login');
-          router.replace('/LoginScreen');
-          return;
-        }
-        console.log('[ChatsScreen] Token successfully retrieved');
-
-        // Get email from token
-        const getEmailFromToken = () => {
-          console.log('[ChatsScreen] Decoding JWT token');
-          try {
-            const decoded = jwtDecode(token);
-            console.log('[ChatsScreen] Token decoded successfully, email:', decoded.sub);
-            return decoded.sub;
-          } catch (error) {
-            console.error('[ChatsScreen] Failed to decode token:', error);
-            return "sampleText@gmail.com" // Default value if decode fails
-          }
-        };
-        const currentUserEmail = getEmailFromToken();
-
-        // Fetch current user data
-        console.log('[ChatsScreen] Fetching current user data');
-        const userResponse = await axios.get(`${API_BASE_URL}/api/users/${currentUserEmail}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-        });
-        
-        if (!isMounted) return;
-
-        console.log('[ChatsScreen] User response data:', userResponse.data);
-        
-        const userData = {
-          userID: userResponse.data.userID,
-          name: userResponse.data.name,
-          email: userResponse.data.email,
-          photoURL: userResponse.data.photoURL || null
-        };
-        console.log('[ChatsScreen] Current user data retrieved:', userData);
-        setCurrentUser(userData);
-
-        // Fetch chat history
-        console.log('[ChatsScreen] Fetching chat history');
-        const chatResponse = await axios.get(`${API_BASE_URL}/api/chathistory/user/${userData.userID}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-        });
-
-        if (!isMounted) return;
-
-        console.log('[ChatsScreen] Chat response data:', chatResponse.data);
-        setMessages(chatResponse.data);
-        
-      } catch (error) {
-        console.error('[ChatsScreen] Error in initial data fetch:', error);
-        console.error('[ChatsScreen] Error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        });
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-          setInitialDataFetched(true);
-          console.log('[ChatsScreen] Initial data fetch completed');
-        }
+  const refreshChats = useCallback(async (manual = false) => {
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    if (manual) setIsRefreshing(true);
+    else if (chats.length === 0) setIsLoading(true);
+    setError('');
+    try {
+      const data = await chatData.loadSummaries({
+        force: true,
+        signal: controller.signal,
+      });
+      if (!controller.signal.aborted) {
+        setChats(data.chats);
+        setCurrentUserId(data.currentUserId);
       }
-    };
+    } catch (requestError) {
+      if (controller.signal.aborted) return;
+      if (requestError?.code === 'UNAUTHENTICATED') {
+        router.replace('/LoginScreen');
+      } else {
+        setError('Chats could not be refreshed. Check your connection and try again.');
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    }
+  }, [chats.length, router]);
 
-    fetchData();
-
+  useFocusEffect(useCallback(() => {
+    const cachedData = chatData.peekSummaries();
+    if (cachedData) {
+      setChats(cachedData.chats);
+      setCurrentUserId(cachedData.currentUserId);
+      setIsLoading(false);
+    }
+    refreshChats(false);
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') refreshChats(false);
+    });
     return () => {
-      console.log('[ChatsScreen] Cleaning up initial data fetch effect');
-      isMounted = false;
+      subscription.remove();
+      activeRequest.current?.abort();
     };
-  }, []);
-
-  // Second useEffect: Process messages after initial data fetch
-  useEffect(() => {
-    if (!initialDataFetched) {
-      console.log('[ChatsScreen] Waiting for initial data fetch to complete');
-      return;
-    }
-
-    console.log('[ChatsScreen] Starting message processing');
-    if (messages.length > 0 && currentUser) {
-      console.log('[ChatsScreen] Processing messages into chats');
-      const processMessages = () => {
-        // Create a map to store latest message for each chat partner
-        const chatPartnerMap = new Map();
-        
-        messages.forEach(msg => {
-          const currentDate = new Date(msg.date);
-          console.log('[ChatsScreen] Processing message:', {
-            messageId: msg.messageID,
-            date: currentDate,
-            senderId: msg.senderId,
-            receiverId: msg.receiverId,
-            senderPhotoURL: msg.senderPhotoURL,
-            receiverPhotoURL: msg.receiverPhotoURL
-          });
-
-          // Determine chat partner ID
-          const chatPartnerId = msg.senderId === currentUser.userID ? msg.receiverId : msg.senderId;
-
-          // Skip messages where the partner no longer exists (deleted user)
-          if (chatPartnerId == null) return;
-          
-          // If this chat partner hasn't been seen or this message is newer
-          if (!chatPartnerMap.has(chatPartnerId) || 
-              currentDate > new Date(chatPartnerMap.get(chatPartnerId).date)) {
-            console.log('[ChatsScreen] Updating latest message for chat partner:', chatPartnerId);
-            chatPartnerMap.set(chatPartnerId, msg);
-          }
-        });
-        
-        // Convert map to array and sort by date
-        const sortedMessages = Array.from(chatPartnerMap.values())
-          .sort((a, b) => new Date(b.date) - new Date(a.date));
-        console.log('[ChatsScreen] Processed messages count:', sortedMessages.length);
-        console.log("SortedMessages :", sortedMessages);
-        
-        setChats(sortedMessages);
-        console.log('[ChatsScreen] Message processing completed');
-      };
-
-      processMessages();
-    } else {
-      console.log('[ChatsScreen] No messages or user data to process yet');
-    }
-  }, [initialDataFetched, messages, currentUser]); // Added initialDataFetched as dependency
+  }, [refreshChats]));
 
   const renderItem = ({ item }) => {
-    if (!currentUser) return null;
-    
-    // Determine chat partner based on senderId/receiverId
-    const isCurrentUserSender = item.senderId === currentUser.userID;
-    const chatPartnerName = isCurrentUserSender ? item.receiverName : item.senderName;
-    const chatPartnerId = isCurrentUserSender ? item.receiverId : item.senderId;
-    const chatPartnerPhotoURL = isCurrentUserSender ? item.receiverPhotoURL || null : item.senderPhotoURL || null;
-    
-    console.log('[ChatsScreen] Rendering chat item:', {
-      messageId: item.messageID,
-      partnerName: chatPartnerName,
-      partnerId: chatPartnerId,
-      partnerPhotoURL: chatPartnerPhotoURL
-    });
-
     return (
       <TouchableOpacity 
+        accessibilityRole="button"
+        accessibilityLabel={`Open chat with ${item.partnerName}`}
         onPress={() => {
-          console.log('[ChatsScreen] Navigating to chat with user:', chatPartnerId);
-          router.push(`/ChatsScreen2?partnerUserId=${chatPartnerId}&currentUser=${currentUser.userID}`);
+          router.push(`/ChatsScreen2?partnerUserId=${item.partnerId}&currentUser=${currentUserId}`);
         }}
       >
         <View style={styles.chatContainer}>
           <ProfileImage
-            uri={chatPartnerPhotoURL}
-            name={chatPartnerName}
+            uri={item.partnerPhotoURL}
+            name={item.partnerName}
             style={styles.avatar}
             textStyle={styles.avatarInitials}
             screen="ChatsScreen"
-            userId={chatPartnerId}
+            userId={item.partnerId}
             role="chat-partner"
+            diagnostics={false}
           />
           <View style={styles.chatContent}>
             <View style={styles.headerContainer}>
-              <Text style={styles.senderName}>{chatPartnerName}</Text>
+              <Text style={styles.senderName}>{item.partnerName}</Text>
               <Text style={styles.date}>
                 {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </Text>
@@ -231,27 +125,39 @@ const ChatsScreen = () => {
     </View>
   );
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingScreen}>
-        <MorphingInfinity size={86} color="#2FA84F" />
-        <Text style={styles.loadingText}>Loading chats...</Text>
-      </View>
-    );
-  }
-
-  console.log('[ChatsScreen] Rendering main component with', chats.length, 'chats');
   return (
     <View style={styles.screen}>
       <View style={styles.container}>
         <Text style={styles.header}>Chats</Text>
-        <FlatList
-          data={chats}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.messageID.toString()}
-          ListEmptyComponent={renderEmptyState}
-          contentContainerStyle={chats.length === 0 ? styles.emptyListContent : null}
-        />
+        {error ? (
+          <View style={styles.statusRow}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity accessibilityRole="button" onPress={() => refreshChats(true)}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+        {isLoading && chats.length === 0 ? (
+          <View style={styles.loadingScreen}>
+            <MorphingInfinity size={86} color="#2FA84F" />
+            <Text style={styles.loadingText}>Loading chats...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={chats}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.messageID.toString()}
+            ListEmptyComponent={renderEmptyState}
+            contentContainerStyle={chats.length === 0 ? styles.emptyListContent : null}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={() => refreshChats(true)}
+                tintColor="#2FA84F"
+              />
+            }
+          />
+        )}
       </View>
       <NavigationBar style={styles.navigationBar} />
     </View>
@@ -320,6 +226,27 @@ const styles = StyleSheet.create({
     marginTop: 24,
     color: '#101820',
     fontSize: 18,
+    fontWeight: '700',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 10,
+    backgroundColor: '#FFF4F2',
+  },
+  errorText: {
+    flex: 1,
+    color: '#7D251D',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  retryText: {
+    color: '#176B31',
+    fontSize: 15,
     fontWeight: '700',
   },
   emptyListContent: {

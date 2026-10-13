@@ -51,13 +51,14 @@ explanation; it does not mean the frontend received HTTP 503.
 - Keys, authorization headers, prompts, listing descriptions, and generated
   explanations are excluded from these diagnostics. Do not enable HTTP wire/body
   logging to investigate this flow.
-- Pricing uses `pricing.ai.model`, defaulting to `gemini-3.1-flash-lite`.
+- Pricing uses `pricing.ai.model`, defaulting to `gemini-3.5-flash-lite`.
   The chat setting `llm.model` does not select the pricing model.
 
-This logging change does not add retries, timeout configuration, a retry button,
-cache-policy changes, or a new API response contract. Existing servers must load
-the updated code before these events appear; creating a worktree does not update
-another session's running application.
+Pricing calls now use `pricing.ai.connect-timeout-ms` (default 2000) and
+`pricing.ai.read-timeout-ms` (default 8000). The listing screen offers Retry after
+an unavailable estimate, and estimate/explanation work is cached and coalesced by
+listing state. Existing servers must load the updated code before these controls
+appear; creating a worktree does not update another session's running application.
 
 ### Focused Tests
 
